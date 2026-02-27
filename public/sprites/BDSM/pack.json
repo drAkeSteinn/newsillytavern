@@ -1,0 +1,15 @@
+{
+  "id": "BDSM",
+  "title": "BDSM",
+  "match": {
+    "ubicacion": "",
+    "lugar": ""
+  },
+  "defaultAction": "OCIOSA",
+  "actions": {
+    "OCIOSA": {
+      "sequence": [],
+      "idle": ""
+    }
+  }
+}

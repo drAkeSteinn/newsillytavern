@@ -1,0 +1,39 @@
+{
+  "packs": {
+    "__root__": [
+      "sounds/ah1.mp3",
+      "sounds/ah2.mp3",
+      "sounds/escupir.mp3",
+      "sounds/handjob1.mp3",
+      "sounds/handjob2.mp3",
+      "sounds/handjob3.mp3",
+      "sounds/impact_1.wav",
+      "sounds/impact_2.wav",
+      "sounds/longblow.mp3",
+      "sounds/mmh1.mp3",
+      "sounds/pop1.mp3",
+      "sounds/rain_1.wav",
+      "sounds/rain_2.wav",
+      "sounds/slurpt1.mp3",
+      "sounds/sssssuck1.mp3"
+    ],
+    "gag": [
+      "sounds/gag/gag1.mp3"
+    ],
+    "glog": [
+      "sounds/glog/glog1.mp3",
+      "sounds/glog/glog2.mp3",
+      "sounds/glog/glog3.mp3",
+      "sounds/glog/glog4.mp3",
+      "sounds/glog/glog5.mp3"
+    ],
+    "long": [
+      "sounds/long/longblow.mp3"
+    ],
+    "slurp": [
+      "sounds/slurp/slurp1.mp3"
+    ]
+  },
+  "generatedFrom": "packaged",
+  "note": "Auto-generated from extension sounds folder. You can overwrite by scanning a local folder via the UI if supported."
+}

@@ -1,0 +1,3 @@
+Put your background image/video files in this folder (or any folder you will pick with the BG scanner).
+Recommended: put them here: extensions/dop-tirano-suite/backgrounds/
+Then use: Background Packs -> Scan BG folder (Picker).

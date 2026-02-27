@@ -1,0 +1,6 @@
+Put your .mp3/.wav/.ogg SFX files here.
+Suggested names:
+- impact_1.mp3
+- rain_1.mp3
+- emotion_angry_1.mp3
+- emotion_sad_1.mp3
