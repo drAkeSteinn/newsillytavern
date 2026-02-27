@@ -5,6 +5,7 @@ import type {
   ChatSession, 
   ChatMessage, 
   CharacterGroup,
+  GroupMember,
   LLMConfig,
   TTSConfig,
   AppSettings,
@@ -15,7 +16,11 @@ import type {
   Persona,
   BackgroundPack,
   BackgroundIndex,
-  BackgroundTriggerHit
+  BackgroundTriggerHit,
+  Lorebook,
+  LorebookEntry,
+  LorebookSettings,
+  SillyTavernLorebook
 } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { processMessageTemplate } from '@/lib/prompt-template';
@@ -78,7 +83,7 @@ const defaultSettings: AppSettings = {
     transitionDuration: 500
   },
   chatLayout: {
-    novelMode: false,
+    novelMode: true,
     chatWidth: 60,
     chatHeight: 70,
     chatX: 50,
@@ -139,6 +144,16 @@ const defaultPersona: Persona = {
   updatedAt: new Date().toISOString()
 };
 
+const defaultLorebookSettings: LorebookSettings = {
+  scanDepth: 5,
+  caseSensitive: false,
+  matchWholeWords: false,
+  useGroupScoring: false,
+  automationId: '',
+  tokenBudget: 2048,
+  recursionLimit: 3
+};
+
 // ============ Store Interface ============
 
 interface TavernState {
@@ -156,6 +171,8 @@ interface TavernState {
   personas: Persona[];
   backgroundPacks: BackgroundPack[];
   backgroundIndex: BackgroundIndex;
+  lorebooks: Lorebook[];
+  activeLorebookIds: string[];  // IDs of active lorebooks
 
   // Current State
   activeSessionId: string | null;
@@ -198,6 +215,12 @@ interface TavernState {
   updateGroup: (id: string, updates: Partial<CharacterGroup>) => void;
   deleteGroup: (id: string) => void;
   setActiveGroup: (id: string | null) => void;
+  getGroupById: (id: string) => CharacterGroup | undefined;
+  addGroupMember: (groupId: string, characterId: string, role?: 'leader' | 'member' | 'observer') => void;
+  removeGroupMember: (groupId: string, characterId: string) => void;
+  updateGroupMember: (groupId: string, characterId: string, updates: Partial<GroupMember>) => void;
+  toggleGroupMemberActive: (groupId: string, characterId: string) => void;
+  toggleGroupMemberPresent: (groupId: string, characterId: string) => void;
 
   // LLM Actions
   addLLMConfig: (config: Omit<LLMConfig, 'id'>) => void;
@@ -246,6 +269,21 @@ interface TavernState {
   setActivePersona: (id: string) => void;
   getActivePersona: () => Persona | undefined;
 
+  // Lorebook Actions
+  addLorebook: (lorebook: Omit<Lorebook, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateLorebook: (id: string, updates: Partial<Lorebook>) => void;
+  deleteLorebook: (id: string) => void;
+  toggleLorebook: (id: string) => void;
+  setActiveLorebooks: (ids: string[]) => void;
+  addLorebookEntry: (lorebookId: string, entry: Omit<LorebookEntry, 'uid'>) => void;
+  updateLorebookEntry: (lorebookId: string, uid: number, updates: Partial<LorebookEntry>) => void;
+  deleteLorebookEntry: (lorebookId: string, uid: number) => void;
+  duplicateLorebookEntry: (lorebookId: string, uid: number) => void;
+  importSillyTavernLorebook: (stLorebook: SillyTavernLorebook, name: string, description?: string) => Lorebook;
+  exportSillyTavernLorebook: (id: string) => SillyTavernLorebook | null;
+  getActiveLorebooks: () => Lorebook[];
+  getLorebookById: (id: string) => Lorebook | undefined;
+
   // Prompt Template Actions
   addPromptTemplate: (template: Omit<PromptTemplate, 'id'>) => void;
   updatePromptTemplate: (id: string, updates: Partial<PromptTemplate>) => void;
@@ -286,6 +324,8 @@ export const useTavernStore = create<TavernState>()(
       personas: [defaultPersona],
       backgroundPacks: [],
       backgroundIndex: { backgrounds: [], lastUpdated: 0, source: '' },
+      lorebooks: [],
+      activeLorebookIds: [],
 
       // Initial State
       activeSessionId: null,
@@ -451,6 +491,19 @@ export const useTavernStore = create<TavernState>()(
         groups: [...state.groups, {
           ...group,
           id: uuidv4(),
+          // Ensure members array is initialized from characterIds if not provided
+          members: group.members || (group.characterIds || []).map((id, index) => ({
+            characterId: id,
+            role: 'member' as const,
+            isActive: true,
+            isPresent: true,
+            joinOrder: index
+          })),
+          // Set defaults for new fields
+          maxResponsesPerTurn: group.maxResponsesPerTurn ?? 3,
+          allowMentions: group.allowMentions ?? true,
+          mentionTriggers: group.mentionTriggers ?? [],
+          conversationStyle: group.conversationStyle ?? 'sequential',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }]
@@ -468,6 +521,80 @@ export const useTavernStore = create<TavernState>()(
       })),
 
       setActiveGroup: (id) => set({ activeGroupId: id }),
+
+      getGroupById: (id) => get().groups.find((g) => g.id === id),
+
+      addGroupMember: (groupId, characterId, role = 'member') => set((state) => ({
+        groups: state.groups.map((g) => {
+          if (g.id !== groupId) return g;
+          const existingMember = g.members?.find(m => m.characterId === characterId);
+          if (existingMember) return g; // Already a member
+          const newMember: GroupMember = {
+            characterId,
+            role,
+            isActive: true,
+            isPresent: true,
+            joinOrder: g.members?.length || 0
+          };
+          return {
+            ...g,
+            members: [...(g.members || []), newMember],
+            characterIds: [...(g.characterIds || []), characterId],
+            updatedAt: new Date().toISOString()
+          };
+        })
+      })),
+
+      removeGroupMember: (groupId, characterId) => set((state) => ({
+        groups: state.groups.map((g) => {
+          if (g.id !== groupId) return g;
+          return {
+            ...g,
+            members: (g.members || []).filter(m => m.characterId !== characterId),
+            characterIds: (g.characterIds || []).filter(id => id !== characterId),
+            updatedAt: new Date().toISOString()
+          };
+        })
+      })),
+
+      updateGroupMember: (groupId, characterId, updates) => set((state) => ({
+        groups: state.groups.map((g) => {
+          if (g.id !== groupId) return g;
+          return {
+            ...g,
+            members: (g.members || []).map(m =>
+              m.characterId === characterId ? { ...m, ...updates } : m
+            ),
+            updatedAt: new Date().toISOString()
+          };
+        })
+      })),
+
+      toggleGroupMemberActive: (groupId, characterId) => set((state) => ({
+        groups: state.groups.map((g) => {
+          if (g.id !== groupId) return g;
+          return {
+            ...g,
+            members: (g.members || []).map(m =>
+              m.characterId === characterId ? { ...m, isActive: !m.isActive } : m
+            ),
+            updatedAt: new Date().toISOString()
+          };
+        })
+      })),
+
+      toggleGroupMemberPresent: (groupId, characterId) => set((state) => ({
+        groups: state.groups.map((g) => {
+          if (g.id !== groupId) return g;
+          return {
+            ...g,
+            members: (g.members || []).map(m =>
+              m.characterId === characterId ? { ...m, isPresent: !m.isPresent } : m
+            ),
+            updatedAt: new Date().toISOString()
+          };
+        })
+      })),
 
       // LLM Actions
       addLLMConfig: (config) => set((state) => ({
@@ -704,6 +831,232 @@ export const useTavernStore = create<TavernState>()(
         return state.personas.find((p) => p.id === state.activePersonaId);
       },
 
+      // Lorebook Actions
+      addLorebook: (lorebook) => set((state) => ({
+        lorebooks: [...state.lorebooks, {
+          ...lorebook,
+          id: uuidv4(),
+          settings: lorebook.settings || defaultLorebookSettings,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }]
+      })),
+
+      updateLorebook: (id, updates) => set((state) => ({
+        lorebooks: state.lorebooks.map((l) =>
+          l.id === id ? { ...l, ...updates, updatedAt: new Date().toISOString() } : l
+        )
+      })),
+
+      deleteLorebook: (id) => set((state) => ({
+        lorebooks: state.lorebooks.filter((l) => l.id !== id),
+        activeLorebookIds: state.activeLorebookIds.filter((aid) => aid !== id)
+      })),
+
+      toggleLorebook: (id) => set((state) => {
+        const isActive = state.activeLorebookIds.includes(id);
+        return {
+          activeLorebookIds: isActive
+            ? state.activeLorebookIds.filter((aid) => aid !== id)
+            : [...state.activeLorebookIds, id],
+          lorebooks: state.lorebooks.map((l) =>
+            l.id === id ? { ...l, active: !l.active, updatedAt: new Date().toISOString() } : l
+          )
+        };
+      }),
+
+      setActiveLorebooks: (ids) => set((state) => ({
+        activeLorebookIds: ids,
+        lorebooks: state.lorebooks.map((l) => ({
+          ...l,
+          active: ids.includes(l.id),
+          updatedAt: new Date().toISOString()
+        }))
+      })),
+
+      addLorebookEntry: (lorebookId, entry) => set((state) => {
+        const lorebook = state.lorebooks.find((l) => l.id === lorebookId);
+        if (!lorebook) return state;
+        
+        const maxUid = lorebook.entries.reduce((max, e) => Math.max(max, e.uid), -1);
+        const newEntry: LorebookEntry = {
+          ...entry,
+          uid: maxUid + 1,
+          key: entry.key || [],
+          keysecondary: entry.keysecondary || [],
+          comment: entry.comment || '',
+          content: entry.content || '',
+          constant: entry.constant ?? false,
+          selective: entry.selective ?? false,
+          order: entry.order ?? 100,
+          position: entry.position ?? 0,
+          disable: entry.disable ?? false,
+          excludeRecursion: entry.excludeRecursion ?? false,
+          preventRecursion: entry.preventRecursion ?? false,
+          delayUntilRecursion: entry.delayUntilRecursion ?? false,
+          probability: entry.probability ?? 100,
+          useProbability: entry.useProbability ?? false,
+          depth: entry.depth ?? 4,
+          selectLogic: entry.selectLogic ?? 0,
+          group: entry.group ?? '',
+          groupOverride: entry.groupOverride ?? false,
+          groupWeight: entry.groupWeight ?? 100,
+          scanDepth: entry.scanDepth ?? null,
+          caseSensitive: entry.caseSensitive ?? null,
+          matchWholeWords: entry.matchWholeWords ?? null,
+          useGroupScoring: entry.useGroupScoring ?? null,
+          automationId: entry.automationId ?? '',
+          role: entry.role ?? null,
+          vectorized: entry.vectorized ?? false,
+          displayIndex: entry.displayIndex ?? lorebook.entries.length,
+          extensions: entry.extensions ?? {}
+        };
+        
+        return {
+          lorebooks: state.lorebooks.map((l) =>
+            l.id === lorebookId 
+              ? { 
+                  ...l, 
+                  entries: [...l.entries, newEntry],
+                  updatedAt: new Date().toISOString() 
+                } 
+              : l
+          )
+        };
+      }),
+
+      updateLorebookEntry: (lorebookId, uid, updates) => set((state) => ({
+        lorebooks: state.lorebooks.map((l) =>
+          l.id === lorebookId 
+            ? { 
+                ...l, 
+                entries: l.entries.map((e) =>
+                  e.uid === uid ? { ...e, ...updates } : e
+                ),
+                updatedAt: new Date().toISOString() 
+              } 
+            : l
+        )
+      })),
+
+      deleteLorebookEntry: (lorebookId, uid) => set((state) => ({
+        lorebooks: state.lorebooks.map((l) =>
+          l.id === lorebookId 
+            ? { 
+                ...l, 
+                entries: l.entries.filter((e) => e.uid !== uid),
+                updatedAt: new Date().toISOString() 
+              } 
+            : l
+        )
+      })),
+
+      duplicateLorebookEntry: (lorebookId, uid) => set((state) => {
+        const lorebook = state.lorebooks.find((l) => l.id === lorebookId);
+        if (!lorebook) return state;
+        
+        const entry = lorebook.entries.find((e) => e.uid === uid);
+        if (!entry) return state;
+        
+        const maxUid = lorebook.entries.reduce((max, e) => Math.max(max, e.uid), -1);
+        const newEntry: LorebookEntry = {
+          ...entry,
+          uid: maxUid + 1,
+          comment: `${entry.comment} (copy)`,
+          displayIndex: lorebook.entries.length
+        };
+        
+        return {
+          lorebooks: state.lorebooks.map((l) =>
+            l.id === lorebookId 
+              ? { 
+                  ...l, 
+                  entries: [...l.entries, newEntry],
+                  updatedAt: new Date().toISOString() 
+                } 
+              : l
+          )
+        };
+      }),
+
+      importSillyTavernLorebook: (stLorebook, name, description = '') => {
+        const entries: LorebookEntry[] = Object.values(stLorebook.entries).map((entry, index) => ({
+          uid: entry.uid ?? index,
+          key: entry.key || [],
+          keysecondary: entry.keysecondary || [],
+          comment: entry.comment || '',
+          content: entry.content || '',
+          constant: entry.constant ?? false,
+          selective: entry.selective ?? false,
+          order: entry.order ?? 100,
+          position: entry.position ?? 0,
+          disable: entry.disable ?? false,
+          excludeRecursion: entry.excludeRecursion ?? false,
+          preventRecursion: entry.preventRecursion ?? false,
+          delayUntilRecursion: entry.delayUntilRecursion ?? false,
+          probability: entry.probability ?? 100,
+          useProbability: entry.useProbability ?? false,
+          depth: entry.depth ?? 4,
+          selectLogic: entry.selectLogic ?? 0,
+          group: entry.group ?? '',
+          groupOverride: entry.groupOverride ?? false,
+          groupWeight: entry.groupWeight ?? 100,
+          scanDepth: entry.scanDepth ?? null,
+          caseSensitive: entry.caseSensitive ?? null,
+          matchWholeWords: entry.matchWholeWords ?? null,
+          useGroupScoring: entry.useGroupScoring ?? null,
+          automationId: entry.automationId ?? '',
+          role: entry.role ?? null,
+          vectorized: entry.vectorized ?? false,
+          displayIndex: entry.displayIndex ?? index,
+          extensions: entry.extensions ?? {}
+        }));
+
+        const lorebook: Lorebook = {
+          id: uuidv4(),
+          name,
+          description,
+          entries,
+          settings: {
+            ...defaultLorebookSettings,
+            ...(stLorebook.settings || {})
+          },
+          tags: [],
+          active: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        set((state) => ({
+          lorebooks: [...state.lorebooks, lorebook],
+          activeLorebookIds: [...state.activeLorebookIds, lorebook.id]
+        }));
+
+        return lorebook;
+      },
+
+      exportSillyTavernLorebook: (id) => {
+        const lorebook = get().lorebooks.find((l) => l.id === id);
+        if (!lorebook) return null;
+
+        const entries: Record<string, LorebookEntry> = {};
+        lorebook.entries.forEach((entry) => {
+          entries[entry.uid.toString()] = entry;
+        });
+
+        return {
+          entries,
+          settings: lorebook.settings
+        };
+      },
+
+      getActiveLorebooks: () => {
+        const state = get();
+        return state.lorebooks.filter((l) => state.activeLorebookIds.includes(l.id));
+      },
+
+      getLorebookById: (id) => get().lorebooks.find((l) => l.id === id),
+
       // Prompt Template Actions
       addPromptTemplate: (template) => set((state) => ({
         promptTemplates: [...state.promptTemplates, { ...template, id: uuidv4() }]
@@ -758,6 +1111,8 @@ export const useTavernStore = create<TavernState>()(
         personas: state.personas,
         backgroundPacks: state.backgroundPacks,
         backgroundIndex: state.backgroundIndex,
+        lorebooks: state.lorebooks,
+        activeLorebookIds: state.activeLorebookIds,
         activeSessionId: state.activeSessionId,
         activeCharacterId: state.activeCharacterId,
         activeGroupId: state.activeGroupId,
@@ -805,17 +1160,56 @@ export const useTavernStore = create<TavernState>()(
           ? persistedPersonas 
           : currentState.personas;
 
+        // Migrate groups to new format with members array
+        const persistedGroups = persisted.groups as CharacterGroup[] | undefined;
+        const mergedGroups = (persistedGroups || currentState.groups).map(group => {
+          // If group already has members array, just ensure all fields exist
+          if (group.members && group.members.length > 0) {
+            return {
+              ...group,
+              maxResponsesPerTurn: group.maxResponsesPerTurn ?? 3,
+              allowMentions: group.allowMentions ?? true,
+              mentionTriggers: group.mentionTriggers ?? [],
+              conversationStyle: group.conversationStyle ?? 'sequential',
+              characterIds: group.characterIds || group.members.map(m => m.characterId)
+            };
+          }
+          
+          // Migrate from characterIds to members
+          const characterIds = group.characterIds || [];
+          const members: GroupMember[] = characterIds.map((characterId, index) => ({
+            characterId,
+            role: 'member' as const,
+            isActive: true,
+            isPresent: true,
+            joinOrder: index
+          }));
+          
+          return {
+            ...group,
+            members,
+            characterIds,
+            maxResponsesPerTurn: group.maxResponsesPerTurn ?? 3,
+            allowMentions: group.allowMentions ?? true,
+            mentionTriggers: group.mentionTriggers ?? [],
+            conversationStyle: group.conversationStyle ?? 'sequential'
+          };
+        });
+
         return {
           ...currentState,
           ...persisted,
           characters: mergedCharacters,
           settings: mergedSettings,
           personas: mergedPersonas,
+          groups: mergedGroups,
           activePersonaId: (persisted.activePersonaId as string) || 'default',
           soundTriggers: (persisted.soundTriggers as SoundTrigger[]) || currentState.soundTriggers,
           soundCollections: currentState.soundCollections, // Always use fresh collections from API
           backgroundPacks: (persisted.backgroundPacks as BackgroundPack[]) || currentState.backgroundPacks,
-          backgroundIndex: currentState.backgroundIndex // Always use fresh index from API
+          backgroundIndex: currentState.backgroundIndex, // Always use fresh index from API
+          lorebooks: (persisted.lorebooks as Lorebook[]) || currentState.lorebooks,
+          activeLorebookIds: (persisted.activeLorebookIds as string[]) || currentState.activeLorebookIds
         };
       }
     }

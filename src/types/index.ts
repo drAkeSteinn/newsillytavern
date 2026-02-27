@@ -74,16 +74,54 @@ export interface ChatSession {
 
 // ============ Group Types ============
 
+export type GroupRole = 'leader' | 'member' | 'observer';
+
+export interface GroupMember {
+  characterId: string;
+  role: GroupRole;
+  isActive: boolean;      // Can respond
+  isPresent: boolean;     // Is in the scene
+  joinOrder: number;      // Order they joined the group
+}
+
+export type GroupActivationStrategy = 
+  | 'all'           // All active members respond
+  | 'round_robin'   // Take turns in order
+  | 'random'        // Random selection
+  | 'reactive'      // Only mentioned characters respond
+  | 'smart';        // AI decides who should respond
+
 export interface CharacterGroup {
   id: string;
   name: string;
   description: string;
-  characterIds: string[];
+  characterIds: string[];     // Legacy: simple list of character IDs
+  members: GroupMember[];     // Enhanced: detailed member info
   avatar: string;
   systemPrompt: string;
-  activationStrategy: 'round_robin' | 'random' | 'smart';
+  activationStrategy: GroupActivationStrategy;
+  maxResponsesPerTurn: number;  // Limit responses per turn (except 'all' strategy)
+  allowMentions: boolean;       // Enable mention detection
+  mentionTriggers: string[];    // Additional mention trigger words
+  conversationStyle: 'sequential' | 'parallel';  // How responses are generated
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MentionDetectionResult {
+  characterId: string;
+  characterName: string;
+  triggerType: 'name' | 'alias' | 'pronoun' | 'keyword';
+  matchedText: string;
+  position: number;
+}
+
+export interface GroupStreamEvent {
+  type: 'character_start' | 'token' | 'character_done' | 'character_error' | 'done' | 'error';
+  characterId?: string;
+  characterName?: string;
+  content?: string;
+  error?: string;
 }
 
 // ============ LLM Configuration Types ============
@@ -389,3 +427,82 @@ export interface CharacterCardV2 {
 // TavernCardImage type for PNG files with embedded character data
 // These are PNG images with Base64 encoded JSON in tEXt chunks
 export type TavernCardImage = Blob;
+
+// ============ Lorebook Types (SillyTavern Compatible) ============
+
+export type LorebookPosition = 
+  | 0   // After system prompt
+  | 1   // After user message
+  | 2   // Before user message  
+  | 3   // After assistant message
+  | 4   // Before assistant message
+  | 5   // At top of chat
+  | 6   // At bottom of chat (newest messages)
+  | 7;  // Outlet (custom position)
+
+export type LorebookLogic = 
+  | 'AND_ANY'    // Match ANY primary key AND ANY secondary key
+  | 'NOT_ALL'    // NOT match ALL primary keys
+  | 'NOT_ANY'    // NOT match ANY primary key
+  | 'AND_ALL';   // Match ALL primary keys
+
+export interface LorebookEntry {
+  uid: number;                    // Unique identifier
+  key: string[];                  // Primary keywords
+  keysecondary: string[];         // Secondary keywords (optional)
+  comment: string;                // Entry title/description
+  content: string;                // Content to inject
+  constant: boolean;              // Always active
+  selective: boolean;             // Use secondary keys
+  order: number;                  // Insertion order (higher = later)
+  position: LorebookPosition;     // Where to inject
+  disable: boolean;               // Entry disabled
+  excludeRecursion: boolean;      // Exclude from recursive scanning
+  preventRecursion: boolean;      // Prevent this entry from triggering others
+  delayUntilRecursion: boolean;   // Only activate during recursion
+  probability: number;            // Activation probability (0-100)
+  useProbability: boolean;        // Use probability check
+  depth: number;                  // Scan depth (messages to scan back)
+  selectLogic: number;            // 0 = AND_ANY, 1 = NOT_ALL, 2 = NOT_ANY, 3 = AND_ALL
+  group: string;                  // Group name
+  groupOverride: boolean;         // Override group settings
+  groupWeight: number;            // Weight within group (for random selection)
+  scanDepth: number | null;       // Custom scan depth (null = use global)
+  caseSensitive: boolean | null;  // Case sensitive matching (null = use global)
+  matchWholeWords: boolean | null; // Match whole words only
+  useGroupScoring: boolean | null; // Use group scoring
+  automationId: string;           // Automation ID
+  role: number | null;            // Role (0 = system, 1 = user, 2 = assistant)
+  vectorized: boolean;            // Vectorized for semantic search
+  displayIndex: number;           // Display order in UI
+  extensions: Record<string, unknown>; // Extension data
+}
+
+export interface LorebookSettings {
+  scanDepth: number;              // Global scan depth
+  caseSensitive: boolean;         // Global case sensitivity
+  matchWholeWords: boolean;       // Global whole word matching
+  useGroupScoring: boolean;       // Use group scoring
+  automationId: string;           // Default automation ID
+  tokenBudget: number;            // Max tokens for lorebook content
+  recursionLimit: number;         // Max recursion depth
+}
+
+export interface Lorebook {
+  id: string;                     // Internal ID
+  name: string;                   // Lorebook name
+  description: string;            // Lorebook description
+  entries: LorebookEntry[];       // Entries (converted from object for easier handling)
+  settings: LorebookSettings;     // Lorebook settings
+  characterId?: string;           // Attached to character (optional)
+  tags: string[];                 // Tags for organization
+  active: boolean;                // Lorebook active
+  createdAt: string;
+  updatedAt: string;
+}
+
+// SillyTavern Lorebook format (for import/export)
+export interface SillyTavernLorebook {
+  entries: Record<string, LorebookEntry>;
+  settings?: Partial<LorebookSettings>;
+}

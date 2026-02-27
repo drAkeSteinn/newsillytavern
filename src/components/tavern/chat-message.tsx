@@ -2,11 +2,13 @@
 
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType } from '@/types';
-import { User, Bot, Copy, Check, Trash2, RefreshCw, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
+import { Copy, Check, Trash2, RefreshCw, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import { useState, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { TextFormatter } from './text-formatter';
+
+type MessageDisplayMode = 'bubble' | 'compact' | 'full';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -15,6 +17,7 @@ interface ChatMessageProps {
   userName?: string;
   userAvatar?: string;
   showTimestamp?: boolean;
+  showTokens?: boolean;
   onSwipe?: (direction: 'left' | 'right') => void;
   onDelete?: () => void;
   onRegenerate?: () => void;
@@ -22,7 +25,7 @@ interface ChatMessageProps {
   hasAlternatives?: boolean;
   currentIndex?: number;
   totalAlternatives?: number;
-  compact?: boolean;
+  displayMode?: MessageDisplayMode;
 }
 
 export const ChatMessageBubble = memo(function ChatMessageBubble({
@@ -32,6 +35,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   userName = 'You',
   userAvatar,
   showTimestamp = true,
+  showTokens = false,
   onSwipe,
   onDelete,
   onRegenerate,
@@ -39,11 +43,14 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   hasAlternatives = false,
   currentIndex = 0,
   totalAlternatives = 1,
-  compact = false
+  displayMode = 'bubble'
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  
+  const isCompact = displayMode === 'compact';
+  const isFull = displayMode === 'full';
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -63,33 +70,98 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
     );
   }
 
+  // Determine display name and avatar
+  const displayName = isUser ? userName : characterName;
+  const displayAvatar = isUser ? userAvatar : characterAvatar;
+  const avatarBorder = isUser ? 'border-blue-500' : 'border-amber-500';
+  const avatarGradient = isUser 
+    ? 'from-blue-400 to-blue-600' 
+    : 'from-amber-400 to-orange-600';
+
+  // Full mode: simpler layout, no bubbles
+  if (isFull) {
+    return (
+      <div className={cn(
+        'group py-2 px-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300',
+        isUser && 'bg-primary/5'
+      )}>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-medium text-sm">{displayName}</span>
+          {showTimestamp && (
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+            </span>
+          )}
+          {showTokens && message.metadata?.tokens && (
+            <span className="text-xs text-muted-foreground/70">
+              • {message.metadata.tokens} tokens
+            </span>
+          )}
+        </div>
+        <TextFormatter 
+          content={message.content} 
+          isUser={isUser}
+          className="text-sm leading-relaxed"
+        />
+        <div className={cn(
+          'flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity'
+        )}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={handleCopy}
+          >
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          </Button>
+          {!isUser && (
+            <>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onSpeak}>
+                <Volume2 className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRegenerate}>
+                <RefreshCw className="h-3 w-3" />
+              </Button>
+            </>
+          )}
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onDelete}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        'group flex gap-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-300',
-        compact ? 'py-2 px-1' : 'py-4 px-4',
+        'group flex gap-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-300',
+        isCompact ? 'py-2 px-1' : 'py-3 px-4',
         isUser ? 'flex-row-reverse' : 'flex-row'
       )}
     >
-      {/* Avatar */}
-      <div className="flex-shrink-0">
+      {/* Avatar - Circular */}
+      <div className="flex-shrink-0 self-start">
         <div className={cn(
           'rounded-full overflow-hidden border-2 flex items-center justify-center',
-          compact ? 'w-8 h-8' : 'w-10 h-10',
-          isUser ? 'border-primary' : 'border-amber-500'
+          isCompact ? 'w-8 h-8' : 'w-10 h-10',
+          avatarBorder
         )}>
-          {isUser ? (
-            userAvatar ? (
-              <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
-            ) : (
-              <User className={cn('text-primary', compact ? 'w-4 h-4' : 'w-5 h-5')} />
-            )
+          {displayAvatar ? (
+            <img 
+              src={displayAvatar} 
+              alt={displayName} 
+              className="w-full h-full object-cover" 
+            />
           ) : (
-            characterAvatar ? (
-              <img src={characterAvatar} alt={characterName} className="w-full h-full object-cover" />
-            ) : (
-              <Bot className={cn('text-amber-500', compact ? 'w-4 h-4' : 'w-5 h-5')} />
-            )
+            <div className={cn(
+              'w-full h-full flex items-center justify-center bg-gradient-to-br',
+              avatarGradient
+            )}>
+              <span className="text-white font-bold text-sm">
+                {displayName?.[0]?.toUpperCase() || '?'}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -97,29 +169,36 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
       {/* Message Content */}
       <div className={cn(
         'flex-1 max-w-[80%]',
-        isUser ? 'items-end' : 'items-start'
+        isUser ? 'items-end' : 'items-start',
+        'flex flex-col'
       )}>
-        {/* Name and Timestamp */}
-        {!compact && (
-          <div className={cn(
-            'flex items-center gap-2 mb-1',
-            isUser ? 'flex-row-reverse' : 'flex-row'
+        {/* Name and Timestamp - Above the bubble */}
+        <div className={cn(
+          'flex items-center gap-2 mb-1',
+          isUser ? 'flex-row-reverse' : 'flex-row'
+        )}>
+          <span className={cn(
+            'font-medium',
+            isCompact ? 'text-xs' : 'text-sm'
           )}>
-            <span className="font-medium text-sm">
-              {isUser ? userName : characterName}
+            {displayName}
+          </span>
+          {showTimestamp && !isCompact && (
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
             </span>
-            {showTimestamp && (
-              <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
-              </span>
-            )}
-          </div>
-        )}
+          )}
+          {showTokens && !isCompact && message.metadata?.tokens && (
+            <span className="text-xs text-muted-foreground/70">
+              • {message.metadata.tokens} tokens
+            </span>
+          )}
+        </div>
 
         {/* Message Bubble */}
         <div className={cn(
           'rounded-2xl relative group/message',
-          compact ? 'px-3 py-2' : 'px-4 py-3',
+          isCompact ? 'px-3 py-2' : 'px-4 py-3',
           isUser 
             ? 'bg-primary text-primary-foreground rounded-tr-sm' 
             : 'bg-muted rounded-tl-sm'
@@ -129,12 +208,12 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
             isUser={isUser}
             className={cn(
               'text-sm leading-relaxed',
-              compact && 'text-xs'
+              isCompact && 'text-xs'
             )}
           />
 
           {/* Swipe Indicators */}
-          {!isUser && hasAlternatives && !compact && (
+          {!isUser && hasAlternatives && !isCompact && (
             <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1">
               <Button
                 variant="ghost"
@@ -161,9 +240,9 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
         </div>
 
         {/* Action Buttons */}
-        {!compact && (
+        {!isCompact && (
           <div className={cn(
-            'flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity',
+            'flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity',
             isUser ? 'justify-end' : 'justify-start'
           )}>
             <Button

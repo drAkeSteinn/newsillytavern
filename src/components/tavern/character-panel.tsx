@@ -8,7 +8,6 @@ import {
   Plus, 
   Search, 
   Users, 
-  Settings, 
   MessageSquare,
   MoreVertical,
   Trash2,
@@ -25,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useState, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -33,14 +33,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CharacterEditor } from './character-editor';
+import { GroupEditor } from './group-editor';
 import { importCharacterCard, exportCharacterCardAsPng, exportCharacterCardAsJson } from '@/lib/character-card';
-import type { CharacterCard } from '@/types';
+import type { CharacterCard, ChatSession } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 export function CharacterPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
+  const [groupEditorOpen, setGroupEditorOpen] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +60,7 @@ export function CharacterPanel() {
     createSession,
     setActiveSession,
     deleteCharacter,
+    deleteGroup,
     addCharacter,
     sidebarOpen
   } = useTavernStore();
@@ -82,6 +86,35 @@ export function CharacterPanel() {
   const handleSelectGroup = (groupId: string) => {
     setActiveGroup(groupId);
     setActiveCharacter(null);
+    
+    // Find existing session for this group or create new
+    const existingSession = sessions.find(s => s.groupId === groupId);
+    if (existingSession) {
+      setActiveSession(existingSession.id);
+    } else {
+      // Create a new session for the group
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        const id = uuidv4();
+        const newSession: ChatSession = {
+          id,
+          characterId: 'group',
+          groupId,
+          name: `Chat con ${group.name}`,
+          messages: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        // Add the session to the store
+        useTavernStore.setState((state) => ({
+          sessions: [...state.sessions, newSession],
+          activeSessionId: id,
+          activeGroupId: groupId,
+          activeCharacterId: null
+        }));
+      }
+    }
   };
 
   const handleEditCharacter = (characterId: string) => {
@@ -89,8 +122,18 @@ export function CharacterPanel() {
     setEditorOpen(true);
   };
 
+  const handleEditGroup = (groupId: string) => {
+    setEditingGroupId(groupId);
+    setGroupEditorOpen(true);
+  };
+
+  const handleNewGroup = () => {
+    setEditingGroupId(null);
+    setGroupEditorOpen(true);
+  };
+
   const handleDeleteCharacter = (characterId: string) => {
-    if (confirm('Are you sure you want to delete this character?')) {
+    if (confirm('¿Estás seguro de que quieres eliminar este personaje?')) {
       deleteCharacter(characterId);
     }
   };
@@ -115,8 +158,8 @@ export function CharacterPanel() {
       
       if (!result) {
         toast({
-          title: 'Import Failed',
-          description: 'Could not parse character card. Make sure it\'s a valid PNG or JSON file.',
+          title: 'Error de Importación',
+          description: 'No se pudo analizar la tarjeta del personaje. Asegúrate de que sea un archivo PNG o JSON válido.',
           variant: 'destructive'
         });
         return;
@@ -126,7 +169,7 @@ export function CharacterPanel() {
       
       // Add the character to the store
       addCharacter({
-        name: character.name || 'Unnamed Character',
+        name: character.name || 'Personaje sin nombre',
         description: character.description || '',
         personality: character.personality || '',
         scenario: character.scenario || '',
@@ -144,14 +187,14 @@ export function CharacterPanel() {
       });
 
       toast({
-        title: 'Character Imported',
-        description: `"${character.name || 'Unnamed Character'}" has been imported successfully.`
+        title: 'Personaje Importado',
+        description: `"${character.name || 'Personaje sin nombre'}" ha sido importado exitosamente.`
       });
     } catch (error) {
       console.error('Import error:', error);
       toast({
-        title: 'Import Failed',
-        description: 'An error occurred while importing the character.',
+        title: 'Error de Importación',
+        description: 'Ocurrió un error al importar el personaje.',
         variant: 'destructive'
       });
     } finally {
@@ -187,14 +230,14 @@ export function CharacterPanel() {
       URL.revokeObjectURL(url);
       
       toast({
-        title: 'Character Exported',
-        description: `"${character.name}" has been exported as ${format.toUpperCase()}.`
+        title: 'Personaje Exportado',
+        description: `"${character.name}" ha sido exportado como ${format.toUpperCase()}.`
       });
     } catch (error) {
       console.error('Export error:', error);
       toast({
-        title: 'Export Failed',
-        description: 'An error occurred while exporting the character.',
+        title: 'Error de Exportación',
+        description: 'Ocurrió un error al exportar el personaje.',
         variant: 'destructive'
       });
     }
@@ -228,8 +271,8 @@ export function CharacterPanel() {
       
       if (!result) {
         toast({
-          title: 'Import Failed',
-          description: 'Could not parse character card. Make sure it\'s a valid PNG or JSON file.',
+          title: 'Error de Importación',
+          description: 'No se pudo analizar la tarjeta del personaje. Asegúrate de que sea un archivo PNG o JSON válido.',
           variant: 'destructive'
         });
         return;
@@ -238,7 +281,7 @@ export function CharacterPanel() {
       const { character, avatar } = result;
       
       addCharacter({
-        name: character.name || 'Unnamed Character',
+        name: character.name || 'Personaje sin nombre',
         description: character.description || '',
         personality: character.personality || '',
         scenario: character.scenario || '',
@@ -256,14 +299,14 @@ export function CharacterPanel() {
       });
 
       toast({
-        title: 'Character Imported',
-        description: `"${character.name || 'Unnamed Character'}" has been imported successfully.`
+        title: 'Personaje Importado',
+        description: `"${character.name || 'Personaje sin nombre'}" ha sido importado exitosamente.`
       });
     } catch (error) {
       console.error('Import error:', error);
       toast({
-        title: 'Import Failed',
-        description: 'An error occurred while importing the character.',
+        title: 'Error de Importación',
+        description: 'Ocurrió un error al importar el personaje.',
         variant: 'destructive'
       });
     } finally {
@@ -297,8 +340,8 @@ export function CharacterPanel() {
           <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-10 flex items-center justify-center">
             <div className="bg-background border-2 border-dashed border-primary rounded-lg p-6 text-center">
               <Upload className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <p className="text-sm font-medium">Drop character card here</p>
-              <p className="text-xs text-muted-foreground mt-1">PNG or JSON</p>
+              <p className="text-sm font-medium">Suelta la tarjeta aquí</p>
+              <p className="text-xs text-muted-foreground mt-1">PNG o JSON</p>
             </div>
           </div>
         )}
@@ -306,7 +349,7 @@ export function CharacterPanel() {
         {/* Header */}
         <div className="p-4 border-b space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-lg">Characters</h2>
+            <h2 className="font-semibold text-lg">Personajes</h2>
             <div className="flex gap-1">
               <Button 
                 variant="ghost" 
@@ -314,7 +357,7 @@ export function CharacterPanel() {
                 className="h-8 w-8" 
                 onClick={handleImportClick}
                 disabled={isImporting}
-                title="Import Character Card"
+                title="Importar Personaje"
               >
                 {isImporting ? (
                   <div className="w-4 h-4 border-2 border-current border-t-transparent animate-spin" />
@@ -322,7 +365,13 @@ export function CharacterPanel() {
                   <Upload className="w-4 h-4" />
                 )}
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNewCharacter} title="Create New Character">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8" 
+                onClick={handleNewCharacter} 
+                title="Crear Nuevo Personaje"
+              >
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
@@ -331,7 +380,7 @@ export function CharacterPanel() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search characters..."
+              placeholder="Buscar personajes..."
               className="pl-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -342,24 +391,28 @@ export function CharacterPanel() {
         <ScrollArea className="flex-1">
           {/* Characters List */}
           <div className="p-2">
+            <div className="flex items-center gap-2 px-2 py-1 text-muted-foreground">
+              <MessageSquare className="w-4 h-4" />
+              <span className="text-sm font-medium">Personajes</span>
+            </div>
             {filteredCharacters.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchQuery ? 'No characters found' : 'No characters yet'}
+                {searchQuery ? 'No se encontraron personajes' : 'Sin personajes aún'}
                 <Button 
                   variant="link" 
                   className="block mx-auto mt-2"
                   onClick={handleNewCharacter}
                 >
-                  Create your first character
+                  Crea tu primer personaje
                 </Button>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1 mt-1">
                 {filteredCharacters.map((character) => (
                   <div
                     key={character.id}
                     className={cn(
-                      'group flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors',
+                      'flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors',
                       activeCharacterId === character.id 
                         ? 'bg-primary/10 border border-primary/20' 
                         : 'hover:bg-muted'
@@ -367,7 +420,7 @@ export function CharacterPanel() {
                     onClick={() => handleSelectCharacter(character.id)}
                   >
                     {/* Avatar */}
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                       {character.avatar ? (
                         <img 
                           src={character.avatar} 
@@ -376,7 +429,7 @@ export function CharacterPanel() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-600">
-                          <span className="text-white font-bold text-lg">
+                          <span className="text-white font-bold">
                             {character.name[0].toUpperCase()}
                           </span>
                         </div>
@@ -385,19 +438,19 @@ export function CharacterPanel() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{character.name}</p>
+                      <p className="text-sm font-medium truncate">{character.name}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         {character.tags.slice(0, 2).join(', ')}
                       </p>
                     </div>
 
-                    {/* Actions */}
+                    {/* Actions - always visible */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                          className="h-8 w-8 flex-shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="w-4 h-4" />
@@ -409,7 +462,7 @@ export function CharacterPanel() {
                           handleEditCharacter(character.id);
                         }}>
                           <Edit className="w-4 h-4 mr-2" />
-                          Edit
+                          Editar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={(e) => {
@@ -417,14 +470,14 @@ export function CharacterPanel() {
                           handleExportCharacter(character, 'png');
                         }}>
                           <Download className="w-4 h-4 mr-2" />
-                          Export as PNG
+                          Exportar como PNG
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
                           handleExportCharacter(character, 'json');
                         }}>
                           <FileUp className="w-4 h-4 mr-2" />
-                          Export as JSON
+                          Exportar como JSON
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
@@ -435,7 +488,7 @@ export function CharacterPanel() {
                           }}
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
+                          Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -446,18 +499,33 @@ export function CharacterPanel() {
           </div>
 
           {/* Groups Section */}
-          {groups.length > 0 && (
-            <div className="p-2 border-t mt-2">
-              <div className="flex items-center gap-2 px-2 py-1 text-muted-foreground">
+          <div className="p-2 border-t mt-2">
+            <div className="flex items-center justify-between px-2 py-1 text-muted-foreground">
+              <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                <span className="text-sm font-medium">Groups</span>
+                <span className="text-sm font-medium">Grupos</span>
               </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6"
+                onClick={handleNewGroup}
+                title="Crear Nuevo Grupo"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            {groups.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                Sin grupos aún
+              </div>
+            ) : (
               <div className="space-y-1 mt-1">
                 {groups.map((group) => (
                   <div
                     key={group.id}
                     className={cn(
-                      'group flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors',
+                      'flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors',
                       activeGroupId === group.id 
                         ? 'bg-primary/10 border border-primary/20' 
                         : 'hover:bg-muted'
@@ -468,43 +536,105 @@ export function CharacterPanel() {
                       <Users className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{group.name}</p>
+                      <p className="text-sm font-medium truncate">{group.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {group.characterIds.length} characters
+                        {group.members?.length || group.characterIds?.length || 0} personajes
                       </p>
                     </div>
+                    
+                    {/* Group Actions Menu - always visible */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditGroup(group.id);
+                        }}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Editar Grupo
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`¿Estás seguro de que quieres eliminar el grupo "${group.name}"?`)) {
+                              deleteGroup(group.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Eliminar Grupo
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </ScrollArea>
 
         {/* Footer */}
-        <div className="p-3 border-t">
+        <div className="p-3 border-t space-y-2">
           <Button 
             variant="outline" 
             className="w-full justify-start gap-2"
             onClick={handleNewCharacter}
           >
             <Plus className="w-4 h-4" />
-            New Character
+            Nuevo Personaje
+          </Button>
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2"
+            onClick={handleNewGroup}
+          >
+            <Users className="w-4 h-4" />
+            Nuevo Grupo
           </Button>
         </div>
       </div>
 
       {/* Character Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingCharacterId ? 'Edit Character' : 'Create New Character'}
+              {editingCharacterId ? 'Editar Personaje' : 'Crear Nuevo Personaje'}
             </DialogTitle>
           </DialogHeader>
           <CharacterEditor 
             characterId={editingCharacterId}
             onClose={() => setEditorOpen(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Editor Dialog */}
+      <Dialog open={groupEditorOpen} onOpenChange={setGroupEditorOpen}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle>
+              {editingGroupId ? 'Editar Grupo' : 'Crear Nuevo Grupo'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <GroupEditor 
+              key={editingGroupId || 'new-group'}
+              groupId={editingGroupId}
+              onClose={() => setGroupEditorOpen(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </>

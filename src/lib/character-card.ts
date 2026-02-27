@@ -146,15 +146,51 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
 }
 
 /**
- * Convert File to Data URL
+ * Convert File to Data URL (for importing)
  */
-function fileToDataUrl(file: File): Promise<string> {
+async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Upload an image to the server and return the URL
+ */
+async function uploadImage(file: File, type: string = 'avatar'): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('type', type);
+
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to upload image');
+  }
+
+  const { url } = await response.json();
+  return url;
+}
+
+/**
+ * Upload a data URL to the server and return the URL
+ */
+async function uploadDataUrl(dataUrl: string, type: string = 'avatar'): Promise<string> {
+  // Convert data URL to Blob
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  
+  // Create a File object
+  const file = new File([blob], `imported-${Date.now()}.png`, { type: blob.type || 'image/png' });
+  
+  return uploadImage(file, type);
 }
 
 /**
@@ -191,16 +227,38 @@ export async function importCharacterCard(file: File): Promise<{
 } | null> {
   const extension = file.name.split('.').pop()?.toLowerCase();
   
-  if (extension === 'png' || file.type === 'image/png') {
-    return parseCharacterCardFromPng(file);
-  } else if (extension === 'json' || file.type === 'application/json') {
-    const result = await parseCharacterCardFromJson(file);
-    if (result) {
-      return {
-        character: result.character,
-        avatar: result.avatar || ''
-      };
+  try {
+    if (extension === 'png' || file.type === 'image/png') {
+      const result = await parseCharacterCardFromPng(file);
+      if (result) {
+        // Upload the avatar to the server instead of storing base64
+        const avatarUrl = await uploadDataUrl(result.avatar, 'avatar');
+        return {
+          character: result.character,
+          avatar: avatarUrl
+        };
+      }
+    } else if (extension === 'json' || file.type === 'application/json') {
+      const result = await parseCharacterCardFromJson(file);
+      if (result) {
+        let avatarUrl = '';
+        if (result.avatar) {
+          // If avatar is a data URL, upload it
+          if (result.avatar.startsWith('data:')) {
+            avatarUrl = await uploadDataUrl(result.avatar, 'avatar');
+          } else {
+            avatarUrl = result.avatar;
+          }
+        }
+        return {
+          character: result.character,
+          avatar: avatarUrl
+        };
+      }
     }
+  } catch (error) {
+    console.error('Error importing character card:', error);
+    return null;
   }
   
   console.error('Unsupported file format');

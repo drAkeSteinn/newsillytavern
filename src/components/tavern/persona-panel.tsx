@@ -15,7 +15,8 @@ import {
   User,
   Edit2,
   X,
-  Upload
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import type { Persona } from '@/types';
@@ -40,11 +41,12 @@ export function PersonaPanel() {
     description: '',
     avatar: ''
   });
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreatePersona = () => {
     const newPersona: Omit<Persona, 'id' | 'createdAt' | 'updatedAt'> = {
-      name: 'New Persona',
+      name: 'Nueva Persona',
       description: '',
       avatar: '',
       isActive: false
@@ -54,7 +56,7 @@ export function PersonaPanel() {
     const newId = personas.length > 0 ? 'new' : 'temp'; // Will be replaced
     setEditingId(newId);
     setEditForm({
-      name: 'New Persona',
+      name: 'Nueva Persona',
       description: '',
       avatar: ''
     });
@@ -86,53 +88,80 @@ export function PersonaPanel() {
     setEditForm({ name: '', description: '', avatar: '' });
   };
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>, personaId?: string) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>, personaId?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (personaId) {
-        // Update existing persona
-        updatePersona(personaId, { avatar: dataUrl });
-      } else {
-        // Update edit form
-        setEditForm(prev => ({ ...prev, avatar: dataUrl }));
+    // Validate file size (max 2MB for base64)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Imagen muy grande. El tamaño máximo es 2MB.');
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      // Convert to base64 for persistent storage
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        
+        if (personaId) {
+          // Update existing persona
+          updatePersona(personaId, { avatar: base64 });
+        } else {
+          // Update edit form
+          setEditForm(prev => ({ ...prev, avatar: base64 }));
+        }
+        setUploading(false);
+      };
+      reader.onerror = () => {
+        alert('Error al leer la imagen');
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(error instanceof Error ? error.message : 'Error al subir imagen');
+      setUploading(false);
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleDelete = (id: string) => {
     if (id === 'default') {
-      alert('Cannot delete the default persona');
+      alert('No se puede eliminar la persona por defecto');
       return;
     }
-    if (confirm('Are you sure you want to delete this persona?')) {
+    if (confirm('¿Estás seguro de que deseas eliminar esta persona?')) {
       deletePersona(id);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h3 className="font-medium">Personas</h3>
+          <h3 className="font-medium text-base">Personas</h3>
           <p className="text-sm text-muted-foreground">
-            Define who you are in the roleplay
+            Define quién eres en el roleplay
           </p>
         </div>
         <Button size="sm" onClick={handleCreatePersona}>
           <Plus className="w-4 h-4 mr-1" />
-          New Persona
+          Nueva Persona
         </Button>
       </div>
 
       {/* Active Persona Preview */}
       {activePersonaId && (
-        <div className="p-3 rounded-lg border bg-primary/5 border-primary/20">
-          <p className="text-xs text-muted-foreground mb-2">Active Persona</p>
+        <div className="p-3 rounded-lg border bg-primary/5 border-primary/20 flex-shrink-0">
+          <p className="text-xs text-muted-foreground mb-2">Persona Activa</p>
           <div className="flex items-center gap-3">
             <Avatar className="w-10 h-10">
               <AvatarImage src={personas.find(p => p.id === activePersonaId)?.avatar} />
@@ -142,7 +171,7 @@ export function PersonaPanel() {
             </Avatar>
             <div>
               <p className="font-medium">
-                {personas.find(p => p.id === activePersonaId)?.name || 'User'}
+                {personas.find(p => p.id === activePersonaId)?.name || 'Usuario'}
               </p>
               {personas.find(p => p.id === activePersonaId)?.description && (
                 <p className="text-xs text-muted-foreground line-clamp-1">
@@ -154,9 +183,9 @@ export function PersonaPanel() {
         </div>
       )}
 
-      {/* Persona List */}
-      <ScrollArea className="h-[400px] pr-4">
-        <div className="space-y-2">
+      {/* Persona Grid */}
+      <ScrollArea className="flex-1">
+        <div className="grid grid-cols-2 gap-3 pr-4">
           {personas.map((persona) => (
             <div
               key={persona.id}
@@ -172,10 +201,20 @@ export function PersonaPanel() {
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                     <div className="relative">
-                      <Avatar className="w-12 h-12 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                      <Avatar 
+                        className={cn(
+                          "w-12 h-12", 
+                          !uploading && "cursor-pointer"
+                        )} 
+                        onClick={() => !uploading && fileInputRef.current?.click()}
+                      >
                         <AvatarImage src={editForm.avatar} />
                         <AvatarFallback>
-                          <User className="w-6 h-6" />
+                          {uploading ? (
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                          ) : (
+                            <User className="w-6 h-6" />
+                          )}
                         </AvatarFallback>
                       </Avatar>
                       <Button
@@ -183,8 +222,13 @@ export function PersonaPanel() {
                         variant="secondary"
                         className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full"
                         onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
                       >
-                        <Upload className="w-3 h-3" />
+                        {uploading ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Upload className="w-3 h-3" />
+                        )}
                       </Button>
                       <input
                         ref={fileInputRef}
@@ -192,93 +236,92 @@ export function PersonaPanel() {
                         accept="image/*"
                         className="hidden"
                         onChange={(e) => handleAvatarUpload(e)}
+                        disabled={uploading}
                       />
                     </div>
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1">
                       <Input
                         value={editForm.name}
                         onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="Persona Name"
+                        placeholder="Nombre de Persona"
                         className="h-8"
+                        disabled={uploading}
                       />
                     </div>
                   </div>
                   <Textarea
                     value={editForm.description}
                     onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe your persona's personality, background, or any details you want the AI to know about you..."
-                    rows={3}
+                    placeholder="Describe la personalidad, antecedentes..."
+                    rows={2}
                     className="text-sm resize-none"
+                    disabled={uploading}
                   />
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                    <Button size="sm" variant="ghost" onClick={handleCancelEdit} disabled={uploading}>
                       <X className="w-4 h-4 mr-1" />
-                      Cancel
+                      Cancelar
                     </Button>
-                    <Button size="sm" onClick={() => handleSaveEdit(persona.id)}>
-                      Save
+                    <Button size="sm" onClick={() => handleSaveEdit(persona.id)} disabled={uploading}>
+                      {uploading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+                      Guardar
                     </Button>
                   </div>
                 </div>
               ) : (
                 // View Mode
-                <div className="flex items-start gap-3">
-                  <Avatar className="w-10 h-10 flex-shrink-0">
-                    <AvatarImage src={persona.avatar} />
-                    <AvatarFallback>
-                      <User className="w-5 h-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{persona.name}</p>
-                      {persona.id === activePersonaId && (
-                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-                          Active
-                        </span>
-                      )}
-                      {persona.id === 'default' && (
-                        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
-                          Default
-                        </span>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Avatar className="w-9 h-9 flex-shrink-0">
+                      <AvatarImage src={persona.avatar} />
+                      <AvatarFallback>
+                        <User className="w-4 h-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-sm truncate">{persona.name}</p>
+                        {persona.id === activePersonaId && (
+                          <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
+                            Activa
+                          </span>
+                        )}
+                      </div>
+                      {persona.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          {persona.description}
+                        </p>
                       )}
                     </div>
-                    {persona.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                        {persona.description}
-                      </p>
-                    )}
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center justify-end gap-1">
                     {persona.id !== activePersonaId && (
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="ghost"
-                        className="h-8 w-8"
+                        className="h-6 text-xs"
                         onClick={() => setActivePersona(persona.id)}
-                        title="Set as active"
                       >
-                        <Check className="w-4 h-4" />
+                        <Check className="w-3 h-3 mr-1" />
+                        Activar
                       </Button>
                     )}
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="ghost"
-                      className="h-8 w-8"
+                      className="h-6 w-6 p-0"
                       onClick={() => handleStartEdit(persona)}
-                      title="Edit persona"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-3 h-3" />
                     </Button>
                     {persona.id !== 'default' && (
                       <Button
-                        size="icon"
+                        size="sm"
                         variant="ghost"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
                         onClick={() => handleDelete(persona.id)}
-                        title="Delete persona"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     )}
                   </div>
@@ -288,22 +331,21 @@ export function PersonaPanel() {
           ))}
 
           {personas.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="col-span-2 text-center py-8 text-muted-foreground">
               <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>No personas created yet</p>
-              <p className="text-xs mt-1">Create a persona to define who you are in roleplays</p>
+              <p>No hay personas creadas aún</p>
+              <p className="text-xs mt-1">Crea una persona para definir quién eres en los roleplays</p>
             </div>
           )}
         </div>
       </ScrollArea>
 
       {/* Help Text */}
-      <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-        <p className="font-medium text-foreground mb-1">About Personas</p>
-        <p>
-          Personas define your identity in the roleplay. When you create a persona with a name 
-          and description, the AI will use this information to understand who it&apos;s talking to.
-          This adds depth and personalization to your conversations.
+      <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground flex-shrink-0">
+        <p className="font-medium text-foreground mb-1">Acerca de Personas</p>
+        <p className="text-xs">
+          Las personas definen tu identidad en el roleplay. Cuando creas una persona con un nombre 
+          y descripción, la IA usará esta información para entender con quién está hablando.
         </p>
       </div>
     </div>

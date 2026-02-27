@@ -8,36 +8,29 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { EmojiPicker } from './emoji-picker';
-import { TextFormatter } from './text-formatter';
 import { StreamingText } from './streaming-text';
+import { useHotkeys, formatHotkey } from '@/hooks/use-hotkeys';
 import { 
   Send, 
-  Loader2, 
+  Loader2,
   GripVertical,
-  Maximize2,
-  Minimize2,
-  Move,
-  X,
   Settings,
   ChevronUp,
   ChevronDown,
   RotateCcw,
-  Eraser
+  Eraser,
+  Users,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import type { ChatLayoutSettings } from '@/types';
+import type { ChatLayoutSettings, CharacterCard, CharacterGroup, Persona } from '@/types';
 
 interface NovelChatBoxProps {
   onSendMessage: (message: string) => void;
@@ -45,9 +38,29 @@ interface NovelChatBoxProps {
   onResetChat?: () => void;
   onClearChat?: () => void;
   streamingContent?: string;
+  streamingCharacter?: CharacterCard | null;
+  streamingProgress?: { current: number; total: number } | null;
+  isGroupMode?: boolean;
+  activeGroup?: CharacterGroup | null;
+  activeCharacter?: CharacterCard | null;
+  characters?: CharacterCard[];
+  activePersona?: Persona | null;
 }
 
-export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClearChat, streamingContent = '' }: NovelChatBoxProps) {
+export function NovelChatBox({ 
+  onSendMessage, 
+  isGenerating, 
+  onResetChat, 
+  onClearChat, 
+  streamingContent = '',
+  streamingCharacter = null,
+  streamingProgress = null,
+  isGroupMode = false,
+  activeGroup = null,
+  activeCharacter = null,
+  characters = [],
+  activePersona = null
+}: NovelChatBoxProps) {
   const [input, setInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -64,15 +77,19 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
   const {
     activeSessionId,
     getActiveSession,
-    getActiveCharacter,
     settings,
     updateSettings,
     deleteMessage,
   } = useTavernStore();
 
   const activeSession = getActiveSession();
-  const activeCharacter = getActiveCharacter();
   const layout = settings.chatLayout;
+  const hotkeys = settings.hotkeys;
+
+  // Determine display name for header
+  const headerName = isGroupMode 
+    ? activeGroup?.name || 'Group Chat'
+    : activeCharacter?.name || 'Chat';
 
   // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {
@@ -148,7 +165,7 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
   }, [isDragging, layout.chatWidth, layout.chatHeight, updateLayout]);
 
   // Resize handlers
-  const handleResizeStart = (e: React.MouseEvent, direction: 'corner' | 'horizontal' | 'vertical') => {
+  const handleResizeStart = (e: React.MouseEvent) => {
     if (isCollapsed) return;
     e.preventDefault();
     e.stopPropagation();
@@ -159,7 +176,6 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
       width: layout.chatWidth,
       height: layout.chatHeight
     };
-    (window as unknown as Record<string, unknown>).resizeDirection = direction;
   };
 
   useEffect(() => {
@@ -173,17 +189,8 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
       const deltaX = ((e.clientX - resizeStartRef.current.x) / rect.width) * 100;
       const deltaY = ((e.clientY - resizeStartRef.current.y) / rect.height) * 100;
 
-      const direction = (window as unknown as Record<string, unknown>).resizeDirection as string;
-      
-      let newWidth = resizeStartRef.current.width;
-      let newHeight = resizeStartRef.current.height;
-
-      if (direction === 'corner' || direction === 'horizontal') {
-        newWidth = Math.max(25, Math.min(90, resizeStartRef.current.width + deltaX * 2));
-      }
-      if (direction === 'corner' || direction === 'vertical') {
-        newHeight = Math.max(30, Math.min(90, resizeStartRef.current.height + deltaY * 2));
-      }
+      let newWidth = Math.max(25, Math.min(90, resizeStartRef.current.width + deltaX * 2));
+      let newHeight = Math.max(30, Math.min(90, resizeStartRef.current.height + deltaY * 2));
 
       updateLayout({ chatWidth: newWidth, chatHeight: newHeight });
     };
@@ -208,11 +215,42 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    const sendKey = hotkeys.send || 'Enter';
+    const newLineKey = hotkeys.newLine || 'Shift+Enter';
+    
+    // Check if this is the send hotkey
+    const isSendKey = sendKey.toLowerCase() === 'enter' && e.key === 'Enter' && !e.shiftKey;
+    const isNewLineKey = newLineKey.toLowerCase() === 'shift+enter' && e.key === 'Enter' && e.shiftKey;
+    
+    if (isSendKey) {
       e.preventDefault();
       handleSend();
+    } else if (isNewLineKey) {
+      // Let the default behavior (new line) happen
+      return;
     }
   };
+
+  // Hotkeys for regenerate and swipe (global)
+  useHotkeys(hotkeys, {
+    onRegenerate: () => {
+      if (!isGenerating && activeSession && activeSession.messages.length > 0) {
+        // Get last assistant message
+        const lastAssistantMsg = [...activeSession.messages].reverse().find(m => m.role === 'assistant' && !m.isDeleted);
+        if (lastAssistantMsg) {
+          // Trigger regenerate by deleting and resending
+          deleteMessage(activeSessionId!, lastAssistantMsg.id);
+          setInput('');
+        }
+      }
+    },
+    onSwipeLeft: () => {
+      // Could be used for message swiping in future
+    },
+    onSwipeRight: () => {
+      // Could be used for message swiping in future
+    }
+  }, !isGenerating);
 
   const handleQuickReply = (reply: string) => {
     setInput(reply);
@@ -248,8 +286,35 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
       >
         <div className="flex items-center gap-2">
           <GripVertical className="w-4 h-4 text-muted-foreground" />
+          
+          {/* Avatar in header */}
+          <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+            {isGroupMode ? (
+              <div className="w-full h-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center">
+                <Users className="w-3 h-3 text-white" />
+              </div>
+            ) : activeCharacter?.avatar ? (
+              <img 
+                src={activeCharacter.avatar} 
+                alt={activeCharacter.name}
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">
+                  {activeCharacter?.name?.[0]?.toUpperCase() || '?'}
+                </span>
+              </div>
+            )}
+          </div>
+          
           <span className="text-sm font-medium truncate max-w-[150px]">
-            {activeCharacter?.name || 'Chat'}
+            {headerName}
+          </span>
+          
+          {/* Message count */}
+          <span className="text-xs text-muted-foreground">
+            {activeSession.messages.filter(m => !m.isDeleted).length} msgs
           </span>
         </div>
         
@@ -380,51 +445,108 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
       {/* Messages Area */}
       {!isCollapsed && (
         <>
-          <ScrollArea 
-            className="flex-1 min-h-0" 
-            ref={scrollRef}
-          >
+          <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
             <div className="p-2 space-y-2">
-              {activeSession.messages.filter(m => !m.isDeleted).map((message) => (
-                <ChatMessageBubble
-                  key={message.id}
-                  message={message}
-                  characterName={activeCharacter?.name}
-                  characterAvatar={activeCharacter?.avatar}
-                  showTimestamp={settings.showTimestamps}
-                  onDelete={() => deleteMessage(activeSessionId!, message.id)}
-                  compact
-                />
-              ))}
+              {activeSession.messages.filter(m => !m.isDeleted).map((message) => {
+                // Determine character for this message
+                let messageCharacter: CharacterCard | undefined;
+                let displayName: string | undefined;
+                let displayAvatar: string | undefined;
+                
+                if (message.role === 'user') {
+                  displayName = activePersona?.name || 'You';
+                  displayAvatar = activePersona?.avatar || undefined;
+                } else if (isGroupMode) {
+                  messageCharacter = characters.find(c => c.id === message.characterId);
+                  displayName = messageCharacter?.name;
+                  displayAvatar = messageCharacter?.avatar;
+                } else {
+                  messageCharacter = activeCharacter || undefined;
+                  displayName = activeCharacter?.name;
+                  displayAvatar = activeCharacter?.avatar;
+                }
+                
+                return (
+                  <ChatMessageBubble
+                    key={message.id}
+                    message={message}
+                    characterName={displayName}
+                    characterAvatar={displayAvatar}
+                    userName={activePersona?.name || 'You'}
+                    userAvatar={activePersona?.avatar || undefined}
+                    showTimestamp={settings.showTimestamps}
+                    showTokens={settings.showTokens}
+                    onDelete={() => deleteMessage(activeSessionId!, message.id)}
+                    displayMode={settings.messageDisplay}
+                  />
+                );
+              })}
 
               {/* Streaming Message or Typing Indicator */}
               {isGenerating && (
-                <div className="flex gap-2 py-2">
-                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    {activeCharacter?.avatar ? (
+                <div className="flex gap-2 py-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-amber-500 flex-shrink-0 flex items-center justify-center">
+                    {isGroupMode && streamingCharacter ? (
+                      streamingCharacter.avatar ? (
+                        <img 
+                          src={streamingCharacter.avatar} 
+                          alt={streamingCharacter.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+                          <span className="text-white font-bold text-xs">
+                            {streamingCharacter.name?.[0]?.toUpperCase() || '?'}
+                          </span>
+                        </div>
+                      )
+                    ) : activeCharacter?.avatar ? (
                       <img 
                         src={activeCharacter.avatar} 
-                        alt="" 
-                        className="w-full h-full rounded-full object-cover"
+                        alt={activeCharacter.name}
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-4 h-4 rounded-full bg-amber-500" />
-                    )}
-                  </div>
-                  <div className="bg-muted rounded-lg px-2 py-1.5 max-w-[85%]">
-                    {streamingContent ? (
-                      <StreamingText 
-                        content={streamingContent}
-                        isStreaming={true}
-                        className="text-xs"
-                      />
-                    ) : (
-                      <div className="flex gap-1">
-                        <span className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+                        <span className="text-white font-bold text-xs">
+                          {activeCharacter?.name?.[0]?.toUpperCase() || '?'}
+                        </span>
                       </div>
                     )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    {/* Name above bubble */}
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-xs font-medium">
+                        {isGroupMode && streamingCharacter 
+                          ? streamingCharacter.name 
+                          : activeCharacter?.name || 'Assistant'}
+                      </span>
+                      {streamingProgress && (
+                        <span className="text-[10px] text-muted-foreground">
+                          ({streamingProgress.current}/{streamingProgress.total})
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Content bubble */}
+                    <div className="bg-muted rounded-lg rounded-tl-sm px-3 py-2 max-w-[85%]">
+                      {streamingContent ? (
+                        <StreamingText 
+                          content={streamingContent}
+                          isStreaming={true}
+                          className="text-xs"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -483,7 +605,7 @@ export function NovelChatBox({ onSendMessage, isGenerating, onResetChat, onClear
           {/* Resize Handles */}
           <div
             className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
-            onMouseDown={(e) => handleResizeStart(e, 'corner')}
+            onMouseDown={handleResizeStart}
           >
             <div className="absolute bottom-1 right-1 w-2 h-2 border-r-2 border-b-2 border-muted-foreground/30" />
           </div>

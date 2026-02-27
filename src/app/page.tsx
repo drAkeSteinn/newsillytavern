@@ -6,6 +6,7 @@ import { CharacterPanel } from '@/components/tavern/character-panel';
 import { SessionsSidebar } from '@/components/tavern/sessions-sidebar';
 import { SettingsPanel } from '@/components/tavern/settings-panel';
 import { BackgroundGallery } from '@/components/tavern/background-gallery';
+import { SettingsApplier } from '@/components/tavern/settings-applier';
 import { Button } from '@/components/ui/button';
 import { 
   Menu, 
@@ -14,30 +15,16 @@ import {
   PanelLeft,
   Settings,
   Loader2,
-  Image as ImageIcon,
-  BookOpen,
-  MessageSquare
+  Image as ImageIcon
 } from 'lucide-react';
 import { useState } from 'react';
 import { useHydration } from '@/hooks/use-hydration';
-import { cn } from '@/lib/utils';
 
 export default function TavernFlow() {
-  const { sidebarOpen, setSidebarOpen, settingsOpen, setSettingsOpen, settings, updateSettings } = useTavernStore();
+  const { sidebarOpen, setSidebarOpen, settingsOpen, setSettingsOpen } = useTavernStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [backgroundGalleryOpen, setBackgroundGalleryOpen] = useState(false);
   const hydrated = useHydration();
-
-  const isNovelMode = settings.chatLayout.novelMode;
-
-  const toggleNovelMode = () => {
-    updateSettings({
-      chatLayout: {
-        ...settings.chatLayout,
-        novelMode: !isNovelMode
-      }
-    });
-  };
 
   const togglePanels = () => {
     setSidebarOpen(!sidebarOpen);
@@ -45,6 +32,9 @@ export default function TavernFlow() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Settings Applier - Applies user settings to the app */}
+      <SettingsApplier />
+      
       {/* Header */}
       <header className="h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-4 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -68,25 +58,6 @@ export default function TavernFlow() {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Novel Mode Toggle */}
-          <Button
-            variant={isNovelMode ? "default" : "ghost"}
-            size="sm"
-            className={cn(
-              "gap-2",
-              isNovelMode ? "bg-amber-600 hover:bg-amber-700 text-white" : ""
-            )}
-            onClick={toggleNovelMode}
-            title={isNovelMode ? "Switch to Normal Mode" : "Switch to Novel Mode"}
-          >
-            {isNovelMode ? (
-              <MessageSquare className="w-4 h-4" />
-            ) : (
-              <BookOpen className="w-4 h-4" />
-            )}
-            <span className="hidden sm:inline">{isNovelMode ? "Normal" : "Novel"}</span>
-          </Button>
-          
           {/* Background Gallery Button */}
           <Button
             variant="ghost"

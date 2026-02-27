@@ -1,198 +1,382 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import type { SpriteEntry, SpriteAnimation } from '@/types/triggers';
+import { 
+  Maximize2, 
+  RotateCcw,
+  Settings
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
 
-interface CharacterSpriteProps {
-  sprite?: SpriteEntry;
-  expression?: string;
-  isAnimating?: boolean;
-  isTalking?: boolean;
-  className?: string;
-  onExpressionChange?: (expression: string) => void;
+interface SpriteSettings {
+  x: number;        // percentage (0-100) - horizontal position
+  y: number;        // percentage (0-100) - vertical position from bottom (0 = bottom)
+  width: number;    // percentage (10-80)
+  height: number;   // percentage (10-90)
+  opacity: number;  // 0-1
 }
 
-export function CharacterSprite({
-  sprite,
-  expression = 'neutral',
-  isAnimating = false,
-  isTalking = false,
-  className,
-  onExpressionChange,
+interface CharacterSpriteProps {
+  characterId: string;
+  characterName: string;
+  avatarUrl: string;
+  onSettingsChange?: (settings: SpriteSettings) => void;
+}
+
+const DEFAULT_SPRITE_SETTINGS: SpriteSettings = {
+  x: 50,           // center horizontally
+  y: 0,            // at bottom (0 = bottom, higher values = higher up)
+  width: 35,       // 35% of screen width
+  height: 70,      // 70% of screen height
+  opacity: 0.9
+};
+
+export function CharacterSprite({ 
+  characterId, 
+  characterName, 
+  avatarUrl,
+  onSettingsChange 
 }: CharacterSpriteProps) {
-  const [currentFrame, setCurrentFrame] = useState(0);
-  const [currentExpression, setCurrentExpression] = useState(expression);
-  const animationRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Update expression when prop changes
-  useEffect(() => {
-    setCurrentExpression(expression);
-  }, [expression]);
-
-  // Animation loop for sprite frames
-  useEffect(() => {
-    if (!isAnimating || !sprite?.expressions?.length) {
-      if (animationRef.current) {
-        clearInterval(animationRef.current);
-        animationRef.current = null;
+  const [settings, setSettings] = useState<SpriteSettings>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`sprite-${characterId}`);
+      if (saved) {
+        try {
+          return { ...DEFAULT_SPRITE_SETTINGS, ...JSON.parse(saved) };
+        } catch {
+          return DEFAULT_SPRITE_SETTINGS;
+        }
       }
-      return;
     }
+    return DEFAULT_SPRITE_SETTINGS;
+  });
 
-    const frameInterval = 150; // ms between frames
-    animationRef.current = setInterval(() => {
-      setCurrentFrame((prev) => (prev + 1) % (sprite.expressions?.length || 1));
-    }, frameInterval);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  
+  const spriteRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef({ x: 0, y: 0, settingsX: 0, settingsY: 0 });
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
-    return () => {
-      if (animationRef.current) {
-        clearInterval(animationRef.current);
-      }
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem(`sprite-${characterId}`, JSON.stringify(settings));
+    onSettingsChange?.(settings);
+  }, [settings, characterId, onSettingsChange]);
+
+  // Drag handlers - click anywhere on sprite to drag
+  const handleDragStart = (e: React.MouseEvent) => {
+    // Don't start drag if clicking on controls
+    if ((e.target as HTMLElement).closest('.sprite-controls')) return;
+    if (isResizing) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      settingsX: settings.x,
+      settingsY: settings.y
     };
-  }, [isAnimating, sprite]);
-
-  // Talking animation (subtle bounce)
-  const talkingClass = isTalking ? 'animate-bounce' : '';
-
-  // Get the current image to display
-  const getImageSrc = () => {
-    if (!sprite) return null;
-
-    // If we have multiple images for expressions
-    if (sprite.expressions && sprite.expressions.length > 0) {
-      const expressionIndex = sprite.expressions.indexOf(currentExpression);
-      if (expressionIndex >= 0) {
-        // Build path to expression image
-        return sprite.path.replace(/\.png$/i, `_${currentExpression}.png`);
-      }
-    }
-
-    // Default to main sprite image
-    return sprite.path;
   };
 
-  const imageSrc = getImageSrc();
+  useEffect(() => {
+    if (!isDragging) return;
 
-  if (!sprite) {
-    return (
-      <div
-        className={cn(
-          'relative flex items-center justify-center',
-          'w-64 h-96 rounded-lg bg-gradient-to-b from-transparent to-black/20',
-          className
-        )}
-      >
-        <div className="text-muted-foreground text-sm">
-          No sprite configured
-        </div>
-      </div>
-    );
-  }
+    const handleDragMove = (e: MouseEvent) => {
+      const container = spriteRef.current?.parentElement;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
+      const deltaY = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
+
+      // Calculate new position
+      let newX = dragStartRef.current.settingsX + deltaX;
+      // Invert deltaY because we use 'bottom' positioning
+      // Dragging up (negative deltaY) should increase Y (move sprite up)
+      let newY = dragStartRef.current.settingsY - deltaY;
+
+      // Constrain X: sprite center must stay within screen
+      const halfWidth = settings.width / 2;
+      newX = Math.max(halfWidth, Math.min(100 - halfWidth, newX));
+
+      // Constrain Y: sprite bottom must stay within screen
+      // y = 0 means at bottom, higher values move it up
+      // Maximum Y should not exceed (100 - height) to keep sprite visible
+      const maxY = 100 - settings.height;
+      newY = Math.max(0, Math.min(maxY, newY));
+
+      setSettings(prev => ({ ...prev, x: newX, y: newY }));
+    };
+
+    const handleDragEnd = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+    };
+  }, [isDragging, settings.width, settings.height]);
+
+  // Resize handlers
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: settings.width,
+      height: settings.height
+    };
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleResizeMove = (e: MouseEvent) => {
+      const container = spriteRef.current?.parentElement;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const deltaX = ((e.clientX - resizeStartRef.current.x) / rect.width) * 100;
+      const deltaY = ((e.clientY - resizeStartRef.current.y) / rect.height) * 100;
+
+      let newWidth = Math.max(10, Math.min(80, resizeStartRef.current.width + deltaX * 2));
+      let newHeight = Math.max(10, Math.min(90, resizeStartRef.current.height + deltaY * 2));
+
+      setSettings(prev => ({ 
+        ...prev, 
+        width: newWidth, 
+        height: newHeight 
+      }));
+    };
+
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isResizing]);
+
+  const updateSetting = (key: keyof SpriteSettings, value: number) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const resetSettings = () => {
+    setSettings(DEFAULT_SPRITE_SETTINGS);
+  };
+
+  // Calculate max Y based on height
+  const maxY = Math.max(0, 100 - settings.height);
 
   return (
     <div
+      ref={spriteRef}
       className={cn(
-        'relative flex items-end justify-center',
-        'w-64 h-96 overflow-hidden',
-        talkingClass,
-        className
+        "absolute select-none",
+        isDragging ? "cursor-grabbing" : "cursor-grab"
       )}
+      style={{
+        left: `${settings.x}%`,
+        bottom: `${settings.y}%`,  // y=0 at bottom
+        transform: 'translate(-50%, 0)',
+        width: `${settings.width}%`,
+        height: `${settings.height}%`,
+        opacity: settings.opacity,
+        zIndex: 5
+      }}
+      onMouseDown={handleDragStart}
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => !isDragging && setShowControls(false)}
     >
-      {/* Sprite Image */}
+      {/* The actual sprite image */}
       <img
-        src={imageSrc || sprite.path}
-        alt={sprite.label}
-        className={cn(
-          'max-w-full max-h-full object-contain',
-          'transition-transform duration-150',
-          isAnimating && 'scale-105'
-        )}
-        onError={(e) => {
-          // Fallback to main sprite if expression image not found
-          const target = e.target as HTMLImageElement;
-          if (target.src !== sprite.path) {
-            target.src = sprite.path;
-          }
-        }}
+        src={avatarUrl}
+        alt={characterName}
+        className="w-full h-full object-contain object-bottom drop-shadow-2xl select-none pointer-events-none"
+        draggable={false}
       />
 
-      {/* Expression indicator */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-        <div className="px-2 py-1 rounded-full bg-black/50 text-white text-xs">
-          {currentExpression}
+      {/* Controls overlay - only show on hover */}
+      {showControls && !isDragging && (
+        <div className="sprite-controls absolute top-2 right-2 z-50 flex flex-col gap-1"
+          onMouseEnter={(e) => e.stopPropagation()}
+        >
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="secondary" 
+                size="icon" 
+                className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="end">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm">Sprite Settings</h4>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2"
+                    onClick={resetSettings}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reset
+                  </Button>
+                </div>
+
+                {/* Size sliders */}
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span>Width</span>
+                      <span className="text-muted-foreground">{Math.round(settings.width)}%</span>
+                    </div>
+                    <Slider
+                      value={[settings.width]}
+                      min={10}
+                      max={80}
+                      step={1}
+                      onValueChange={([v]) => updateSetting('width', v)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span>Height</span>
+                      <span className="text-muted-foreground">{Math.round(settings.height)}%</span>
+                    </div>
+                    <Slider
+                      value={[settings.height]}
+                      min={10}
+                      max={90}
+                      step={1}
+                      onValueChange={([v]) => updateSetting('height', v)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span>Opacity</span>
+                      <span className="text-muted-foreground">{Math.round(settings.opacity * 100)}%</span>
+                    </div>
+                    <Slider
+                      value={[settings.opacity * 100]}
+                      min={20}
+                      max={100}
+                      step={1}
+                      onValueChange={([v]) => updateSetting('opacity', v / 100)}
+                    />
+                  </div>
+                </div>
+
+                {/* Position controls */}
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span>X Position (Horizontal)</span>
+                      <span className="text-muted-foreground">{Math.round(settings.x)}%</span>
+                    </div>
+                    <Slider
+                      value={[settings.x]}
+                      min={0}
+                      max={100}
+                      step={1}
+                      onValueChange={([v]) => updateSetting('x', v)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span>Y Position (Vertical from bottom)</span>
+                      <span className="text-muted-foreground">{Math.round(settings.y)}%</span>
+                    </div>
+                    <Slider
+                      value={[settings.y]}
+                      min={0}
+                      max={maxY}
+                      step={1}
+                      onValueChange={([v]) => updateSetting('y', v)}
+                    />
+                  </div>
+                </div>
+
+                {/* Quick position buttons */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setSettings(prev => ({ ...prev, x: 20 }))}
+                  >
+                    Left
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setSettings(prev => ({ ...prev, x: 50 }))}
+                  >
+                    Center
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setSettings(prev => ({ ...prev, x: 80 }))}
+                  >
+                    Right
+                  </Button>
+                </div>
+
+                <p className="text-xs text-muted-foreground pt-2">
+                  💡 Click and drag the sprite to move it anywhere.
+                </p>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-      </div>
+      )}
 
-      {/* Animation glow effect */}
-      {isAnimating && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/20 to-transparent animate-pulse" />
+      {/* Resize handle - top left corner */}
+      {showControls && !isDragging && (
+        <div
+          className="sprite-controls absolute top-2 left-2 w-6 h-6 cursor-nwse-resize bg-background/80 backdrop-blur-sm rounded flex items-center justify-center hover:bg-background/90"
+          onMouseDown={handleResizeStart}
+          onMouseEnter={(e) => e.stopPropagation()}
+        >
+          <div className="w-3 h-3 border-l-2 border-t-2 border-muted-foreground" />
         </div>
       )}
-    </div>
-  );
-}
 
-// ============ Sprite Display with Background ============
-
-interface SpriteSceneProps {
-  sprite?: SpriteEntry;
-  background?: string;
-  expression?: string;
-  isTalking?: boolean;
-  overlay?: string;
-  overlayPlacement?: 'none' | 'back' | 'front';
-}
-
-export function SpriteScene({
-  sprite,
-  background,
-  expression,
-  isTalking,
-  overlay,
-  overlayPlacement = 'none',
-}: SpriteSceneProps) {
-  return (
-    <div className="relative w-full h-full overflow-hidden rounded-lg">
-      {/* Background Layer */}
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: background ? `url(${background})` : undefined,
-          backgroundColor: !background ? '#1a1a2e' : undefined,
-        }}
-      />
-
-      {/* Back Overlay */}
-      {overlay && overlayPlacement === 'back' && (
-        <div
-          className="absolute inset-0 bg-contain bg-center bg-no-repeat pointer-events-none opacity-80"
-          style={{ backgroundImage: `url(${overlay})` }}
-        />
+      {/* Drag indicator border when hovering */}
+      {showControls && !isDragging && (
+        <div className="absolute inset-0 border-2 border-dashed border-primary/30 rounded-lg pointer-events-none" />
       )}
-
-      {/* Character Sprite */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-10">
-        <CharacterSprite
-          sprite={sprite}
-          expression={expression}
-          isTalking={isTalking}
-          isAnimating={isTalking}
-          className="drop-shadow-2xl"
-        />
-      </div>
-
-      {/* Front Overlay */}
-      {overlay && overlayPlacement === 'front' && (
-        <div
-          className="absolute inset-0 bg-contain bg-center bg-no-repeat pointer-events-none opacity-80 z-20"
-          style={{ backgroundImage: `url(${overlay})` }}
-        />
-      )}
-
-      {/* Vignette effect */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-black/20 z-30" />
     </div>
   );
 }

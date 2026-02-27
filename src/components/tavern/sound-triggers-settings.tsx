@@ -31,7 +31,6 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
-  ChevronDown,
   Zap,
   Music
 } from 'lucide-react';
@@ -78,7 +77,7 @@ export function SoundTriggersSettings() {
   // Create new trigger
   const handleAddTrigger = () => {
     const newTrigger: Omit<SoundTrigger, 'id' | 'createdAt' | 'updatedAt' | 'currentIndex'> = {
-      name: `New Trigger ${soundTriggers.length + 1}`,
+      name: `Nuevo Trigger ${soundTriggers.length + 1}`,
       active: true,
       keywords: [],
       keywordsEnabled: {},
@@ -139,17 +138,17 @@ export function SoundTriggersSettings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col gap-4">
       {/* Global Settings */}
-      <div className="p-4 rounded-lg border bg-muted/30 space-y-4">
+      <div className="p-4 rounded-lg border bg-muted/30 space-y-4 flex-shrink-0">
         <h4 className="font-medium flex items-center gap-2">
           <Volume2 className="w-4 h-4" />
-          Global Sound Settings
+          Configuración Global de Sonidos
         </h4>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Enable Sounds</Label>
+        <div className="grid grid-cols-4 gap-4">
+          <label className="flex items-center justify-between p-2 rounded border bg-background">
+            <span className="text-sm">Habilitar</span>
             <Switch
               checked={settings.sound?.enabled ?? true}
               onCheckedChange={(checked) => 
@@ -158,10 +157,10 @@ export function SoundTriggersSettings() {
                 })
               }
             />
-          </div>
+          </label>
           
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Realtime Detection</Label>
+          <label className="flex items-center justify-between p-2 rounded border bg-background">
+            <span className="text-sm">Tiempo Real</span>
             <Switch
               checked={settings.sound?.realtimeEnabled ?? true}
               onCheckedChange={(checked) => 
@@ -170,30 +169,30 @@ export function SoundTriggersSettings() {
                 })
               }
             />
+          </label>
+
+          <div className="col-span-2">
+            <div className="flex justify-between text-sm mb-1">
+              <span>Volumen Global</span>
+              <span className="text-muted-foreground">{Math.round((settings.sound?.globalVolume ?? 0.85) * 100)}%</span>
+            </div>
+            <Slider
+              value={[(settings.sound?.globalVolume ?? 0.85) * 100]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={([value]) => 
+                updateSettings({ 
+                  sound: { ...settings.sound, globalVolume: value / 100 } 
+                })
+              }
+            />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Global Volume</span>
-            <span>{Math.round((settings.sound?.globalVolume ?? 0.85) * 100)}%</span>
-          </div>
-          <Slider
-            value={[(settings.sound?.globalVolume ?? 0.85) * 100]}
-            min={0}
-            max={100}
-            step={1}
-            onValueChange={([value]) => 
-              updateSettings({ 
-                sound: { ...settings.sound, globalVolume: value / 100 } 
-              })
-            }
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <Label className="text-xs">Max Sounds Per Message</Label>
+            <Label className="text-xs">Máx. Sonidos/Mensaje</Label>
             <Input
               type="number"
               min={1}
@@ -204,11 +203,11 @@ export function SoundTriggersSettings() {
                   sound: { ...settings.sound, maxSoundsPerMessage: parseInt(e.target.value) || 3 } 
                 })
               }
-              className="mt-1"
+              className="mt-1 h-8"
             />
           </div>
           <div>
-            <Label className="text-xs">Global Cooldown (ms)</Label>
+            <Label className="text-xs">Enfriamiento Global (ms)</Label>
             <Input
               type="number"
               min={0}
@@ -219,74 +218,75 @@ export function SoundTriggersSettings() {
                   sound: { ...settings.sound, globalCooldown: parseInt(e.target.value) || 150 } 
                 })
               }
-              className="mt-1"
+              className="mt-1 h-8"
             />
+          </div>
+          <div className="flex items-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchCollections}
+              disabled={isLoading}
+              className="w-full h-8"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5 mr-1", isLoading && "animate-spin")} />
+              Actualizar
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Triggers List */}
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium flex items-center gap-2">
-          <Zap className="w-4 h-4" />
-          Sound Triggers ({soundTriggers.length})
-        </h4>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchCollections}
-            disabled={isLoading}
-          >
-            <RefreshCw className={cn("w-4 h-4 mr-1", isLoading && "animate-spin")} />
-            Update Collections
-          </Button>
-          <Button size="sm" onClick={handleAddTrigger}>
-            <Plus className="w-4 h-4 mr-1" />
-            Add Trigger
-          </Button>
+      {/* Triggers Header */}
+      <div className="flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <h4 className="font-medium flex items-center gap-2">
+            <Zap className="w-4 h-4" />
+            Triggers de Sonido ({soundTriggers.length})
+          </h4>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Music className="w-4 h-4" />
+            {isLoading ? (
+              <span>Cargando...</span>
+            ) : (
+              <>
+                <span>{soundCollections.length} colecciones</span>
+                <span className="text-xs">({soundCollections.reduce((acc, c) => acc + c.files.length, 0)} sonidos)</span>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Collections Info */}
-      <div className="p-3 rounded-lg bg-muted/50 text-sm">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Music className="w-4 h-4" />
-          {isLoading ? (
-            <span>Loading collections...</span>
-          ) : (
-            <>
-              <span>{soundCollections.length} collections available</span>
-              <span className="text-xs">({soundCollections.reduce((acc, c) => acc + c.files.length, 0)} sounds total)</span>
-            </>
-          )}
-        </div>
+        <Button size="sm" onClick={handleAddTrigger}>
+          <Plus className="w-4 h-4 mr-1" />
+          Agregar Trigger
+        </Button>
       </div>
 
       {/* No Collections Warning */}
       {!isLoading && soundCollections.length === 0 && (
-        <div className="p-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 text-sm">
-          <p className="font-medium text-yellow-500">No sound collections found</p>
+        <div className="p-4 rounded-lg border border-yellow-500/50 bg-yellow-500/10 text-sm flex-shrink-0">
+          <p className="font-medium text-yellow-500">No se encontraron colecciones de sonidos</p>
           <p className="text-muted-foreground mt-1">
-            Add sound files to <code className="bg-muted px-1 rounded">public/sounds/</code> folder and click "Update Collections"
+            Agrega archivos a <code className="bg-muted px-1 rounded">public/sounds/</code> y haz clic en "Actualizar"
           </p>
         </div>
       )}
 
       {/* Triggers Accordion */}
       {soundTriggers.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <VolumeX className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>No sound triggers configured</p>
-          <p className="text-xs mt-1">Add a trigger to play sounds based on keywords</p>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          <div className="text-center">
+            <VolumeX className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p>No hay triggers de sonido configurados</p>
+            <p className="text-xs mt-1">Agrega un trigger para reproducir sonidos basados en palabras clave</p>
+          </div>
         </div>
       ) : (
-        <ScrollArea className="h-[400px] pr-4">
+        <ScrollArea className="flex-1">
           <Accordion
             type="multiple"
             value={expandedTriggers}
             onValueChange={setExpandedTriggers}
-            className="space-y-2"
+            className="space-y-2 pr-4"
           >
             {soundTriggers.map((trigger) => {
               const collection = soundCollections.find(c => c.name === trigger.collection);
@@ -295,63 +295,101 @@ export function SoundTriggersSettings() {
                 <AccordionItem
                   key={trigger.id}
                   value={trigger.id}
-                  className="border rounded-lg data-[state=open]:bg-muted/20"
+                  className="border rounded-lg data-[state=open]:bg-muted/10"
                 >
-                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <AccordionTrigger className="px-4 py-2 hover:no-underline">
                     <div className="flex items-center gap-3 w-full">
                       <div
                         className={cn(
-                          "w-2 h-2 rounded-full",
+                          "w-2 h-2 rounded-full flex-shrink-0",
                           trigger.active ? "bg-green-500" : "bg-muted-foreground"
                         )}
                       />
-                      <span className="font-medium">{trigger.name}</span>
+                      <span className="font-medium text-sm">{trigger.name}</span>
                       <span className="text-xs text-muted-foreground ml-auto mr-2">
-                        {trigger.keywords.length} keywords · {collection?.files.length || 0} sounds
+                        {trigger.keywords.length} claves · {collection?.files.length || 0} sonidos
                       </span>
                     </div>
                   </AccordionTrigger>
                   
                   <AccordionContent className="px-4 pb-4">
-                    <div className="space-y-4 pt-2">
-                      {/* Trigger Name & Active Toggle */}
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <Label className="text-xs">Trigger Name</Label>
+                    <div className="space-y-3 pt-2">
+                      {/* Row 1: Name, Active, Collection, Play Mode */}
+                      <div className="grid grid-cols-4 gap-3">
+                        <div>
+                          <Label className="text-xs">Nombre</Label>
                           <Input
                             value={trigger.name}
                             onChange={(e) => updateSoundTrigger(trigger.id, { name: e.target.value })}
-                            className="mt-1"
+                            className="mt-1 h-8"
                           />
                         </div>
-                        <div className="flex items-center gap-2 pt-4">
-                          <Label className="text-sm">Active</Label>
-                          <Switch
-                            checked={trigger.active}
-                            onCheckedChange={() => toggleSoundTrigger(trigger.id)}
-                          />
+                        <div className="flex items-end pb-1">
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <Switch
+                              checked={trigger.active}
+                              onCheckedChange={() => toggleSoundTrigger(trigger.id)}
+                            />
+                            Activo
+                          </label>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Colección</Label>
+                          <Select
+                            value={trigger.collection}
+                            onValueChange={(value) => updateSoundTrigger(trigger.id, { collection: value })}
+                          >
+                            <SelectTrigger className="mt-1 h-8">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {soundCollections.map((col) => (
+                                <SelectItem key={col.name} value={col.name}>
+                                  {col.name === '__root__' ? 'Raíz' : col.name}
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({col.files.length})
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Modo</Label>
+                          <Select
+                            value={trigger.playMode}
+                            onValueChange={(value: 'random' | 'cyclic') => 
+                              updateSoundTrigger(trigger.id, { playMode: value })
+                            }
+                          >
+                            <SelectTrigger className="mt-1 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="random">Aleatorio</SelectItem>
+                              <SelectItem value="cyclic">Cíclico</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
-                      {/* Keywords */}
-                      <div className="space-y-2">
-                        <Label className="text-xs">Keywords (comma-separated)</Label>
+                      {/* Row 2: Keywords */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Palabras Clave (separadas por coma)</Label>
                         <Input
                           value={trigger.keywords.join(', ')}
                           onChange={(e) => handleKeywordsChange(trigger.id, e.target.value)}
-                          placeholder="golpe, impact, punch..."
-                          className="mt-1"
+                          placeholder="golpe, impacto, puño..."
+                          className="h-8"
                         />
-                        
-                        {/* Keyword Toggles */}
                         {trigger.keywords.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
+                          <div className="flex flex-wrap gap-1.5 mt-1">
                             {trigger.keywords.map((keyword) => (
                               <button
                                 key={keyword}
                                 onClick={() => toggleSoundKeyword(trigger.id, keyword)}
                                 className={cn(
-                                  "px-2 py-1 rounded text-xs transition-colors",
+                                  "px-2 py-0.5 rounded text-xs transition-colors",
                                   trigger.keywordsEnabled[keyword]
                                     ? "bg-primary text-primary-foreground"
                                     : "bg-muted text-muted-foreground line-through"
@@ -364,70 +402,25 @@ export function SoundTriggersSettings() {
                         )}
                       </div>
 
-                      {/* Collection & Play Mode */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-xs">Sound Collection</Label>
-                          <Select
-                            value={trigger.collection}
-                            onValueChange={(value) => updateSoundTrigger(trigger.id, { collection: value })}
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select collection" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {soundCollections.map((col) => (
-                                <SelectItem key={col.name} value={col.name}>
-                                  {col.name === '__root__' ? 'Root Sounds' : col.name}
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    ({col.files.length})
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label className="text-xs">Play Mode</Label>
-                          <Select
-                            value={trigger.playMode}
-                            onValueChange={(value: 'random' | 'cyclic') => 
-                              updateSoundTrigger(trigger.id, { playMode: value })
+                      {/* Row 3: Volume, Cooldown, Delay */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span>Volumen</span>
+                            <span className="text-muted-foreground">{Math.round(trigger.volume * 100)}%</span>
+                          </div>
+                          <Slider
+                            value={[trigger.volume * 100]}
+                            min={0}
+                            max={100}
+                            step={1}
+                            onValueChange={([value]) => 
+                              updateSoundTrigger(trigger.id, { volume: value / 100 })
                             }
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="random">Random</SelectItem>
-                              <SelectItem value="cyclic">Cyclic (in order)</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          />
                         </div>
-                      </div>
-
-                      {/* Volume */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Volume</span>
-                          <span>{Math.round(trigger.volume * 100)}%</span>
-                        </div>
-                        <Slider
-                          value={[trigger.volume * 100]}
-                          min={0}
-                          max={100}
-                          step={1}
-                          onValueChange={([value]) => 
-                            updateSoundTrigger(trigger.id, { volume: value / 100 })
-                          }
-                        />
-                      </div>
-
-                      {/* Cooldown & Delay */}
-                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label className="text-xs">Cooldown (ms)</Label>
+                          <Label className="text-xs">Enfriamiento (ms)</Label>
                           <Input
                             type="number"
                             min={0}
@@ -436,11 +429,11 @@ export function SoundTriggersSettings() {
                             onChange={(e) => 
                               updateSoundTrigger(trigger.id, { cooldown: parseInt(e.target.value) || 0 })
                             }
-                            className="mt-1"
+                            className="mt-1 h-8"
                           />
                         </div>
                         <div>
-                          <Label className="text-xs">Delay (ms)</Label>
+                          <Label className="text-xs">Retardo (ms)</Label>
                           <Input
                             type="number"
                             min={0}
@@ -449,40 +442,43 @@ export function SoundTriggersSettings() {
                             onChange={(e) => 
                               updateSoundTrigger(trigger.id, { delay: parseInt(e.target.value) || 0 })
                             }
-                            className="mt-1"
+                            className="mt-1 h-8"
                           />
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex gap-2 pt-2">
+                      {/* Row 4: Actions */}
+                      <div className="flex gap-2 pt-1">
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-7 text-xs"
                           onClick={() => handleTestSound(trigger)}
                           disabled={testingSound === trigger.id || !collection?.files.length}
                         >
                           <Play className={cn(
-                            "w-4 h-4 mr-1",
+                            "w-3 h-3 mr-1",
                             testingSound === trigger.id && "animate-pulse"
                           )} />
-                          Test
+                          Probar
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-7 text-xs"
                           onClick={() => cloneSoundTrigger(trigger.id)}
                         >
-                          <Copy className="w-4 h-4 mr-1" />
-                          Clone
+                          <Copy className="w-3 h-3 mr-1" />
+                          Clonar
                         </Button>
                         <Button
                           variant="destructive"
                           size="sm"
+                          className="h-7 text-xs"
                           onClick={() => deleteSoundTrigger(trigger.id)}
                         >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Delete
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Eliminar
                         </Button>
                       </div>
                     </div>

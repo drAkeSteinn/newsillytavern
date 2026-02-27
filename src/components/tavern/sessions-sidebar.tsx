@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export function SessionsSidebar() {
   const {
@@ -26,7 +27,8 @@ export function SessionsSidebar() {
     sidebarOpen,
     setSidebarOpen,
     setSettingsOpen,
-    activeCharacterId
+    activeCharacterId,
+    groups
   } = useTavernStore();
 
   const handleNewChat = () => {
@@ -37,10 +39,15 @@ export function SessionsSidebar() {
 
   const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Delete this chat?')) {
+    if (confirm('¿Eliminar este chat?')) {
       deleteSession(sessionId);
     }
   };
+
+  // Sort sessions by last activity
+  const sortedSessions = [...sessions].sort((a, b) => 
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 
   return (
     <div className={cn(
@@ -56,6 +63,7 @@ export function SessionsSidebar() {
             size="icon" 
             className="h-7 w-7"
             onClick={() => setSettingsOpen(true)}
+            title="Configuración"
           >
             <Settings className="w-4 h-4" />
           </Button>
@@ -64,6 +72,7 @@ export function SessionsSidebar() {
             size="icon" 
             className="h-7 w-7"
             onClick={() => setSidebarOpen(false)}
+            title="Ocultar panel"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -79,7 +88,7 @@ export function SessionsSidebar() {
           disabled={!activeCharacterId}
         >
           <Plus className="w-4 h-4" />
-          New Chat
+          Nuevo Chat
         </Button>
       </div>
 
@@ -89,24 +98,32 @@ export function SessionsSidebar() {
           {sessions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">
               <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>No chats yet</p>
+              <p>Sin chats aún</p>
             </div>
           ) : (
-            sessions.map((session) => {
-              const character = getCharacterById(session.characterId);
+            sortedSessions.map((session) => {
+              const isGroup = !!session.groupId;
+              const group = isGroup ? groups.find(g => g.id === session.groupId) : null;
+              const character = !isGroup ? getCharacterById(session.characterId) : null;
+              
               return (
                 <div
                   key={session.id}
                   className={cn(
-                    'group flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors',
+                    'flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors group',
                     activeSessionId === session.id 
                       ? 'bg-primary/10 border border-primary/20' 
                       : 'hover:bg-muted'
                   )}
                   onClick={() => setActiveSession(session.id)}
                 >
+                  {/* Avatar */}
                   <div className="w-8 h-8 rounded-lg overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
-                    {character?.avatar ? (
+                    {isGroup ? (
+                      <div className="w-full h-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-white" />
+                      </div>
+                    ) : character?.avatar ? (
                       <img 
                         src={character.avatar} 
                         alt={character.name}
@@ -117,18 +134,20 @@ export function SessionsSidebar() {
                     )}
                   </div>
 
+                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{session.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {session.messages.length} messages • {formatDistanceToNow(new Date(session.updatedAt), { addSuffix: true })}
+                    <p className="font-medium text-sm truncate">
+                      {isGroup ? group?.name : character?.name || session.name}
                     </p>
                   </div>
 
+                  {/* Delete button - always visible */}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0 opacity-60 hover:opacity-100"
                     onClick={(e) => handleDeleteSession(session.id, e)}
+                    title="Eliminar"
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -143,7 +162,7 @@ export function SessionsSidebar() {
       <div className="p-3 border-t space-y-2">
         <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground">
           <Users className="w-4 h-4" />
-          Groups
+          Grupos
         </Button>
       </div>
     </div>
