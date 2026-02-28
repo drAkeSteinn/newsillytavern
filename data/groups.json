@@ -1,0 +1,36 @@
+[
+  {
+    "name": "Clinica",
+    "description": "Una clinica rota",
+    "systemPrompt": "",
+    "activationStrategy": "all",
+    "maxResponsesPerTurn": 3,
+    "allowMentions": true,
+    "mentionTriggers": [],
+    "conversationStyle": "sequential",
+    "characterIds": [
+      "9347d77a-b189-44fc-8f36-7e0bb3599c16",
+      "c94f4257-b46d-471d-b8f5-831ceea0254b"
+    ],
+    "members": [
+      {
+        "characterId": "9347d77a-b189-44fc-8f36-7e0bb3599c16",
+        "role": "member",
+        "isActive": true,
+        "isPresent": true,
+        "joinOrder": 0
+      },
+      {
+        "characterId": "c94f4257-b46d-471d-b8f5-831ceea0254b",
+        "role": "member",
+        "isActive": true,
+        "isPresent": true,
+        "joinOrder": 1
+      }
+    ],
+    "avatar": "",
+    "id": "ec563464-f9a9-4507-a8dd-6e50d0395292",
+    "createdAt": "2026-02-27T20:48:18.761Z",
+    "updatedAt": "2026-02-27T20:48:18.761Z"
+  }
+]

@@ -10,6 +10,9 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { getLogger } from '@/lib/logger';
+
+const triggerLogger = getLogger('trigger');
 import { 
   Volume2, 
   Image as ImageIcon, 
@@ -92,7 +95,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
   const handleTestSound = (src: string) => {
     const audio = new Audio(src);
     audio.volume = settings.globalVolume;
-    audio.play().catch(console.error);
+    audio.play().catch((error) => triggerLogger.error('Audio play failed', { error }));
   };
 
   return (

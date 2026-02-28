@@ -32,6 +32,9 @@ import {
 } from '@/components/ui/tooltip';
 import { useTavernStore } from '@/store/tavern-store';
 import type { BackgroundFit } from '@/types';
+import { getLogger } from '@/lib/logger';
+
+const bgLogger = getLogger('background');
 
 interface BackgroundFile {
   name: string;
@@ -75,7 +78,7 @@ export function BackgroundGallery({ open, onOpenChange }: BackgroundGalleryProps
       const data = await response.json();
       setCollections(data.collections || []);
     } catch (error) {
-      console.error('Error fetching backgrounds:', error);
+      bgLogger.error('Error fetching backgrounds', { error });
     } finally {
       setIsLoading(false);
     }

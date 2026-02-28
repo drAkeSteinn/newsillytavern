@@ -184,7 +184,7 @@ export function BackgroundWithOverlays({
       {overlay && (
         <div 
           className={cn(
-            "absolute inset-0 bg-background/40 z-20",
+            "absolute inset-0 bg-background/40 z-20 pointer-events-none",
             blur && "backdrop-blur-[2px]"
           )}
           style={{ transition: `opacity ${transitionDuration}ms ease-in-out` }}

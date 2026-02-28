@@ -7,8 +7,11 @@ import { NovelChatBox } from './novel-chat-box';
 import { CharacterSprite } from './character-sprite';
 import { useSoundTriggers } from '@/hooks/use-sound-triggers';
 import { useBackgroundTriggers } from '@/hooks/use-background-triggers';
+import { GroupSprites } from './group-sprites';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard } from '@/types';
+import { t } from '@/lib/i18n';
+import { chatLogger } from '@/lib/logger';
 
 export function ChatPanel() {
   const [streamingContent, setStreamingContent] = useState('');
@@ -34,7 +37,12 @@ export function ChatPanel() {
   const addMessage = useTavernStore((state) => state.addMessage);
   const deleteMessage = useTavernStore((state) => state.deleteMessage);
   const updateSession = useTavernStore((state) => state.updateSession);
+  const addSwipeAlternative = useTavernStore((state) => state.addSwipeAlternative);
 
+  // Ref to track ongoing generation and prevent race conditions
+  const generationIdRef = useRef<string | null>(null);
+  const isGenerationInProgressRef = useRef(false);
+  
   // Get derived values from subscribed state
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeCharacter = characters.find((c) => c.id === activeCharacterId);
@@ -53,11 +61,28 @@ export function ChatPanel() {
   // Track current streaming message key for triggers
   const streamingMessageKeyRef = useRef<string>('');
 
+  // Sync ref with store state
+  useEffect(() => {
+    if (!isGenerating && isGenerationInProgressRef.current) {
+      // Store says not generating but we think we are - cleanup
+      isGenerationInProgressRef.current = false;
+      generationIdRef.current = null;
+    }
+  }, [isGenerating]);
+
   const handleSend = useCallback(async (userMessage: string) => {
-    if (!userMessage.trim() || isGenerating || !activeSessionId) return;
+    // Double-check using both state and ref to prevent race conditions
+    if (!userMessage.trim()) return;
+    if (isGenerating || isGenerationInProgressRef.current) return;
+    if (!activeSessionId) return;
     
     // For group mode, we don't need activeCharacter
     if (!isGroupMode && !activeCharacter) return;
+
+    // Generate a unique ID for this generation
+    const generationId = `gen_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    generationIdRef.current = generationId;
+    isGenerationInProgressRef.current = true;
 
     setGenerating(true);
     setStreamingContent('');
@@ -80,13 +105,16 @@ export function ChatPanel() {
       swipeIndex: 0
     });
 
+    // Helper to check if this generation is still the active one
+    const isStillActive = () => generationIdRef.current === generationId;
+
     try {
       // Get the active LLM config
       const { llmConfigs } = useTavernStore.getState();
       const activeLLMConfig = llmConfigs.find(c => c.isActive);
       
       if (!activeLLMConfig) {
-        throw new Error('No active LLM configuration. Please configure an LLM connection in settings.');
+        throw new Error(t('chat.noLLM'));
       }
 
       // Get current session messages (before adding the user message, since we just added it)
@@ -95,6 +123,9 @@ export function ChatPanel() {
 
       // Check if streaming is enabled
       const useStreaming = activeLLMConfig.parameters.stream;
+      
+      // Get context settings from store
+      const contextConfig = settings.context;
 
       // Handle group chat
       if (isGroupMode && activeGroup) {
@@ -103,7 +134,7 @@ export function ChatPanel() {
         const groupCharacters = characters.filter(c => groupCharacterIds.includes(c.id));
         
         if (groupCharacters.length === 0) {
-          throw new Error('No characters in this group. Add characters to the group first.');
+          throw new Error(t('chat.noGroupCharacters'));
         }
 
         // Use group streaming endpoint
@@ -119,13 +150,14 @@ export function ChatPanel() {
             messages: currentMessages.filter((m: { isDeleted: boolean }) => !m.isDeleted),
             llmConfig: activeLLMConfig,
             userName: activePersona?.name || 'User',
-            persona: activePersona
+            persona: activePersona,
+            contextConfig
           })
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to start group streaming');
+          throw new Error(errorData.error || t('chat.error.streaming'));
         }
 
         const reader = response.body?.getReader();
@@ -138,6 +170,12 @@ export function ChatPanel() {
 
         try {
           while (true) {
+            // Check if generation was cancelled
+            if (!isStillActive()) {
+              reader.cancel();
+              break;
+            }
+            
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -170,21 +208,24 @@ export function ChatPanel() {
                   scanSoundTriggers(currentCharacterContent, streamingMessageKeyRef.current);
                   scanForBackgroundTriggers(currentCharacterContent, streamingMessageKeyRef.current);
                 } else if (parsed.type === 'character_done') {
-                  if (parsed.fullContent && activeSessionId) {
+                  if (parsed.fullContent && activeSessionId && isStillActive()) {
                     addMessage(activeSessionId, {
                       characterId: parsed.characterId,
                       role: 'assistant',
                       content: parsed.fullContent,
                       isDeleted: false,
                       swipeId: crypto.randomUUID(),
-                      swipeIndex: 0
+                      swipeIndex: 0,
+                      metadata: {
+                        promptData: parsed.promptSections || []
+                      }
                     });
                   }
                   setStreamingContent('');
                   setStreamingCharacter(null);
                 } else if (parsed.type === 'character_error') {
-                  console.error(`Character ${parsed.characterName} error:`, parsed.error);
-                  if (activeSessionId) {
+                  chatLogger.error(`Character ${parsed.characterName} error`, { error: parsed.error });
+                  if (activeSessionId && isStillActive()) {
                     addMessage(activeSessionId, {
                       characterId: parsed.characterId,
                       role: 'system',
@@ -201,7 +242,7 @@ export function ChatPanel() {
                 if (parseError instanceof Error && !parseError.message.includes('JSON')) {
                   throw parseError;
                 }
-                console.warn('Failed to parse SSE data:', data);
+                chatLogger.debug('Failed to parse SSE data (group)', { data });
               }
             }
           }
@@ -228,13 +269,14 @@ export function ChatPanel() {
             messages: currentMessages.filter((m: { isDeleted: boolean }) => !m.isDeleted),
             llmConfig: activeLLMConfig,
             userName: activePersona?.name || 'User',
-            persona: activePersona
+            persona: activePersona,
+            contextConfig
           })
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to start streaming');
+          throw new Error(errorData.error || t('chat.error.streaming'));
         }
 
         const reader = response.body?.getReader();
@@ -243,9 +285,16 @@ export function ChatPanel() {
         const decoder = new TextDecoder();
         let accumulatedContent = '';
         let buffer = '';
+        let promptSections: { type: string; label: string; content: string; color: string }[] = [];
 
         try {
           while (true) {
+            // Check if generation was cancelled
+            if (!isStillActive()) {
+              reader.cancel();
+              break;
+            }
+            
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -262,7 +311,10 @@ export function ChatPanel() {
               try {
                 const parsed = JSON.parse(data);
                 
-                if (parsed.type === 'token' && parsed.content) {
+                if (parsed.type === 'prompt_data' && parsed.promptSections) {
+                  // Capture prompt sections for metadata
+                  promptSections = parsed.promptSections;
+                } else if (parsed.type === 'token' && parsed.content) {
                   accumulatedContent += parsed.content;
                   setStreamingContent(accumulatedContent);
                   scanSoundTriggers(accumulatedContent, streamingMessageKeyRef.current);
@@ -277,14 +329,17 @@ export function ChatPanel() {
                     cleanedMessage = cleanedMessage.slice(namePrefix.length).trim();
                   }
                   
-                  if (cleanedMessage) {
+                  if (cleanedMessage && isStillActive()) {
                     addMessage(activeSessionId, {
                       characterId: activeCharacter.id,
                       role: 'assistant',
                       content: cleanedMessage,
                       isDeleted: false,
                       swipeId: crypto.randomUUID(),
-                      swipeIndex: 0
+                      swipeIndex: 0,
+                      metadata: {
+                        promptData: promptSections
+                      }
                     });
                   }
                   setStreamingContent('');
@@ -293,7 +348,7 @@ export function ChatPanel() {
                 if (parseError instanceof Error && !parseError.message.includes('JSON')) {
                   throw parseError;
                 }
-                console.warn('Failed to parse SSE data:', data);
+                chatLogger.debug('Failed to parse SSE data (single)', { data });
               }
             }
           }
@@ -312,49 +367,184 @@ export function ChatPanel() {
             messages: currentMessages.filter((m: { isDeleted: boolean }) => !m.isDeleted),
             llmConfig: activeLLMConfig,
             userName: activePersona?.name || 'User',
-            persona: activePersona
+            persona: activePersona,
+            contextConfig
           })
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to generate response');
+          throw new Error(data.error || t('chat.error.generation'));
         }
 
-        addMessage(activeSessionId, {
-          characterId: activeCharacter.id,
-          role: 'assistant',
-          content: data.message,
-          isDeleted: false,
-          swipeId: crypto.randomUUID(),
-          swipeIndex: 0,
-          metadata: {
-            tokens: data.usage?.totalTokens,
-            model: data.model
-          }
-        });
+        if (isStillActive()) {
+          addMessage(activeSessionId, {
+            characterId: activeCharacter.id,
+            role: 'assistant',
+            content: data.message,
+            isDeleted: false,
+            swipeId: crypto.randomUUID(),
+            swipeIndex: 0,
+            metadata: {
+              tokens: data.usage?.totalTokens,
+              model: data.model
+            }
+          });
+        }
       }
     } catch (error) {
-      console.error('Generation error:', error);
-      addMessage(activeSessionId, {
-        characterId: activeCharacter?.id || 'system',
-        role: 'system',
-        content: `⚠️ ${error instanceof Error ? error.message : 'Failed to generate response. Please check your LLM configuration.'}`,
-        isDeleted: false,
-        swipeId: crypto.randomUUID(),
-        swipeIndex: 0
-      });
+      chatLogger.error('Generation error', { error });
+      if (isStillActive() && activeSessionId) {
+        addMessage(activeSessionId, {
+          characterId: activeCharacter?.id || 'system',
+          role: 'system',
+          content: `⚠️ ${error instanceof Error ? error.message : t('chat.error.generation')}`,
+          isDeleted: false,
+          swipeId: crypto.randomUUID(),
+          swipeIndex: 0
+        });
+      }
     } finally {
-      setGenerating(false);
-      setStreamingContent('');
+      // Only clear generation state if this is still the active generation
+      if (isStillActive()) {
+        setGenerating(false);
+        setStreamingContent('');
+        isGenerationInProgressRef.current = false;
+        generationIdRef.current = null;
+      }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, resetSoundDetection, scanSoundTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, resetSoundDetection, scanSoundTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context]);
+
+  // Handle regenerate - create a new swipe alternative for an existing message
+  const handleRegenerate = useCallback(async (messageId: string) => {
+    if (isGenerating || isGenerationInProgressRef.current || !activeSessionId) return;
+    
+    // Generate a unique ID for this regeneration
+    const generationId = `regen_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    generationIdRef.current = generationId;
+    isGenerationInProgressRef.current = true;
+
+    setGenerating(true);
+    setStreamingContent('');
+
+    // Helper to check if this generation is still the active one
+    const isStillActive = () => generationIdRef.current === generationId;
+
+    try {
+      // Get the active LLM config
+      const { llmConfigs } = useTavernStore.getState();
+      const activeLLMConfig = llmConfigs.find(c => c.isActive);
+      
+      if (!activeLLMConfig) {
+        throw new Error(t('chat.error.noConfig'));
+      }
+
+      // Get current session messages
+      const currentSession = useTavernStore.getState().sessions.find(s => s.id === activeSessionId);
+      const currentMessages = currentSession?.messages || [];
+      const contextConfig = settings.context;
+
+      // Use regenerate endpoint
+      const response = await fetch('/api/chat/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: activeSessionId,
+          messageId,
+          character: activeCharacter,
+          messages: currentMessages.filter((m: { isDeleted: boolean }) => !m.isDeleted),
+          llmConfig: activeLLMConfig,
+          userName: activePersona?.name || 'User',
+          persona: activePersona,
+          contextConfig
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || t('chat.error.regeneration'));
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+      let buffer = '';
+
+      try {
+        while (true) {
+          if (!isStillActive()) {
+            reader.cancel();
+            break;
+          }
+          
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const messages = buffer.split('\n\n');
+          buffer = messages.pop() || '';
+
+          for (const message of messages) {
+            const dataMatch = message.match(/^data: (.+)$/s);
+            if (!dataMatch) continue;
+            
+            const data = dataMatch[1];
+            
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.type === 'token' && parsed.content) {
+                accumulatedContent += parsed.content;
+                setStreamingContent(accumulatedContent);
+              } else if (parsed.type === 'error') {
+                throw new Error(parsed.error);
+              } else if (parsed.type === 'done' && parsed.content && isStillActive()) {
+                // Add the regenerated content as a new swipe alternative
+                addSwipeAlternative(activeSessionId, messageId, parsed.content);
+              }
+            } catch (parseError) {
+              if (parseError instanceof Error && !parseError.message.includes('JSON')) {
+                throw parseError;
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      chatLogger.error('Regeneration error', { error });
+    } finally {
+      if (isStillActive()) {
+        setGenerating(false);
+        setStreamingContent('');
+        isGenerationInProgressRef.current = false;
+        generationIdRef.current = null;
+      }
+    }
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, addSwipeAlternative, setGenerating, settings.context]);
 
   const handleResetChat = () => {
-    if (!activeSessionId || !activeCharacter) return;
+    if (!activeSessionId) return;
     
-    if (confirm('Reset chat to the first message from the character?')) {
+    // Group mode reset
+    if (isGroupMode && activeGroup) {
+      if (confirm(t('chat.resetConfirm'))) {
+        updateSession(activeSessionId, { 
+          messages: [],
+          updatedAt: new Date().toISOString()
+        });
+      }
+      return;
+    }
+    
+    // Single character mode reset
+    if (!activeCharacter) return;
+    
+    if (confirm(t('chat.resetFirstConfirm'))) {
       const firstMessage = {
         id: crypto.randomUUID(),
         characterId: activeCharacter.id,
@@ -374,8 +564,13 @@ export function ChatPanel() {
   };
 
   const handleClearChat = () => {
-    if (activeSessionId && confirm('Are you sure you want to clear all messages?')) {
-      updateSession(activeSessionId, { messages: [] });
+    if (!activeSessionId) return;
+    
+    if (confirm(t('chat.clearConfirm'))) {
+      updateSession(activeSessionId, { 
+        messages: [],
+        updatedAt: new Date().toISOString()
+      });
     }
   };
 
@@ -395,9 +590,9 @@ export function ChatPanel() {
           <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
             <Sparkles className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold">Welcome to TavernFlow</h2>
+          <h2 className="text-2xl font-bold">{t('chat.welcome.title')}</h2>
           <p className="text-muted-foreground max-w-md">
-            Select a character from the sidebar to start chatting, or create a new character to begin your adventure.
+            {t('chat.welcome.subtitle')}
           </p>
         </div>
       </div>
@@ -416,12 +611,25 @@ export function ChatPanel() {
         transitionDuration={settings.backgroundTriggers?.transitionDuration || 500}
       />
 
-      {/* Character Sprite Area - Draggable and Resizable */}
-      {settings.chatLayout.showCharacterSprite && activeCharacter?.avatar && (
+      {/* Character Sprite Area - Single Character Mode */}
+      {!isGroupMode && settings.chatLayout.showCharacterSprite && activeCharacter?.avatar && (
         <CharacterSprite
           characterId={activeCharacter.id}
           characterName={activeCharacter.name}
           avatarUrl={activeCharacter.avatar}
+          spriteConfig={activeCharacter.spriteConfig}
+          isStreaming={isGenerating && !!streamingContent}
+        />
+      )}
+
+      {/* Group Sprites - Multiple Characters */}
+      {isGroupMode && settings.chatLayout.showCharacterSprite && activeGroup && (
+        <GroupSprites
+          characters={characters.filter(c => 
+            (activeGroup.members?.map(m => m.characterId) || activeGroup.characterIds || []).includes(c.id)
+          )}
+          activeCharacterId={streamingCharacter?.id || null}
+          isStreaming={isGenerating && !!streamingContent}
         />
       )}
 
@@ -431,6 +639,7 @@ export function ChatPanel() {
         isGenerating={isGenerating}
         onResetChat={handleResetChat}
         onClearChat={handleClearChat}
+        onRegenerate={handleRegenerate}
         streamingContent={streamingContent}
         streamingCharacter={streamingCharacter}
         streamingProgress={streamingProgress}

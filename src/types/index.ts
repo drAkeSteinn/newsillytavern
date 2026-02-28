@@ -20,17 +20,32 @@ export interface CharacterCard {
   tags: string[];
   avatar: string;
   sprites: CharacterSprite[];
+  spriteConfig?: SpriteConfig;  // Sprite configuration for the character
   voice: VoiceSettings | null;
   createdAt: string;
   updatedAt: string;
 }
 
+// Sprite state type
+export type SpriteState = 'idle' | 'talk' | 'thinking' | 'happy' | 'sad' | 'angry';
+
+// Single sprite with state mapping
 export interface CharacterSprite {
   id: string;
   name: string;
-  expression: string;
+  expression: string;  // Legacy: kept for backward compatibility
   imageUrl: string;
+  state?: SpriteState;  // Which state this sprite is for
   animations?: SpriteAnimation[];
+}
+
+// Sprite configuration for a character
+export interface SpriteConfig {
+  enabled: boolean;
+  collection?: string;  // Selected collection name
+  sprites: {
+    [key in SpriteState]?: string;  // URL to sprite for each state
+  };
 }
 
 export interface SpriteAnimation {
@@ -38,6 +53,20 @@ export interface SpriteAnimation {
   frames: string[];
   frameDuration: number;
   loop: boolean;
+}
+
+// Sprite collection from the filesystem
+export interface SpriteCollection {
+  id: string;
+  name: string;
+  path: string;
+  files: SpriteFile[];
+}
+
+export interface SpriteFile {
+  name: string;
+  url: string;
+  type: 'image' | 'animation';
 }
 
 // ============ Chat Types ============
@@ -51,6 +80,7 @@ export interface ChatMessage {
   isDeleted: boolean;
   swipeId: string;
   swipeIndex: number;
+  swipes: string[];           // Array of all swipe alternatives (content is swipes[swipeIndex])
   metadata?: MessageMetadata;
 }
 
@@ -58,6 +88,15 @@ export interface MessageMetadata {
   tokens?: number;
   model?: string;
   finishReason?: string;
+  promptData?: PromptSection[];  // Store the prompt sent to LLM
+}
+
+// Prompt section for displaying in prompt viewer
+export interface PromptSection {
+  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'post_history' | 'chat_history' | 'instructions';
+  label: string;
+  content: string;
+  color: string;  // Tailwind color class for the section header
 }
 
 export interface ChatSession {
@@ -342,6 +381,16 @@ export interface ChatLayoutSettings {
 
 export type BackgroundFit = 'cover' | 'contain' | 'stretch';
 
+// Context settings for message limits
+export interface ContextSettings {
+  maxMessages: number;           // Maximum messages in context (sliding window)
+  maxTokens: number;             // Maximum tokens for context
+  keepFirstN: number;            // Always keep first N messages
+  keepLastN: number;             // Always keep last N messages
+  enableSummaries: boolean;      // Enable future summarization
+  summaryThreshold: number;      // When to trigger summarization
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   fontSize: number;
@@ -360,6 +409,7 @@ export interface AppSettings {
   sound: SoundSettings;
   backgroundTriggers: BackgroundTriggerSettings;
   chatLayout: ChatLayoutSettings;
+  context: ContextSettings;
 }
 
 // ============ API Types ============

@@ -37,6 +37,9 @@ import { GroupEditor } from './group-editor';
 import { importCharacterCard, exportCharacterCardAsPng, exportCharacterCardAsJson } from '@/lib/character-card';
 import type { CharacterCard, ChatSession } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { getLogger } from '@/lib/logger';
+
+const charLogger = getLogger('character');
 
 export function CharacterPanel() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -191,7 +194,7 @@ export function CharacterPanel() {
         description: `"${character.name || 'Personaje sin nombre'}" ha sido importado exitosamente.`
       });
     } catch (error) {
-      console.error('Import error:', error);
+      charLogger.error('Import error', { error, source: 'file-input' });
       toast({
         title: 'Error de Importación',
         description: 'Ocurrió un error al importar el personaje.',
@@ -234,7 +237,7 @@ export function CharacterPanel() {
         description: `"${character.name}" ha sido exportado como ${format.toUpperCase()}.`
       });
     } catch (error) {
-      console.error('Export error:', error);
+      charLogger.error('Export error', { error, characterName: character.name, format });
       toast({
         title: 'Error de Exportación',
         description: 'Ocurrió un error al exportar el personaje.',
@@ -303,7 +306,7 @@ export function CharacterPanel() {
         description: `"${character.name || 'Personaje sin nombre'}" ha sido importado exitosamente.`
       });
     } catch (error) {
-      console.error('Import error:', error);
+      charLogger.error('Import error', { error, source: 'drag-drop' });
       toast({
         title: 'Error de Importación',
         description: 'Ocurrió un error al importar el personaje.',

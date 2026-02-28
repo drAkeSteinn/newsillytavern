@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import type { SoundTrigger, SoundCollection } from '@/types';
+import { getLogger } from '@/lib/logger';
 import {
   Plus,
   Play,
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 
 export function SoundTriggersSettings() {
+  const soundLogger = getLogger('sound');
   const {
     soundTriggers,
     soundCollections,
@@ -60,10 +62,10 @@ export function SoundTriggersSettings() {
     try {
       const response = await fetch('/api/sounds/collections');
       const data = await response.json();
-      console.log('[SoundTriggers] Loaded collections:', data.collections?.length || 0);
+      soundLogger.debug('Loaded sound collections', { count: data.collections?.length || 0 });
       setSoundCollections(data.collections);
     } catch (error) {
-      console.error('Failed to fetch sound collections:', error);
+      soundLogger.error('Failed to fetch sound collections', { error });
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +115,7 @@ export function SoundTriggersSettings() {
         });
       }
     } catch (error) {
-      console.error('Failed to play sound:', error);
+      soundLogger.error('Failed to play sound', { error });
     } finally {
       setTimeout(() => setTestingSound(null), 300);
     }

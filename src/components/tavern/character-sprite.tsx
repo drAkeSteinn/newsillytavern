@@ -14,6 +14,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
+import type { SpriteConfig, SpriteState } from '@/types';
+import { SpritePreview } from './sprite-preview';
 
 interface SpriteSettings {
   x: number;        // percentage (0-100) - horizontal position
@@ -27,6 +29,9 @@ interface CharacterSpriteProps {
   characterId: string;
   characterName: string;
   avatarUrl: string;
+  spriteConfig?: SpriteConfig;  // Sprite configuration from character
+  spriteState?: SpriteState;     // Current sprite state (idle, talk, thinking, etc.)
+  isStreaming?: boolean;         // Is the character currently streaming?
   onSettingsChange?: (settings: SpriteSettings) => void;
 }
 
@@ -38,10 +43,48 @@ const DEFAULT_SPRITE_SETTINGS: SpriteSettings = {
   opacity: 0.9
 };
 
+// Get the appropriate sprite URL based on state and config
+function getSpriteUrl(
+  state: SpriteState,
+  spriteConfig?: SpriteConfig,
+  avatarUrl?: string
+): string {
+  // If no config or sprites defined, use avatar
+  if (!spriteConfig?.sprites) {
+    return avatarUrl || '';
+  }
+
+  const sprites = spriteConfig.sprites;
+
+  // Priority order for state
+  const priorityMap: Record<SpriteState, SpriteState[]> = {
+    'talk': ['talk', 'idle'],
+    'thinking': ['thinking', 'idle'],
+    'happy': ['happy', 'idle'],
+    'sad': ['sad', 'idle'],
+    'angry': ['angry', 'idle'],
+    'idle': ['idle']
+  };
+
+  const statesToTry = priorityMap[state] || ['idle'];
+  
+  for (const s of statesToTry) {
+    if (sprites[s]) {
+      return sprites[s];
+    }
+  }
+
+  // Fallback to avatar
+  return avatarUrl || '';
+}
+
 export function CharacterSprite({ 
   characterId, 
   characterName, 
   avatarUrl,
+  spriteConfig,
+  spriteState = 'idle',
+  isStreaming = false,
   onSettingsChange 
 }: CharacterSpriteProps) {
   const [settings, setSettings] = useState<SpriteSettings>(() => {
@@ -65,6 +108,13 @@ export function CharacterSprite({
   const spriteRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0, settingsX: 0, settingsY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+
+  // Determine the current sprite URL based on state
+  const currentSpriteUrl = getSpriteUrl(
+    isStreaming ? 'talk' : spriteState,
+    spriteConfig,
+    avatarUrl
+  );
 
   // Save settings to localStorage
   useEffect(() => {
@@ -156,8 +206,11 @@ export function CharacterSprite({
       const deltaX = ((e.clientX - resizeStartRef.current.x) / rect.width) * 100;
       const deltaY = ((e.clientY - resizeStartRef.current.y) / rect.height) * 100;
 
-      let newWidth = Math.max(10, Math.min(80, resizeStartRef.current.width + deltaX * 2));
-      let newHeight = Math.max(10, Math.min(90, resizeStartRef.current.height + deltaY * 2));
+      // Handle is in top-left corner, so:
+      // - Dragging left (negative deltaX) increases width
+      // - Dragging up (negative deltaY) increases height
+      let newWidth = Math.max(10, Math.min(80, resizeStartRef.current.width - deltaX * 2));
+      let newHeight = Math.max(10, Math.min(90, resizeStartRef.current.height - deltaY * 2));
 
       setSettings(prev => ({ 
         ...prev, 
@@ -210,13 +263,22 @@ export function CharacterSprite({
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => !isDragging && setShowControls(false)}
     >
-      {/* The actual sprite image */}
-      <img
-        src={avatarUrl}
-        alt={characterName}
-        className="w-full h-full object-contain object-bottom drop-shadow-2xl select-none pointer-events-none"
-        draggable={false}
-      />
+      {/* The actual sprite image/video */}
+      {currentSpriteUrl ? (
+        <SpritePreview
+          src={currentSpriteUrl}
+          alt={characterName}
+          className="w-full h-full drop-shadow-2xl select-none pointer-events-none"
+        />
+      ) : (
+        <div className="w-full h-full flex items-end justify-center">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg">
+            <span className="text-white font-bold text-2xl">
+              {characterName?.[0]?.toUpperCase() || '?'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Controls overlay - only show on hover */}
       {showControls && !isDragging && (

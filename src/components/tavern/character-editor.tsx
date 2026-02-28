@@ -26,9 +26,14 @@ import {
   Mic,
   Image as ImageIcon,
   Loader2,
-  HelpCircle
+  HelpCircle,
+  Palette
 } from 'lucide-react';
 import type { CharacterCard } from '@/types';
+import { SpriteManager } from './sprite-manager';
+import { getLogger } from '@/lib/logger';
+
+const editorLogger = getLogger('editor');
 
 interface CharacterEditorProps {
   characterId: string | null;
@@ -112,7 +117,7 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Upload error:', error);
+      editorLogger.error('Upload error', { error });
       alert(error instanceof Error ? error.message : 'Error al subir la imagen');
       setUploading(false);
     } finally {
@@ -455,14 +460,10 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
 
             {/* Sprites Tab */}
             <TabsContent value="sprites" className="mt-0">
-              <div className="text-center py-6 text-muted-foreground">
-                <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Los sprites te permiten agregar diferentes expresiones para tu personaje.</p>
-                <Button variant="outline" size="sm" className="mt-3">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Agregar Sprite
-                </Button>
-              </div>
+              <SpriteManager
+                character={character}
+                onChange={(updates) => setCharacter(prev => ({ ...prev, ...updates }))}
+              />
             </TabsContent>
 
             {/* Voice Tab */}

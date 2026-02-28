@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import type { Persona } from '@/types';
+import { getLogger } from '@/lib/logger';
+
+const personaLogger = getLogger('persona');
 
 export function PersonaPanel() {
   const { 
@@ -121,7 +124,7 @@ export function PersonaPanel() {
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Upload error:', error);
+      personaLogger.error('Upload error', { error });
       alert(error instanceof Error ? error.message : 'Error al subir imagen');
       setUploading(false);
     } finally {

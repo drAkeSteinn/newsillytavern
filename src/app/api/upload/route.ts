@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, rmdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
 // Supported image types
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/webm'];
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const type = formData.get('type') as string || 'avatar'; // avatar, background, etc.
+    const type = formData.get('type') as string || 'avatar'; // avatar, background, sprite, etc.
+    const collection = formData.get('collection') as string | null; // For sprites: collection name
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP' },
+        { error: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, WebM' },
         { status: 400 }
       );
     }
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Validate file size
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 5MB' },
+        { error: 'File too large. Maximum size is 10MB' },
         { status: 400 }
       );
     }
@@ -39,8 +40,21 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop() || 'png';
     const filename = `${timestamp}-${randomString}.${ext}`;
 
+    // Determine upload directory based on type
+    let uploadDir: string;
+    let publicUrl: string;
+
+    if (type === 'sprite' && collection) {
+      // Upload to sprites collection
+      uploadDir = path.join(process.cwd(), 'public', 'sprites', collection);
+      publicUrl = `/sprites/${collection}/${filename}`;
+    } else {
+      // Default upload location
+      uploadDir = path.join(process.cwd(), 'public', 'uploads', type);
+      publicUrl = `/uploads/${type}/${filename}`;
+    }
+
     // Create upload directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', type);
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true });
     }
@@ -51,15 +65,16 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
-    // Return the public URL
-    const url = `/uploads/${type}/${filename}`;
+    // Determine if it's an animation
+    const isAnimation = /\.(gif|webm|apng)$/i.test(filename);
 
     return NextResponse.json({
       success: true,
-      url,
+      url: publicUrl,
       filename,
       size: file.size,
-      type: file.type
+      type: file.type,
+      isAnimation
     });
   } catch (error) {
     console.error('Upload error:', error);

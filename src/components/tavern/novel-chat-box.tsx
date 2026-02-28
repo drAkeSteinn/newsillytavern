@@ -22,7 +22,8 @@ import {
   Users,
   RefreshCw,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import {
   Popover,
@@ -31,12 +32,14 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { ChatLayoutSettings, CharacterCard, CharacterGroup, Persona } from '@/types';
+import { t } from '@/lib/i18n';
 
 interface NovelChatBoxProps {
   onSendMessage: (message: string) => void;
   isGenerating: boolean;
   onResetChat?: () => void;
   onClearChat?: () => void;
+  onRegenerate?: (messageId: string) => void;
   streamingContent?: string;
   streamingCharacter?: CharacterCard | null;
   streamingProgress?: { current: number; total: number } | null;
@@ -51,7 +54,8 @@ export function NovelChatBox({
   onSendMessage, 
   isGenerating, 
   onResetChat, 
-  onClearChat, 
+  onClearChat,
+  onRegenerate,
   streamingContent = '',
   streamingCharacter = null,
   streamingProgress = null,
@@ -80,6 +84,8 @@ export function NovelChatBox({
     settings,
     updateSettings,
     deleteMessage,
+    swipeMessage,
+    getSwipeCount,
   } = useTavernStore();
 
   const activeSession = getActiveSession();
@@ -88,8 +94,8 @@ export function NovelChatBox({
 
   // Determine display name for header
   const headerName = isGroupMode 
-    ? activeGroup?.name || 'Group Chat'
-    : activeCharacter?.name || 'Chat';
+    ? activeGroup?.name || t('chat.groupTitle')
+    : activeCharacter?.name || t('chat.title');
 
   // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {
@@ -314,7 +320,7 @@ export function NovelChatBox({
           
           {/* Message count */}
           <span className="text-xs text-muted-foreground">
-            {activeSession.messages.filter(m => !m.isDeleted).length} msgs
+            {activeSession.messages.filter(m => !m.isDeleted).length}{t('chat.messagesCount')}
           </span>
         </div>
         
@@ -328,10 +334,10 @@ export function NovelChatBox({
             </PopoverTrigger>
             <PopoverContent className="w-64" align="end">
               <div className="space-y-4">
-                <h4 className="font-medium text-sm">Chat Box Settings</h4>
+                <h4 className="font-medium text-sm">{t('chatbox.settings')}</h4>
                 
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Width: {Math.round(layout.chatWidth)}%</label>
+                  <label className="text-xs text-muted-foreground">{t('chatbox.width')} {Math.round(layout.chatWidth)}%</label>
                   <Slider
                     value={[layout.chatWidth]}
                     onValueChange={([value]) => updateLayout({ chatWidth: value })}
@@ -342,7 +348,7 @@ export function NovelChatBox({
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Height: {Math.round(layout.chatHeight)}%</label>
+                  <label className="text-xs text-muted-foreground">{t('chatbox.height')} {Math.round(layout.chatHeight)}%</label>
                   <Slider
                     value={[layout.chatHeight]}
                     onValueChange={([value]) => updateLayout({ chatHeight: value })}
@@ -353,7 +359,7 @@ export function NovelChatBox({
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Opacity: {Math.round(layout.chatOpacity * 100)}%</label>
+                  <label className="text-xs text-muted-foreground">{t('chatbox.opacity')} {Math.round(layout.chatOpacity * 100)}%</label>
                   <Slider
                     value={[layout.chatOpacity * 100]}
                     onValueChange={([value]) => updateLayout({ chatOpacity: value / 100 })}
@@ -364,20 +370,20 @@ export function NovelChatBox({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <label className="text-xs text-muted-foreground">Blur Background</label>
+                  <label className="text-xs text-muted-foreground">{t('chatbox.blurBackground')}</label>
                   <Button
                     variant={layout.blurBackground ? "default" : "outline"}
                     size="sm"
                     className="h-6 px-2 text-xs"
                     onClick={() => updateLayout({ blurBackground: !layout.blurBackground })}
                   >
-                    {layout.blurBackground ? 'On' : 'Off'}
+                    {layout.blurBackground ? t('common.on') : t('common.off')}
                   </Button>
                 </div>
 
                 {/* Chat Actions */}
                 <div className="pt-2 border-t space-y-2">
-                  <label className="text-xs text-muted-foreground">Chat Actions</label>
+                  <label className="text-xs text-muted-foreground">{t('chatbox.actions')}</label>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -389,7 +395,7 @@ export function NovelChatBox({
                       }}
                     >
                       <RotateCcw className="w-3 h-3 mr-1" />
-                      Reset
+                      {t('common.reset')}
                     </Button>
                     <Button
                       variant="outline"
@@ -401,7 +407,7 @@ export function NovelChatBox({
                       }}
                     >
                       <Eraser className="w-3 h-3 mr-1" />
-                      Clear
+                      {t('common.clear')}
                     </Button>
                   </div>
                 </div>
@@ -420,7 +426,7 @@ export function NovelChatBox({
                     });
                   }}
                 >
-                  Reset Position
+                  {t('chat.resetPosition')}
                 </Button>
               </div>
             </PopoverContent>
@@ -454,7 +460,7 @@ export function NovelChatBox({
                 let displayAvatar: string | undefined;
                 
                 if (message.role === 'user') {
-                  displayName = activePersona?.name || 'You';
+                  displayName = activePersona?.name || t('message.you');
                   displayAvatar = activePersona?.avatar || undefined;
                 } else if (isGroupMode) {
                   messageCharacter = characters.find(c => c.id === message.characterId);
@@ -472,12 +478,17 @@ export function NovelChatBox({
                     message={message}
                     characterName={displayName}
                     characterAvatar={displayAvatar}
-                    userName={activePersona?.name || 'You'}
+                    userName={activePersona?.name || t('message.you')}
                     userAvatar={activePersona?.avatar || undefined}
                     showTimestamp={settings.showTimestamps}
                     showTokens={settings.showTokens}
                     onDelete={() => deleteMessage(activeSessionId!, message.id)}
                     displayMode={settings.messageDisplay}
+                    onSwipe={(direction) => swipeMessage(activeSessionId!, message.id, direction)}
+                    hasAlternatives={(message.swipes?.length || 1) > 1}
+                    currentIndex={message.swipeIndex || 0}
+                    totalAlternatives={message.swipes?.length || 1}
+                    onRegenerate={() => onRegenerate?.(message.id)}
                   />
                 );
               })}
@@ -582,7 +593,7 @@ export function NovelChatBox({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Message..."
+                placeholder={t('chat.messagePlaceholder')}
                 className="min-h-[32px] max-h-[80px] resize-none text-xs flex-1"
                 disabled={isGenerating}
                 rows={1}

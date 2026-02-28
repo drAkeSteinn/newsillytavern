@@ -54,9 +54,10 @@ const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: strin
 interface SettingsPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: string;
 }
 
-export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
+export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: SettingsPanelProps) {
   const { 
     settings, 
     updateSettings, 
@@ -205,7 +206,7 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="llm" className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <Tabs key={initialTab} defaultValue={initialTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="border-b px-4 flex-shrink-0 bg-muted/30">
             <TabsList className="h-11 flex-wrap gap-1">
               <TabsTrigger value="llm" className="gap-1.5 text-xs">
@@ -223,6 +224,10 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
               <TabsTrigger value="chat" className="gap-1.5 text-xs">
                 <MessageSquare className="w-4 h-4" />
                 Chat
+              </TabsTrigger>
+              <TabsTrigger value="context" className="gap-1.5 text-xs">
+                <Database className="w-4 h-4" />
+                Contexto
               </TabsTrigger>
               <TabsTrigger value="appearance" className="gap-1.5 text-xs">
                 <Palette className="w-4 h-4" />
@@ -687,6 +692,175 @@ export function SettingsPanel({ open, onOpenChange }: SettingsPanelProps) {
                         }
                       />
                     </label>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Context Settings */}
+            <TabsContent value="context" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Message Limits */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium">Límites de Contexto</h3>
+                    <p className="text-xs text-muted-foreground">Controla cuántos mensajes se envían al LLM</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg border space-y-2">
+                      <div className="flex justify-between">
+                        <Label>Máximo de Mensajes</Label>
+                        <span className="text-sm text-muted-foreground">{settings.context?.maxMessages ?? 50}</span>
+                      </div>
+                      <Slider
+                        value={[settings.context?.maxMessages ?? 50]}
+                        min={10}
+                        max={200}
+                        step={5}
+                        onValueChange={([maxMessages]) => 
+                          updateSettings({ 
+                            context: { ...(settings.context ?? {}), maxMessages } 
+                          })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Ventana deslizante de mensajes. Los mensajes más antiguos se excluyen.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-lg border space-y-2">
+                      <div className="flex justify-between">
+                        <Label>Límite de Tokens</Label>
+                        <span className="text-sm text-muted-foreground">{settings.context?.maxTokens ?? 4096}</span>
+                      </div>
+                      <Slider
+                        value={[settings.context?.maxTokens ?? 4096]}
+                        min={1024}
+                        max={128000}
+                        step={512}
+                        onValueChange={([maxTokens]) => 
+                          updateSettings({ 
+                            context: { ...(settings.context ?? {}), maxTokens } 
+                          })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Presupuesto de tokens para el historial. Se ajusta según el proveedor.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg border">
+                        <Label className="text-xs">Conservar Primeros N</Label>
+                        <Input
+                          type="number"
+                          value={settings.context?.keepFirstN ?? 1}
+                          onChange={(e) => 
+                            updateSettings({ 
+                              context: { ...(settings.context ?? {}), keepFirstN: parseInt(e.target.value) || 1 } 
+                            })
+                          }
+                          min={0}
+                          max={10}
+                          className="mt-1 h-8"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Mensaje de saludo</p>
+                      </div>
+                      <div className="p-3 rounded-lg border">
+                        <Label className="text-xs">Conservar Últimos N</Label>
+                        <Input
+                          type="number"
+                          value={settings.context?.keepLastN ?? 20}
+                          onChange={(e) => 
+                            updateSettings({ 
+                              context: { ...(settings.context ?? {}), keepLastN: parseInt(e.target.value) || 20 } 
+                            })
+                          }
+                          min={5}
+                          max={50}
+                          className="mt-1 h-8"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Mensajes recientes</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Future Summary Feature */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium">Resúmenes (Próximamente)</h3>
+                    <p className="text-xs text-muted-foreground">Compresión inteligente del historial</p>
+                  </div>
+
+                  <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <div>
+                        <Label className="text-sm">Activar Resúmenes</Label>
+                        <p className="text-xs text-muted-foreground">Resumir conversaciones largas automáticamente</p>
+                      </div>
+                      <Switch
+                        checked={settings.context?.enableSummaries ?? false}
+                        disabled={true}
+                        onCheckedChange={(enableSummaries) => 
+                          updateSettings({ 
+                            context: { ...(settings.context ?? {}), enableSummaries } 
+                          })
+                        }
+                      />
+                    </label>
+                    
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="text-amber-500">⚠️</span> Esta función estará disponible en una futura actualización.
+                        Permitirá resumir automáticamente el historial cuando exceda el límite configurado.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg border space-y-2">
+                    <div className="flex justify-between">
+                      <Label>Umbral de Resumen</Label>
+                      <span className="text-sm text-muted-foreground">{settings.context?.summaryThreshold ?? 40}</span>
+                    </div>
+                    <Slider
+                      value={[settings.context?.summaryThreshold ?? 40]}
+                      min={20}
+                      max={100}
+                      step={5}
+                      disabled={true}
+                      onValueChange={([summaryThreshold]) => 
+                        updateSettings({ 
+                          context: { ...(settings.context ?? {}), summaryThreshold } 
+                        })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Número de mensajes para considerar resumen automático.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-muted/30 text-sm text-muted-foreground">
+                    <h4 className="font-medium text-foreground mb-2">¿Cómo funciona la ventana deslizante?</h4>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>Los mensajes se excluyen del centro cuando exceden el límite.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>El mensaje de saludo siempre se conserva.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>Los últimos N mensajes recientes siempre se incluyen.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <span>El límite de tokens tiene prioridad sobre el conteo de mensajes.</span>
+                      </li>
+                    </ul>
                   </div>
                 </div>
               </div>

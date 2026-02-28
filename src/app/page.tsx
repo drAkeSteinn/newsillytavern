@@ -15,19 +15,28 @@ import {
   PanelLeft,
   Settings,
   Loader2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  BookOpen,
+  Music
 } from 'lucide-react';
 import { useState } from 'react';
 import { useHydration } from '@/hooks/use-hydration';
+import { t } from '@/lib/i18n';
 
 export default function TavernFlow() {
   const { sidebarOpen, setSidebarOpen, settingsOpen, setSettingsOpen } = useTavernStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [backgroundGalleryOpen, setBackgroundGalleryOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('llm');
   const hydrated = useHydration();
 
   const togglePanels = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const openSettingsTab = (tab: string) => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
   };
 
   return (
@@ -63,17 +72,37 @@ export default function TavernFlow() {
             variant="ghost"
             size="icon"
             onClick={() => setBackgroundGalleryOpen(true)}
-            title="Background Gallery"
+            title={t('nav.backgroundGallery')}
           >
             <ImageIcon className="w-5 h-5" />
+          </Button>
+          
+          {/* Lorebooks Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openSettingsTab('lorebooks')}
+            title={t('nav.lorebooks')}
+          >
+            <BookOpen className="w-5 h-5" />
+          </Button>
+          
+          {/* Sound Triggers Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openSettingsTab('sounds')}
+            title={t('nav.soundTriggers')}
+          >
+            <Music className="w-5 h-5" />
           </Button>
           
           {/* Settings Button */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSettingsOpen(true)}
-            title="Settings"
+            onClick={() => openSettingsTab('llm')}
+            title={t('nav.settings')}
           >
             <Settings className="w-5 h-5" />
           </Button>
@@ -85,7 +114,7 @@ export default function TavernFlow() {
               size="icon"
               onClick={togglePanels}
               className="hidden md:flex"
-              title={sidebarOpen ? "Hide Panels" : "Show Panels"}
+              title={sidebarOpen ? t('nav.hidePanels') : t('nav.showPanels')}
             >
               {sidebarOpen ? (
                 <PanelLeftClose className="w-5 h-5" />
@@ -115,14 +144,14 @@ export default function TavernFlow() {
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <Loader2 className="w-8 h-8 animate-spin" />
-              <span className="text-sm">Loading...</span>
+              <span className="text-sm">{t('common.loading')}</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Settings Panel */}
-      {hydrated && <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />}
+      {hydrated && <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} initialTab={settingsTab} />}
 
       {/* Background Gallery */}
       {hydrated && <BackgroundGallery open={backgroundGalleryOpen} onOpenChange={setBackgroundGalleryOpen} />}
