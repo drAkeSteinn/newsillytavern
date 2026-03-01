@@ -20,11 +20,13 @@ import { getCooldownManager } from '../cooldown-manager';
 
 export interface ItemHandlerState {
   processedItems: Map<string, Set<string>>; // messageKey -> itemIds processed
+  triggeredPositions: Map<string, Set<number>>; // messageKey -> wordPositions already triggered
 }
 
 export function createItemHandlerState(): ItemHandlerState {
   return {
     processedItems: new Map(),
+    triggeredPositions: new Map(),
   };
 }
 
@@ -141,6 +143,7 @@ export function parseItemTags(content: string): ParsedItemTag[] {
 
 /**
  * Check item triggers - Detects item additions, removals, and equipment
+ * Uses wordPosition for token validation to prevent duplicate triggers
  */
 export function checkItemTriggers(
   tokens: DetectedToken[],
@@ -162,8 +165,9 @@ export function checkItemTriggers(
   }
   
   const processedForMessage = state.processedItems.get(context.messageKey) ?? new Set<string>();
+  const triggeredPositions = state.triggeredPositions.get(context.messageKey) ?? new Set<number>();
   
-  // 1. Parse explicit item tags from content
+  // 1. Parse explicit item tags from content (these don't need wordPosition validation)
   const parsedTags = parseItemTags(content);
   
   for (const tag of parsedTags) {
@@ -192,119 +196,93 @@ export function checkItemTriggers(
     }
   }
   
-  // 2. Check keyword-based triggers (auto-detection)
+  // 2. Check keyword-based triggers (auto-detection) using token validation
   if (inventorySettings.autoDetect) {
-    // Check for item acquisition
-    for (const pattern of ITEM_ACQUISITION_PATTERNS) {
-      const matches = content.matchAll(pattern);
-      for (const match of matches) {
-        const itemName = match[1]?.trim();
-        if (!itemName || processedForMessage.has(itemName)) continue;
-        
-        // Try to find matching item in registry
-        const matchedItem = findItemByName(itemName, items);
-        
-        const hit: InventoryTriggerHit = {
-          type: 'add',
-          itemId: matchedItem?.id || `item-auto-${Date.now()}`,
-          item: matchedItem,
-          quantity: 1,
-          message: `Obtained: ${itemName}`,
-        };
-        
-        result.hits.push(hit);
-        result.itemsToAdd.push({ itemId: hit.itemId, quantity: 1 });
-        processedForMessage.add(itemName);
+    // Process tokens for keyword-based detection
+    for (const token of tokens) {
+      // Skip if this position already triggered something
+      if (triggeredPositions.has(token.wordPosition)) {
+        continue;
       }
-    }
-    
-    // Check for item removal
-    for (const pattern of ITEM_REMOVAL_PATTERNS) {
-      const matches = content.matchAll(pattern);
-      for (const match of matches) {
-        const itemName = match[1]?.trim();
-        if (!itemName || processedForMessage.has(itemName)) continue;
+      
+      const normalizedToken = token.token.toLowerCase();
+      
+      // Check items with trigger keywords
+      for (const item of items) {
+        if (!item.triggerKeywords || item.triggerKeywords.length === 0) continue;
         
-        // Try to find in inventory
-        const entry = findInventoryEntryByName(itemName, inventoryEntries, items);
+        // Check if token matches any trigger keyword
+        const hasKeyword = item.triggerKeywords.some(kw => {
+          const normalizedKw = kw.toLowerCase().trim();
+          return normalizedToken.includes(normalizedKw) || normalizedKw.includes(normalizedToken);
+        });
         
-        if (entry) {
-          const hit: InventoryTriggerHit = {
-            type: 'remove',
-            itemId: entry.itemId,
-            item: items.find(i => i.id === entry.itemId),
-            quantity: 1,
-            message: `Lost/Used: ${itemName}`,
-          };
+        if (hasKeyword && !processedForMessage.has(item.id)) {
+          // Check context keys if present
+          if (item.contextKeys && item.contextKeys.length > 0) {
+            const hasContext = item.contextKeys.some(kw =>
+              content.toLowerCase().includes(kw.toLowerCase())
+            );
+            if (!hasContext) continue;
+          }
           
-          result.hits.push(hit);
-          result.itemsToRemove.push({ entryId: entry.id, quantity: 1 });
-          processedForMessage.add(itemName);
-        }
-      }
-    }
-    
-    // Check for equipment
-    for (const pattern of EQUIP_PATTERNS) {
-      const matches = content.matchAll(pattern);
-      for (const match of matches) {
-        const itemName = match[1]?.trim();
-        if (!itemName || processedForMessage.has(`equip-${itemName}`)) continue;
-        
-        const entry = findInventoryEntryByName(itemName, inventoryEntries, items);
-        const item = entry ? items.find(i => i.id === entry.itemId) : null;
-        
-        if (entry && item?.equippable) {
-          const slot = item.slot || 'none';
           const hit: InventoryTriggerHit = {
-            type: 'equip',
+            type: 'add',
             itemId: item.id,
             item,
             quantity: 1,
-            message: `Equipped: ${itemName}`,
+            message: `Found: ${item.name}`,
           };
           
           result.hits.push(hit);
-          result.itemsToEquip.push({ entryId: entry.id, slot });
-          processedForMessage.add(`equip-${itemName}`);
+          result.itemsToAdd.push({ itemId: item.id, quantity: 1 });
+          
+          // Mark this position as triggered
+          triggeredPositions.add(token.wordPosition);
+          processedForMessage.add(item.id);
+          break; // Move to next token
         }
       }
-    }
-    
-    // Check items with trigger keywords
-    for (const item of items) {
-      if (!item.triggerKeywords || item.triggerKeywords.length === 0) continue;
       
-      const hasKeyword = item.triggerKeywords.some(kw =>
-        content.toLowerCase().includes(kw.toLowerCase())
-      );
-      
-      if (hasKeyword && !processedForMessage.has(item.id)) {
-        // Check context keys if present
-        if (item.contextKeys && item.contextKeys.length > 0) {
-          const hasContext = item.contextKeys.some(kw =>
-            content.toLowerCase().includes(kw.toLowerCase())
-          );
-          if (!hasContext) continue;
+      // Check natural language patterns (only if not already triggered at this position)
+      if (!triggeredPositions.has(token.wordPosition)) {
+        // Check for item acquisition patterns
+        for (const pattern of ITEM_ACQUISITION_PATTERNS) {
+          pattern.lastIndex = 0; // Reset regex state
+          const matches = content.matchAll(pattern);
+          for (const match of matches) {
+            const matchIndex = match.index ?? 0;
+            const itemName = match[1]?.trim();
+            if (!itemName || processedForMessage.has(itemName)) continue;
+            
+            // Check if this match corresponds to current token position
+            if (token.position >= matchIndex && token.position <= matchIndex + match[0].length) {
+              const matchedItem = findItemByName(itemName, items);
+              
+              const hit: InventoryTriggerHit = {
+                type: 'add',
+                itemId: matchedItem?.id || `item-auto-${Date.now()}`,
+                item: matchedItem,
+                quantity: 1,
+                message: `Obtained: ${itemName}`,
+              };
+              
+              result.hits.push(hit);
+              result.itemsToAdd.push({ itemId: hit.itemId, quantity: 1 });
+              
+              triggeredPositions.add(token.wordPosition);
+              processedForMessage.add(itemName);
+              break;
+            }
+          }
         }
-        
-        const hit: InventoryTriggerHit = {
-          type: 'add',
-          itemId: item.id,
-          item,
-          quantity: 1,
-          message: `Found: ${item.name}`,
-        };
-        
-        result.hits.push(hit);
-        result.itemsToAdd.push({ itemId: item.id, quantity: 1 });
-        processedForMessage.add(item.id);
       }
     }
   }
   
   // Update state
   state.processedItems.set(context.messageKey, processedForMessage);
+  state.triggeredPositions.set(context.messageKey, triggeredPositions);
   
   return result;
 }
@@ -541,6 +519,7 @@ export function executeInventoryTrigger(
  */
 export function resetItemHandlerState(state: ItemHandlerState, messageKey: string): void {
   state.processedItems.delete(messageKey);
+  state.triggeredPositions.delete(messageKey);
 }
 
 /**
@@ -548,6 +527,7 @@ export function resetItemHandlerState(state: ItemHandlerState, messageKey: strin
  */
 export function clearItemHandlerState(state: ItemHandlerState): void {
   state.processedItems.clear();
+  state.triggeredPositions.clear();
 }
 
 // ============================================

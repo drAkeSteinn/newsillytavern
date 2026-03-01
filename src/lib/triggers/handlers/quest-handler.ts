@@ -20,12 +20,14 @@ import { getCooldownManager } from '../cooldown-manager';
 export interface QuestHandlerState {
   processedQuests: Map<string, Set<string>>; // messageKey -> questIds processed
   questProgressTracked: Map<string, Set<string>>; // questId -> objectiveIds tracked
+  triggeredPositions: Map<string, Set<number>>; // messageKey -> wordPositions already triggered
 }
 
 export function createQuestHandlerState(): QuestHandlerState {
   return {
     processedQuests: new Map(),
     questProgressTracked: new Map(),
+    triggeredPositions: new Map(),
   };
 }
 
@@ -115,6 +117,7 @@ export function parseQuestTags(content: string): ParsedQuestTag[] {
 
 /**
  * Check quest triggers - Detects quest start, progress, and completion
+ * Uses wordPosition for token validation to prevent duplicate triggers
  */
 export function checkQuestTriggers(
   tokens: DetectedToken[],
@@ -137,8 +140,9 @@ export function checkQuestTriggers(
   
   const cooldownManager = getCooldownManager();
   const processedForMessage = state.processedQuests.get(context.messageKey) ?? new Set<string>();
+  const triggeredPositions = state.triggeredPositions.get(context.messageKey) ?? new Set<number>();
   
-  // 1. Parse explicit quest tags from content
+  // 1. Parse explicit quest tags from content (these don't need wordPosition validation)
   const parsedTags = parseQuestTags(content);
   
   for (const tag of parsedTags) {
@@ -148,28 +152,39 @@ export function checkQuestTriggers(
     }
   }
   
-  // 2. Check keyword-based triggers (auto-detection)
+  // 2. Check keyword-based triggers (auto-detection) using token validation
   if (questSettings.autoDetect) {
     const activeQuests = quests.filter(q => 
       q.sessionId === sessionId && q.status === 'active'
     );
     
-    for (const quest of activeQuests) {
-      // Skip if already processed for this message
-      if (processedForMessage.has(quest.id)) continue;
+    // Process tokens for keyword-based detection
+    for (const token of tokens) {
+      // Skip if this position already triggered something
+      if (triggeredPositions.has(token.wordPosition)) {
+        continue;
+      }
       
-      // Check for progress/completion keywords
-      const progressHit = checkQuestProgress(quest, tokens, content);
-      if (progressHit) {
-        result.hits.push(progressHit);
-        result.progressedQuests.push(quest);
+      for (const quest of activeQuests) {
+        // Skip if already processed for this message
+        if (processedForMessage.has(quest.id)) continue;
         
-        // Check if quest is now complete
-        if (progressHit.action === 'complete') {
-          result.completedQuests.push(quest);
+        // Check for progress/completion keywords using tokens
+        const progressHit = checkQuestProgressWithToken(quest, token, content);
+        if (progressHit) {
+          result.hits.push(progressHit);
+          result.progressedQuests.push(quest);
+          
+          // Check if quest is now complete
+          if (progressHit.action === 'complete') {
+            result.completedQuests.push(quest);
+          }
+          
+          // Mark this position as triggered
+          triggeredPositions.add(token.wordPosition);
+          processedForMessage.add(quest.id);
+          break; // Move to next token
         }
-        
-        processedForMessage.add(quest.id);
       }
     }
     
@@ -178,26 +193,38 @@ export function checkQuestTriggers(
       q.sessionId === sessionId && q.status === 'paused'
     );
     
-    for (const quest of inactiveQuests) {
-      if (quest.triggers.startKeywords.length === 0) continue;
+    for (const token of tokens) {
+      if (triggeredPositions.has(token.wordPosition)) {
+        continue;
+      }
       
-      const hasKeyword = quest.triggers.startKeywords.some(kw => 
-        content.toLowerCase().includes(kw.toLowerCase())
-      );
-      
-      if (hasKeyword) {
-        result.hits.push({
-          questId: quest.id,
-          quest,
-          action: 'start',
-          message: `Quest "${quest.title}" resumed`,
+      for (const quest of inactiveQuests) {
+        if (quest.triggers.startKeywords.length === 0) continue;
+        
+        // Check if token matches any start keyword
+        const hasKeyword = quest.triggers.startKeywords.some(kw => {
+          const normalizedKw = kw.toLowerCase().trim();
+          const normalizedToken = token.token.toLowerCase();
+          return normalizedToken.includes(normalizedKw) || normalizedKw.includes(normalizedToken);
         });
+        
+        if (hasKeyword) {
+          result.hits.push({
+            questId: quest.id,
+            quest,
+            action: 'start',
+            message: `Quest "${quest.title}" resumed`,
+          });
+          triggeredPositions.add(token.wordPosition);
+          break;
+        }
       }
     }
   }
   
   // Update state
   state.processedQuests.set(context.messageKey, processedForMessage);
+  state.triggeredPositions.set(context.messageKey, triggeredPositions);
   
   return result;
 }
@@ -259,7 +286,68 @@ function processParsedTag(
 }
 
 /**
- * Check quest progress based on keywords
+ * Check quest progress based on a single token
+ * Uses token-level validation for more precise matching
+ */
+function checkQuestProgressWithToken(
+  quest: Quest,
+  token: DetectedToken,
+  content: string
+): QuestTriggerHit | null {
+  if (!quest.triggers.autoComplete && !quest.triggers.trackProgress) {
+    return null;
+  }
+  
+  const normalizedToken = token.token.toLowerCase();
+  const lowerContent = content.toLowerCase();
+  
+  // Check each incomplete objective
+  for (const objective of quest.objectives) {
+    if (objective.isCompleted) continue;
+    
+    // Check completion keywords against token
+    const hasCompletionKeyword = quest.triggers.completionKeywords.some(kw => {
+      const normalizedKw = kw.toLowerCase().trim();
+      return normalizedToken.includes(normalizedKw) || normalizedKw.includes(normalizedToken);
+    });
+    
+    if (hasCompletionKeyword && quest.triggers.autoComplete) {
+      return {
+        questId: quest.id,
+        quest,
+        objectiveId: objective.id,
+        objective,
+        action: 'complete',
+        message: `Objective completed: ${objective.description}`,
+      };
+    }
+    
+    // Check for progress keywords (if tracking)
+    if (quest.triggers.trackProgress && objective.target) {
+      const targetLower = objective.target.toLowerCase();
+      const matchesTarget = normalizedToken.includes(targetLower) || 
+                           targetLower.includes(normalizedToken) ||
+                           lowerContent.includes(targetLower);
+      
+      if (matchesTarget) {
+        return {
+          questId: quest.id,
+          quest,
+          objectiveId: objective.id,
+          objective,
+          action: 'progress',
+          progress: 1,
+          message: `Progress made on: ${objective.description}`,
+        };
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Check quest progress based on keywords (legacy, uses full content)
  */
 function checkQuestProgress(
   quest: Quest,
@@ -394,6 +482,7 @@ export function createQuestFromDetection(
  */
 export function resetQuestHandlerState(state: QuestHandlerState, messageKey: string): void {
   state.processedQuests.delete(messageKey);
+  state.triggeredPositions.delete(messageKey);
 }
 
 /**
@@ -402,6 +491,7 @@ export function resetQuestHandlerState(state: QuestHandlerState, messageKey: str
 export function clearQuestHandlerState(state: QuestHandlerState): void {
   state.processedQuests.clear();
   state.questProgressTracked.clear();
+  state.triggeredPositions.clear();
 }
 
 // ============================================

@@ -63,6 +63,20 @@ import {
   type BackgroundHandlerState,
   type BackgroundTriggerContext,
 } from './handlers/background-handler';
+import {
+  createQuestHandlerState,
+  checkQuestTriggers,
+  resetQuestHandlerState,
+  type QuestHandlerState,
+  type QuestTriggerContext,
+} from './handlers/quest-handler';
+import {
+  createItemHandlerState,
+  checkItemTriggers,
+  resetItemHandlerState,
+  type ItemHandlerState,
+  type ItemTriggerContext,
+} from './handlers/item-handler';
 import type { BackgroundOverlay, BackgroundTransitionType } from '@/types';
 
 // ============================================
@@ -75,6 +89,8 @@ export interface TriggerSystemConfig {
   spriteEnabled?: boolean;
   backgroundEnabled?: boolean;
   hudEnabled?: boolean;
+  questEnabled?: boolean;
+  inventoryEnabled?: boolean;
   debug?: boolean;
   maxSoundsPerMessage?: number;
 }
@@ -116,6 +132,8 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   const spriteHandlerState = useMemo(() => createSpriteHandlerState(), []);
   const hudHandlerState = useMemo(() => createHUDHandlerState(), []);
   const backgroundHandlerState = useMemo(() => createBackgroundHandlerState(), []);
+  const questHandlerState = useMemo(() => createQuestHandlerState(), []);
+  const itemHandlerState = useMemo(() => createItemHandlerState(), []);
   
   // Track last processed content per message
   const lastProcessedRef = useRef<Map<string, string>>(new Map());
@@ -140,8 +158,12 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       backgroundHandlerState.lastTriggeredBackground.clear();
       backgroundHandlerState.lastTriggerTime.clear();
       backgroundHandlerState.currentActivePack.clear();
+      questHandlerState.processedQuests.clear();
+      questHandlerState.triggeredPositions.clear();
+      itemHandlerState.processedItems.clear();
+      itemHandlerState.triggeredPositions.clear();
     };
-  }, [config.debug, config.tokenDetector, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState]);
+  }, [config.debug, config.tokenDetector, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState]);
   
   // Check for return to default background periodically
   useEffect(() => {
@@ -364,7 +386,126 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         });
       }
     }
-  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, getActiveHUDTemplate]);
+    
+    // Process Quest triggers
+    if (config.questEnabled !== false && store.questSettings?.enabled) {
+      const questContext: QuestTriggerContext = {
+        ...context,
+        quests: store.quests,
+        questSettings: store.questSettings,
+        sessionId: store.activeSessionId || '',
+      };
+      
+      const questResult = checkQuestTriggers(
+        newTokens,
+        content,
+        questContext,
+        questHandlerState
+      );
+      
+      if (questResult.hits.length > 0) {
+        // Process quest trigger hits
+        for (const hit of questResult.hits) {
+          console.log(`[TriggerSystem] Quest trigger: ${hit.message}`);
+          
+          // Handle different quest actions
+          switch (hit.action) {
+            case 'start':
+              if (hit.questTitle) {
+                store.startQuest({
+                  sessionId: store.activeSessionId || '',
+                  title: hit.questTitle,
+                  description: hit.description || '',
+                  priority: 'side',
+                });
+              }
+              break;
+            case 'progress':
+              if (hit.questId && hit.objectiveId) {
+                store.progressObjective(hit.questId, hit.objectiveId, hit.progress || 1);
+              }
+              break;
+            case 'complete':
+              if (hit.questId) {
+                store.completeQuest(hit.questId);
+              }
+              break;
+            case 'fail':
+              if (hit.questId) {
+                store.failQuest(hit.questId);
+              }
+              break;
+          }
+          
+          // Add notification if enabled
+          if (store.questSettings.showNotifications) {
+            store.addQuestNotification({
+              questId: hit.questId,
+              questTitle: hit.quest?.title || 'Quest',
+              type: hit.action === 'complete' ? 'completed' : hit.action === 'fail' ? 'failed' : 'objective_complete',
+              message: hit.message,
+            });
+          }
+        }
+      }
+    }
+    
+    // Process Item triggers
+    if (config.inventoryEnabled !== false && store.inventorySettings?.enabled) {
+      const defaultContainer = store.containers.find(c => c.isDefault);
+      
+      const itemContext: ItemTriggerContext = {
+        ...context,
+        items: store.items,
+        inventoryEntries: defaultContainer?.entries || [],
+        inventorySettings: store.inventorySettings,
+        defaultContainerId: defaultContainer?.id || '',
+      };
+      
+      const itemResult = checkItemTriggers(
+        newTokens,
+        content,
+        itemContext,
+        itemHandlerState
+      );
+      
+      if (itemResult.hits.length > 0) {
+        // Process item trigger hits
+        for (const hit of itemResult.hits) {
+          console.log(`[TriggerSystem] Item trigger: ${hit.message}`);
+          
+          switch (hit.type) {
+            case 'add':
+              store.addToInventory(hit.itemId, hit.quantity);
+              break;
+            case 'remove':
+              // Find the entry to remove
+              const entryToRemove = defaultContainer?.entries.find(e => e.itemId === hit.itemId);
+              if (entryToRemove) {
+                store.removeFromInventory(entryToRemove.id, hit.quantity);
+              }
+              break;
+            case 'equip':
+              const entryToEquip = defaultContainer?.entries.find(e => e.itemId === hit.itemId);
+              if (entryToEquip && hit.item?.slot) {
+                store.equipItem(entryToEquip.id, hit.item.slot);
+              }
+              break;
+          }
+          
+          // Add notification if enabled
+          if (store.inventorySettings.showNotifications) {
+            store.addInventoryNotification({
+              type: hit.type,
+              itemName: hit.item?.name || 'Item',
+              quantity: hit.quantity,
+              message: hit.message,
+            });
+          }
+        }
+      }
+    }
+  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, getActiveHUDTemplate]);
   
   /**
    * Process full content at once (non-streaming)
@@ -400,13 +541,15 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     resetSpriteHandlerState(spriteHandlerState, messageKey);
     resetHUDHandlerState(hudHandlerState, messageKey);
     resetBackgroundHandlerState(backgroundHandlerState, messageKey);
+    resetQuestHandlerState(questHandlerState, messageKey);
+    resetItemHandlerState(itemHandlerState, messageKey);
     
     // Clear last processed
     lastProcessedRef.current.delete(messageKey);
     
     // Emit message end event
     bus.emit(createMessageEndEvent(messageKey, character, ''));
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState]);
   
   return {
     processStreamingContent,

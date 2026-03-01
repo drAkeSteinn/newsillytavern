@@ -4,8 +4,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createLLM } from '@/lib/llm';
-import type { ChatMessage, SummaryData, SummarySettings } from '@/types';
+import { generateResponse } from '@/lib/llm';
+import type { ChatMessage, SummaryData, SummarySettings, LLMConfig } from '@/types';
 
 // ============================================
 // Request/Response Types
@@ -157,21 +157,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<SummaryRe
       previousSummary
     );
 
-    // Create LLM instance
-    const llm = createLLM({
+    // Build LLM config
+    const llmConfig: LLMConfig = {
+      id: 'summary-config',
+      name: 'Summary Generator',
       provider: apiConfig.provider as any,
       endpoint: apiConfig.endpoint,
       apiKey: apiConfig.apiKey,
       model: apiConfig.model,
-    });
-
-    // Generate summary
-    const response = await llm.generate({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      params: {
+      parameters: {
         temperature: 0.3, // Lower temperature for more consistent summaries
         topP: 0.9,
         topK: 40,
@@ -182,8 +176,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<SummaryRe
         frequencyPenalty: 0,
         presencePenalty: 0,
         stopStrings: [],
-      }
-    });
+      },
+      isActive: true,
+    };
+
+    // Generate summary
+    const response = await generateResponse(
+      apiConfig.provider,
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      llmConfig,
+      characterName
+    );
 
     const summaryContent = response.content || '';
     const tokenCount = estimateTokens(summaryContent);
