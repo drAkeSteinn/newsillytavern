@@ -81,7 +81,7 @@ const ITEM_REMOVAL_PATTERNS = [
 
 const EQUIP_PATTERNS = [
   /(?:equipas?|te\s+pones?|vistes?|empuñas?|usas?|portas?)\s+(?:un[ao]?\s+)?([^.!?\n]+)/gi,
-  /(?:you\s+equip|you\s+put\s+on|you\s+wield)\s+(?:a\s+)?([^.!?\n]+))/gi,
+  /(?:you\s+equip|you\s+put\s+on|you\s+wield)\s+(?:a\s+)?([^.!?\n]+)/gi,
 ];
 
 /**
