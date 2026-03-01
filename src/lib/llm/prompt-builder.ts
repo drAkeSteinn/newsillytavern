@@ -8,7 +8,9 @@ import type {
   Persona, 
   PromptSection, 
   CharacterGroup,
-  Lorebook
+  Lorebook,
+  SummaryData,
+  CharacterMemory
 } from '@/types';
 import type { ChatApiMessage, CompletionPromptConfig, GroupPromptBuildResult } from './types';
 import { processCharacterTemplate } from '@/lib/prompt-template';
@@ -34,6 +36,9 @@ export const SECTION_COLORS = {
   post_history: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
   chat_history: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   instructions: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  summary: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
+  memory: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  relationship: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
 } as const;
 
 // ============================================
@@ -533,4 +538,117 @@ export function createUserMessage(content: string): ChatMessage {
     swipeId: '',
     swipeIndex: 0
   };
+}
+
+// ============================================
+// Summary & Memory Functions
+// ============================================
+
+/**
+ * Build summary section for context compression
+ */
+export function buildSummarySection(summary: SummaryData): PromptSection {
+  return {
+    type: 'system',
+    label: 'Conversation Summary',
+    content: `[Previous Conversation Summary]\n${summary.content}`,
+    color: SECTION_COLORS.summary
+  };
+}
+
+/**
+ * Build character memory section
+ */
+export function buildMemorySection(memory: CharacterMemory, characterName: string): PromptSection | null {
+  if (!memory.events.length && !memory.relationships.length && !memory.notes) {
+    return null;
+  }
+
+  const parts: string[] = [];
+  
+  // Add events
+  if (memory.events.length > 0) {
+    parts.push(`[Key Events and Facts]`);
+    for (const event of memory.events) {
+      const importance = event.importance >= 0.7 ? '⭐' : '';
+      parts.push(`${importance} ${event.content}`);
+    }
+  }
+  
+  // Add relationships
+  if (memory.relationships.length > 0) {
+    parts.push(`\n[Relationships]`);
+    for (const rel of memory.relationships) {
+      const sentiment = rel.sentiment > 50 ? '😊' : rel.sentiment < -50 ? '😞' : '😐';
+      parts.push(`${sentiment} ${rel.targetName}: ${rel.relationship} (${rel.sentiment >= 0 ? '+' : ''}${rel.sentiment})`);
+    }
+  }
+  
+  // Add notes
+  if (memory.notes) {
+    parts.push(`\n[Notes]\n${memory.notes}`);
+  }
+
+  return {
+    type: 'character_note',
+    label: `${characterName}'s Memory`,
+    content: parts.join('\n'),
+    color: SECTION_COLORS.memory
+  };
+}
+
+/**
+ * Build instructions section for summary behavior
+ */
+export function buildSummaryInstructionsSection(
+  characterName: string, 
+  summaryEnabled: boolean
+): PromptSection | null {
+  if (!summaryEnabled) return null;
+
+  const content = `## Memory Instructions
+- Remember important events, decisions, and emotional moments
+- Track relationship development with ${characterName}
+- Maintain consistency with previous conversations
+- Key information should be naturally recalled when relevant`;
+
+  return {
+    type: 'instructions',
+    label: 'Memory Instructions',
+    content,
+    color: SECTION_COLORS.instructions
+  };
+}
+
+/**
+ * Get messages for summarization
+ * Returns messages that should be included in summary generation
+ */
+export function getMessagesForSummary(
+  messages: ChatMessage[],
+  summarySettings: { triggerThreshold: number; keepRecentMessages: number }
+): ChatMessage[] {
+  const visibleMessages = messages.filter(m => !m.isDeleted);
+  
+  if (visibleMessages.length <= summarySettings.triggerThreshold) {
+    return [];
+  }
+  
+  // Exclude recent messages that should stay unsummarized
+  const messagesToSummarize = visibleMessages.slice(
+    0, 
+    visibleMessages.length - summarySettings.keepRecentMessages
+  );
+  
+  return messagesToSummarize;
+}
+
+/**
+ * Format summary with context markers
+ */
+export function formatSummaryWithContext(summary: SummaryData, totalMessages: number): string {
+  const startMsg = summary.messageRange.start + 1;
+  const endMsg = summary.messageRange.end + 1;
+  
+  return `[Summary of messages ${startMsg}-${endMsg} of ${totalMessages}]\n${summary.content}`;
 }

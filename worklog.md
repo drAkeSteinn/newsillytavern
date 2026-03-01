@@ -1,6 +1,209 @@
 # TavernFlow - Sprite System Work Log
 
 ---
+Task ID: 16
+Agent: Main Agent
+Task: Implement FASE 2 - Sistema de Memoria y Resúmenes (Enhanced with configurable intervals)
+
+Work Log:
+- Updated types in `/src/types/index.ts`:
+  - Added `normalChatInterval`: Messages between summaries for normal chat (default: 20)
+  - Added `groupChatInterval`: Messages between summaries for group chat (default: 15)
+  - Added `summarizeOnTurnEnd`: Summarize at end of turn in groups
+  - Added `includeCharacterThoughts`: Include character internal thoughts
+  - Added `preserveEmotionalMoments`: Highlight emotional moments in summaries
+  - Enhanced `promptTemplate` with `{{conversation}}` placeholder support
+- Updated memory slice in `/src/store/slices/memorySlice.ts`:
+  - Added `SessionSummaryTracking`: Per-session message counting
+  - Added `sessionTracking` state: Record<sessionId, tracking>
+  - Added `incrementMessageCount()`: Track messages since last summary
+  - Added `resetMessageCount()`: Reset after summary generation
+  - Added `shouldGenerateSummary()`: Check if threshold reached (normal vs group)
+  - Added `initSessionTracking()`: Initialize tracking for new sessions
+  - Added `getSessionSummaries()`: Get summaries for specific session
+  - Exported `SessionSummaryTracking` interface
+- Updated summary API `/src/app/api/chat/summary/route.ts`:
+  - Enhanced prompt builder to support `{{conversation}}` placeholder
+  - Custom prompt template now properly replaces placeholder
+  - Falls back to appending conversation if no placeholder
+- Created `MemorySettingsPanel` component `/src/components/memory/memory-settings-panel.tsx`:
+  - Enable/disable memory system
+  - **Interval configuration for normal chat** (5-50 messages, default 20)
+  - **Interval configuration for group chat** (5-40 messages, default 15)
+  - Messages to keep unsummarized setting
+  - Max summary tokens setting
+  - Toggle: Summarize on turn end (groups)
+  - Toggle: Include character thoughts
+  - Toggle: Preserve emotional moments
+  - **Collapsible prompt editor** with save/reset functionality
+  - Prompt preview when collapsed
+  - Variable hints showing `{{conversation}}` placeholder usage
+- Created `SummaryViewer` component `/src/components/memory/summary-viewer.tsx`:
+  - Displays summaries for a session
+  - Expandable summary cards
+  - Token count and message range display
+  - Delete and regenerate buttons
+  - Empty state handling
+  - Loading state during generation
+- Created `CharacterMemoryEditor` component `/src/components/memory/character-memory-editor.tsx`:
+  - Event memory editor with type selection (fact, relationship, event, emotion, location, item, state_change)
+  - Importance slider for events
+  - Relationship editor with sentiment tracking (-100 to +100)
+  - Character notes textarea
+  - Visual indicators for event types and sentiment levels
+- Created `/src/components/memory/index.ts` for exports
+- Updated store persistence to include `sessionTracking`
+- Updated slices index to export `SessionSummaryTracking`
+
+Stage Summary:
+- **CONFIGURABLE INTERVALS**: Separate message counts for normal (20) and group (15) chats
+- **PROMPT EDITOR**: Full customization of summary prompt with placeholder support
+- **SESSION TRACKING**: Per-session message counting for summary triggers
+- **BEHAVIOR TOGGLES**: Turn-end, thoughts, emotional moments options
+- **MEMORY EDITOR**: Character-specific memory with events and relationships
+- **SUMMARY VIEWER**: Visual display of generated summaries
+- All lint checks pass
+
+Architecture:
+```
+Chat Message → incrementMessageCount(sessionId, isGroupChat)
+                        ↓
+              shouldGenerateSummary() → Check interval threshold
+                        ↓
+              Summary API → LLM Generation with custom prompt
+                        ↓
+              SummaryData stored → resetMessageCount()
+                        ↓
+              Prompt Builder → Include in context
+```
+
+Configuration Options:
+```
+normalChatInterval:     5-50 messages (default: 20)
+groupChatInterval:      5-40 messages (default: 15)
+keepRecentMessages:     5-50 messages (default: 10)
+maxSummaryTokens:       100-2000 (default: 500)
+summarizeOnTurnEnd:     boolean
+includeCharacterThoughts: boolean
+preserveEmotionalMoments: boolean
+promptTemplate:         Custom prompt with {{conversation}}
+```
+
+Memory Editor Features:
+```
+Events:
+  - Types: fact, relationship, event, emotion, location, item, state_change
+  - Importance: 0-1 scale
+  - Timestamp tracking
+
+Relationships:
+  - Target: character name or "user"
+  - Type: relationship description
+  - Sentiment: -100 (hostile) to +100 (positive)
+  - Notes: additional details
+```
+
+UI Improvements:
+- Collapsible prompt editor with preview
+- Color-coded event types
+- Sentiment bar visualization
+- Import/Export ready for templates
+
+---
+Task ID: 15
+Agent: Main Agent
+Task: Implement FASE 2 - Sistema de Memoria y Resúmenes
+
+Work Log:
+- Created memory types in `/src/types/index.ts`:
+  - `MemoryEvent`: Significant occurrences (fact, relationship, event, emotion, location, item, state_change)
+  - `CharacterMemory`: Persistent memory with events, relationships, notes
+  - `RelationshipMemory`: Track relationships with sentiment (-100 to 100)
+  - `SummaryData`: Compressed conversation history with message range
+  - `SummarySettings`: Configuration for auto-summarization
+  - `ChatSessionMemory`: Extended session fields for memory
+- Created memory slice in `/src/store/slices/memorySlice.ts`:
+  - Summary state: summaries array, settings, generation status
+  - Character memories: per-character event tracking
+  - Summary actions: add, update, delete, clear
+  - Memory actions: addEvent, updateEvent, removeEvent
+  - Relationship actions: update, remove
+  - Notes actions: setCharacterNotes
+- Created summary API in `/src/app/api/chat/summary/route.ts`:
+  - POST endpoint for generating summaries
+  - Builds summary prompt from message history
+  - Integrates previous summaries for continuous context
+  - Token estimation for summary size
+  - LLM integration for generation
+  - GET endpoint for status check
+- Updated prompt builder in `/src/lib/llm/prompt-builder.ts`:
+  - Added SECTION_COLORS for summary, memory, relationship
+  - `buildSummarySection()`: Creates summary prompt section
+  - `buildMemorySection()`: Creates character memory section
+  - `buildSummaryInstructionsSection()`: Instructions for memory behavior
+  - `getMessagesForSummary()`: Filters messages for summarization
+  - `formatSummaryWithContext()`: Formats summary with context markers
+- Created memory settings panel in `/src/components/memory/memory-settings-panel.tsx`:
+  - Enable/disable summary system
+  - Auto-summarize toggle
+  - Trigger threshold slider (10-100 messages)
+  - Keep recent messages slider (5-30)
+  - Max summary tokens slider (200-2000)
+  - Summary status display (generating/active/error)
+  - Clear summaries button
+  - Customizable prompt template
+  - Character memory info section
+- Integrated memory slice into main store (`/src/store/index.ts`):
+  - Added MemorySlice to combined state
+  - Added memory state to persistence
+- Added Memory tab to SettingsPanel (`/src/components/tavern/settings-panel.tsx`):
+  - New "Memoria" tab with Brain icon
+  - Full MemorySettingsPanel component integration
+
+Stage Summary:
+- **MEMORY SYSTEM**: Complete implementation for conversation memory
+- **SUMMARIES**: Auto-generated compression of chat history
+- **CHARACTER MEMORY**: Persistent event and relationship tracking
+- **PROMPT INTEGRATION**: Summary and memory injected into prompts
+- **CONFIGURABLE**: Threshold, tokens, and template settings
+- All lint checks pass
+
+Architecture:
+```
+Chat Messages → Threshold Check → Summary API → LLM Generation
+                        ↓
+                 SummaryData (stored in session)
+                        ↓
+              Prompt Builder → Include in System Prompt
+                        ↓
+              Character AI → Contextual Response
+```
+
+Summary Settings:
+```
+enabled:            Toggle summary system
+autoSummarize:      Auto-trigger on threshold
+triggerThreshold:   Messages before summary (default: 20)
+keepRecentMessages: Unsummarized messages (default: 10)
+maxSummaryTokens:   Summary size limit (default: 500)
+promptTemplate:     Custom instructions for summarization
+```
+
+Memory Features:
+```
+Events:         Key moments remembered by character
+Relationships:  Sentiment tracking (-100 to +100)
+Notes:          User-editable memory notes
+```
+
+Usage:
+1. Enable summaries in Settings → Memoria
+2. Set trigger threshold (when to summarize)
+3. Configure keep recent messages (immediate context)
+4. Chat normally - summaries generate automatically
+5. Summary appears in prompt for context
+
+---
 Task ID: 14
 Agent: Main Agent
 Task: Implement FASE 1 - Sistema de Atmósfera y Clima

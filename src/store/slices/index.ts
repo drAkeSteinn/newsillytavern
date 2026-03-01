@@ -15,3 +15,4 @@ export { UISlice, createUISlice } from './uiSlice';
 export { SpriteSlice, createSpriteSlice, CharacterSpriteState, setReturnToIdleCallback } from './spriteSlice';
 export { HUDSlice, createHUDSlice } from './hudSlice';
 export { AtmosphereSlice, createAtmosphereSlice, DEFAULT_ATMOSPHERE_LAYERS, DEFAULT_ATMOSPHERE_PRESETS, DEFAULT_ATMOSPHERE_SETTINGS } from './atmosphereSlice';
+export { MemorySlice, createMemorySlice, DEFAULT_SUMMARY_SETTINGS, SessionSummaryTracking } from './memorySlice';

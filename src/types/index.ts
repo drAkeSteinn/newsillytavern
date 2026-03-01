@@ -1032,3 +1032,112 @@ export interface HUDTriggerHit {
   oldValue: string | number | boolean;
   newValue: string | number | boolean;
 }
+
+// ============ Memory & Summary Types ============
+
+// Memory event - a significant occurrence in the roleplay
+export interface MemoryEvent {
+  id: string;
+  type: 'fact' | 'relationship' | 'event' | 'emotion' | 'location' | 'item' | 'state_change';
+  content: string;           // Description of what happened/was learned
+  characterId?: string;      // Related character (if any)
+  timestamp: string;
+  importance: number;        // 0-1, how important to remember
+  metadata?: Record<string, unknown>;
+}
+
+// Character memory - persistent memory for a character
+export interface CharacterMemory {
+  id: string;
+  characterId: string;
+  events: MemoryEvent[];
+  relationships: RelationshipMemory[];  // Track relationships with other characters/users
+  notes: string;              // User-editable notes
+  lastUpdated: string;
+}
+
+// Relationship memory - how the character feels about someone
+export interface RelationshipMemory {
+  targetId: string;          // Character ID or 'user' for the user
+  targetName: string;
+  relationship: string;     // e.g., "close friend", "rival", "lover", "stranger"
+  sentiment: number;         // -100 to 100, negative to positive
+  notes: string;
+  lastUpdated: string;
+}
+
+// Summary data - compressed conversation history
+export interface SummaryData {
+  id: string;
+  sessionId: string;
+  content: string;           // The summary text
+  messageRange: {
+    start: number;           // Index of first message summarized
+    end: number;             // Index of last message summarized
+  };
+  tokens: number;            // Approximate token count
+  createdAt: string;
+  model?: string;            // Model used for generation
+}
+
+// Summary settings configuration
+export interface SummarySettings {
+  enabled: boolean;
+  autoSummarize: boolean;           // Auto-generate summaries
+  
+  // Message interval settings (separate for normal chat and groups)
+  normalChatInterval: number;       // Messages between summaries for normal chat
+  groupChatInterval: number;        // Messages between summaries for group chat
+  
+  triggerThreshold: number;         // Legacy: Messages before triggering summary
+  keepRecentMessages: number;       // Messages to keep unsummarized
+  maxSummaryTokens: number;         // Max tokens for summary output
+  promptTemplate: string;           // Custom prompt template
+  model?: string;                   // Model to use for summaries (fallback to main)
+  
+  // Summary behavior
+  summarizeOnTurnEnd: boolean;      // Summarize at end of turn (group chat)
+  includeCharacterThoughts: boolean; // Include character internal thoughts in summary
+  preserveEmotionalMoments: boolean; // Highlight emotional moments
+}
+
+// Default summary settings
+export const DEFAULT_SUMMARY_SETTINGS: SummarySettings = {
+  enabled: false,
+  autoSummarize: true,
+  
+  // Default intervals
+  normalChatInterval: 20,           // Every 20 messages in normal chat
+  groupChatInterval: 15,            // Every 15 messages in group chat (more frequent due to multiple chars)
+  
+  triggerThreshold: 20,
+  keepRecentMessages: 10,
+  maxSummaryTokens: 500,
+  promptTemplate: `You are a conversation summarizer for a roleplay chat. Your task is to create a concise but comprehensive summary of the conversation.
+
+**Instructions:**
+1. Preserve key events, decisions, and plot developments
+2. Track emotional moments and character development
+3. Note important dialogue exchanges
+4. Keep track of items, locations, and relationships
+5. Maintain chronological order
+
+**Format:**
+Write a narrative summary (not bullet points) that captures the essence of the conversation.
+
+**Conversation to summarize:**
+{{conversation}}
+
+**Summary:**`,
+  summarizeOnTurnEnd: true,
+  includeCharacterThoughts: true,
+  preserveEmotionalMoments: true,
+};
+
+// Extended ChatSession with memory and summary fields (to be merged with existing)
+export interface ChatSessionMemory {
+  summaries: SummaryData[];
+  currentSummaryId?: string;
+  memoryEnabled: boolean;
+  lastSummaryAt?: string;
+}

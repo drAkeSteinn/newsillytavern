@@ -27,7 +27,8 @@ import {
   Download,
   Upload,
   Layers,
-  Cloud
+  Cloud,
+  Brain
 } from 'lucide-react';
 import {
   Dialog,
@@ -44,6 +45,7 @@ import { PersonaPanel } from './persona-panel';
 import { LorebookPanel } from './lorebook-panel';
 import { HUDManager } from '@/components/settings/hud-manager';
 import { AtmosphereSettings } from '@/components/atmosphere';
+import { MemorySettingsPanel } from '@/components/memory';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean }[] = [
   { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false },
@@ -265,6 +267,10 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               <TabsTrigger value="atmosphere" className="gap-1.5 text-xs">
                 <Cloud className="w-4 h-4" />
                 Atmósfera
+              </TabsTrigger>
+              <TabsTrigger value="memory" className="gap-1.5 text-xs">
+                <Brain className="w-4 h-4" />
+                Memoria
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1159,6 +1165,11 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             {/* Atmosphere Settings */}
             <TabsContent value="atmosphere" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
               <AtmosphereSettings />
+            </TabsContent>
+
+            {/* Memory Settings */}
+            <TabsContent value="memory" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+              <MemorySettingsPanel />
             </TabsContent>
           </div>
         </Tabs>
