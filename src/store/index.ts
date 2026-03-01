@@ -25,6 +25,7 @@ import {
   createQuestSlice,
   createDialogueSlice,
   createInventorySlice,
+  createStatsSlice,
 } from './slices';
 
 // Import slice types
@@ -46,6 +47,7 @@ import type {
   QuestSlice,
   DialogueSlice,
   InventorySlice,
+  StatsSlice,
 } from './slices';
 
 // Import defaults for merge function
@@ -68,7 +70,8 @@ export type TavernState = CharacterSlice &
   MemorySlice &
   QuestSlice &
   DialogueSlice &
-  InventorySlice;
+  InventorySlice &
+  StatsSlice;
 
 // Create the combined store
 export const useTavernStore = create<TavernState>()(
@@ -92,13 +95,14 @@ export const useTavernStore = create<TavernState>()(
       ...createQuestSlice(set, get),
       ...createDialogueSlice(set, get),
       ...createInventorySlice(set, get),
+      ...createStatsSlice(set, get),
     }),
     {
       name: 'tavernflow-storage', // Same name for backward compatibility
       partialize: (state) => ({
         // Data to persist
         characters: state.characters,
-        sessions: state.sessions,
+        sessions: state.sessions,  // sessionStats is stored within sessions
         groups: state.groups,
         backgrounds: state.backgrounds,
         llmConfigs: state.llmConfigs,
@@ -146,6 +150,7 @@ export const useTavernStore = create<TavernState>()(
         currencies: state.currencies,
         inventorySettings: state.inventorySettings,
         inventoryNotifications: state.inventoryNotifications,
+        // Stats state is stored within sessions.sessionStats
       }),
       merge: (persistedState: unknown, currentState) => {
         const persisted = persistedState as Record<string, unknown> | undefined;
@@ -240,4 +245,4 @@ export const useTavernStore = create<TavernState>()(
 );
 
 // Export types
-export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice };
+export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice, StatsSlice };

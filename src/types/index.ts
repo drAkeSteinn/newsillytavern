@@ -230,6 +230,7 @@ export interface CharacterCard {
   spriteIndex?: SpriteIndex;    // Cached sprite file index
   voice: VoiceSettings | null;
   hudTemplateId?: string | null;  // HUD template to use for this character
+  statsConfig?: CharacterStatsConfig;  // Stats system configuration (attributes, skills, etc.)
   createdAt: string;
   updatedAt: string;
 }
@@ -343,6 +344,7 @@ export interface ChatSession {
   updatedAt: string;
   background?: string;
   scenario?: string;
+  sessionStats?: SessionStats;  // Stats values for this session (per character)
 }
 
 // ============ Group Types ============
@@ -1675,3 +1677,180 @@ export interface CharacterEquipment {
   slots: Record<ItemSlot, InventoryEntry | null>;
   stats: ItemStat[];        // Aggregated stats from equipment
 }
+
+// ============ Character Stats System Types ============
+
+// Attribute type
+export type AttributeType = 'number' | 'keyword' | 'text';
+
+// Requirement operator for skill/intention/invitation conditions
+export type RequirementOperator = '<' | '<=' | '>' | '>=' | '==' | '!=' | 'between';
+
+// Single requirement for skills/intentions/invitations
+export interface StatRequirement {
+  attributeKey: string;      // Key del atributo: "vida", "mana"
+  operator: RequirementOperator;
+  value: number | string;
+  valueMax?: number;         // Para operador 'between'
+}
+
+// Attribute definition (stored in CharacterCard)
+export interface AttributeDefinition {
+  id: string;
+  name: string;              // Display name: "Vida", "Maná", "Resistencia"
+  key: string;               // Template key: "vida" → {{vida}}
+  type: AttributeType;
+  
+  // Para tipo number
+  defaultValue: number | string;
+  min?: number;
+  max?: number;
+  
+  // Para detección Post-LLM (detección automática de cambios)
+  detectionTags?: string;    // Tags simples separados por coma: "Vida:, vida:, HP:, ❤️"
+  caseSensitive?: boolean;   // Distinguir mayúsculas/minúsculas (default: false)
+  
+  // Formato de salida cuando se inyecta en el prompt
+  outputFormat?: string;     // Formato: "Vida: {value}" → "Vida: 50"
+  
+  // Legacy (deprecated, use detectionTags instead)
+  keywordPattern?: string;   // Regex pattern: "Vida:\\s*(\\d+)"
+  keywordFormat?: string;    // Output format: "Vida: {value}"
+  
+  // UI
+  icon?: string;             // Emoji or icon name
+  color?: string;            // Tailwind color for HUD
+  showInHUD?: boolean;       // Show in HUD overlay
+}
+
+// Skill definition (stored in CharacterCard)
+export interface SkillDefinition {
+  id: string;
+  name: string;              // "Golpe furioso"
+  description: string;       // "Golpe con gran velocidad..."
+  key: string;               // Template key: "golpe_furioso" → {{golpe_furioso}}
+  requirements: StatRequirement[];
+  category?: string;         // "combate", "magia", "social"
+  
+  // Formato de inyección personalizado
+  injectFormat?: string;     // Default: "- {name}: {description}"
+}
+
+// Intention definition (stored in CharacterCard)
+export interface IntentionDefinition {
+  id: string;
+  name: string;              // "Atacar con furia"
+  description: string;
+  key: string;               // Template key
+  requirements: StatRequirement[];
+  examples?: string[];       // Examples of how to manifest this intention
+}
+
+// Invitation definition (stored in CharacterCard)
+export interface InvitationDefinition {
+  id: string;
+  name: string;              // "Invitar a acercarse"
+  description: string;
+  key: string;               // Template key
+  requirements: StatRequirement[];
+  triggers?: string[];       // Contexts where this invitation is appropriate
+}
+
+// Block headers configuration (customizable headers for injected content)
+export interface StatsBlockHeaders {
+  skills: string;            // Default: "Habilidades disponibles:"
+  intentions: string;        // Default: "Intenciones disponibles:"
+  invitations: string;       // Default: "Invitaciones disponibles:"
+}
+
+// Character stats configuration (stored in CharacterCard.statsConfig)
+export interface CharacterStatsConfig {
+  enabled: boolean;          // Stats system active for this character
+  
+  // Definitions
+  attributes: AttributeDefinition[];
+  skills: SkillDefinition[];
+  intentions: IntentionDefinition[];
+  invitations: InvitationDefinition[];
+  
+  // Customizable block headers
+  blockHeaders: StatsBlockHeaders;
+}
+
+// Stat change log entry (for history/debug)
+export interface StatChangeLogEntry {
+  attributeId: string;
+  attributeKey: string;
+  attributeName: string;
+  oldValue: number | string;
+  newValue: number | string;
+  reason: 'llm_detection' | 'manual' | 'trigger' | 'initialization';
+  timestamp: number;
+}
+
+// Character stats values (stored in SessionStats per character)
+export interface CharacterSessionStats {
+  // Current values for each attribute
+  attributeValues: Record<string, number | string>;
+  
+  // Last update timestamp per attribute
+  lastUpdated: Record<string, number>;
+  
+  // Change history (optional, for debug/undo)
+  changeLog?: StatChangeLogEntry[];
+}
+
+// Session stats state (stored in ChatSession.sessionStats)
+export interface SessionStats {
+  // Stats per character (supports group chats)
+  characterStats: Record<string, CharacterSessionStats>;
+  
+  // Metadata
+  initialized: boolean;      // Whether stats were initialized from defaults
+  lastModified: number;      // Global timestamp of last change
+}
+
+// Stats trigger hit result (Post-LLM detection)
+export interface StatsTriggerHit {
+  characterId: string;
+  attributeId: string;
+  attributeKey: string;
+  attributeName: string;
+  oldValue: number | string;
+  newValue: number | string;
+  matchedPattern: string;    // The regex pattern that matched
+  matchedText: string;       // The actual text matched
+}
+
+// Resolved stats for prompt injection
+export interface ResolvedStats {
+  // Resolved attribute values (key → formatted string)
+  attributes: Record<string, string>;
+  
+  // Available items after requirement evaluation
+  availableSkills: SkillDefinition[];
+  availableIntentions: IntentionDefinition[];
+  availableInvitations: InvitationDefinition[];
+  
+  // Formatted block strings (empty string if no items available)
+  skillsBlock: string;
+  intentionsBlock: string;
+  invitationsBlock: string;
+}
+
+// Default stats block headers
+export const DEFAULT_STATS_BLOCK_HEADERS: StatsBlockHeaders = {
+  skills: 'Habilidades disponibles:',
+  intentions: 'Intenciones disponibles:',
+  invitations: 'Invitaciones disponibles:',
+};
+
+// Default empty stats config
+export const DEFAULT_STATS_CONFIG: CharacterStatsConfig = {
+  enabled: false,
+  attributes: [],
+  skills: [],
+  intentions: [],
+  invitations: [],
+  blockHeaders: DEFAULT_STATS_BLOCK_HEADERS,
+};

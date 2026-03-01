@@ -28,7 +28,7 @@
     "enabled": true,
     "globalVolume": 0.85,
     "maxSoundsPerMessage": 3,
-    "globalCooldown": 0,
+    "globalCooldown": 150,
     "realtimeEnabled": true
   },
   "backgroundTriggers": {
@@ -39,12 +39,12 @@
   },
   "chatLayout": {
     "novelMode": true,
-    "chatWidth": 80.54652880354506,
-    "chatHeight": 41.851851851851855,
-    "chatX": 50.25383045536689,
-    "chatY": 79.07407407407408,
+    "chatWidth": 71.72051089406462,
+    "chatHeight": 35.55555555555556,
+    "chatX": 50.991735537190074,
+    "chatY": 82.22222222222223,
     "chatOpacity": 0.95,
-    "blurBackground": false,
+    "blurBackground": true,
     "showCharacterSprite": true
   }
 }

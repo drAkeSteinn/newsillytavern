@@ -20,6 +20,7 @@ export type { MemorySlice } from './memorySlice';
 export type { QuestSlice } from './questSlice';
 export type { DialogueSlice } from './dialogueSlice';
 export type { InventorySlice } from './inventorySlice';
+export type { StatsSlice } from './statsSlice';
 
 // Export slice creators and other values
 export { createCharacterSlice } from './characterSlice';
@@ -41,3 +42,11 @@ export type { SessionSummaryTracking } from './memorySlice';
 export { createQuestSlice, DEFAULT_QUEST_SETTINGS } from './questSlice';
 export { createDialogueSlice, DEFAULT_DIALOGUE_SETTINGS } from './dialogueSlice';
 export { createInventorySlice, DEFAULT_INVENTORY_SETTINGS, getRarityColor, getCategoryIcon } from './inventorySlice';
+export { 
+  createStatsSlice, 
+  evaluateRequirement,
+  evaluateRequirements,
+  filterSkillsByRequirements,
+  filterIntentionsByRequirements,
+  filterInvitationsByRequirements
+} from './statsSlice';

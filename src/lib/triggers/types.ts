@@ -11,7 +11,7 @@ import type { TriggerContext } from './trigger-bus';
 
 export interface TriggerMatch {
   triggerId: string;
-  triggerType: 'sound' | 'sprite' | 'background' | 'effect' | 'quest';
+  triggerType: 'sound' | 'sprite' | 'background' | 'effect' | 'quest' | 'stats' | 'hud';
   keyword: string;
   data: Record<string, unknown>;
 }

@@ -10,7 +10,8 @@ import type {
   CharacterGroup,
   Lorebook,
   SummaryData,
-  CharacterMemory
+  CharacterMemory,
+  SessionStats,
 } from '@/types';
 import type { ChatApiMessage, CompletionPromptConfig, GroupPromptBuildResult } from './types';
 import { processCharacterTemplate } from '@/lib/prompt-template';
@@ -19,6 +20,13 @@ import {
   type LorebookInjectOptions,
   type LorebookInjectResult
 } from '@/lib/lorebook';
+import {
+  resolveStats,
+  resolveStatsInText,
+  buildStatsPromptSections,
+  hasStatsKeys,
+  type StatsResolutionContext,
+} from '@/lib/stats';
 
 // ============================================
 // Section Colors for Prompt Viewer
@@ -52,6 +60,7 @@ export interface PromptBuildOptions {
   lorebooks?: Lorebook[];
   postHistoryInstructions?: string;
   lorebookOptions?: LorebookInjectOptions;
+  sessionStats?: SessionStats;
 }
 
 // ============================================
@@ -65,9 +74,17 @@ export function buildSystemPrompt(
   character: CharacterCard, 
   userName: string = 'User', 
   persona?: Persona,
-  lorebookSection?: PromptSection | null
+  lorebookSection?: PromptSection | null,
+  sessionStats?: SessionStats
 ): { prompt: string; sections: PromptSection[] } {
   const sections: PromptSection[] = [];
+  
+  // Resolve stats for this character
+  const resolvedStats = resolveStats({
+    characterId: character.id,
+    statsConfig: character.statsConfig,
+    sessionStats,
+  });
 
   // Main system instruction
   const systemContent = `You are now in roleplay mode. You will act as ${character.name}.`;
@@ -168,10 +185,20 @@ The user's name is ${userName}${persona?.description ? `, and their persona has 
     color: SECTION_COLORS.instructions
   });
 
-  // Build the prompt string from sections
-  const prompt = sections.map(s => `[${s.label}]\n${s.content}`).join('\n\n');
+  // Add stats sections if configured
+  const statsSections = buildStatsPromptSections(resolvedStats, character.name);
+  sections.push(...statsSections);
 
-  return { prompt, sections };
+  // Resolve stats keys in all sections content
+  const processedSections = sections.map(s => ({
+    ...s,
+    content: resolveStatsInText(s.content, resolvedStats)
+  }));
+
+  // Build the prompt string from processed sections
+  const prompt = processedSections.map(s => `[${s.label}]\n${s.content}`).join('\n\n');
+
+  return { prompt, sections: processedSections };
 }
 
 /**
@@ -314,9 +341,17 @@ export function buildGroupSystemPrompt(
   group: CharacterGroup,
   userName: string = 'User',
   persona?: Persona,
-  lorebookSection?: PromptSection | null
+  lorebookSection?: PromptSection | null,
+  sessionStats?: SessionStats
 ): { prompt: string; sections: PromptSection[] } {
   const sections: PromptSection[] = [];
+  
+  // Resolve stats for this character in the group
+  const resolvedStats = resolveStats({
+    characterId: character.id,
+    statsConfig: character.statsConfig,
+    sessionStats,
+  });
 
   // Group context
   const groupContext = `You are in a group roleplay. You will act as ${character.name}.`;
@@ -433,10 +468,20 @@ export function buildGroupSystemPrompt(
     color: SECTION_COLORS.instructions
   });
 
-  // Build the prompt string from sections
-  const prompt = sections.map(s => `[${s.label}]\n${s.content}`).join('\n\n');
+  // Add stats sections if configured
+  const statsSections = buildStatsPromptSections(resolvedStats, character.name);
+  sections.push(...statsSections);
 
-  return { prompt, sections };
+  // Resolve stats keys in all sections content
+  const processedSections = sections.map(s => ({
+    ...s,
+    content: resolveStatsInText(s.content, resolvedStats)
+  }));
+
+  // Build the prompt string from processed sections
+  const prompt = processedSections.map(s => `[${s.label}]\n${s.content}`).join('\n\n');
+
+  return { prompt, sections: processedSections };
 }
 
 /**

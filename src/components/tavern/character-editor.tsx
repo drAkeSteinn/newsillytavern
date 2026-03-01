@@ -35,7 +35,8 @@ import {
   Wand2,
   Crown,
   Star,
-  Layers
+  Layers,
+  Activity
 } from 'lucide-react';
 import type { CharacterCard, SpriteLibraries } from '@/types';
 import { SpriteManager } from './sprite-manager';
@@ -45,6 +46,7 @@ import { SpritePackEditor } from './sprite-pack-editor';
 import { SpriteDebugPanel } from './sprite-debug-panel';
 import { PresetSelector, presetToData } from './preset-selector';
 import { HUDSelector } from './hud-selector';
+import { StatsEditor } from './stats-editor';
 import { getLogger } from '@/lib/logger';
 
 const editorLogger = getLogger('editor');
@@ -305,7 +307,7 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
 
         {/* Tabs */}
         <Tabs defaultValue="description" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid grid-cols-6 w-full flex-shrink-0 h-9">
+          <TabsList className="grid grid-cols-7 w-full flex-shrink-0 h-9">
             <Tooltip>
               <TooltipTrigger asChild>
                 <TabsTrigger value="description" className="text-xs gap-1">
@@ -350,6 +352,15 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                 </TabsTrigger>
               </TooltipTrigger>
               <TooltipContent><p>Cambia sprites automáticamente según palabras clave</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="stats" className="text-xs gap-1">
+                  <Activity className="w-3.5 h-3.5" />
+                  Stats
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Sistema de atributos, habilidades e intenciones</p></TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -722,6 +733,14 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                   <SpriteDebugPanel />
                 </TabsContent>
               </Tabs>
+            </TabsContent>
+
+            {/* Stats Tab */}
+            <TabsContent value="stats" className="mt-0">
+              <StatsEditor
+                statsConfig={character.statsConfig}
+                onChange={(statsConfig) => setCharacter(prev => ({ ...prev, statsConfig }))}
+              />
             </TabsContent>
 
             {/* Voice Tab */}

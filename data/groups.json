@@ -1,7 +1,7 @@
 [
   {
     "name": "Clinica",
-    "description": "Una sala de interrogatorio en la prision",
+    "description": "Una celda fria y oscura en la prision",
     "systemPrompt": "",
     "activationStrategy": "all",
     "maxResponsesPerTurn": 3,
@@ -9,28 +9,29 @@
     "mentionTriggers": [],
     "conversationStyle": "sequential",
     "characterIds": [
-      "a19f59fb-0114-4f57-ace3-a09ed3fd5a57",
-      "096e9dbe-3367-40dd-8af2-1e4a09e42e17"
+      "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
+      "611876f7-399e-49a3-a32f-aa847e8f28da"
     ],
     "members": [
       {
-        "characterId": "a19f59fb-0114-4f57-ace3-a09ed3fd5a57",
+        "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "member",
         "isActive": true,
         "isPresent": true,
         "joinOrder": 0
       },
       {
-        "characterId": "096e9dbe-3367-40dd-8af2-1e4a09e42e17",
-        "role": "leader",
+        "characterId": "611876f7-399e-49a3-a32f-aa847e8f28da",
+        "role": "member",
         "isActive": true,
         "isPresent": true,
         "joinOrder": 1
       }
     ],
     "avatar": "",
-    "id": "dffff7e5-81d4-47fc-a65e-be148afffaef",
-    "createdAt": "2026-03-01T01:44:48.546Z",
-    "updatedAt": "2026-03-01T01:44:48.546Z"
+    "hudTemplateId": null,
+    "id": "e1ef8f7f-f8ea-45e4-ae78-d6d8b57b5bc4",
+    "createdAt": "2026-03-01T21:45:26.755Z",
+    "updatedAt": "2026-03-01T21:45:26.755Z"
   }
 ]
