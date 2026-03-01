@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import type { CharacterCard } from '@/types';
+import type { CharacterCard, Lorebook } from '@/types';
 import {
   DEFAULT_CHARACTER,
   buildSystemPrompt,
@@ -17,7 +17,8 @@ import {
   callAnthropic,
   callOllama,
   callTextGenerationWebUI,
-  GenerateResponse
+  GenerateResponse,
+  buildLorebookSectionForPrompt
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -31,7 +32,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Validate request (automatically detects request type)
     const validation = validateRequest(null, body);
     if (!validation.success) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     const {
       message,
       character,
@@ -49,6 +50,9 @@ export async function POST(request: NextRequest) {
       userName = 'User',
       persona
     } = validation.data;
+
+    // Extract lorebooks from body (not validated by validation.ts)
+    const lorebooks: Lorebook[] = body.lorebooks || [];
 
     if (!llmConfig) {
       return NextResponse.json(
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Sanitize user message
     const sanitizedMessage = sanitizeInput(message);
-    
+
     // Create default character if none provided
     const effectiveCharacter: CharacterCard = character || DEFAULT_CHARACTER;
 
@@ -75,8 +79,18 @@ export async function POST(request: NextRequest) {
     // Apply sliding window to messages
     const contextWindow = selectContextMessages(messages, llmConfig, contextConfig);
 
-    // Build system prompt with persona (using processed character)
-    const { prompt: systemPrompt } = buildSystemPrompt(processedCharacter, effectiveUserName, persona);
+    // Process lorebooks and get matched entries
+    const { section: lorebookSection } = buildLorebookSectionForPrompt(
+      messages,
+      lorebooks,
+      {
+        scanDepth: contextConfig.scanDepth,
+        tokenBudget: 2048
+      }
+    );
+
+    // Build system prompt with persona and lorebook (using processed character)
+    const { prompt: systemPrompt } = buildSystemPrompt(processedCharacter, effectiveUserName, persona, lorebookSection);
 
     // Prepare messages with new user message (use context-windowed messages)
     const allMessages = [...contextWindow.messages, createUserMessage(sanitizedMessage)];

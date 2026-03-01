@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection } from '@/types';
+import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook } from '@/types';
 import {
   createSSEJSON,
   createErrorResponse,
@@ -17,7 +17,8 @@ import {
   streamOpenAICompatible,
   streamAnthropic,
   streamOllama,
-  streamTextGenerationWebUI
+  streamTextGenerationWebUI,
+  buildLorebookSectionForPrompt
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -169,6 +170,9 @@ export async function POST(request: NextRequest) {
       lastResponderId
     } = validation.data;
 
+    // Extract lorebooks from body (not validated by validation.ts)
+    const lorebooks: Lorebook[] = body.lorebooks || [];
+
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
     }
@@ -191,6 +195,16 @@ export async function POST(request: NextRequest) {
 
     // Apply sliding window to messages
     const contextWindow = selectContextMessages(messages, llmConfig, contextConfig);
+
+    // Process lorebooks and get matched entries
+    const { section: lorebookSection } = buildLorebookSectionForPrompt(
+      messages,
+      lorebooks,
+      {
+        scanDepth: contextConfig.scanDepth,
+        tokenBudget: 2048
+      }
+    );
 
     // Create a TransformStream for SSE
     const stream = new ReadableStream({
@@ -217,7 +231,8 @@ export async function POST(request: NextRequest) {
               characters,
               group,
               effectiveUserName,
-              persona
+              persona,
+              lorebookSection
             );
 
             // Build chat messages with previous responses from this turn

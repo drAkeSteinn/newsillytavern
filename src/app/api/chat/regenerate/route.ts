@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { CharacterCard, PromptSection } from '@/types';
+import type { CharacterCard, PromptSection, Lorebook } from '@/types';
 import {
   DEFAULT_CHARACTER,
   createSSEJSON,
@@ -21,7 +21,8 @@ import {
   streamOpenAICompatible,
   streamAnthropic,
   streamOllama,
-  streamTextGenerationWebUI
+  streamTextGenerationWebUI,
+  buildLorebookSectionForPrompt
 } from '@/lib/llm';
 import {
   sanitizeInput
@@ -64,7 +65,8 @@ function validateRegenerateRequest(data: unknown) {
       llmConfig: obj.llmConfig as Record<string, unknown>,
       userName: typeof obj.userName === 'string' ? obj.userName : 'User',
       persona: obj.persona as Record<string, unknown> | undefined,
-      contextConfig: obj.contextConfig as Record<string, unknown> | undefined
+      contextConfig: obj.contextConfig as Record<string, unknown> | undefined,
+      lorebooks: Array.isArray(obj.lorebooks) ? obj.lorebooks : []
     }
   } as const;
 }
@@ -87,8 +89,12 @@ export async function POST(request: NextRequest) {
       llmConfig,
       userName = 'User',
       persona,
-      contextConfig
+      contextConfig,
+      lorebooks = []
     } = validation.data;
+
+    // Extract lorebooks for processing
+    const typedLorebooks: Lorebook[] = lorebooks;
 
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
@@ -124,11 +130,22 @@ export async function POST(request: NextRequest) {
     // Apply sliding window to messages
     const contextWindow = selectContextMessages(messagesBeforeRegenerate, llmConfig, ctxConfig);
 
-    // Build system prompt with persona (using processed character)
+    // Process lorebooks and get matched entries
+    const { section: lorebookSection } = buildLorebookSectionForPrompt(
+      messagesBeforeRegenerate,
+      typedLorebooks,
+      {
+        scanDepth: ctxConfig.scanDepth,
+        tokenBudget: 2048
+      }
+    );
+
+    // Build system prompt with persona and lorebook (using processed character)
     const { prompt: systemPrompt, sections: systemSections } = buildSystemPrompt(
       processedCharacter,
       effectiveUserName,
-      persona
+      persona,
+      lorebookSection
     );
 
     // Build all prompt sections for storage

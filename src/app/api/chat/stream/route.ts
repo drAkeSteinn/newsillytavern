@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection } from '@/types';
+import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook } from '@/types';
 import {
   StreamRequest,
   DEFAULT_CHARACTER,
@@ -22,7 +22,8 @@ import {
   streamOpenAICompatible,
   streamAnthropic,
   streamOllama,
-  streamTextGenerationWebUI
+  streamTextGenerationWebUI,
+  buildLorebookSectionForPrompt
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -53,13 +54,16 @@ export async function POST(request: NextRequest) {
       persona
     } = validation.data;
 
+    // Extract lorebooks from body (not validated by validation.ts)
+    const lorebooks: Lorebook[] = body.lorebooks || [];
+
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
     }
 
     // Sanitize user message
     const sanitizedMessage = sanitizeInput(message);
-    
+
     // Create default character if none provided
     const effectiveCharacter: CharacterCard = character || DEFAULT_CHARACTER;
 
@@ -74,15 +78,26 @@ export async function POST(request: NextRequest) {
 
     // Apply sliding window to messages
     const contextWindow = selectContextMessages(messages, llmConfig, contextConfig);
-    
+
     // Log context stats (for debugging)
     const stats = getContextStats(messages);
-    
-    // Build system prompt with persona (using processed character)
+
+    // Process lorebooks and get matched entries
+    const { section: lorebookSection } = buildLorebookSectionForPrompt(
+      messages,
+      lorebooks,
+      {
+        scanDepth: contextConfig.scanDepth,
+        tokenBudget: 2048
+      }
+    );
+
+    // Build system prompt with persona and lorebook (using processed character)
     const { prompt: systemPrompt, sections: systemSections } = buildSystemPrompt(
       processedCharacter,
       effectiveUserName,
-      persona
+      persona,
+      lorebookSection
     );
 
     // Build all prompt sections for storage

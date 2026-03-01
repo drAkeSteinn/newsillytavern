@@ -37,6 +37,9 @@ export function ChatPanel() {
   const hudTemplates = useTavernStore((state) => state.hudTemplates);
   const hudSessionState = useTavernStore((state) => state.hudSessionState);
   const setActiveHUD = useTavernStore((state) => state.setActiveHUD);
+  // Lorebooks for prompt injection
+  const lorebooks = useTavernStore((state) => state.lorebooks);
+  const activeLorebookIds = useTavernStore((state) => state.activeLorebookIds);
   
   const setGenerating = useTavernStore((state) => state.setGenerating);
   const addMessage = useTavernStore((state) => state.addMessage);
@@ -178,6 +181,9 @@ export function ChatPanel() {
           throw new Error(t('chat.noGroupCharacters'));
         }
 
+        // Get active lorebooks for prompt injection
+        const activeLorebooks = lorebooks.filter(lb => activeLorebookIds.includes(lb.id) && lb.active);
+
         // Use group streaming endpoint
         const response = await fetch('/api/chat/group-stream', {
           method: 'POST',
@@ -192,7 +198,8 @@ export function ChatPanel() {
             llmConfig: activeLLMConfig,
             userName: activePersona?.name || 'User',
             persona: activePersona,
-            contextConfig
+            contextConfig,
+            lorebooks: activeLorebooks
           })
         });
 
@@ -299,6 +306,9 @@ export function ChatPanel() {
       // Single character chat
       if (!activeCharacter) return;
 
+      // Get active lorebooks for prompt injection
+      const activeLorebooks = lorebooks.filter(lb => activeLorebookIds.includes(lb.id) && lb.active);
+
       if (useStreaming) {
         const response = await fetch('/api/chat/stream', {
           method: 'POST',
@@ -312,7 +322,8 @@ export function ChatPanel() {
             llmConfig: activeLLMConfig,
             userName: activePersona?.name || 'User',
             persona: activePersona,
-            contextConfig
+            contextConfig,
+            lorebooks: activeLorebooks
           })
         });
 
@@ -411,7 +422,8 @@ export function ChatPanel() {
             llmConfig: activeLLMConfig,
             userName: activePersona?.name || 'User',
             persona: activePersona,
-            contextConfig
+            contextConfig,
+            lorebooks: activeLorebooks
           })
         });
 
@@ -462,7 +474,7 @@ export function ChatPanel() {
         }
       }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context, lorebooks, activeLorebookIds]);
 
   // Handle regenerate - create a new swipe alternative for an existing message
   const handleRegenerate = useCallback(async (messageId: string) => {
@@ -498,6 +510,9 @@ export function ChatPanel() {
       const currentMessages = currentSession?.messages || [];
       const contextConfig = settings.context;
 
+      // Get active lorebooks for prompt injection
+      const activeLorebooks = lorebooks.filter(lb => activeLorebookIds.includes(lb.id) && lb.active);
+
       // Use regenerate endpoint
       const response = await fetch('/api/chat/regenerate', {
         method: 'POST',
@@ -510,7 +525,8 @@ export function ChatPanel() {
           llmConfig: activeLLMConfig,
           userName: activePersona?.name || 'User',
           persona: activePersona,
-          contextConfig
+          contextConfig,
+          lorebooks: activeLorebooks
         })
       });
 
@@ -582,7 +598,7 @@ export function ChatPanel() {
         }
       }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, addSwipeAlternative, setGenerating, settings.context]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, addSwipeAlternative, setGenerating, settings.context, lorebooks, activeLorebookIds]);
 
   // Handle edit message
   const handleEdit = useCallback((messageId: string, newContent: string) => {
