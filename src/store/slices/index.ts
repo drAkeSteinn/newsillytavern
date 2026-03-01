@@ -14,3 +14,4 @@ export { SoundSlice, createSoundSlice } from './soundSlice';
 export { UISlice, createUISlice } from './uiSlice';
 export { SpriteSlice, createSpriteSlice, CharacterSpriteState, setReturnToIdleCallback } from './spriteSlice';
 export { HUDSlice, createHUDSlice } from './hudSlice';
+export { AtmosphereSlice, createAtmosphereSlice, DEFAULT_ATMOSPHERE_LAYERS, DEFAULT_ATMOSPHERE_PRESETS, DEFAULT_ATMOSPHERE_SETTINGS } from './atmosphereSlice';

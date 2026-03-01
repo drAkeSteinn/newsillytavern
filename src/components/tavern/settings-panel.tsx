@@ -26,7 +26,8 @@ import {
   BookOpen,
   Download,
   Upload,
-  Layers
+  Layers,
+  Cloud
 } from 'lucide-react';
 import {
   Dialog,
@@ -42,6 +43,7 @@ import { BackgroundTriggersSettings } from './background-triggers-settings';
 import { PersonaPanel } from './persona-panel';
 import { LorebookPanel } from './lorebook-panel';
 import { HUDManager } from '@/components/settings/hud-manager';
+import { AtmosphereSettings } from '@/components/atmosphere';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean }[] = [
   { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false },
@@ -259,6 +261,10 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               <TabsTrigger value="hud" className="gap-1.5 text-xs">
                 <Layers className="w-4 h-4" />
                 HUD
+              </TabsTrigger>
+              <TabsTrigger value="atmosphere" className="gap-1.5 text-xs">
+                <Cloud className="w-4 h-4" />
+                Atmósfera
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1148,6 +1154,11 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             {/* HUD Settings */}
             <TabsContent value="hud" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
               <HUDManager />
+            </TabsContent>
+
+            {/* Atmosphere Settings */}
+            <TabsContent value="atmosphere" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+              <AtmosphereSettings />
             </TabsContent>
           </div>
         </Tabs>

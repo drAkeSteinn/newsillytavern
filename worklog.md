@@ -1,6 +1,100 @@
 # TavernFlow - Sprite System Work Log
 
 ---
+Task ID: 14
+Agent: Main Agent
+Task: Implement FASE 1 - Sistema de Atmósfera y Clima
+
+Work Log:
+- Created atmosphere types in `/src/types/index.ts`:
+  - `AtmosphereRenderType`: 'css' | 'canvas' | 'overlay' | 'shader'
+  - `AtmosphereCategory`: precipitation, particles, fog, light, overlay, ambient
+  - `AtmosphereLayer`: Complete layer definition with intensity, speed, opacity, colors, triggers, audio
+  - `AtmospherePreset`: Named preset with multiple layers
+  - `AtmosphereState`: Runtime state for active layers
+  - `AtmosphereSettings`: Global settings with performance mode
+  - `AtmosphereTriggerHit`: Trigger detection result
+- Created atmosphere slice in `/src/store/slices/atmosphereSlice.ts`:
+  - DEFAULT_ATMOSPHERE_LAYERS: 14 pre-defined layers (rain-light, rain-heavy, snow-light, snow-heavy, fog-light, fog-heavy, fireflies, falling-leaves, embers, light-rays, lightning, dust-overlay, night-filter)
+  - DEFAULT_ATMOSPHERE_PRESETS: 7 presets (clear, rainy-day, stormy-night, snowy-wonderland, summer-night, autumn-day, cozy-fire)
+  - Layer management: add, update, remove layers
+  - Preset management: add, update, remove presets
+  - Activation: activateLayer, deactivateLayer, toggleLayer, activatePreset, clearAll
+  - Settings: global intensity, audio enabled, volume, performance mode
+- Integrated atmosphere slice into main store (`/src/store/index.ts`):
+  - Added AtmosphereSlice to combined state
+  - Added atmosphere state to persistence
+  - Added AtmosphereSlice to exports
+- Created atmosphere components in `/src/components/atmosphere/`:
+  - `atmosphere-renderer.tsx`: Main container, manages layer rendering and audio loops
+  - `css-atmosphere-layer.tsx`: CSS-based effects (rain drops)
+  - `canvas-atmosphere-layer.tsx`: Canvas-based particle system (snow, fireflies, leaves, embers)
+  - `overlay-atmosphere-layer.tsx`: Overlay effects (fog, night filter, light rays, lightning)
+  - `atmosphere-settings.tsx`: Settings panel with presets and configuration
+  - `atmosphere-presets.tsx`: Quick preset selector with icons
+  - `index.ts`: Component exports
+- Added CSS animations to `/src/app/globals.css`:
+  - Rain fall animation with customizable speed/direction
+  - Fog drift animation
+  - Light rays shimmer
+  - Lightning flash effect
+  - Snow fall animation
+  - Performance optimization for reduced motion
+- Created atmosphere trigger handler in `/src/lib/triggers/handlers/atmosphere-handler.ts`:
+  - AtmosphereTriggerHandler class implementing TriggerHandler interface
+  - Preset detection with priority (presets checked before individual layers)
+  - Layer detection with trigger keys and context keys
+  - Cooldown management per-layer and global
+  - `detectAtmosphereTriggers()` helper function
+- Integrated AtmosphereRenderer into `/src/app/page.tsx`:
+  - Added cloud button in header for atmosphere settings
+  - Renderer positioned at z-index 30 (above background, below UI)
+- Added Atmosphere tab to SettingsPanel (`/src/components/tavern/settings-panel.tsx`):
+  - New "Atmósfera" tab with Cloud icon
+  - Full AtmosphereSettings component integration
+
+Stage Summary:
+- **ATMOSPHERE SYSTEM**: Complete implementation ready for use
+- **14 LAYERS**: Rain (light/heavy), Snow (light/heavy), Fog (light/heavy), Fireflies, Leaves, Embers, Light rays, Lightning, Dust, Night filter
+- **7 PRESETS**: Clear, Rainy Day, Stormy Night, Snowy Wonderland, Summer Night, Autumn Day, Cozy Fire
+- **3 RENDER TYPES**: CSS (rain), Canvas (particles), Overlay (fog/filters)
+- **AUDIO SUPPORT**: Ambient audio loops with volume control
+- **PERFORMANCE MODES**: Quality, Balanced, Performance
+- **TRIGGER DETECTION**: Auto-detect from message content
+- All lint checks pass
+
+Architecture:
+```
+Settings → AtmosphereSettings → Select Preset or Layers
+                ↓
+AtmosphereRenderer (in page.tsx)
+        ├─→ CSSAtmosphereLayer (rain effects)
+        ├─→ CanvasAtmosphereLayer (particles: snow, fireflies, leaves, embers)
+        └─→ OverlayAtmosphereLayer (fog, night filter, light rays, lightning)
+                ↓
+Message: "The storm rages outside..."
+                ↓
+AtmosphereHandler → Detects "storm" → Activates "stormy-night" preset
+```
+
+Layer Categories:
+```
+precipitation: rain, snow, hail
+particles: fireflies, leaves, dust, embers
+fog: fog, mist, haze
+light: sun rays, lightning, aurora
+overlay: color filters, vignette, lens effects
+ambient: background ambient effects
+```
+
+Performance Modes:
+```
+quality:    100% particles, best visual
+balanced:   70% particles, good balance
+performance: 40% particles, best FPS
+```
+
+---
 Task ID: 13
 Agent: Main Agent
 Task: Implement Background Trigger System Phase 3 (Overlays, Variants, Advanced Transitions)

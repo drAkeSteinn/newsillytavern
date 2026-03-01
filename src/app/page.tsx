@@ -7,6 +7,7 @@ import { SessionsSidebar } from '@/components/tavern/sessions-sidebar';
 import { SettingsPanel } from '@/components/tavern/settings-panel';
 import { BackgroundGallery } from '@/components/tavern/background-gallery';
 import { SettingsApplier } from '@/components/tavern/settings-applier';
+import { AtmosphereRenderer } from '@/components/atmosphere';
 import { Button } from '@/components/ui/button';
 import { 
   Menu, 
@@ -17,7 +18,8 @@ import {
   Loader2,
   Image as ImageIcon,
   BookOpen,
-  Music
+  Music,
+  Cloud
 } from 'lucide-react';
 import { useState } from 'react';
 import { useHydration } from '@/hooks/use-hydration';
@@ -44,6 +46,9 @@ export default function TavernFlow() {
       {/* Settings Applier - Applies user settings to the app */}
       <SettingsApplier />
       
+      {/* Atmosphere Effects Renderer */}
+      {hydrated && <AtmosphereRenderer />}
+      
       {/* Header */}
       <header className="h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-4 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -67,6 +72,16 @@ export default function TavernFlow() {
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Atmosphere Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openSettingsTab('atmosphere')}
+            title={t('nav.atmosphere') || 'Atmósfera'}
+          >
+            <Cloud className="w-5 h-5" />
+          </Button>
+          
           {/* Background Gallery Button */}
           <Button
             variant="ghost"

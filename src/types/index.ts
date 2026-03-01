@@ -2,6 +2,105 @@
 // TAVERNFLOW - Type Definitions
 // ============================================
 
+// ============ Atmosphere Types ============
+
+// Atmosphere layer type (how it's rendered)
+export type AtmosphereRenderType = 'css' | 'canvas' | 'overlay' | 'shader';
+
+// Atmosphere category for grouping
+export type AtmosphereCategory = 
+  | 'precipitation'  // rain, snow, hail
+  | 'particles'      // fireflies, leaves, dust, embers
+  | 'fog'            // fog, mist, haze
+  | 'light'          // sun rays, lightning, aurora
+  | 'overlay'        // color filters, vignette, lens effects
+  | 'ambient';       // background ambient effects
+
+// Single atmosphere layer definition
+export interface AtmosphereLayer {
+  id: string;
+  name: string;
+  category: AtmosphereCategory;
+  renderType: AtmosphereRenderType;
+  
+  // Visual settings
+  intensity: number;         // 0-1, controls particle count/speed
+  speed: number;             // Animation speed multiplier
+  opacity: number;           // Layer opacity 0-1
+  color?: string;            // Primary color (hex or rgba)
+  colorSecondary?: string;   // Secondary color for gradients
+  
+  // Size/density settings
+  density?: number;          // Particle density
+  sizeMin?: number;          // Min particle size
+  sizeMax?: number;          // Max particle size
+  
+  // Direction/movement
+  direction?: number;        // Direction in degrees (0 = down, 90 = right)
+  windSpeed?: number;        // Wind effect on particles
+  
+  // CSS/Canvas specific settings
+  cssClass?: string;         // CSS class for CSS-based effects
+  spriteUrl?: string;        // Sprite URL for overlay/particle effects
+  
+  // Animation settings
+  loop?: boolean;            // Loop animation
+  duration?: number;         // Duration in ms for non-looping effects
+  
+  // Trigger keywords
+  triggerKeys: string[];     // Keywords that activate this layer
+  contextKeys?: string[];    // Additional context keys required
+  
+  // Audio
+  audioLoopUrl?: string;     // Ambient audio loop
+  audioVolume?: number;      // Volume 0-1
+  
+  // State
+  active: boolean;
+  priority: number;          // Rendering priority (higher = on top)
+}
+
+// Preset atmosphere configuration
+export interface AtmospherePreset {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;             // Emoji or icon name
+  thumbnail?: string;        // Preview image
+  layers: AtmosphereLayer[]; // Layers in this preset
+  transitionDuration?: number; // Time to transition to this preset
+}
+
+// Active atmosphere state
+export interface AtmosphereState {
+  activeLayers: AtmosphereLayer[];
+  activePresetId: string | null;
+  transitionProgress: number; // 0-1 for smooth transitions
+  audioEnabled: boolean;
+  globalIntensity: number;    // Multiplier for all layers
+}
+
+// Atmosphere settings
+export interface AtmosphereSettings {
+  enabled: boolean;
+  autoDetect: boolean;        // Auto-detect from messages
+  realtimeEnabled: boolean;   // Detect during streaming
+  globalIntensity: number;    // Global intensity multiplier
+  globalVolume: number;       // Global audio volume
+  transitionDuration: number; // Default transition time
+  showPreview: boolean;       // Show preview in settings
+  performanceMode: 'quality' | 'balanced' | 'performance';
+}
+
+// Atmosphere trigger result
+export interface AtmosphereTriggerHit {
+  layerId: string;
+  layer?: AtmosphereLayer;
+  presetId?: string;
+  preset?: AtmospherePreset;
+  intensity?: number;         // Detected intensity from context
+}
+
 // ============ Character Card Types ============
 
 // ============ Sprite Trigger System Types ============

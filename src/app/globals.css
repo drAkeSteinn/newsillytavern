@@ -153,3 +153,144 @@
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: oklch(0.556 0 0 / 0.5);
 }
+
+/* ============================================
+   Atmosphere Effects
+   ============================================ */
+
+/* Atmosphere Container */
+.atmosphere-container {
+  z-index: 30;
+}
+
+/* Rain Effects */
+.rain-drop {
+  position: absolute;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, rgba(174, 194, 224, 0.8));
+  border-radius: 0 0 5px 5px;
+  animation: rain-fall linear infinite;
+}
+
+@keyframes rain-fall {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+/* Rain Light */
+.rain-light {
+  animation: rain-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes rain-shimmer {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.1);
+  }
+}
+
+/* Rain Heavy */
+.rain-heavy {
+  animation: rain-heavy-intensity 2s ease-in-out infinite;
+}
+
+@keyframes rain-heavy-intensity {
+  0%, 100% {
+    filter: brightness(1) contrast(1.05);
+  }
+  50% {
+    filter: brightness(0.95) contrast(1.1);
+  }
+}
+
+/* Fog Effects */
+@keyframes fog-drift {
+  0%, 100% {
+    transform: translateX(-2%) scale(1.02);
+  }
+  50% {
+    transform: translateX(2%) scale(1);
+  }
+}
+
+/* Light Rays */
+@keyframes light-rays-shimmer {
+  0%, 100% {
+    opacity: 0.2;
+    transform: translateX(-5%);
+  }
+  50% {
+    opacity: 0.4;
+    transform: translateX(5%);
+  }
+}
+
+/* Lightning Flash */
+@keyframes lightning-flash {
+  0%, 100% {
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  10% {
+    opacity: 0.3;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  20%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Snow Flakes */
+.snowflake {
+  position: absolute;
+  color: white;
+  font-size: 1em;
+  animation: snow-fall linear infinite;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes snow-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* Performance optimization - reduce motion when preferred */
+@media (prefers-reduced-motion: reduce) {
+  .rain-drop,
+  .snowflake,
+  .atmosphere-overlay,
+  .rain-light,
+  .rain-heavy {
+    animation: none !important;
+  }
+}
