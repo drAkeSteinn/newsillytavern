@@ -1,6 +1,339 @@
 # TavernFlow - Sprite System Work Log
 
 ---
+Task ID: 19
+Agent: Main Agent
+Task: Implement FASE 5 - Sistema de Inventario y Items
+
+Work Log:
+- Created inventory types in `/src/types/index.ts`:
+  - `ItemCategory`: weapon, armor, accessory, consumable, material, key, book, tool, treasure, clothing, misc
+  - `ItemRarity`: common, uncommon, rare, epic, legendary, unique, cursed
+  - `ItemSlot`: main_hand, off_hand, head, chest, legs, feet, hands, accessory1, accessory2, back, none
+  - `ItemStat`: Stat definition with name, value, isPercentage
+  - `ItemEffect`: Effect definition (buff, debuff, heal, damage, special)
+  - `Item`: Complete item definition with stats, effects, triggers
+  - `InventoryEntry`: Item in inventory with quantity, durability, equipment state
+  - `InventoryContainer`: Storage containers (inventory, storage, shop, chest)
+  - `CurrencyEntry`: Currency tracking (gold, silver, gems)
+  - `InventorySettings`: Configuration for auto-detection and display
+  - `InventoryTriggerHit`: Trigger detection result
+  - `InventoryNotification`: Item update notifications
+  - `CharacterEquipment`: Equipment state per character
+  - `DEFAULT_INVENTORY_SETTINGS`: Default configuration
+- Created inventory slice in `/src/store/slices/inventorySlice.ts`:
+  - Item registry: addItem, updateItem, deleteItem, getItemById, searchItems
+  - Inventory: addToInventory, removeFromInventory, transferItem, getItemCount
+  - Containers: addContainer, updateContainer, deleteContainer
+  - Currency: addCurrency, updateCurrency, deleteCurrency, adjustCurrency
+  - Equipment: equipItem, unequipItem, getEquippedItems, getEquipmentStats
+  - Settings: setInventorySettings
+  - Notifications: addInventoryNotification, markNotificationRead
+  - Utility: sortInventory, clearInventory, exportInventory, importInventory
+  - Helper functions: getRarityColor, getCategoryIcon, createDefaultItem
+- Created item handler in `/src/lib/triggers/handlers/item-handler.ts`:
+  - `parseItemTags()`: Parser for `<item:add>`, `<item:remove>`, `<item:equip>` tags
+  - `checkItemTriggers()`: Detect item additions, removals, and equipment from messages
+  - Natural language patterns for acquisition, removal, and equipment detection
+  - `buildInventoryPromptSection()`: Build prompt section with inventory
+  - `createItemFromDetection()`: Create item from detected content
+- Integrated inventory slice into main store (`/src/store/index.ts`):
+  - Added InventorySlice to combined state
+  - Added items, containers, currencies, inventorySettings to persistence
+- Created inventory components in `/src/components/inventory/`:
+  - `item-card.tsx`: Individual item display with stats, effects, rarity colors
+  - `item-editor.tsx`: Full item creation/editing form with tabs (Basic, Stats, Triggers)
+  - `inventory-panel.tsx`: Main panel with tabs (Inventory, Registry, Currency, Settings)
+  - `index.ts`: Component exports
+- Added Inventory tab to SettingsPanel (`/src/components/tavern/settings-panel.tsx`):
+  - New "Inventario" tab with Package icon
+  - Full InventoryPanel component integration
+
+Stage Summary:
+- **INVENTORY SYSTEM**: Complete implementation for item management
+- **ITEM REGISTRY**: Define items with stats, effects, rarity, category
+- **AUTO-DETECTION**: Parse item tags and natural language patterns
+- **EQUIPMENT**: Slot-based equipment system with stat aggregation
+- **CURRENCY**: Multiple currency types with adjustment tracking
+- **CONTAINERS**: Multiple storage containers with transfer support
+- All lint checks pass
+
+Architecture:
+```
+Settings → Inventory Tab → Manage items, containers, currency
+                ↓
+InventoryPanel
+    ├── Inventory: View/filter/add items
+    ├── Registry: Define item templates
+    ├── Currency: Track currencies
+    └── Settings: Configure auto-detection
+                ↓
+Chat Message: "Obtienes una Espada del Destino"
+                ↓
+ItemHandler → Detects pattern → Creates/adds item
+                ↓
+Item stored in container
+                ↓
+Notifications: Item pickup alerts
+```
+
+Item Features:
+```
+Categories:
+  - weapon: Swords, bows, etc.
+  - armor: Helmets, chestplates
+  - accessory: Rings, amulets
+  - consumable: Potions, food
+  - material: Crafting materials
+  - key: Quest items
+  - book: Scrolls, documents
+  - tool: Tools, instruments
+  - treasure: Gems, valuables
+  - clothing: Outfits
+  - misc: Other items
+
+Rarities:
+  - common: Grey
+  - uncommon: Green
+  - rare: Blue
+  - epic: Purple
+  - legendary: Gold
+  - unique: Red
+  - cursed: Dark purple
+
+Equipment Slots:
+  - main_hand, off_hand
+  - head, chest, legs, feet, hands
+  - accessory1, accessory2
+  - back
+
+Auto-Detection:
+  - Tag-based: <item:add name="Sword"/>
+  - Natural language: "obtienes una espada"
+  - Trigger keywords per item
+```
+
+UI Components:
+- ItemCard: Expandable card with stats, effects, rarity colors
+- ItemEditor: Full form with tabs (Basic, Stats, Triggers)
+- InventoryPanel: Main panel with filtering, sorting, search
+
+---
+Task ID: 18
+Agent: Main Agent
+Task: Implement FASE 4 - Sistema de Diálogos Mejorados
+
+Work Log:
+- Created dialogue types in `/src/types/index.ts`:
+  - `SpeechBubbleStyle`: 'modern' | 'classic' | 'minimal' | 'neon' | 'elegant' | 'dark'
+  - `TextSegmentType`: dialogue, action, narration, thought, system, emphasis, whisper, shout
+  - `TextSegment`: Parsed text segment with type, content, and metadata
+  - `CharacterDialogueStyle`: Per-character style overrides (colors, fonts)
+  - `TypewriterSettings`: Typewriter effect configuration
+  - `DialogueFormatSettings`: Format markers for detection
+  - `DialogueSettings`: Complete dialogue display settings
+  - `DEFAULT_DIALOGUE_SETTINGS`: Default configuration
+- Created dialogue slice in `/src/store/slices/dialogueSlice.ts`:
+  - Dialogue settings state management
+  - setDialogueSettings: Update all settings
+  - resetDialogueSettings: Reset to defaults
+  - setTypewriterSettings: Update typewriter config
+  - setFormatSettings: Update format markers
+  - setCharacterStyle: Set per-character style overrides
+  - removeCharacterStyle: Remove character override
+  - getCharacterStyle: Get character-specific style
+- Created dialogue parser in `/src/lib/dialogue/dialogue-parser.ts`:
+  - `parseTextSegments()`: Parse text into formatted segments
+  - `findMarkers()`: Find all format markers in text
+  - `detectEmotion()`: Detect emotions from text
+  - `isShout()`: Check if text is shouting
+  - `isEmphasis()`: Check for emphasis markers
+  - `detectSpeaker()`: Detect speaker name from text
+- Created dialogue components in `/src/components/dialogue/`:
+  - `typewriter-text.tsx`: Typewriter effect component
+  - `speech-bubble.tsx`: Speech bubble with multiple styles
+  - `formatted-message.tsx`: Main message formatter
+  - `dialogue-settings-panel.tsx`: Settings panel for dialogue config
+  - `index.ts`: Component exports
+- Integrated into store `/src/store/index.ts`:
+  - Added DialogueSlice to combined state
+  - Added dialogueSettings to persistence
+- Updated chat tab in `/src/components/tavern/settings-panel.tsx`:
+  - Created `ChatSettingsContent` component with sub-tabs
+  - **Diálogos tab**: DialogueSettingsPanel integration
+  - **Diseño tab**: Chat layout settings (width, height, sprites)
+  - **Respuestas tab**: Quick replies management
+  - Added explanatory banners and tips
+
+Stage Summary:
+- **DIALOGUE SYSTEM**: Complete implementation for message formatting
+- **FORMAT DETECTION**: Auto-detect dialogue, actions, thoughts, whispers
+- **BUBBLE STYLES**: 6 visual styles (modern, classic, minimal, neon, elegant, dark)
+- **TYPEWRITER**: Configurable effect with cursor and speed settings
+- **PER-CHARACTER STYLES**: Override colors/fonts per character
+- **CHAT TAB REORGANIZED**: 3 sub-tabs with clear organization
+- All lint checks pass
+
+Architecture:
+```
+Settings → Chat Tab → Diálogos → Configure formatting
+                     ↓
+         DialogueSettingsPanel
+                     ↓
+         Store: dialogueSettings
+                     ↓
+Chat Message → FormattedMessage → parseTextSegments
+                     ↓
+         TextSegments (dialogue, action, narration, etc.)
+                     ↓
+         SpeechBubble → Render with style
+```
+
+Format Detection:
+```
+"quoted text"    → dialogue (bold, quotes)
+*asterisk text*  → action (italic, amber)
+(parenthetical)  → thought (smaller, muted)
+~tilde text~     → whisper (small, muted)
+```
+
+Bubble Styles:
+```
+modern:   Clean rounded bubbles with blur
+classic:  Comic book style with pointer
+minimal:  Simple border, no effects
+neon:     Glowing purple edges
+elegant:  Amber gradient, fancy
+dark:     Dark mode optimized
+```
+
+Settings Panel Organization:
+```
+Chat Tab
+├── Diálogos
+│   ├── Main toggle
+│   ├── Bubble style selector
+│   ├── Typewriter settings
+│   ├── Format detection toggles
+│   └── Advanced (animations, spacing)
+├── Diseño
+│   ├── Width/Height sliders
+│   ├── Novel mode toggle
+│   ├── Blur background toggle
+│   └── Sprite toggle
+└── Respuestas
+    ├── Quick reply list
+    └── Add/Edit/Delete replies
+```
+
+---
+Task ID: 17
+Agent: Main Agent
+Task: Implement FASE 3 - Sistema de Quests/Misiones
+
+Work Log:
+- Created quest types in `/src/types/index.ts`:
+  - `QuestStatus`: 'active' | 'completed' | 'failed' | 'paused'
+  - `QuestPriority`: 'main' | 'side' | 'hidden'
+  - `QuestObjectiveType`: 'collect' | 'reach' | 'defeat' | 'talk' | 'discover' | 'custom'
+  - `QuestObjective`: Objective with description, type, progress tracking
+  - `QuestReward`: Reward definitions (item, experience, relationship, unlock, custom)
+  - `QuestTrigger`: Auto-detection configuration with keywords
+  - `Quest`: Complete quest definition with objectives, rewards, triggers
+  - `QuestSettings`: Global quest system settings
+  - `QuestTriggerHit`: Trigger detection result
+  - `QuestNotification`: Quest update notifications
+  - `DEFAULT_QUEST_SETTINGS`: Default configuration
+- Created quest slice in `/src/store/slices/questSlice.ts`:
+  - Quest CRUD: addQuest, updateQuest, deleteQuest
+  - Status management: startQuest, completeQuest, failQuest, pauseQuest, resumeQuest
+  - Objective management: addObjective, updateObjective, completeObjective, progressObjective, removeObjective
+  - Settings: setQuestSettings
+  - Notifications: addQuestNotification, markNotificationRead, clearQuestNotifications
+  - Session management: getSessionQuests, getActiveQuests, clearSessionQuests
+  - Progress calculation: Automatic 0-100% based on completed objectives
+- Created quest handler in `/src/lib/triggers/handlers/quest-handler.ts`:
+  - `QuestHandlerState`: Processed quests tracking
+  - `parseQuestTags()`: Parser for `<quest:start>`, `<quest:progress>`, `<quest:complete>` tags
+  - `checkQuestTriggers()`: Detect quest start, progress, and completion from message content
+  - `buildQuestPromptSection()`: Build prompt section with active quests
+  - `createQuestFromDetection()`: Create quest from detected content
+- Updated trigger types `/src/lib/triggers/types.ts`:
+  - Added 'quest' to TriggerMatch triggerType
+- Created handlers index `/src/lib/triggers/handlers/index.ts`:
+  - Exports all handlers including quest-handler
+- Created quest components in `/src/components/quests/`:
+  - `quest-card.tsx`: Individual quest display with expandable objectives, progress bar, status indicators
+  - `quest-editor.tsx`: Full quest creation/editing form with objectives, rewards, triggers
+  - `quest-log-panel.tsx`: Main quest log with filtering, sorting, and search
+  - `quest-settings-panel.tsx`: Quest system settings panel
+  - `index.ts`: Component exports
+- Integrated quest slice into main store (`/src/store/index.ts`):
+  - Added QuestSlice to combined state
+  - Added quest state to persistence (quests, questSettings, questNotifications)
+  - Added QuestSlice to exports
+- Added Quests tab to SettingsPanel (`/src/components/tavern/settings-panel.tsx`):
+  - New "Misiones" tab with Target icon
+  - Full QuestSettingsPanel component integration
+
+Stage Summary:
+- **QUEST SYSTEM**: Complete implementation for mission tracking
+- **CRUD OPERATIONS**: Create, update, delete quests
+- **OBJECTIVES**: Multiple objectives per quest with progress tracking
+- **REWARDS**: Configurable rewards (items, experience, relationships, unlocks)
+- **AUTO-DETECTION**: Parse quest tags and keywords from messages
+- **NOTIFICATIONS**: Quest update notifications with unread tracking
+- **PRIORITY SYSTEM**: Main, side, and hidden quests
+- All lint checks pass
+
+Architecture:
+```
+Settings → QuestSettingsPanel → Configure auto-detection
+                ↓
+QuestLogPanel → Create/Edit Quests
+                ↓
+Chat Message: "<quest:start title='Find the artifact'/>"
+                ↓
+QuestHandler → Detects tag → Creates Quest
+                ↓
+Quest stored with objectives
+                ↓
+Progress tracking via message content
+                ↓
+Complete: Rewards applied, notification sent
+```
+
+Quest Features:
+```
+Statuses:
+  - active: Currently being tracked
+  - completed: All objectives done
+  - failed: Quest failed
+  - paused: Temporarily paused
+
+Priorities:
+  - main: Primary storyline quests
+  - side: Optional side content
+  - hidden: Secret/undiscovered quests
+
+Objectives:
+  - Types: collect, reach, defeat, talk, discover, custom
+  - Progress: current/target count tracking
+  - Optional: Can be marked as optional
+
+Auto-Detection:
+  - Quest tags: <quest:start>, <quest:progress>, <quest:complete>
+  - Keywords: Configurable completion keywords
+  - Pattern matching: For quest name detection
+```
+
+UI Components:
+- QuestCard: Expandable card with progress, objectives, rewards
+- QuestEditor: Full form for creating/editing quests
+- QuestLogPanel: Filterable quest list with search
+- QuestSettingsPanel: Auto-detection and prompt settings
+
+---
 Task ID: 16
 Agent: Main Agent
 Task: Implement FASE 2 - Sistema de Memoria y Resúmenes (Enhanced with configurable intervals)

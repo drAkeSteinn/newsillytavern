@@ -1141,3 +1141,537 @@ export interface ChatSessionMemory {
   memoryEnabled: boolean;
   lastSummaryAt?: string;
 }
+
+// ============ Quest System Types ============
+
+// Quest status
+export type QuestStatus = 'active' | 'completed' | 'failed' | 'paused';
+
+// Quest priority
+export type QuestPriority = 'main' | 'side' | 'hidden';
+
+// Quest objective type
+export type QuestObjectiveType = 'collect' | 'reach' | 'defeat' | 'talk' | 'discover' | 'custom';
+
+// Single quest objective
+export interface QuestObjective {
+  id: string;
+  description: string;          // "Recoger 3 piedras mágicas"
+  type: QuestObjectiveType;
+  target?: string;              // Target entity (item name, location, enemy type, character)
+  currentCount: number;         // Current progress
+  targetCount: number;          // Goal count
+  isCompleted: boolean;
+  isOptional: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+// Quest reward definition
+export interface QuestReward {
+  type: 'item' | 'experience' | 'relationship' | 'unlock' | 'custom';
+  name: string;
+  description?: string;
+  quantity?: number;
+  metadata?: Record<string, unknown>;
+}
+
+// Quest trigger configuration
+export interface QuestTrigger {
+  // Activation triggers
+  startKeywords: string[];      // Keywords that can START this quest
+  startPattern?: RegExp | string; // Custom regex pattern for activation
+  
+  // Completion triggers
+  completionKeywords: string[]; // Keywords that can COMPLETE objectives
+  completionPattern?: RegExp | string;
+  
+  // Auto-detection
+  autoStart: boolean;           // Auto-start when keywords detected
+  autoComplete: boolean;        // Auto-complete objectives when detected
+  trackProgress: boolean;       // Track progress automatically
+}
+
+// Quest definition
+export interface Quest {
+  id: string;
+  sessionId: string;            // Which session this quest belongs to
+  characterId?: string;         // Related character (optional)
+  
+  // Basic info
+  title: string;
+  description: string;
+  status: QuestStatus;
+  priority: QuestPriority;
+  
+  // Objectives
+  objectives: QuestObjective[];
+  
+  // Rewards
+  rewards: QuestReward[];
+  
+  // Trigger configuration
+  triggers: QuestTrigger;
+  
+  // Timing
+  startedAt?: string;
+  completedAt?: string;
+  updatedAt: string;
+  
+  // Progress
+  progress: number;             // 0-100 percentage
+  currentObjectiveId?: string;  // Current active objective
+  
+  // Display
+  icon?: string;                // Emoji or icon name
+  color?: string;               // Tailwind color for priority
+  notes?: string;               // User notes
+  
+  // Metadata
+  isHidden: boolean;            // Hidden quest (not shown in log until discovered)
+  isRepeatable: boolean;        // Can be repeated
+  prerequisites?: string[];     // Quest IDs that must be completed first
+  metadata?: Record<string, unknown>;
+}
+
+// Quest settings
+export interface QuestSettings {
+  enabled: boolean;
+  autoDetect: boolean;          // Auto-detect quest triggers in messages
+  realtimeEnabled: boolean;     // Detect during streaming
+  showNotifications: boolean;   // Show quest update notifications
+  showCompletedInLog: boolean;  // Keep completed quests in log
+  maxActiveQuests: number;      // Maximum active quests at once
+  promptInclude: boolean;       // Include active quests in prompt
+  promptTemplate: string;       // Template for quest prompt section
+}
+
+// Default quest settings
+export const DEFAULT_QUEST_SETTINGS: QuestSettings = {
+  enabled: true,
+  autoDetect: true,
+  realtimeEnabled: true,
+  showNotifications: true,
+  showCompletedInLog: true,
+  maxActiveQuests: 10,
+  promptInclude: true,
+  promptTemplate: `**Quests Activos:**
+{{activeQuests}}
+
+Instrucciones: Usa la información de los quests activos para contextualizar tus respuestas. Progresar en los quests a través de la narrativa cuando sea apropiado.`,
+};
+
+// Quest trigger hit result
+export interface QuestTriggerHit {
+  questId: string;
+  quest?: Quest;
+  objectiveId?: string;
+  objective?: QuestObjective;
+  action: 'start' | 'progress' | 'complete' | 'fail';
+  progress?: number;
+  message: string;
+}
+
+// Quest notification
+export interface QuestNotification {
+  id: string;
+  questId: string;
+  questTitle: string;
+  type: 'started' | 'updated' | 'completed' | 'failed' | 'objective_complete';
+  message: string;
+  timestamp: string;
+  read: boolean;
+}
+
+// ============ Dialogue System Types ============
+
+// Speech bubble style
+export type SpeechBubbleStyle = 
+  | 'modern'      // Rounded, clean
+  | 'classic'     // Comic book style
+  | 'minimal'     // Simple border
+  | 'neon'        // Glowing effect
+  | 'elegant'     // Fancy, decorative
+  | 'dark';       // Dark mode optimized
+
+// Text segment type in a message
+export type TextSegmentType = 
+  | 'dialogue'     // "quoted speech"
+  | 'action'       // *asterisk actions*
+  | 'narration'    // Regular narration
+  | 'thought'      // (parenthetical thoughts)
+  | 'system'       // System messages
+  | 'emphasis'     // **bold emphasis**
+  | 'whisper'      // ~whispered text~
+  | 'shout';       // ALL CAPS or !!!
+
+// Parsed text segment
+export interface TextSegment {
+  id: string;
+  type: TextSegmentType;
+  content: string;
+  startIndex: number;
+  endIndex: number;
+  metadata?: {
+    emotion?: string;
+    intensity?: number;
+    speaker?: string;
+  };
+}
+
+// Character dialogue style override
+export interface CharacterDialogueStyle {
+  characterId: string;
+  bubbleColor?: string;         // Tailwind color class
+  textColor?: string;           // Tailwind color class
+  borderColor?: string;         // Tailwind color class
+  fontStyle?: 'normal' | 'italic' | 'bold';
+  fontSize?: 'sm' | 'base' | 'lg';
+  customClass?: string;         // Custom CSS class
+}
+
+// Typewriter effect settings
+export interface TypewriterSettings {
+  enabled: boolean;
+  speed: number;               // Characters per second
+  startDelay: number;          // ms before starting
+  pauseOnPunctuation: boolean;
+  punctuationPauseMs: number;  // Extra pause on .!?
+  cursorChar: string;          // Cursor character
+  showCursor: boolean;
+  cursorBlinkMs: number;       // Cursor blink rate
+}
+
+// Dialogue format settings
+export interface DialogueFormatSettings {
+  // Dialogue detection
+  dialogueMarkers: {
+    open: string;              // Opening marker (default: ")
+    close: string;             // Closing marker (default: ")
+  };
+  actionMarkers: {
+    open: string;              // Opening marker (default: *)
+    close: string;             // Closing marker (default: *)
+  };
+  thoughtMarkers: {
+    open: string;              // Opening marker (default: ()
+    close: string;             // Closing marker (default: ))
+  };
+  whisperMarkers: {
+    open: string;              // Opening marker (default: ~)
+    close: string;             // Closing marker (default: ~)
+  };
+}
+
+// Dialogue display settings
+export interface DialogueSettings {
+  // Main settings
+  enabled: boolean;
+  
+  // Bubble style
+  bubbleStyle: SpeechBubbleStyle;
+  showCharacterAvatar: boolean;
+  avatarPosition: 'left' | 'right' | 'hidden';
+  avatarSize: 'sm' | 'md' | 'lg';
+  
+  // Formatting
+  formatting: DialogueFormatSettings;
+  
+  // Typewriter
+  typewriter: TypewriterSettings;
+  
+  // Character overrides
+  characterStyles: CharacterDialogueStyle[];
+  
+  // Colors
+  userBubbleColor: string;
+  assistantBubbleColor: string;
+  systemBubbleColor: string;
+  
+  // Spacing
+  messageSpacing: 'compact' | 'normal' | 'spacious';
+  bubbleMaxWidth: number;      // Percentage (50-100)
+  
+  // Animation
+  animateEntry: boolean;
+  entryAnimation: 'fade' | 'slide' | 'scale' | 'none';
+  animationDurationMs: number;
+  
+  // Advanced
+  parseEmotions: boolean;
+  highlightActions: boolean;
+  separateDialogue: boolean;   // Show dialogue in separate bubble
+}
+
+// Default dialogue settings
+export const DEFAULT_DIALOGUE_SETTINGS: DialogueSettings = {
+  enabled: true,
+  bubbleStyle: 'modern',
+  showCharacterAvatar: true,
+  avatarPosition: 'left',
+  avatarSize: 'md',
+  formatting: {
+    dialogueMarkers: { open: '"', close: '"' },
+    actionMarkers: { open: '*', close: '*' },
+    thoughtMarkers: { open: '(', close: ')' },
+    whisperMarkers: { open: '~', close: '~' },
+  },
+  typewriter: {
+    enabled: true,
+    speed: 50,
+    startDelay: 0,
+    pauseOnPunctuation: true,
+    punctuationPauseMs: 100,
+    cursorChar: '▋',
+    showCursor: true,
+    cursorBlinkMs: 530,
+  },
+  characterStyles: [],
+  userBubbleColor: 'bg-blue-500/20',
+  assistantBubbleColor: 'bg-purple-500/20',
+  systemBubbleColor: 'bg-muted',
+  messageSpacing: 'normal',
+  bubbleMaxWidth: 85,
+  animateEntry: true,
+  entryAnimation: 'fade',
+  animationDurationMs: 200,
+  parseEmotions: true,
+  highlightActions: true,
+  separateDialogue: false,
+};
+
+// ============ Inventory & Items System Types ============
+
+// Item category for organization
+export type ItemCategory = 
+  | 'weapon'       // Swords, bows, etc.
+  | 'armor'        // Helmets, chestplates, etc.
+  | 'accessory'    // Rings, amulets, etc.
+  | 'consumable'   // Potions, food, etc.
+  | 'material'     // Crafting materials
+  | 'key'          // Key items, quest items
+  | 'book'         // Books, scrolls, documents
+  | 'tool'         // Tools, instruments
+  | 'treasure'     // Valuables, gems, gold
+  | 'clothing'     // Clothes, outfits
+  | 'misc';        // Miscellaneous
+
+// Item rarity
+export type ItemRarity = 
+  | 'common'       // Grey/white
+  | 'uncommon'     // Green
+  | 'rare'         // Blue
+  | 'epic'         // Purple
+  | 'legendary'    // Orange/gold
+  | 'unique'       // Red/special
+  | 'cursed';      // Dark purple/black
+
+// Item slot for equipment
+export type ItemSlot = 
+  | 'main_hand'    // Primary weapon
+  | 'off_hand'     // Shield, secondary weapon
+  | 'head'         // Helmet, hat
+  | 'chest'        // Armor, shirt
+  | 'legs'         // Pants, leggings
+  | 'feet'         // Boots, shoes
+  | 'hands'        // Gloves, gauntlets
+  | 'accessory1'   // Ring, amulet
+  | 'accessory2'   // Second accessory
+  | 'back'         // Cloak, cape
+  | 'none';        // No slot (consumables, etc.)
+
+// Item stat definition
+export interface ItemStat {
+  name: string;             // "Attack", "Defense", "Magic Power"
+  value: number;            // Stat value
+  isPercentage?: boolean;   // Whether this is a percentage bonus
+}
+
+// Item effect
+export interface ItemEffect {
+  type: 'buff' | 'debuff' | 'heal' | 'damage' | 'special';
+  name: string;
+  description?: string;
+  value?: number;
+  duration?: number;        // Duration in turns (for buffs/debuffs)
+  trigger?: string;         // When effect activates (on_use, on_equip, passive)
+}
+
+// Item definition
+export interface Item {
+  id: string;
+  name: string;
+  description: string;
+  
+  // Classification
+  category: ItemCategory;
+  rarity: ItemRarity;
+  slot?: ItemSlot;          // Equipment slot (if equippable)
+  
+  // Visual
+  icon?: string;            // Emoji or icon name
+  imageUrl?: string;        // Item image URL
+  color?: string;           // Tailwind color class
+  
+  // Stats & Effects
+  stats?: ItemStat[];
+  effects?: ItemEffect[];
+  
+  // Properties
+  stackable: boolean;       // Can stack in inventory
+  maxStack: number;         // Maximum stack size (1 = unstackable)
+  value?: number;           // Gold/value
+  weight?: number;          // Weight for encumbrance
+  
+  // Usage
+  usable?: boolean;         // Can be used from inventory
+  useAction?: string;       // What happens when used
+  consumable?: boolean;     // Consumed on use
+  cooldown?: number;        // Cooldown in turns
+  
+  // Equipment
+  equippable?: boolean;     // Can be equipped
+  requiredLevel?: number;   // Level requirement
+  requiredStats?: ItemStat[]; // Stat requirements
+  
+  // Triggers
+  triggerKeywords?: string[]; // Keywords that detect this item in messages
+  contextKeys?: string[];   // Additional context keys
+  
+  // Metadata
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Inventory entry - item in inventory with quantity
+export interface InventoryEntry {
+  id: string;
+  itemId: string;
+  item?: Item;              // Resolved item reference
+  
+  // Quantity
+  quantity: number;
+  durability?: number;      // Current durability (if applicable)
+  maxDurability?: number;   // Maximum durability
+  
+  // Equipment state
+  equipped?: boolean;       // Is this item equipped?
+  equippedTo?: string;      // Character ID who has it equipped
+  slot?: ItemSlot;          // Which slot it's equipped to
+  
+  // Custom state
+  customName?: string;      // Renamed item
+  customDescription?: string; // Modified description
+  notes?: string;           // User notes
+  metadata?: Record<string, unknown>;
+  
+  // Timing
+  obtainedAt: string;
+  updatedAt: string;
+}
+
+// Container/Storage
+export interface InventoryContainer {
+  id: string;
+  name: string;
+  type: 'inventory' | 'storage' | 'shop' | 'chest' | 'custom';
+  capacity: number;         // Max items (0 = unlimited)
+  entries: InventoryEntry[];
+  icon?: string;
+  color?: string;
+  isDefault?: boolean;      // Is this the default inventory
+}
+
+// Currency entry
+export interface CurrencyEntry {
+  id: string;
+  name: string;             // "Gold", "Silver", "Gems"
+  icon?: string;            // Emoji or icon
+  amount: number;
+  color?: string;
+  isPrimary?: boolean;      // Primary currency
+}
+
+// Inventory settings
+export interface InventorySettings {
+  enabled: boolean;
+  autoDetect: boolean;      // Auto-detect item additions in messages
+  realtimeEnabled: boolean; // Detect during streaming
+  showNotifications: boolean; // Show item pickup notifications
+  
+  // Display
+  showRarityColors: boolean;
+  showItemValue: boolean;
+  showItemWeight: boolean;
+  compactView: boolean;
+  
+  // Auto-sort
+  autoSort: boolean;
+  sortMode: 'name' | 'rarity' | 'category' | 'value' | 'recent';
+  
+  // Equipment
+  enableEquipment: boolean; // Enable equipment slots
+  showEquippedInInventory: boolean; // Show equipped items in list
+  
+  // Prompt integration
+  promptInclude: boolean;   // Include inventory in prompt
+  promptTemplate: string;   // Template for inventory prompt section
+  
+  // Limits
+  maxInventorySize: number; // Max items in inventory (0 = unlimited)
+  maxCurrencyTypes: number; // Max currency types
+}
+
+// Default inventory settings
+export const DEFAULT_INVENTORY_SETTINGS: InventorySettings = {
+  enabled: true,
+  autoDetect: true,
+  realtimeEnabled: true,
+  showNotifications: true,
+  showRarityColors: true,
+  showItemValue: false,
+  showItemWeight: false,
+  compactView: false,
+  autoSort: false,
+  sortMode: 'recent',
+  enableEquipment: true,
+  showEquippedInInventory: true,
+  promptInclude: true,
+  promptTemplate: `**Inventario:**
+{{inventory}}
+
+**Divisa:**
+{{currency}}`,
+  maxInventorySize: 0,
+  maxCurrencyTypes: 10,
+};
+
+// Inventory trigger hit result
+export interface InventoryTriggerHit {
+  type: 'add' | 'remove' | 'use' | 'equip' | 'unequip';
+  itemId: string;
+  item?: Item;
+  quantity: number;
+  containerId?: string;
+  message: string;
+}
+
+// Inventory notification
+export interface InventoryNotification {
+  id: string;
+  type: 'item_added' | 'item_removed' | 'item_used' | 'item_equipped' | 'currency_changed';
+  itemId?: string;
+  itemName: string;
+  quantity?: number;
+  message: string;
+  timestamp: string;
+  read: boolean;
+}
+
+// Equipment state for a character
+export interface CharacterEquipment {
+  characterId: string;
+  slots: Record<ItemSlot, InventoryEntry | null>;
+  stats: ItemStat[];        // Aggregated stats from equipment
+}

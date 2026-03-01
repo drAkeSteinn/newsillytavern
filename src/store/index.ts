@@ -22,6 +22,9 @@ import {
   createHUDSlice,
   createAtmosphereSlice,
   createMemorySlice,
+  createQuestSlice,
+  createDialogueSlice,
+  createInventorySlice,
 } from './slices';
 
 // Import slice types
@@ -40,6 +43,9 @@ import type {
   HUDSlice,
   AtmosphereSlice,
   MemorySlice,
+  QuestSlice,
+  DialogueSlice,
+  InventorySlice,
 } from './slices';
 
 // Import defaults for merge function
@@ -59,7 +65,10 @@ export type TavernState = CharacterSlice &
   SpriteSlice &
   HUDSlice &
   AtmosphereSlice &
-  MemorySlice;
+  MemorySlice &
+  QuestSlice &
+  DialogueSlice &
+  InventorySlice;
 
 // Create the combined store
 export const useTavernStore = create<TavernState>()(
@@ -80,6 +89,9 @@ export const useTavernStore = create<TavernState>()(
       ...createHUDSlice(set, get),
       ...createAtmosphereSlice(set, get),
       ...createMemorySlice(set, get),
+      ...createQuestSlice(set, get),
+      ...createDialogueSlice(set, get),
+      ...createInventorySlice(set, get),
     }),
     {
       name: 'tavernflow-storage', // Same name for backward compatibility
@@ -122,6 +134,18 @@ export const useTavernStore = create<TavernState>()(
         summarySettings: state.summarySettings,
         characterMemories: state.characterMemories,
         sessionTracking: state.sessionTracking,
+        // Quest state
+        quests: state.quests,
+        questSettings: state.questSettings,
+        questNotifications: state.questNotifications,
+        // Dialogue state
+        dialogueSettings: state.dialogueSettings,
+        // Inventory state
+        items: state.items,
+        containers: state.containers,
+        currencies: state.currencies,
+        inventorySettings: state.inventorySettings,
+        inventoryNotifications: state.inventoryNotifications,
       }),
       merge: (persistedState: unknown, currentState) => {
         const persisted = persistedState as Record<string, unknown> | undefined;
@@ -216,4 +240,4 @@ export const useTavernStore = create<TavernState>()(
 );
 
 // Export types
-export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice };
+export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice };

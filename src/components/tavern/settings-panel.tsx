@@ -28,7 +28,9 @@ import {
   Upload,
   Layers,
   Cloud,
-  Brain
+  Brain,
+  Target,
+  Package
 } from 'lucide-react';
 import {
   Dialog,
@@ -38,7 +40,7 @@ import {
 } from '@/components/ui/dialog';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import type { LLMProvider } from '@/types';
+import type { LLMProvider, AppSettings } from '@/types';
 import { SoundTriggersSettings } from './sound-triggers-settings';
 import { BackgroundTriggersSettings } from './background-triggers-settings';
 import { PersonaPanel } from './persona-panel';
@@ -46,6 +48,9 @@ import { LorebookPanel } from './lorebook-panel';
 import { HUDManager } from '@/components/settings/hud-manager';
 import { AtmosphereSettings } from '@/components/atmosphere';
 import { MemorySettingsPanel } from '@/components/memory';
+import { QuestSettingsPanel } from '@/components/quests';
+import { DialogueSettingsPanel } from '@/components/dialogue';
+import { InventoryPanel } from '@/components/inventory';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean }[] = [
   { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false },
@@ -271,6 +276,14 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               <TabsTrigger value="memory" className="gap-1.5 text-xs">
                 <Brain className="w-4 h-4" />
                 Memoria
+              </TabsTrigger>
+              <TabsTrigger value="quests" className="gap-1.5 text-xs">
+                <Target className="w-4 h-4" />
+                Misiones
+              </TabsTrigger>
+              <TabsTrigger value="inventory" className="gap-1.5 text-xs">
+                <Package className="w-4 h-4" />
+                Inventario
               </TabsTrigger>
             </TabsList>
           </div>
@@ -530,190 +543,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             </TabsContent>
 
             {/* Chat Settings */}
-            <TabsContent value="chat" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Quick Replies Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">Respuestas Rápidas</h3>
-                      <p className="text-xs text-muted-foreground">Botones de respuesta rápida</p>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => {
-                        const newReply = prompt('Ingresa nueva respuesta rápida:');
-                        if (newReply && newReply.trim()) {
-                          updateSettings({ 
-                            quickReplies: [...settings.quickReplies, newReply.trim()] 
-                          });
-                        }
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Agregar
-                    </Button>
-                  </div>
-
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                    {settings.quickReplies.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground border rounded-lg">
-                        <MessageSquare className="w-6 h-6 mx-auto mb-1 opacity-50" />
-                        <p className="text-xs">Sin respuestas rápidas</p>
-                      </div>
-                    ) : (
-                      settings.quickReplies.map((reply, index) => (
-                        <div 
-                          key={index}
-                          className="flex items-center gap-2 p-2 rounded-lg border bg-background hover:bg-muted/50 group"
-                        >
-                          <GripVertical className="w-3 h-3 text-muted-foreground cursor-grab opacity-0 group-hover:opacity-100" />
-                          <Input
-                            value={reply}
-                            onChange={(e) => {
-                              const newReplies = [...settings.quickReplies];
-                              newReplies[index] = e.target.value;
-                              updateSettings({ quickReplies: newReplies });
-                            }}
-                            className="flex-1 h-7 text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100"
-                            onClick={() => {
-                              const newReplies = settings.quickReplies.filter((_, i) => i !== index);
-                              updateSettings({ quickReplies: newReplies });
-                            }}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {settings.quickReplies.length > 0 && (
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-xs h-7"
-                        onClick={() => {
-                          updateSettings({ quickReplies: ['Continuar', '...', 'Sí', 'No'] });
-                        }}
-                      >
-                        Restablecer
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-xs h-7"
-                        onClick={() => {
-                          if (confirm('¿Limpiar todas las respuestas rápidas?')) {
-                            updateSettings({ quickReplies: [] });
-                          }
-                        }}
-                      >
-                        Limpiar
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Chat Layout Settings */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Diseño del Chat</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Ancho</span>
-                        <span className="text-muted-foreground">{settings.chatLayout.chatWidth}%</span>
-                      </div>
-                      <Slider
-                        value={[settings.chatLayout.chatWidth]}
-                        min={25}
-                        max={90}
-                        step={1}
-                        onValueChange={([chatWidth]) => 
-                          updateSettings({ 
-                            chatLayout: { ...settings.chatLayout, chatWidth } 
-                          })
-                        }
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Alto</span>
-                        <span className="text-muted-foreground">{settings.chatLayout.chatHeight}%</span>
-                      </div>
-                      <Slider
-                        value={[settings.chatLayout.chatHeight]}
-                        min={20}
-                        max={90}
-                        step={1}
-                        onValueChange={([chatHeight]) => 
-                          updateSettings({ 
-                            chatLayout: { ...settings.chatLayout, chatHeight } 
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50">
-                      <div>
-                        <Label className="text-sm">Modo Novela</Label>
-                        <p className="text-xs text-muted-foreground">Vista novela por defecto</p>
-                      </div>
-                      <Switch
-                        checked={settings.chatLayout.novelMode}
-                        onCheckedChange={(novelMode) => 
-                          updateSettings({ 
-                            chatLayout: { ...settings.chatLayout, novelMode } 
-                          })
-                        }
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50">
-                      <div>
-                        <Label className="text-sm">Desenfocar Fondo</Label>
-                        <p className="text-xs text-muted-foreground">Efecto blur en fondo</p>
-                      </div>
-                      <Switch
-                        checked={settings.chatLayout.blurBackground}
-                        onCheckedChange={(blurBackground) => 
-                          updateSettings({ 
-                            chatLayout: { ...settings.chatLayout, blurBackground } 
-                          })
-                        }
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 col-span-2">
-                      <div className="flex-1">
-                        <Label className="text-sm">Sprite del Personaje</Label>
-                        <p className="text-xs text-muted-foreground">Mostrar imagen del personaje en el fondo del chat</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">
-                          💡 Pasa el mouse sobre el sprite para arrastrarlo o redimensionarlo
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.chatLayout.showCharacterSprite}
-                        onCheckedChange={(showCharacterSprite) => 
-                          updateSettings({ 
-                            chatLayout: { ...settings.chatLayout, showCharacterSprite } 
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
+            <TabsContent value="chat" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
+              <ChatSettingsContent settings={settings} updateSettings={updateSettings} />
             </TabsContent>
 
             {/* Context Settings */}
@@ -1171,6 +1002,16 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             <TabsContent value="memory" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
               <MemorySettingsPanel />
             </TabsContent>
+            
+            {/* Quest Settings */}
+            <TabsContent value="quests" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+              <QuestSettingsPanel />
+            </TabsContent>
+            
+            {/* Inventory Settings */}
+            <TabsContent value="inventory" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
+              <InventoryPanel />
+            </TabsContent>
           </div>
         </Tabs>
       </DialogContent>
@@ -1257,5 +1098,246 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
         </DialogContent>
       </Dialog>
     </Dialog>
+  );
+}
+
+// ============================================
+// Chat Settings Content Component
+// ============================================
+
+interface ChatSettingsContentProps {
+  settings: AppSettings;
+  updateSettings: (settings: Partial<AppSettings>) => void;
+}
+
+function ChatSettingsContent({ settings, updateSettings }: ChatSettingsContentProps) {
+  return (
+    <Tabs defaultValue="dialogue" className="h-full flex flex-col">
+      <div className="border-b px-4 flex-shrink-0 bg-muted/30">
+        <TabsList className="h-10">
+          <TabsTrigger value="dialogue" className="gap-1.5 text-xs">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Diálogos
+          </TabsTrigger>
+          <TabsTrigger value="layout" className="gap-1.5 text-xs">
+            <Layers className="w-3.5 h-3.5" />
+            Diseño
+          </TabsTrigger>
+          <TabsTrigger value="quick" className="gap-1.5 text-xs">
+            <GripVertical className="w-3.5 h-3.5" />
+            Respuestas
+          </TabsTrigger>
+        </TabsList>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto">
+        {/* Dialogue Settings */}
+        <TabsContent value="dialogue" className="p-4 m-0" forceMount hidden={false}>
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-sm">
+              <p className="text-purple-600 dark:text-purple-400">
+                💬 <strong>Sistema de Diálogos</strong> detecta automáticamente diálogos, acciones y pensamientos en los mensajes y los formatea visualmente con speech bubbles y efecto typewriter.
+              </p>
+            </div>
+            <DialogueSettingsPanel />
+          </div>
+        </TabsContent>
+        
+        {/* Layout Settings */}
+        <TabsContent value="layout" className="p-4 m-0" forceMount hidden>
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-medium mb-4">Diseño del Chat</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Ancho</span>
+                    <span className="text-muted-foreground">{settings.chatLayout.chatWidth}%</span>
+                  </div>
+                  <Slider
+                    value={[settings.chatLayout.chatWidth]}
+                    min={25}
+                    max={90}
+                    step={1}
+                    onValueChange={([chatWidth]) => 
+                      updateSettings({ 
+                        chatLayout: { ...settings.chatLayout, chatWidth } 
+                      })
+                    }
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Alto</span>
+                    <span className="text-muted-foreground">{settings.chatLayout.chatHeight}%</span>
+                  </div>
+                  <Slider
+                    value={[settings.chatLayout.chatHeight]}
+                    min={20}
+                    max={90}
+                    step={1}
+                    onValueChange={([chatHeight]) => 
+                      updateSettings({ 
+                        chatLayout: { ...settings.chatLayout, chatHeight } 
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50">
+                <div>
+                  <Label className="text-sm">Modo Novela</Label>
+                  <p className="text-xs text-muted-foreground">Vista novela por defecto</p>
+                </div>
+                <Switch
+                  checked={settings.chatLayout.novelMode}
+                  onCheckedChange={(novelMode) => 
+                    updateSettings({ 
+                      chatLayout: { ...settings.chatLayout, novelMode } 
+                    })
+                  }
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50">
+                <div>
+                  <Label className="text-sm">Desenfocar Fondo</Label>
+                  <p className="text-xs text-muted-foreground">Efecto blur en fondo</p>
+                </div>
+                <Switch
+                  checked={settings.chatLayout.blurBackground}
+                  onCheckedChange={(blurBackground) => 
+                    updateSettings({ 
+                      chatLayout: { ...settings.chatLayout, blurBackground } 
+                    })
+                  }
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 col-span-2">
+                <div className="flex-1">
+                  <Label className="text-sm">Sprite del Personaje</Label>
+                  <p className="text-xs text-muted-foreground">Mostrar imagen del personaje en el fondo</p>
+                </div>
+                <Switch
+                  checked={settings.chatLayout.showCharacterSprite}
+                  onCheckedChange={(showCharacterSprite) => 
+                    updateSettings({ 
+                      chatLayout: { ...settings.chatLayout, showCharacterSprite } 
+                    })
+                  }
+                />
+              </label>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-muted/30 space-y-2">
+              <Label className="text-xs font-medium">💡 Tips de Diseño</Label>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• <strong>Ancho/Alto</strong>: Controla el tamaño del contenedor del chat</li>
+                <li>• <strong>Modo Novela</strong>: Vista optimizada para lectura</li>
+                <li>• <strong>Sprite</strong>: Arrastra y redimensiona con el mouse</li>
+              </ul>
+            </div>
+          </div>
+        </TabsContent>
+        
+        {/* Quick Replies */}
+        <TabsContent value="quick" className="p-4 m-0" forceMount hidden>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">Respuestas Rápidas</h3>
+                <p className="text-xs text-muted-foreground">Botones de respuesta rápida</p>
+              </div>
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  const newReply = prompt('Ingresa nueva respuesta rápida:');
+                  if (newReply && newReply.trim()) {
+                    updateSettings({ 
+                      quickReplies: [...settings.quickReplies, newReply.trim()] 
+                    });
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Agregar
+              </Button>
+            </div>
+
+            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+              {settings.quickReplies.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Sin respuestas rápidas</p>
+                  <p className="text-xs mt-1">Agrega respuestas para acceder rápidamente</p>
+                </div>
+              ) : (
+                settings.quickReplies.map((reply, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-center gap-2 p-2 rounded-lg border bg-background hover:bg-muted/50 group"
+                  >
+                    <GripVertical className="w-3 h-3 text-muted-foreground cursor-grab opacity-0 group-hover:opacity-100" />
+                    <Input
+                      value={reply}
+                      onChange={(e) => {
+                        const newReplies = [...settings.quickReplies];
+                        newReplies[index] = e.target.value;
+                        updateSettings({ quickReplies: newReplies });
+                      }}
+                      className="flex-1 h-7 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100"
+                      onClick={() => {
+                        const newReplies = settings.quickReplies.filter((_, i) => i !== index);
+                        updateSettings({ quickReplies: newReplies });
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {settings.quickReplies.length > 0 && (
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={() => {
+                    updateSettings({ quickReplies: ['Continuar', '...', 'Sí', 'No'] });
+                  }}
+                >
+                  Restablecer
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={() => {
+                    if (confirm('¿Limpiar todas las respuestas rápidas?')) {
+                      updateSettings({ quickReplies: [] });
+                    }
+                  }}
+                >
+                  Limpiar
+                </Button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </div>
+    </Tabs>
   );
 }

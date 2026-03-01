@@ -16,3 +16,6 @@ export { SpriteSlice, createSpriteSlice, CharacterSpriteState, setReturnToIdleCa
 export { HUDSlice, createHUDSlice } from './hudSlice';
 export { AtmosphereSlice, createAtmosphereSlice, DEFAULT_ATMOSPHERE_LAYERS, DEFAULT_ATMOSPHERE_PRESETS, DEFAULT_ATMOSPHERE_SETTINGS } from './atmosphereSlice';
 export { MemorySlice, createMemorySlice, DEFAULT_SUMMARY_SETTINGS, SessionSummaryTracking } from './memorySlice';
+export { QuestSlice, createQuestSlice, DEFAULT_QUEST_SETTINGS } from './questSlice';
+export { DialogueSlice, createDialogueSlice, DEFAULT_DIALOGUE_SETTINGS } from './dialogueSlice';
+export { InventorySlice, createInventorySlice, DEFAULT_INVENTORY_SETTINGS, getRarityColor, getCategoryIcon } from './inventorySlice';
