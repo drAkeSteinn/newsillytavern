@@ -1,242 +1,253 @@
 // ============================================
-// Validations - Zod schemas for API requests
+// Validations - Simple validation for API requests
+// NO ZOD - Direct validation for robustness
+// Focus on validating ONLY what's strictly necessary
 // ============================================
 
-import { z } from 'zod';
-
 // ============================================
-// Common Schemas
+// Types for validated requests
 // ============================================
 
-export const uuidSchema = z.string().uuid().optional().or(z.literal(''));
+export interface ValidatedStreamRequest {
+  message: string;
+  sessionId: string;
+  characterId?: string;
+  character?: unknown;
+  messages?: unknown[];
+  llmConfig: Record<string, unknown>;
+  userName?: string;
+  persona?: unknown;
+  contextConfig?: unknown;
+}
 
-export const nonEmptyString = z.string().min(1, 'Este campo es requerido');
+export interface ValidatedGroupStreamRequest {
+  message: string;
+  sessionId: string;
+  groupId: string;
+  group: unknown;
+  characters: unknown[];
+  messages?: unknown[];
+  llmConfig: Record<string, unknown>;
+  userName?: string;
+  persona?: unknown;
+  lastResponderId?: string;
+  contextConfig?: unknown;
+}
 
-export const safeString = (maxLength: number = 100000) => 
-  z.string()
-    .max(maxLength, `El texto excede el límite de ${maxLength} caracteres`)
-    .transform(str => str.trim());
-
-export const safeStringOptional = (maxLength: number = 100000) =>
-  z.string()
-    .max(maxLength, `El texto excede el límite de ${maxLength} caracteres`)
-    .transform(str => str.trim())
-    .optional()
-    .or(z.literal(''));
-
-// ============================================
-// LLM Provider Validation
-// ============================================
-
-export const llmProviderSchema = z.enum([
-  'z-ai',
-  'openai',
-  'anthropic',
-  'ollama',
-  'vllm',
-  'koboldcpp',
-  'text-generation-webui',
-  'custom'
-]);
-
-export const llmParametersSchema = z.object({
-  temperature: z.number().min(0).max(2).default(0.7),
-  topP: z.number().min(0).max(1).default(0.9),
-  topK: z.number().min(0).max(100).default(40),
-  maxTokens: z.number().min(1).max(128000).default(512),
-  contextSize: z.number().min(512).max(128000).default(4096),
-  repetitionPenalty: z.number().min(0).max(2).default(1.1),
-  frequencyPenalty: z.number().min(-2).max(2).default(0),
-  presencePenalty: z.number().min(-2).max(2).default(0),
-  stopStrings: z.array(z.string()).default([]),
-  stream: z.boolean().default(true)
-});
-
-export const llmConfigSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1).max(100),
-  provider: llmProviderSchema,
-  endpoint: safeStringOptional(500),
-  apiKey: safeStringOptional(500),
-  model: safeStringOptional(100),
-  parameters: llmParametersSchema,
-  isActive: z.boolean().default(true)
-});
+export interface ValidatedGenerateRequest {
+  message: string;
+  sessionId: string;
+  characterId?: string;
+  character?: unknown;
+  messages?: unknown[];
+  llmConfig: Record<string, unknown>;
+  userName?: string;
+  persona?: unknown;
+  contextConfig?: unknown;
+}
 
 // ============================================
-// Chat Message Validation
-// ============================================
-
-export const chatMessageRoleSchema = z.enum(['user', 'assistant', 'system']);
-
-export const chatMessageSchema = z.object({
-  id: z.string().min(1),
-  characterId: z.string(),
-  role: chatMessageRoleSchema,
-  content: safeString(100000),
-  timestamp: z.string().datetime().optional().or(z.string()),
-  isDeleted: z.boolean().default(false),
-  swipeId: z.string().optional(),
-  swipeIndex: z.number().min(0).default(0),
-  metadata: z.record(z.unknown()).optional()
-});
-
-export const chatMessagesArraySchema = z.array(chatMessageSchema).max(1000, 'Demasiados mensajes en el historial');
-
-// ============================================
-// Character Card Validation (simplified for API)
-// ============================================
-
-export const characterCardSchema = z.object({
-  id: z.string().min(1),
-  name: safeString(100),
-  description: safeStringOptional(10000),
-  personality: safeStringOptional(5000),
-  scenario: safeStringOptional(5000),
-  firstMes: safeStringOptional(10000),
-  mesExample: safeStringOptional(10000),
-  creatorNotes: safeStringOptional(5000),
-  characterNote: safeStringOptional(5000),
-  systemPrompt: safeStringOptional(10000),
-  postHistoryInstructions: safeStringOptional(5000),
-  alternateGreetings: z.array(safeString(5000)).default([]),
-  tags: z.array(safeString(50)).default([]),
-  avatar: safeStringOptional(500),
-  sprites: z.array(z.any()).default([]),
-  spriteConfig: z.any().optional(),
-  voice: z.any().nullable().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional()
-});
-
-// ============================================
-// Persona Validation
-// ============================================
-
-export const personaSchema = z.object({
-  id: z.string().min(1),
-  name: safeString(100),
-  description: safeStringOptional(5000),
-  avatar: safeStringOptional(500),
-  isActive: z.boolean().default(true),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional()
-});
-
-// ============================================
-// Group Member Validation
-// ============================================
-
-export const groupRoleSchema = z.enum(['leader', 'member', 'observer']);
-
-export const groupMemberSchema = z.object({
-  characterId: z.string().min(1),
-  role: groupRoleSchema.default('member'),
-  isActive: z.boolean().default(true),
-  isPresent: z.boolean().default(true),
-  joinOrder: z.number().min(0).default(0)
-});
-
-export const activationStrategySchema = z.enum([
-  'all',
-  'round_robin', 
-  'random',
-  'reactive',
-  'smart'
-]);
-
-export const characterGroupSchema = z.object({
-  id: z.string().min(1),
-  name: safeString(100),
-  description: safeStringOptional(1000),
-  characterIds: z.array(z.string()).default([]),
-  members: z.array(groupMemberSchema).default([]),
-  avatar: safeStringOptional(500),
-  systemPrompt: safeStringOptional(10000),
-  activationStrategy: activationStrategySchema.default('reactive'),
-  maxResponsesPerTurn: z.number().min(1).max(20).default(3),
-  allowMentions: z.boolean().default(true),
-  mentionTriggers: z.array(safeString(50)).default([]),
-  conversationStyle: z.enum(['sequential', 'parallel']).default('sequential'),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional()
-});
-
-// ============================================
-// API Request Schemas
-// ============================================
-
-export const streamRequestSchema = z.object({
-  message: safeString(50000),
-  sessionId: z.string().min(1),
-  characterId: z.string().optional(),
-  character: characterCardSchema.optional(),
-  messages: chatMessagesArraySchema.optional(),
-  llmConfig: llmConfigSchema,
-  userName: safeStringOptional(100),
-  persona: personaSchema.optional()
-});
-
-export const generateRequestSchema = z.object({
-  message: safeString(50000),
-  sessionId: z.string().min(1),
-  characterId: z.string().optional(),
-  character: characterCardSchema.optional(),
-  messages: chatMessagesArraySchema.optional(),
-  llmConfig: llmConfigSchema,
-  userName: safeStringOptional(100),
-  persona: personaSchema.optional()
-});
-
-export const groupStreamRequestSchema = z.object({
-  message: safeString(50000),
-  sessionId: z.string().min(1),
-  groupId: z.string().min(1),
-  group: characterGroupSchema,
-  characters: z.array(characterCardSchema).min(1, 'El grupo debe tener al menos un personaje'),
-  messages: chatMessagesArraySchema.optional(),
-  llmConfig: llmConfigSchema,
-  userName: safeStringOptional(100),
-  persona: personaSchema.optional(),
-  lastResponderId: z.string().optional()
-});
-
-// ============================================
-// Validation Helper Functions
+// Validation Result Type
 // ============================================
 
 export type ValidationResult<T> = 
   | { success: true; data: T }
-  | { success: false; error: string; issues?: z.ZodIssue[] };
+  | { success: false; error: string };
 
-export function validateRequest<T>(
-  schema: z.ZodSchema<T>,
-  data: unknown
-): ValidationResult<T> {
+// ============================================
+// Helper Functions
+// ============================================
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+// ============================================
+// Stream Request Validation (Single Character)
+// ============================================
+
+export function validateStreamRequest(data: unknown): ValidationResult<ValidatedStreamRequest> {
   try {
-    const result = schema.safeParse(data);
-    
-    if (result.success) {
-      return { success: true, data: result.data };
+    if (!isObject(data)) {
+      return { success: false, error: 'Request body must be an object' };
     }
-    
-    // Format error messages
-    const errorMessages = result.error.issues.map(issue => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : 'root';
-      return `${path}: ${issue.message}`;
-    });
-    
-    return {
-      success: false,
-      error: errorMessages.join('; '),
-      issues: result.error.issues
+
+    // Message is required
+    if (!isString(data.message) || data.message.trim().length === 0) {
+      return { success: false, error: 'message is required and cannot be empty' };
+    }
+    if (data.message.length > 50000) {
+      return { success: false, error: 'message exceeds maximum length (50000 characters)' };
+    }
+
+    // sessionId is required
+    if (!isString(data.sessionId) || data.sessionId.length === 0) {
+      return { success: false, error: 'sessionId is required' };
+    }
+
+    // llmConfig is required and must be an object
+    if (!isObject(data.llmConfig)) {
+      return { success: false, error: 'llmConfig is required' };
+    }
+
+    // Build result
+    const result: ValidatedStreamRequest = {
+      message: data.message.trim(),
+      sessionId: data.sessionId,
+      llmConfig: data.llmConfig,
     };
-  } catch (e) {
-    return {
-      success: false,
-      error: e instanceof Error ? e.message : 'Error de validación desconocido'
+
+    // Optional fields
+    if (isString(data.characterId)) result.characterId = data.characterId;
+    if (data.character) result.character = data.character;
+    if (isArray(data.messages)) result.messages = data.messages;
+    if (isString(data.userName)) result.userName = data.userName;
+    if (data.persona) result.persona = data.persona;
+    if (data.contextConfig) result.contextConfig = data.contextConfig;
+
+    return { success: true, data: result };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Validation failed' 
     };
   }
+}
+
+// ============================================
+// Group Stream Request Validation
+// ============================================
+
+export function validateGroupStreamRequest(data: unknown): ValidationResult<ValidatedGroupStreamRequest> {
+  try {
+    if (!isObject(data)) {
+      return { success: false, error: 'Request body must be an object' };
+    }
+
+    // Message is required
+    if (!isString(data.message) || data.message.trim().length === 0) {
+      return { success: false, error: 'message is required and cannot be empty' };
+    }
+    if (data.message.length > 50000) {
+      return { success: false, error: 'message exceeds maximum length (50000 characters)' };
+    }
+
+    // sessionId is required
+    if (!isString(data.sessionId) || data.sessionId.length === 0) {
+      return { success: false, error: 'sessionId is required' };
+    }
+
+    // groupId is required
+    if (!isString(data.groupId) || data.groupId.length === 0) {
+      return { success: false, error: 'groupId is required' };
+    }
+
+    // group is required (just check it exists, don't validate structure)
+    if (!data.group) {
+      return { success: false, error: 'group is required' };
+    }
+
+    // characters is required and must be an array
+    if (!isArray(data.characters) || data.characters.length === 0) {
+      return { success: false, error: 'characters is required and must be a non-empty array' };
+    }
+
+    // llmConfig is required
+    if (!isObject(data.llmConfig)) {
+      return { success: false, error: 'llmConfig is required' };
+    }
+
+    // Build result
+    const result: ValidatedGroupStreamRequest = {
+      message: data.message.trim(),
+      sessionId: data.sessionId,
+      groupId: data.groupId,
+      group: data.group,
+      characters: data.characters,
+      llmConfig: data.llmConfig,
+    };
+
+    // Optional fields
+    if (isArray(data.messages)) result.messages = data.messages;
+    if (isString(data.userName)) result.userName = data.userName;
+    if (data.persona) result.persona = data.persona;
+    if (isString(data.lastResponderId)) result.lastResponderId = data.lastResponderId;
+    if (data.contextConfig) result.contextConfig = data.contextConfig;
+
+    return { success: true, data: result };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Validation failed' 
+    };
+  }
+}
+
+// ============================================
+// Generate Request Validation (Non-streaming)
+// ============================================
+
+export function validateGenerateRequest(data: unknown): ValidationResult<ValidatedGenerateRequest> {
+  // Same as stream request
+  const result = validateStreamRequest(data);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return result;
+}
+
+// ============================================
+// Legacy exports for backward compatibility
+// ============================================
+
+// These are kept for type exports but are not used for actual validation
+export const streamRequestSchema = null as unknown;
+export const generateRequestSchema = null as unknown;
+export const groupStreamRequestSchema = null as unknown;
+
+// Generic validateRequest function that routes to the correct validator
+export function validateRequest<T>(
+  _schema: unknown,
+  data: unknown
+): ValidationResult<T> {
+  // Route to the correct validator based on the presence of group-related fields
+  if (isObject(data)) {
+    // Check if it's a group request
+    if ('groupId' in data && 'group' in data && 'characters' in data) {
+      return validateGroupStreamRequest(data) as ValidationResult<T>;
+    }
+    // Otherwise, it's a single character request
+    return validateStreamRequest(data) as ValidationResult<T>;
+  }
+  
+  return { success: false, error: 'Invalid request format' };
+}
+
+// ============================================
+// Sanitization helpers
+// ============================================
+
+export function sanitizeInput(input: string): string {
+  // Remove control characters except newlines and tabs
+  return input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+}
+
+export function sanitizeHtml(input: string): string {
+  // Basic HTML escaping for user content
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // Quick validation for single fields
@@ -258,20 +269,4 @@ export function validateSessionId(sessionId: unknown): string | null {
     return 'ID de sesión inválido';
   }
   return null;
-}
-
-// Sanitization helpers
-export function sanitizeInput(input: string): string {
-  // Remove control characters except newlines and tabs
-  return input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-}
-
-export function sanitizeHtml(input: string): string {
-  // Basic HTML escaping for user content
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }

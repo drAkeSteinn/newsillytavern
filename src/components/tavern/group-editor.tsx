@@ -45,10 +45,12 @@ import {
   Shuffle,
   Zap,
   Brain,
-  Settings
+  Settings,
+  Layers
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { GroupMember, GroupActivationStrategy } from '@/types';
+import { HUDSelector } from './hud-selector';
 
 interface GroupEditorProps {
   groupId: string | null;
@@ -121,7 +123,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
         maxResponsesPerTurn: existingGroup.maxResponsesPerTurn ?? 3,
         allowMentions: existingGroup.allowMentions ?? true,
         mentionTriggers: existingGroup.mentionTriggers || [],
-        conversationStyle: existingGroup.conversationStyle || 'sequential' as 'sequential' | 'parallel'
+        conversationStyle: existingGroup.conversationStyle || 'sequential' as 'sequential' | 'parallel',
+        hudTemplateId: existingGroup?.hudTemplateId || null
       };
     }
     return {
@@ -132,7 +135,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       maxResponsesPerTurn: 3,
       allowMentions: true,
       mentionTriggers: [],
-      conversationStyle: 'sequential' as 'sequential' | 'parallel'
+      conversationStyle: 'sequential' as 'sequential' | 'parallel',
+      hudTemplateId: null
     };
   }, [existingGroup]);
 
@@ -147,6 +151,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   const [maxResponsesPerTurn, setMaxResponsesPerTurn] = useState(initialValues.maxResponsesPerTurn);
   const [allowMentions, setAllowMentions] = useState(initialValues.allowMentions);
   const [conversationStyle, setConversationStyle] = useState<'sequential' | 'parallel'>(initialValues.conversationStyle);
+  const [hudTemplateId, setHudTemplateId] = useState<string | null>(initialValues.hudTemplateId);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>('');
 
   // Get members - either from existing group or local state
@@ -230,7 +235,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       conversationStyle,
       characterIds: memberIds,
       members,
-      avatar: existingGroup?.avatar || ''
+      avatar: existingGroup?.avatar || '',
+      hudTemplateId
     };
 
     if (isNewGroup) {
@@ -349,6 +355,19 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                     placeholder="Describe el escenario..."
                     rows={2}
                     className="mt-1 text-sm"
+                  />
+                </div>
+
+                {/* HUD Selector */}
+                <div className="pt-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Label className="text-xs">Plantilla HUD</Label>
+                  </div>
+                  <HUDSelector
+                    value={hudTemplateId}
+                    onChange={setHudTemplateId}
+                    placeholder="Sin HUD asignado"
                   />
                 </div>
               </div>

@@ -2,9 +2,10 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Settings, RotateCcw } from 'lucide-react';
+import { Settings, RotateCcw, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Badge } from '@/components/ui/badge';
 import {
   Popover,
   PopoverContent,
@@ -12,6 +13,18 @@ import {
 } from '@/components/ui/popover';
 import type { CharacterCard, SpriteConfig, SpriteState } from '@/types';
 import { SpritePreview } from './sprite-preview';
+import { getSpriteFromCollection } from '@/hooks/use-sprite-triggers';
+import { useTavernStore } from '@/store';
+
+// Format milliseconds to readable time
+function formatTime(ms: number): string {
+  if (ms <= 0) return '0s';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+}
 
 interface GroupSpritesProps {
   characters: CharacterCard[];
@@ -32,7 +45,7 @@ interface GroupSpriteSettings {
   inactiveOpacity: number;
   showAllEqually: boolean;
   globalOpacity: number;
-  grayscaleInactive: boolean;  // Apply grayscale to inactive sprites
+  grayscaleInactive: boolean;
 }
 
 interface SavedPositions {
@@ -58,38 +71,47 @@ const STORAGE_KEY = 'group-sprite-settings';
 const POSITIONS_KEY = 'group-sprite-positions';
 
 // Get the appropriate sprite URL based on state and config
+// Uses new state collections system with fallback to legacy sprites and avatar
 function getSpriteUrl(
   state: SpriteState,
   spriteConfig?: SpriteConfig,
   avatarUrl?: string
-): string {
-  // If no config or sprites defined, use avatar
-  if (!spriteConfig?.sprites) {
-    return avatarUrl || '';
-  }
-
-  const sprites = spriteConfig.sprites;
-
-  // Priority order for state
-  const priorityMap: Record<SpriteState, SpriteState[]> = {
-    'talk': ['talk', 'idle'],
-    'thinking': ['thinking', 'idle'],
-    'happy': ['happy', 'idle'],
-    'sad': ['sad', 'idle'],
-    'angry': ['angry', 'idle'],
-    'idle': ['idle']
-  };
-
-  const statesToTry = priorityMap[state] || ['idle'];
-  
-  for (const s of statesToTry) {
-    if (sprites[s]) {
-      return sprites[s];
+): { url: string; label: string | null } {
+  // First, try state collections (new system)
+  const stateCollection = spriteConfig?.stateCollections?.[state];
+  if (stateCollection && stateCollection.entries.length > 0) {
+    const result = getSpriteFromCollection(stateCollection, false);
+    if (result.url) {
+      return { url: result.url, label: result.label };
     }
   }
 
-  // Fallback to avatar
-  return avatarUrl || '';
+  // Fall back to legacy sprites
+  if (spriteConfig?.sprites?.[state]) {
+    return { url: spriteConfig.sprites[state]!, label: null };
+  }
+
+  // Additional fallbacks for talk and thinking states
+  if (state === 'talk' || state === 'thinking') {
+    // Try idle as fallback
+    const idleCollection = spriteConfig?.stateCollections?.['idle'];
+    if (idleCollection && idleCollection.entries.length > 0) {
+      const result = getSpriteFromCollection(idleCollection, false);
+      if (result.url) {
+        return { url: result.url, label: result.label };
+      }
+    }
+    if (spriteConfig?.sprites?.['idle']) {
+      return { url: spriteConfig.sprites['idle']!, label: null };
+    }
+  }
+
+  // Final fallback to avatar
+  if (avatarUrl) {
+    return { url: avatarUrl, label: 'avatar' };
+  }
+
+  return { url: '', label: null };
 }
 
 export function GroupSprites({
@@ -130,10 +152,18 @@ export function GroupSprites({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  
+  // Countdowns per character (read from store periodically)
+  const [countdowns, setCountdowns] = useState<Map<string, number>>(new Map());
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+
+  // ============================================
+  // UNIFIED SYSTEM: Use store for per-character sprite state
+  // ============================================
+  const store = useTavernStore();
 
   // Save to localStorage
   useEffect(() => {
@@ -143,6 +173,24 @@ export function GroupSprites({
   useEffect(() => {
     localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions));
   }, [positions]);
+
+  // Update countdowns every 100ms for all characters
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newCountdowns = new Map<string, number>();
+      
+      characters.forEach(character => {
+        const remaining = store.getReturnToIdleCountdownForCharacter(character.id);
+        if (remaining > 0) {
+          newCountdowns.set(character.id, remaining);
+        }
+      });
+
+      setCountdowns(newCountdowns);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [characters, store]);
 
   // Get position for a character
   const getCharacterPosition = useCallback((character: CharacterCard, index: number, total: number): SpritePosition => {
@@ -170,7 +218,7 @@ export function GroupSprites({
     });
   }, []);
 
-  // Drag handlers - click anywhere on sprite to drag
+  // Drag handlers
   const handleDragStart = (e: React.MouseEvent, characterId: string) => {
     if (resizingId) return;
     const target = e.target as HTMLElement;
@@ -223,7 +271,7 @@ export function GroupSprites({
     };
   }, [draggingId, positions, updatePosition]);
 
-  // Resize handlers - handle in top-left corner
+  // Resize handlers
   const handleResizeStart = (e: React.MouseEvent, characterId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -248,9 +296,6 @@ export function GroupSprites({
       const deltaX = ((e.clientX - resizeStartRef.current.x) / rect.width) * 100;
       const deltaY = ((e.clientY - resizeStartRef.current.y) / rect.height) * 100;
 
-      // Handle is in top-left corner, so:
-      // - Dragging left (negative deltaX) increases width
-      // - Dragging up (negative deltaY) increases height
       let newWidth = Math.max(15, Math.min(50, resizeStartRef.current.width - deltaX * 2));
       let newHeight = Math.max(20, Math.min(80, resizeStartRef.current.height - deltaY * 2));
 
@@ -304,12 +349,34 @@ export function GroupSprites({
           }
         }
 
+        // ============================================
+        // UNIFIED SYSTEM: Get sprite state from store
+        // ============================================
+        const charSpriteState = store.getCharacterSpriteState(character.id);
+        
         // Determine sprite URL based on state and config
-        const spriteUrl = getSpriteUrl(
-          isStreaming && isActive ? 'talk' : 'idle',
-          character.spriteConfig,
-          character.avatar
-        );
+        // PRIORITY: Trigger sprite > Talk (if streaming) > Idle
+        const hasTriggerSprite = charSpriteState.triggerSpriteUrl;
+        const spriteState: SpriteState = isStreaming && isActive ? 'talk' : 'idle';
+        const countdown = countdowns.get(character.id) || 0;
+        
+        let spriteUrl: string;
+        let spriteLabel: string | null = null;
+        
+        if (hasTriggerSprite) {
+          // Use trigger sprite (highest priority)
+          spriteUrl = charSpriteState.triggerSpriteUrl!;
+          spriteLabel = charSpriteState.triggerSpriteLabel;
+        } else {
+          // Use state collection or fallback
+          const spriteResult = getSpriteUrl(
+            spriteState,
+            character.spriteConfig,
+            character.avatar
+          );
+          spriteUrl = spriteResult.url;
+          spriteLabel = spriteResult.label;
+        }
 
         return (
           <div
@@ -356,6 +423,19 @@ export function GroupSprites({
               </div>
             )}
 
+            {/* Trigger countdown badge - per character */}
+            {hasTriggerSprite && countdown > 0 && (
+              <div className="sprite-controls absolute top-2 left-1/2 -translate-x-1/2 z-50">
+                <Badge 
+                  variant="secondary" 
+                  className="bg-blue-500/90 text-white border-blue-400 gap-1.5 px-3 py-1 shadow-lg"
+                >
+                  <Timer className="h-3 w-3" />
+                  <span className="text-xs font-medium">→ Idle: {formatTime(countdown)}</span>
+                </Badge>
+              </div>
+            )}
+
             {/* Glow effect for active character */}
             {isActive && isStreaming && (
               <div
@@ -377,7 +457,7 @@ export function GroupSprites({
               />
             )}
 
-            {/* Resize handle - top left corner (same as single sprite) */}
+            {/* Resize handle - top left corner */}
             {showControls && (
               <div
                 className="sprite-controls absolute top-2 left-2 w-6 h-6 cursor-nwse-resize bg-background/80 backdrop-blur-sm rounded flex items-center justify-center hover:bg-background/90"

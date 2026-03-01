@@ -132,8 +132,10 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
           m.id === messageId ? { 
             ...m, 
             content,
-            // Also update the current swipe
-            swipes: m.swipes.map((s, i) => i === m.swipeIndex ? content : s)
+            // Also update the current swipe, or initialize swipes if missing
+            swipes: m.swipes?.length 
+              ? m.swipes.map((s, i) => i === (m.swipeIndex || 0) ? content : s)
+              : [content]
           } : m
         ),
         updatedAt: new Date().toISOString()

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "collectionName": "Prisionero",
+  "sprites": {
+    "1772241635918-wcac03.webm": {
+      "label": "think",
+      "filename": "1772241635918-wcac03.webm",
+      "createdAt": "2026-03-01T01:43:03.334Z",
+      "updatedAt": "2026-03-01T01:43:03.334Z"
+    },
+    "1772241498858-j5z4rc.webm": {
+      "label": "idle",
+      "filename": "1772241498858-j5z4rc.webm",
+      "createdAt": "2026-03-01T01:43:13.281Z",
+      "updatedAt": "2026-03-01T01:43:13.281Z"
+    },
+    "1772241493130-rs6u4h.webm": {
+      "label": "talk",
+      "filename": "1772241493130-rs6u4h.webm",
+      "createdAt": "2026-03-01T01:43:18.516Z",
+      "updatedAt": "2026-03-01T01:43:18.516Z"
+    },
+    "1eb103ef-538c-4e4f-af0b-485fa77f0178.png": {
+      "label": "1eb103ef-538c-4e4f-af0b-485fa77f0178",
+      "filename": "1eb103ef-538c-4e4f-af0b-485fa77f0178.png",
+      "createdAt": "2026-03-01T03:09:39.602Z"
+    },
+    "1772334579341-fqnay5.png": {
+      "label": "goth",
+      "filename": "1772334579341-fqnay5.png",
+      "createdAt": "2026-03-01T03:09:54.813Z",
+      "updatedAt": "2026-03-01T03:09:54.813Z"
+    }
+  },
+  "createdAt": "2026-03-01T01:43:03.334Z",
+  "updatedAt": "2026-03-01T03:09:54.813Z"
+}

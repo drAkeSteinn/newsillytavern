@@ -1,0 +1,32 @@
+{
+  "name": "Baño",
+  "description": "Escenas del baño - ducha y baño",
+  "version": "1.0",
+  "transitionDuration": 400,
+  "entries": [
+    {
+      "id": "bathroom_default",
+      "name": "Baño",
+      "url": "/backgrounds/Baño/shower (1).png",
+      "triggerKeys": ["baño", "bathroom", "ducha", "shower"],
+      "contextKeys": [],
+      "tags": ["interior", "baño"]
+    },
+    {
+      "id": "bathroom_shower",
+      "name": "Ducha",
+      "url": "/backgrounds/Baño/shower (2).png",
+      "triggerKeys": ["baño", "bathroom"],
+      "contextKeys": ["ducha", "shower", "agua", "mojar"],
+      "tags": ["interior", "baño", "agua"]
+    },
+    {
+      "id": "bathroom_steam",
+      "name": "Baño con Vapor",
+      "url": "/backgrounds/Baño/shower (3).png",
+      "triggerKeys": ["baño", "bathroom", "ducha"],
+      "contextKeys": ["vapor", "steam", "caliente", "hot"],
+      "tags": ["interior", "baño", "vapor"]
+    }
+  ]
+}

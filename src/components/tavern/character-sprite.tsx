@@ -5,7 +5,12 @@ import { cn } from '@/lib/utils';
 import { 
   Maximize2, 
   RotateCcw,
-  Settings
+  Settings,
+  Lock,
+  LockOpen,
+  Timer,
+  X,
+  Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,8 +19,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
-import type { SpriteConfig, SpriteState } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { SpriteConfig, SpriteState, StateSpriteCollection } from '@/types';
 import { SpritePreview } from './sprite-preview';
+import { useTavernStore } from '@/store';
+import { getSpriteFromCollection } from '@/hooks/use-sprite-triggers';
+import { createDefaultCharacterState } from '@/store/slices/spriteSlice';
 
 interface SpriteSettings {
   x: number;        // percentage (0-100) - horizontal position
@@ -30,8 +40,8 @@ interface CharacterSpriteProps {
   characterName: string;
   avatarUrl: string;
   spriteConfig?: SpriteConfig;  // Sprite configuration from character
-  spriteState?: SpriteState;     // Current sprite state (idle, talk, thinking, etc.)
-  isStreaming?: boolean;         // Is the character currently streaming?
+  isStreaming?: boolean;         // Is the character currently generating?
+  hasContent?: boolean;          // Is there streaming content? (for thinking vs talk)
   onSettingsChange?: (settings: SpriteSettings) => void;
 }
 
@@ -44,38 +54,57 @@ const DEFAULT_SPRITE_SETTINGS: SpriteSettings = {
 };
 
 // Get the appropriate sprite URL based on state and config
+// Uses new state collections system with fallback to legacy sprites and avatar
 function getSpriteUrl(
   state: SpriteState,
   spriteConfig?: SpriteConfig,
   avatarUrl?: string
-): string {
-  // If no config or sprites defined, use avatar
-  if (!spriteConfig?.sprites) {
-    return avatarUrl || '';
-  }
-
-  const sprites = spriteConfig.sprites;
-
-  // Priority order for state
-  const priorityMap: Record<SpriteState, SpriteState[]> = {
-    'talk': ['talk', 'idle'],
-    'thinking': ['thinking', 'idle'],
-    'happy': ['happy', 'idle'],
-    'sad': ['sad', 'idle'],
-    'angry': ['angry', 'idle'],
-    'idle': ['idle']
-  };
-
-  const statesToTry = priorityMap[state] || ['idle'];
-  
-  for (const s of statesToTry) {
-    if (sprites[s]) {
-      return sprites[s];
+): { url: string; label: string | null } {
+  // First, try state collections (new system)
+  const stateCollection = spriteConfig?.stateCollections?.[state];
+  if (stateCollection && stateCollection.entries.length > 0) {
+    const result = getSpriteFromCollection(stateCollection, false);
+    if (result.url) {
+      return { url: result.url, label: result.label };
     }
   }
 
-  // Fallback to avatar
-  return avatarUrl || '';
+  // Fall back to legacy sprites
+  if (spriteConfig?.sprites?.[state]) {
+    return { url: spriteConfig.sprites[state]!, label: null };
+  }
+
+  // Additional fallbacks for talk and thinking states
+  if (state === 'talk' || state === 'thinking') {
+    // Try idle as fallback
+    const idleCollection = spriteConfig?.stateCollections?.['idle'];
+    if (idleCollection && idleCollection.entries.length > 0) {
+      const result = getSpriteFromCollection(idleCollection, false);
+      if (result.url) {
+        return { url: result.url, label: result.label };
+      }
+    }
+    if (spriteConfig?.sprites?.['idle']) {
+      return { url: spriteConfig.sprites['idle']!, label: null };
+    }
+  }
+
+  // Final fallback to avatar
+  if (avatarUrl) {
+    return { url: avatarUrl, label: 'avatar' };
+  }
+
+  return { url: '', label: null };
+}
+
+// Format milliseconds to readable time
+function formatTime(ms: number): string {
+  if (ms <= 0) return '0s';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
 }
 
 export function CharacterSprite({ 
@@ -83,8 +112,8 @@ export function CharacterSprite({
   characterName, 
   avatarUrl,
   spriteConfig,
-  spriteState = 'idle',
   isStreaming = false,
+  hasContent = false,
   onSettingsChange 
 }: CharacterSpriteProps) {
   const [settings, setSettings] = useState<SpriteSettings>(() => {
@@ -104,17 +133,77 @@ export function CharacterSprite({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [showControls, setShowControls] = useState(false);
+  const [countdown, setCountdown] = useState<number>(0);
   
   const spriteRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0, settingsX: 0, settingsY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
-  // Determine the current sprite URL based on state
-  const currentSpriteUrl = getSpriteUrl(
-    isStreaming ? 'talk' : spriteState,
-    spriteConfig,
-    avatarUrl
-  );
+  // ============================================
+  // UNIFIED SYSTEM: Get sprite state from store
+  // ============================================
+  // Use proper Zustand selectors to ensure reactivity
+  const characterSpriteStates = useTavernStore((state) => state.characterSpriteStates);
+  const isLocked = useTavernStore((state) => state.spriteLock.active);
+  const lockState = useTavernStore((state) => state.spriteLock);
+  const getReturnToIdleCountdownForCharacter = useTavernStore((state) => state.getReturnToIdleCountdownForCharacter);
+  const cancelReturnToIdleForCharacter = useTavernStore((state) => state.cancelReturnToIdleForCharacter);
+  const executeReturnToIdleForCharacter = useTavernStore((state) => state.executeReturnToIdleForCharacter);
+  const clearSpriteLock = useTavernStore((state) => state.clearSpriteLock);
+  
+  // Get per-character sprite state from the unified store
+  // This is now reactive because characterSpriteStates is a proper selector
+  const charSpriteState = characterSpriteStates[characterId] || createDefaultCharacterState();
+  
+  // Check if sprite is locked (global state)
+  const spriteLockActive = isLocked && lockState.until === 0 ? true : (isLocked && Date.now() < lockState.until);
+  
+  // Get return to idle state for this character
+  const isReturnToIdleScheduled = charSpriteState.returnToIdle.active;
+  
+  // Determine the effective sprite state:
+  // Priority: Trigger sprite > Talk (if streaming with content) > Thinking (if generating) > Idle
+  const effectiveSpriteState = charSpriteState.triggerSpriteUrl 
+    ? 'idle' // Trigger active, use trigger sprite (handled below)
+    : isStreaming && hasContent 
+      ? 'talk' 
+      : isStreaming 
+        ? 'thinking' 
+        : charSpriteState.spriteState;
+
+  // Update countdown for return to idle
+  useEffect(() => {
+    if (!isReturnToIdleScheduled) {
+      setCountdown(0);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const remaining = getReturnToIdleCountdownForCharacter(characterId);
+      setCountdown(remaining);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 100);
+
+    return () => clearInterval(interval);
+  }, [isReturnToIdleScheduled, getReturnToIdleCountdownForCharacter, characterId]);
+
+  // Determine the current sprite URL
+  // PRIORITY:
+  // 1. Trigger sprite from store (highest priority)
+  // 2. State collection based on effective state (thinking/talk/idle)
+  // 3. Legacy sprites
+  // 4. Avatar (lowest priority)
+  const spriteResult = charSpriteState.triggerSpriteUrl 
+    ? { url: charSpriteState.triggerSpriteUrl, label: charSpriteState.triggerSpriteLabel }
+    : getSpriteUrl(
+        effectiveSpriteState,
+        spriteConfig,
+        avatarUrl
+      );
+  const currentSpriteUrl = spriteResult.url;
+  const currentSpriteLabel = spriteResult.label;
 
   // Save settings to localStorage
   useEffect(() => {
@@ -240,6 +329,19 @@ export function CharacterSprite({
     setSettings(DEFAULT_SPRITE_SETTINGS);
   };
 
+  // Sprite lock/unlock handlers
+  const handleUnlockSprite = () => {
+    clearSpriteLock();
+  };
+
+  const handleCancelReturnToIdle = () => {
+    cancelReturnToIdleForCharacter(characterId);
+  };
+
+  const handleForceReturnToIdle = () => {
+    executeReturnToIdleForCharacter(characterId);
+  };
+
   // Calculate max Y based on height
   const maxY = Math.max(0, 100 - settings.height);
 
@@ -280,11 +382,111 @@ export function CharacterSprite({
         </div>
       )}
 
+      {/* Lock indicator badge */}
+      {spriteLockActive && (
+        <div className="sprite-controls absolute top-2 left-1/2 -translate-x-1/2 z-50">
+          <Badge 
+            variant="secondary" 
+            className="bg-amber-500/90 text-white border-amber-400 gap-1.5 px-3 py-1 shadow-lg"
+          >
+            <Lock className="h-3 w-3" />
+            <span className="text-xs font-medium">Locked</span>
+            {lockState.until > 0 && (
+              <span className="text-xs opacity-80">
+                ({formatTime(lockState.until - Date.now())})
+              </span>
+            )}
+          </Badge>
+        </div>
+      )}
+
+      {/* Return to idle countdown badge */}
+      {isReturnToIdleScheduled && countdown > 0 && (
+        <div className={cn(
+          "sprite-controls absolute top-2 left-1/2 -translate-x-1/2 z-50",
+          spriteLockActive && "top-10" // Offset if lock badge is shown
+        )}>
+          <Badge 
+            variant="secondary" 
+            className="bg-blue-500/90 text-white border-blue-400 gap-1.5 px-3 py-1 shadow-lg"
+          >
+            <Timer className="h-3 w-3" />
+            <span className="text-xs font-medium">→ Idle: {formatTime(countdown)}</span>
+          </Badge>
+        </div>
+      )}
+
       {/* Controls overlay - only show on hover */}
       {showControls && !isDragging && (
         <div className="sprite-controls absolute top-2 right-2 z-50 flex flex-col gap-1"
           onMouseEnter={(e) => e.stopPropagation()}
         >
+          {/* Lock/Unlock button */}
+          {spriteLockActive ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="secondary" 
+                    size="icon" 
+                    className="h-8 w-8 bg-amber-500/80 hover:bg-amber-500 text-white"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={handleUnlockSprite}
+                  >
+                    <Lock className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p className="text-xs">Unlock Sprite</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+
+          {/* Return to idle controls */}
+          {isReturnToIdleScheduled && (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      className="h-8 w-8 bg-red-500/80 hover:bg-red-500 text-white"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={handleCancelReturnToIdle}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p className="text-xs">Cancel Return to Idle</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      className="h-8 w-8 bg-blue-500/80 hover:bg-blue-500 text-white"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={handleForceReturnToIdle}
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p className="text-xs">Return to Idle Now</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
+          )}
+
+          {/* Settings button */}
           <Popover>
             <PopoverTrigger asChild>
               <Button 
@@ -310,6 +512,65 @@ export function CharacterSprite({
                     Reset
                   </Button>
                 </div>
+
+                {/* Lock status */}
+                {spriteLockActive && (
+                  <div className="p-2 rounded-md bg-amber-500/10 border border-amber-500/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-medium">Sprite Locked</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={handleUnlockSprite}
+                      >
+                        <LockOpen className="h-3 w-3 mr-1" />
+                        Unlock
+                      </Button>
+                    </div>
+                    {lockState.until > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Expires in {formatTime(lockState.until - Date.now())}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Return to idle status */}
+                {isReturnToIdleScheduled && (
+                  <div className="p-2 rounded-md bg-blue-500/10 border border-blue-500/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Timer className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium">Return to Idle</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={handleForceReturnToIdle}
+                        >
+                          <Play className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={handleCancelReturnToIdle}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Returns in {formatTime(countdown)}
+                    </p>
+                  </div>
+                )}
 
                 {/* Size sliders */}
                 <div className="space-y-3">

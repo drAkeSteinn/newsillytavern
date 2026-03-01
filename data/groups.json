@@ -1,7 +1,7 @@
 [
   {
     "name": "Clinica",
-    "description": "Una clinica rota",
+    "description": "Una sala de interrogatorio en la prision",
     "systemPrompt": "",
     "activationStrategy": "all",
     "maxResponsesPerTurn": 3,
@@ -9,28 +9,28 @@
     "mentionTriggers": [],
     "conversationStyle": "sequential",
     "characterIds": [
-      "9347d77a-b189-44fc-8f36-7e0bb3599c16",
-      "c94f4257-b46d-471d-b8f5-831ceea0254b"
+      "a19f59fb-0114-4f57-ace3-a09ed3fd5a57",
+      "096e9dbe-3367-40dd-8af2-1e4a09e42e17"
     ],
     "members": [
       {
-        "characterId": "9347d77a-b189-44fc-8f36-7e0bb3599c16",
+        "characterId": "a19f59fb-0114-4f57-ace3-a09ed3fd5a57",
         "role": "member",
         "isActive": true,
         "isPresent": true,
         "joinOrder": 0
       },
       {
-        "characterId": "c94f4257-b46d-471d-b8f5-831ceea0254b",
-        "role": "member",
+        "characterId": "096e9dbe-3367-40dd-8af2-1e4a09e42e17",
+        "role": "leader",
         "isActive": true,
         "isPresent": true,
         "joinOrder": 1
       }
     ],
     "avatar": "",
-    "id": "ec563464-f9a9-4507-a8dd-6e50d0395292",
-    "createdAt": "2026-02-27T20:48:18.761Z",
-    "updatedAt": "2026-02-27T20:48:18.761Z"
+    "id": "dffff7e5-81d4-47fc-a65e-be148afffaef",
+    "createdAt": "2026-03-01T01:44:48.546Z",
+    "updatedAt": "2026-03-01T01:44:48.546Z"
   }
 ]

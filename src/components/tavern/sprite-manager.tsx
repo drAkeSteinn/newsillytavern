@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   Plus,
@@ -27,20 +29,33 @@ import {
   FolderPlus,
   Image as ImageIcon,
   Loader2,
-  Check,
+  RefreshCw,
   Sparkles,
   MessageSquare,
   Brain,
-  Smile,
-  Frown,
-  Angry,
-  RefreshCw,
   X,
-  GripVertical
+  Crown,
+  Star,
+  Package,
+  Edit,
+  Video,
+  Film,
+  FolderOpen,
+  Check,
 } from 'lucide-react';
-import type { SpriteConfig, SpriteState, SpriteCollection, CharacterCard } from '@/types';
-import { SpritePreview, SpriteThumbnail, SpriteTypeBadge } from './sprite-preview';
+import type { 
+  SpriteConfig, 
+  SpriteState, 
+  SpriteCollection, 
+  CharacterCard,
+  SpriteIndexEntry,
+  StateSpriteCollection,
+  CollectionBehavior
+} from '@/types';
+import { StateCollectionEditor } from './state-collection-editor';
+import { SpritePreview } from './sprite-preview';
 import { getLogger } from '@/lib/logger';
+import { v4 as uuidv4 } from 'uuid';
 
 const spriteLogger = getLogger('sprite');
 
@@ -49,188 +64,137 @@ interface SpriteManagerProps {
   onChange: (updates: Partial<CharacterCard>) => void;
 }
 
-// Standard sprite state definitions
+// Standard sprite state definitions (only base states)
 const STANDARD_STATES: { key: SpriteState; label: string; icon: React.ReactNode; description: string }[] = [
-  { key: 'idle', label: 'Idle', icon: <Sparkles className="w-4 h-4" />, description: 'Sprite por defecto cuando no hace nada' },
-  { key: 'talk', label: 'Talk', icon: <MessageSquare className="w-4 h-4" />, description: 'Sprite cuando está hablando' },
-  { key: 'thinking', label: 'Thinking', icon: <Brain className="w-4 h-4" />, description: 'Sprite cuando está pensando' },
-  { key: 'happy', label: 'Happy', icon: <Smile className="w-4 h-4" />, description: 'Sprite cuando está feliz' },
-  { key: 'sad', label: 'Sad', icon: <Frown className="w-4 h-4" />, description: 'Sprite cuando está triste' },
-  { key: 'angry', label: 'Angry', icon: <Angry className="w-4 h-4" />, description: 'Sprite cuando está enojado' },
+  { key: 'idle', label: 'Idle (Reposo)', icon: <Sparkles className="w-4 h-4" />, description: 'Sprite por defecto cuando no hace nada' },
+  { key: 'talk', label: 'Talk (Hablando)', icon: <MessageSquare className="w-4 h-4" />, description: 'Sprite cuando está hablando' },
+  { key: 'thinking', label: 'Thinking (Pensando)', icon: <Brain className="w-4 h-4" />, description: 'Sprite cuando está pensando' },
 ];
 
-// Extended sprite state type for custom states
-type ExtendedSpriteState = SpriteState | string;
+// Check if URL is a video file
+function isVideoUrl(url: string): boolean {
+  return /\.(webm|mp4|mov|avi)(\?.*)?$/i.test(url);
+}
+
+// Check if URL is an animated image
+function isAnimatedImage(url: string): boolean {
+  return /\.(gif|apng)(\?.*)?$/i.test(url);
+}
 
 export function SpriteManager({ character, onChange }: SpriteManagerProps) {
   const [collections, setCollections] = useState<SpriteCollection[]>([]);
+  const [customSprites, setCustomSprites] = useState<SpriteIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [uploading, setUploading] = useState<string | null>(null);
-  const [showNewCollection, setShowNewCollection] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  
+  // Selected collection for uploading - initialize from character's saved config
+  const [selectedCollectionName, setSelectedCollectionName] = useState<string>(() => {
+    return character.spriteConfig?.collection || 'custom';
+  });
+  
+  // Dialogs
+  const [showNewCollectionDialog, setShowNewCollectionDialog] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [creatingCollection, setCreatingCollection] = useState(false);
-  const [customStates, setCustomStates] = useState<string[]>([]);
-  const [showAddState, setShowAddState] = useState(false);
-  const [newStateName, setNewStateName] = useState('');
+  const [uploadLabel, setUploadLabel] = useState('');
+  const [editingSpriteLabel, setEditingSpriteLabel] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState('');
   
-  // Sprite selection dialog state
-  const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
-  const [selectingForState, setSelectingForState] = useState<ExtendedSpriteState | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadStateRef = useRef<ExtendedSpriteState | null>(null);
-  const initialCustomStatesLoaded = useRef(false);
 
   // Get current sprite config - memoized to prevent infinite loops
   const spriteConfig: SpriteConfig = useMemo(() => {
     return character.spriteConfig || {
       enabled: true,
       collection: '',
-      sprites: {}
+      sprites: {},
+      stateCollections: {},
     };
   }, [character.spriteConfig]);
 
-  // Load custom states from spriteConfig - only once on mount
+  // Fetch sprite collections and custom sprites
   useEffect(() => {
-    if (initialCustomStatesLoaded.current) return;
-    initialCustomStatesLoaded.current = true;
-
-    const sprites = character.spriteConfig?.sprites;
-    if (sprites) {
-      const standardKeys = STANDARD_STATES.map(s => s.key);
-      const custom = Object.keys(sprites).filter(key => !standardKeys.includes(key as SpriteState));
-      if (custom.length > 0) {
-        setCustomStates(custom);
-      }
-    }
-  }, [character.spriteConfig?.sprites]);
-
-  // Fetch sprite collections
-  useEffect(() => {
-    const fetchCollections = async () => {
-      try {
-        const response = await fetch('/api/sprites/collections');
-        const data = await response.json();
-        setCollections(data.collections || []);
-      } catch (error) {
-        spriteLogger.error('Error fetching sprite collections', { error });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCollections();
+    fetchData();
   }, []);
 
-  // Refresh collections manually
-  const handleRefreshCollections = async () => {
+  // Fetch all data
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [collectionsRes, spritesRes] = await Promise.all([
+        fetch('/api/sprites/collections'),
+        fetch('/api/sprites/index'),
+      ]);
+      
+      const collectionsData = await collectionsRes.json();
+      const spritesData = await spritesRes.json();
+      
+      setCollections(collectionsData.collections || []);
+      setCustomSprites(spritesData.sprites || []);
+      
+      // Set default collection: first try character's saved collection, then 'custom', then first available
+      if (collectionsData.collections?.length > 0) {
+        const collectionNames = collectionsData.collections.map((c: SpriteCollection) => c.name);
+        const savedCollection = character.spriteConfig?.collection;
+        
+        if (savedCollection && collectionNames.includes(savedCollection)) {
+          // Use the saved collection from character config
+          setSelectedCollectionName(savedCollection);
+        } else {
+          // Fallback: try 'custom', then first available
+          const hasCustom = collectionNames.includes('custom');
+          if (hasCustom) {
+            setSelectedCollectionName('custom');
+          } else {
+            setSelectedCollectionName(collectionsData.collections[0].name);
+          }
+        }
+      }
+    } catch (error) {
+      spriteLogger.error('Error fetching sprite data', { error });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh data
+  const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const response = await fetch('/api/sprites/collections');
-      const data = await response.json();
-      setCollections(data.collections || []);
-    } catch (error) {
-      spriteLogger.error('Error refreshing sprite collections', { error });
+      await fetchData();
     } finally {
       setRefreshing(false);
     }
   };
 
-  // Handle collection selection
+  // Handle collection selection change - saves to character's spriteConfig
   const handleCollectionChange = (collectionName: string) => {
-    const newConfig: SpriteConfig = {
-      enabled: true,
-      collection: collectionName || undefined,
-      sprites: spriteConfig.sprites || {}
-    };
-    onChange({
-      spriteConfig: newConfig
-    });
-  };
-
-  // Open sprite selection dialog for a state
-  const openSpriteSelection = (state: ExtendedSpriteState) => {
-    setSelectingForState(state);
-    setSelectionDialogOpen(true);
-  };
-
-  // Handle sprite upload
-  const handleSpriteUpload = async (state: ExtendedSpriteState, file: File) => {
-    setUploading(state);
-    
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'sprite');
-      formData.append('collection', spriteConfig.collection || 'custom');
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        onChange({
-          spriteConfig: {
-            ...spriteConfig,
-            sprites: {
-              ...spriteConfig.sprites,
-              [state]: data.url
-            }
-          }
-        });
-
-        // Refresh collections if we uploaded to a new one
-        if (!collections.find(c => c.name === spriteConfig.collection)) {
-          const collectionsResponse = await fetch('/api/sprites/collections');
-          const collectionsData = await collectionsResponse.json();
-          setCollections(collectionsData.collections || []);
-        }
-      } else {
-        alert(data.error || 'Error al subir el sprite');
-      }
-    } catch (error) {
-      spriteLogger.error('Upload error', { error });
-      alert('Error al subir el sprite');
-    } finally {
-      setUploading(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      setSelectionDialogOpen(false);
-    }
-  };
-
-  // Handle file input change
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && uploadStateRef.current) {
-      handleSpriteUpload(uploadStateRef.current, file);
-      uploadStateRef.current = null;
-    }
-  };
-
-  // Trigger file upload for a state
-  const triggerUpload = (state: ExtendedSpriteState) => {
-    uploadStateRef.current = state;
-    fileInputRef.current?.click();
-  };
-
-  // Handle sprite removal
-  const handleRemoveSprite = (state: ExtendedSpriteState) => {
-    const newSprites = { ...spriteConfig.sprites };
-    delete newSprites[state];
+    setSelectedCollectionName(collectionName);
+    // Save to character's spriteConfig
     onChange({
       spriteConfig: {
         ...spriteConfig,
-        sprites: newSprites
-      }
+        collection: collectionName,
+      },
     });
   };
 
-  // Create new collection
+  // Handle state collection change
+  const handleStateCollectionChange = (state: SpriteState, collection: StateSpriteCollection) => {
+    onChange({
+      spriteConfig: {
+        ...spriteConfig,
+        stateCollections: {
+          ...spriteConfig.stateCollections,
+          [state]: collection,
+        },
+      },
+    });
+  };
+
+  // Create new collection (folder)
   const handleCreateCollection = async () => {
     if (!newCollectionName.trim()) return;
     
@@ -245,22 +209,10 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
       const data = await response.json();
 
       if (data.success) {
-        // Refresh collections
-        const collectionsResponse = await fetch('/api/sprites/collections');
-        const collectionsData = await collectionsResponse.json();
-        setCollections(collectionsData.collections || []);
-        
-        // Select the new collection - ensure we pass the full spriteConfig
-        const newConfig: SpriteConfig = {
-          enabled: true,
-          collection: data.collection.name,
-          sprites: spriteConfig.sprites || {}
-        };
-        onChange({
-          spriteConfig: newConfig
-        });
-        
-        setShowNewCollection(false);
+        await fetchData();
+        // Save the new collection as the character's selected collection
+        handleCollectionChange(newCollectionName.trim());
+        setShowNewCollectionDialog(false);
         setNewCollectionName('');
       } else {
         alert(data.error || 'Error al crear la colección');
@@ -273,59 +225,130 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
     }
   };
 
-  // Select sprite from collection
-  const handleSelectFromCollection = (url: string) => {
-    if (!selectingForState) return;
+  // Upload sprite to selected collection
+  const handleUploadSprite = async (file: File, label: string) => {
+    setUploading(true);
     
-    onChange({
-      spriteConfig: {
-        ...spriteConfig,
-        sprites: {
-          ...spriteConfig.sprites,
-          [selectingForState]: url
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'sprite');
+      formData.append('collection', selectedCollectionName);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Add to sprite index
+        const addResponse = await fetch('/api/sprites/index', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            label: label || file.name.replace(/\.[^/.]+$/, ''),
+            filename: file.name,
+            url: data.url,
+            pack: selectedCollectionName,
+          }),
+        });
+        
+        if (addResponse.ok) {
+          await fetchData();
         }
+        
+        setShowUploadDialog(false);
+        setUploadLabel('');
+      } else {
+        alert(data.error || 'Error al subir el sprite');
       }
-    });
-    setSelectionDialogOpen(false);
+    } catch (error) {
+      spriteLogger.error('Upload error', { error });
+      alert('Error al subir el sprite');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
-  // Add custom state
-  const handleAddCustomState = () => {
-    if (!newStateName.trim()) return;
+  // Handle file change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const defaultLabel = file.name.replace(/\.[^/.]+$/, '').toLowerCase().replace(/\s+/g, '_');
+      setUploadLabel(defaultLabel);
+      handleUploadSprite(file, uploadLabel || defaultLabel);
+    }
+  };
+
+  // Delete custom sprite
+  const handleDeleteSprite = async (sprite: SpriteIndexEntry) => {
+    if (!confirm(`¿Eliminar el sprite "${sprite.label}"?`)) return;
     
-    const stateKey = newStateName.trim().toLowerCase().replace(/\s+/g, '_');
-    
-    // Check if state already exists
-    const allStates = [...STANDARD_STATES.map(s => s.key), ...customStates];
-    if (allStates.includes(stateKey)) {
-      alert('Este estado ya existe');
+    try {
+      const params = new URLSearchParams({
+        label: sprite.label,
+        pack: sprite.pack || selectedCollectionName,
+      });
+      const response = await fetch(`/api/sprites/index?${params}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setCustomSprites(prev => prev.filter(s => s.label !== sprite.label));
+      }
+    } catch (error) {
+      spriteLogger.error('Delete sprite error', { error });
+    }
+  };
+
+  // Rename sprite
+  const handleRenameSprite = async (sprite: SpriteIndexEntry, newLabel: string) => {
+    if (!newLabel.trim() || sprite.label === newLabel.trim()) {
+      setEditingSpriteLabel(null);
       return;
     }
     
-    setCustomStates(prev => [...prev, stateKey]);
-    setShowAddState(false);
-    setNewStateName('');
+    try {
+      const response = await fetch('/api/sprites/index', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          oldLabel: sprite.label, 
+          newLabel: newLabel.trim(),
+          pack: sprite.pack || selectedCollectionName,
+        }),
+      });
+      
+      if (response.ok) {
+        setCustomSprites(prev => prev.map(s => 
+          s.label === sprite.label ? { ...s, label: newLabel.trim() } : s
+        ));
+      }
+    } catch (error) {
+      spriteLogger.error('Rename sprite error', { error });
+    } finally {
+      setEditingSpriteLabel(null);
+    }
   };
 
-  // Remove custom state
-  const handleRemoveCustomState = (state: string) => {
-    setCustomStates(prev => prev.filter(s => s !== state));
-    handleRemoveSprite(state);
-  };
+  // Filter sprites by selected collection
+  const spritesInSelectedCollection = useMemo(() => {
+    if (!selectedCollectionName) return customSprites;
+    return customSprites.filter(s => s.pack === selectedCollectionName);
+  }, [customSprites, selectedCollectionName]);
 
-  // Get available sprites from selected collection
-  const selectedCollection = collections.find(c => c.name === spriteConfig.collection);
-
-  // Combine standard and custom states
-  const allStates = [
-    ...STANDARD_STATES,
-    ...customStates.map(state => ({
-      key: state as SpriteState,
-      label: state.charAt(0).toUpperCase() + state.slice(1).replace(/_/g, ' '),
-      icon: <ImageIcon className="w-4 h-4" />,
-      description: 'Estado personalizado'
-    }))
-  ];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -337,158 +360,302 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
         onChange={handleFileChange}
       />
 
-      {/* Collection Selection */}
-      <div className="flex gap-2 items-end">
-        <div className="flex-1">
-          <Label className="text-xs">Colección de Sprites</Label>
-          <Select
-            value={spriteConfig.collection || ''}
-            onValueChange={handleCollectionChange}
-          >
-            <SelectTrigger className="h-8 mt-1">
-              <SelectValue placeholder="Seleccionar colección..." />
-            </SelectTrigger>
-            <SelectContent>
-              {collections.map((collection) => (
-                <SelectItem key={collection.id} value={collection.name}>
-                  {collection.name} ({collection.files.length} sprites)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          onClick={handleRefreshCollections}
-          disabled={refreshing}
-          title="Actualizar colecciones"
-        >
-          <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8"
-          onClick={() => setShowNewCollection(true)}
-        >
-          <FolderPlus className="w-4 h-4 mr-1" />
-          Nueva
-        </Button>
-      </div>
+      {/* Tabs for State Collections and Custom Sprites */}
+      <Tabs defaultValue="collections" className="w-full">
+        <TabsList className="grid grid-cols-2 w-full">
+          <TabsTrigger value="collections" className="text-xs gap-1">
+            <Package className="w-3.5 h-3.5" />
+            Colecciones de Estado
+          </TabsTrigger>
+          <TabsTrigger value="custom" className="text-xs gap-1">
+            <ImageIcon className="w-3.5 h-3.5" />
+            Sprites Personalizados
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Avatar fallback notice */}
-      <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-        💡 <strong>Idle</strong> usará el avatar del personaje si no se configura.
-        <strong> Talk</strong> usará idle/avatar si no se configura.
-      </div>
-
-      {/* Sprite States Grid */}
-      <div className="space-y-3">
-        {/* Standard States */}
-        <div className="grid grid-cols-2 gap-3">
-          {STANDARD_STATES.map((state) => {
-            const spriteUrl = spriteConfig.sprites[state.key as SpriteState];
-            const isUploading = uploading === state.key;
-
-            return (
-              <SpriteStateCard
-                key={state.key}
-                state={state}
-                spriteUrl={spriteUrl}
-                isUploading={isUploading}
-                onSelect={() => openSpriteSelection(state.key)}
-                onRemove={() => handleRemoveSprite(state.key)}
-              />
-            );
-          })}
-        </div>
-
-        {/* Custom States */}
-        {customStates.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 pt-2">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">Estados Personalizados</span>
-              <div className="h-px flex-1 bg-border" />
+        {/* State Collections Tab */}
+        <TabsContent value="collections" className="space-y-4 mt-3">
+          {/* Info Banner */}
+          <div className="text-xs bg-muted/50 border rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <Package className="w-4 h-4 text-purple-500" />
+              Colecciones de Estado
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {customStates.map((state) => {
-                const spriteUrl = spriteConfig.sprites[state];
-                const isUploading = uploading === state;
-                const stateInfo = {
-                  key: state as SpriteState,
-                  label: state.charAt(0).toUpperCase() + state.slice(1).replace(/_/g, ' '),
-                  icon: <ImageIcon className="w-4 h-4" />,
-                  description: 'Estado personalizado'
-                };
-
-                return (
-                  <SpriteStateCard
-                    key={state}
-                    state={stateInfo}
-                    spriteUrl={spriteUrl}
-                    isUploading={isUploading}
-                    onSelect={() => openSpriteSelection(state)}
-                    onRemove={() => handleRemoveCustomState(state)}
-                    isCustom
-                  />
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Add Custom State Button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => setShowAddState(true)}
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Agregar Estado Personalizado
-        </Button>
-      </div>
-
-      {/* Sprites from Collection Preview */}
-      {selectedCollection && selectedCollection.files.length > 0 && (
-        <div className="border-t pt-4">
-          <Label className="text-xs mb-2 block">
-            Sprites en "{selectedCollection.name}" ({selectedCollection.files.length})
-          </Label>
-          <ScrollArea className="h-28">
-            <div className="flex gap-2 flex-wrap">
-              {selectedCollection.files.map((file, index) => (
-                <div
-                  key={index}
-                  className="relative group/collection w-14 h-14 rounded border overflow-hidden cursor-pointer hover:border-primary transition-colors"
-                  title={file.name}
-                  onClick={() => {
-                    // Quick assign - opens dialog to select which state
-                    if (allStates.length > 0) {
-                      openSpriteSelection(allStates[0].key);
-                    }
-                  }}
-                >
-                  <SpriteThumbnail
-                    src={file.url}
-                    alt={file.name}
-                    size="md"
-                  />
+            <p className="text-muted-foreground">
+              Cada estado (Idle, Talk, Thinking) ahora es una <strong>colección de sprites</strong>. 
+              Agrega sprites desde tus Sprites Personalizados y define cuál es el principal y cuáles son alternativos.
+            </p>
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <div className="p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                <div className="flex items-center gap-1 text-amber-600 text-xs font-medium">
+                  <Crown className="w-3 h-3" />
+                  Principal
                 </div>
-              ))}
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Sprite que se usará por defecto
+                </p>
+              </div>
+              <div className="p-2 bg-blue-500/10 rounded border border-blue-500/20">
+                <div className="flex items-center gap-1 text-blue-600 text-xs font-medium">
+                  <Star className="w-3 h-3" />
+                  Alternativos
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Variantes adicionales
+                </p>
+              </div>
+              <div className="p-2 bg-green-500/10 rounded border border-green-500/20">
+                <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
+                  <RefreshCw className="w-3 h-3" />
+                  Comportamiento
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Principal/Aleatorio/Lista
+                </p>
+              </div>
             </div>
-          </ScrollArea>
-          <p className="text-xs text-muted-foreground mt-1">
-            Haz clic en un estado arriba para seleccionar un sprite de la colección
-          </p>
-        </div>
-      )}
+          </div>
+
+          {/* State Collections Grid */}
+          <div className="grid grid-cols-1 gap-4">
+            {STANDARD_STATES.map(state => (
+              <StateCollectionEditor
+                key={state.key}
+                stateKey={state.key}
+                stateLabel={state.label}
+                stateIcon={state.icon}
+                stateDescription={state.description}
+                collection={spriteConfig.stateCollections?.[state.key]}
+                customSprites={spritesInSelectedCollection}
+                selectedCollectionName={selectedCollectionName}
+                onChange={(collection) => handleStateCollectionChange(state.key, collection)}
+              />
+            ))}
+          </div>
+
+          {/* Collection selector for state collections - shows character's configured collection */}
+          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg text-xs">
+            <FolderOpen className="w-4 h-4 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              Sprites disponibles desde la colección:
+            </span>
+            <span className="font-medium text-foreground">
+              {spriteConfig.collection || selectedCollectionName}
+            </span>
+            <span className="text-muted-foreground">
+              ({spritesInSelectedCollection.length} sprites)
+            </span>
+          </div>
+
+          {spritesInSelectedCollection.length === 0 && (
+            <div className="text-center py-4 text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <ImageIcon className="w-6 h-6 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium">No hay sprites en "{selectedCollectionName}"</p>
+              <p className="text-xs mt-1">
+                Ve a la pestaña "Sprites Personalizados" para subir sprites a esta colección.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Custom Sprites Tab */}
+        <TabsContent value="custom" className="space-y-4 mt-3">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-medium">Sprites Personalizados</h4>
+              <p className="text-xs text-muted-foreground">
+                Sube y gestiona los sprites que usarás en las colecciones de estado.
+              </p>
+            </div>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                title="Sincronizar colecciones"
+              >
+                <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
+              </Button>
+            </div>
+          </div>
+
+          {/* Collection Selector */}
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <Label className="text-xs">Colección de Sprites</Label>
+              <Select
+                value={selectedCollectionName}
+                onValueChange={handleCollectionChange}
+              >
+                <SelectTrigger className="h-8 mt-1">
+                  <SelectValue placeholder="Seleccionar colección..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {collections.map((collection) => (
+                    <SelectItem key={collection.id} value={collection.name}>
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="w-3 h-3" />
+                        {collection.name} ({collection.files.length})
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setShowNewCollectionDialog(true)}
+            >
+              <FolderPlus className="w-4 h-4 mr-1" />
+              Nueva
+            </Button>
+          </div>
+
+          {/* Upload Section */}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-8 flex-1"
+              onClick={() => setShowUploadDialog(true)}
+              disabled={!selectedCollectionName}
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              Subir Sprite a "{selectedCollectionName}"
+            </Button>
+          </div>
+
+          {/* Sprites Grid */}
+          {spritesInSelectedCollection.length > 0 ? (
+            <ScrollArea className="h-[300px]">
+              <div className="grid grid-cols-3 gap-2 pr-2">
+                {spritesInSelectedCollection.map(sprite => (
+                  <div
+                    key={sprite.label}
+                    className="relative group border rounded-lg overflow-hidden"
+                  >
+                    <div className="aspect-square relative bg-muted/50">
+                      <SpritePreview
+                        src={sprite.url}
+                        alt={sprite.label}
+                        className="w-full h-full"
+                        objectFit="contain"
+                      />
+                      {/* Type indicator */}
+                      {isVideoUrl(sprite.url) && (
+                        <div className="absolute top-1 right-1">
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-blue-500/80 text-white">
+                            <Video className="w-2.5 h-2.5 mr-0.5" />
+                            WEBM
+                          </Badge>
+                        </div>
+                      )}
+                      {isAnimatedImage(sprite.url) && (
+                        <div className="absolute top-1 right-1">
+                          <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-purple-500/80 text-white">
+                            <Film className="w-2.5 h-2.5 mr-0.5" />
+                            GIF
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Label */}
+                    <div className="p-1.5 bg-background border-t">
+                      {editingSpriteLabel === sprite.label ? (
+                        <input
+                          type="text"
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          onBlur={() => handleRenameSprite(sprite, newLabel)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameSprite(sprite, newLabel);
+                            if (e.key === 'Escape') setEditingSpriteLabel(null);
+                          }}
+                          className="w-full h-6 text-xs px-1 border rounded"
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs truncate flex-1">{sprite.label}</span>
+                          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              onClick={() => {
+                                setEditingSpriteLabel(sprite.label);
+                                setNewLabel(sprite.label);
+                              }}
+                            >
+                              <Edit className="w-2.5 h-2.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteSprite(sprite)}
+                            >
+                              <Trash2 className="w-2.5 h-2.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground border rounded-lg">
+              <FolderOpen className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay sprites en "{selectedCollectionName}"</p>
+              <p className="text-xs mt-1">Sube sprites a esta colección</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setShowUploadDialog(true)}
+              >
+                <Upload className="w-4 h-4 mr-1" />
+                Subir Sprite
+              </Button>
+            </div>
+          )}
+
+          {/* Collections Info */}
+          {collections.length > 0 && (
+            <div className="border-t pt-4">
+              <Label className="text-xs mb-2 block">
+                Todas las colecciones ({collections.length})
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {collections.map(collection => (
+                  <Badge 
+                    key={collection.id} 
+                    variant={collection.name === selectedCollectionName ? "default" : "outline"} 
+                    className="text-xs cursor-pointer"
+                    onClick={() => handleCollectionChange(collection.name)}
+                  >
+                    {collection.name === selectedCollectionName && (
+                      <Check className="w-3 h-3 mr-1" />
+                    )}
+                    <FolderOpen className="w-3 h-3 mr-1" />
+                    {collection.name} ({collection.files.length})
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* New Collection Dialog */}
-      <Dialog open={showNewCollection} onOpenChange={setShowNewCollection}>
+      <Dialog open={showNewCollectionDialog} onOpenChange={setShowNewCollectionDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nueva Colección de Sprites</DialogTitle>
@@ -504,10 +671,13 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
                 className="mt-1"
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Se creará una nueva carpeta para organizar tus sprites.
+              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewCollection(false)}>
+            <Button variant="outline" onClick={() => setShowNewCollectionDialog(false)}>
               Cancelar
             </Button>
             <Button onClick={handleCreateCollection} disabled={creatingCollection || !newCollectionName.trim()}>
@@ -527,142 +697,47 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Add Custom State Dialog */}
-      <Dialog open={showAddState} onOpenChange={setShowAddState}>
+      {/* Upload Sprite Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nuevo Estado de Sprite</DialogTitle>
+            <DialogTitle>Subir Sprite a "{selectedCollectionName}"</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="stateName">Nombre del estado</Label>
+              <Label htmlFor="spriteLabel">Etiqueta del sprite</Label>
               <Input
-                id="stateName"
-                value={newStateName}
-                onChange={(e) => setNewStateName(e.target.value)}
-                placeholder="Ej: blushing, excited, sleepy..."
+                id="spriteLabel"
+                value={uploadLabel}
+                onChange={(e) => setUploadLabel(e.target.value)}
+                placeholder="Ej: happy, sad, excited..."
                 className="mt-1"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddCustomState()}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Identificador único para este sprite (sin espacios, usar guiones bajos)
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              El estado se guardará en minúsculas y con guiones bajos en lugar de espacios.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddState(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleAddCustomState} disabled={!newStateName.trim()}>
-              <Plus className="w-4 h-4 mr-1" />
-              Agregar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Sprite Selection Dialog */}
-      <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              Seleccionar Sprite para "{selectingForState}"
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            {/* Upload Section */}
+            
             <div>
-              <Label className="text-xs mb-2 block">Subir nueva imagen</Label>
+              <Label className="text-xs mb-2 block">Seleccionar archivo</Label>
               <div
                 className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => selectingForState && triggerUpload(selectingForState)}
+                onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Haz clic para subir una imagen
+                  Haz clic para seleccionar
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   PNG, JPG, GIF, WebP, WebM (máx. 10MB)
                 </p>
               </div>
             </div>
-
-            {/* Collection Selection */}
-            {selectedCollection && selectedCollection.files.length > 0 ? (
-              <div>
-                <Label className="text-xs mb-2 block">
-                  O seleccionar de "{selectedCollection.name}"
-                </Label>
-                <ScrollArea className="h-48">
-                  <div className="grid grid-cols-4 gap-2">
-                    {selectedCollection.files.map((file, index) => {
-                      const isSelected = spriteConfig.sprites[selectingForState as keyof typeof spriteConfig.sprites] === file.url;
-                      
-                      return (
-                        <div
-                          key={index}
-                          className={cn(
-                            "relative group aspect-square rounded border overflow-hidden cursor-pointer transition-all",
-                            isSelected 
-                              ? "border-primary ring-2 ring-primary/30" 
-                              : "hover:border-primary"
-                          )}
-                          onClick={() => handleSelectFromCollection(file.url)}
-                          title={file.name}
-                        >
-                          <SpriteThumbnail
-                            src={file.url}
-                            alt={file.name}
-                            size="lg"
-                            className="w-full h-full"
-                          />
-                          {isSelected && (
-                            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                              <Check className="w-6 h-6 text-primary" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Check className="w-5 h-5 text-white" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-muted-foreground text-sm">
-                {collections.length === 0 ? (
-                  <>
-                    <p>No hay colecciones de sprites.</p>
-                    <p>Crea una colección y sube sprites para seleccionarlos aquí.</p>
-                  </>
-                ) : (
-                  <>
-                    <p>Selecciona una colección arriba para ver los sprites disponibles.</p>
-                  </>
-                )}
-              </div>
-            )}
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectionDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
               Cancelar
             </Button>
-            {selectingForState && spriteConfig.sprites[selectingForState as keyof typeof spriteConfig.sprites] && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  handleRemoveSprite(selectingForState);
-                  setSelectionDialogOpen(false);
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Eliminar
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -670,97 +745,4 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
   );
 }
 
-// Sprite State Card Component
-interface SpriteStateCardProps {
-  state: {
-    key: SpriteState | string;
-    label: string;
-    icon: React.ReactNode;
-    description: string;
-  };
-  spriteUrl?: string;
-  isUploading: boolean;
-  onSelect: () => void;
-  onRemove: () => void;
-  isCustom?: boolean;
-}
-
-function SpriteStateCard({ state, spriteUrl, isUploading, onSelect, onRemove, isCustom }: SpriteStateCardProps) {
-  const isIdle = state.key === 'idle';
-  const isTalk = state.key === 'talk';
-
-  return (
-    <div className="border rounded-lg p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 bg-muted rounded">
-          {state.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{state.label}</div>
-          <div className="text-xs text-muted-foreground truncate">{state.description}</div>
-        </div>
-      </div>
-
-      {/* Sprite Preview */}
-      <div className="relative group">
-        <div
-          className={cn(
-            "w-full h-20 rounded border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors",
-            spriteUrl ? "border-primary/30 bg-muted/30" : "border-muted-foreground/25",
-            !isUploading && "hover:border-primary/50 cursor-pointer"
-          )}
-          onClick={() => !isUploading && onSelect()}
-        >
-          {isUploading ? (
-            <div className="text-center text-muted-foreground">
-              <Loader2 className="w-5 h-5 mx-auto animate-spin" />
-              <span className="text-xs mt-1">Subiendo...</span>
-            </div>
-          ) : spriteUrl ? (
-            <SpritePreview
-              src={spriteUrl}
-              alt={state.label}
-              className="w-full h-full"
-            />
-          ) : (
-            <div className="text-center text-muted-foreground">
-              <ImageIcon className="w-5 h-5 mx-auto mb-1" />
-              <span className="text-xs">
-                {isIdle ? 'Usa avatar' : isTalk ? 'Usa idle' : 'Seleccionar'}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Hover overlay */}
-        {spriteUrl && !isUploading && (
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 rounded">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-6 text-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelect();
-              }}
-            >
-              <RefreshCw className="w-3 h-3 mr-1" />
-              Cambiar
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="h-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+export default SpriteManager;

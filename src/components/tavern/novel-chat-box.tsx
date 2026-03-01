@@ -40,6 +40,8 @@ interface NovelChatBoxProps {
   onResetChat?: () => void;
   onClearChat?: () => void;
   onRegenerate?: (messageId: string) => void;
+  onEdit?: (messageId: string, newContent: string) => void;
+  onReplay?: (messageId: string, content: string, characterId?: string) => void;
   streamingContent?: string;
   streamingCharacter?: CharacterCard | null;
   streamingProgress?: { current: number; total: number } | null;
@@ -56,6 +58,8 @@ export function NovelChatBox({
   onResetChat, 
   onClearChat,
   onRegenerate,
+  onEdit,
+  onReplay,
   streamingContent = '',
   streamingCharacter = null,
   streamingProgress = null,
@@ -489,6 +493,8 @@ export function NovelChatBox({
                     currentIndex={message.swipeIndex || 0}
                     totalAlternatives={message.swipes?.length || 1}
                     onRegenerate={() => onRegenerate?.(message.id)}
+                    onEdit={onEdit}
+                    onReplay={onReplay}
                   />
                 );
               })}

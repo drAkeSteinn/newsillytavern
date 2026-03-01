@@ -54,6 +54,25 @@ export function useHotkeys(hotkeys: HotkeyConfig, actions: HotkeyActions, enable
       const target = event.target as HTMLElement;
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       
+      // If user is typing in an input/textarea, only allow specific hotkeys
+      // Block navigation hotkeys (arrows) to allow cursor movement
+      if (isTyping) {
+        // Check for newLine
+        if (matchesHotkey(event, hotkeys.newLine)) {
+          // This is handled by the textarea's onKeyDown
+          return;
+        }
+
+        // Check for send
+        if (matchesHotkey(event, hotkeys.send)) {
+          // This is handled by the textarea's onKeyDown
+          return;
+        }
+        
+        // Don't process other hotkeys (like swipe arrows) when typing
+        return;
+      }
+
       // Check for regenerate
       if (matchesHotkey(event, hotkeys.regenerate)) {
         event.preventDefault();
@@ -73,21 +92,6 @@ export function useHotkeys(hotkeys: HotkeyConfig, actions: HotkeyActions, enable
         event.preventDefault();
         actions.onSwipeRight?.();
         return;
-      }
-
-      // For send/newline, only handle when in a textarea
-      if (isTyping) {
-        // Check for newLine
-        if (matchesHotkey(event, hotkeys.newLine)) {
-          // This is handled by the textarea's onKeyDown
-          return;
-        }
-
-        // Check for send
-        if (matchesHotkey(event, hotkeys.send)) {
-          // This is handled by the textarea's onKeyDown
-          return;
-        }
       }
     };
 

@@ -21,7 +21,6 @@ import {
 } from '@/lib/llm';
 import {
   validateRequest,
-  generateRequestSchema,
   sanitizeInput
 } from '@/lib/validations';
 import {
@@ -33,8 +32,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validate request
-    const validation = validateRequest(generateRequestSchema, body);
+    // Validate request (automatically detects request type)
+    const validation = validateRequest(null, body);
     if (!validation.success) {
       return NextResponse.json(
         { error: validation.error },

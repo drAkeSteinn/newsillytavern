@@ -2,9 +2,10 @@
 
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType, PromptSection } from '@/types';
-import { Copy, Check, Trash2, RefreshCw, ChevronLeft, ChevronRight, Volume2, Eye } from 'lucide-react';
+import { Copy, Check, Trash2, RefreshCw, ChevronLeft, ChevronRight, Volume2, Eye, Edit2, Play, X, Check as CheckIcon } from 'lucide-react';
 import { useState, memo, Fragment } from 'react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { formatDistanceToNow } from 'date-fns';
 import { TextFormatter } from './text-formatter';
 import { PromptViewerDialog } from './prompt-viewer-dialog';
@@ -24,6 +25,8 @@ interface ChatMessageProps {
   onDelete?: () => void;
   onRegenerate?: () => void;
   onSpeak?: () => void;
+  onEdit?: (messageId: string, newContent: string) => void;
+  onReplay?: (messageId: string, content: string, characterId?: string) => void;
   hasAlternatives?: boolean;
   currentIndex?: number;
   totalAlternatives?: number;
@@ -42,6 +45,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   onDelete,
   onRegenerate,
   onSpeak,
+  onEdit,
+  onReplay,
   hasAlternatives = false,
   currentIndex = 0,
   totalAlternatives = 1,
@@ -49,6 +54,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   
@@ -59,6 +66,27 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleStartEdit = () => {
+    setEditContent(message.content);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditContent(message.content);
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = () => {
+    if (editContent.trim()) {
+      onEdit?.(message.id, editContent.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleReplay = () => {
+    onReplay?.(message.id, message.content, message.characterId);
   };
 
   // Always allow viewing prompt for assistant messages
@@ -105,11 +133,34 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
               </span>
             )}
           </div>
-          <TextFormatter 
-            content={message.content} 
-            isUser={isUser}
-            className="text-sm leading-relaxed"
-          />
+          
+          {isEditing ? (
+            <div className="space-y-2">
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-[80px] text-sm"
+                autoFocus
+              />
+              <div className="flex gap-1">
+                <Button size="sm" type="button" onClick={handleSaveEdit}>
+                  <CheckIcon className="h-3 w-3 mr-1" />
+                  {t('common.save')}
+                </Button>
+                <Button size="sm" type="button" variant="ghost" onClick={handleCancelEdit}>
+                  <X className="h-3 w-3 mr-1" />
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <TextFormatter 
+              content={message.content} 
+              isUser={isUser}
+              className="text-sm leading-relaxed"
+            />
+          )}
+          
           <div className={cn(
             'flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity'
           )}>
@@ -131,6 +182,24 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                   title={t('message.viewPrompt')}
                 >
                   <Eye className="h-3 w-3" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6"
+                  onClick={handleStartEdit}
+                  title={t('message.edit')}
+                >
+                  <Edit2 className="h-3 w-3" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6"
+                  onClick={handleReplay}
+                  title={t('message.replay')}
+                >
+                  <Play className="h-3 w-3" />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onSpeak}>
                   <Volume2 className="h-3 w-3" />
@@ -226,17 +295,38 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
             ? 'bg-primary text-primary-foreground rounded-tr-sm' 
             : 'bg-muted rounded-tl-sm'
         )}>
-          <TextFormatter 
-            content={message.content} 
-            isUser={isUser}
-            className={cn(
-              'text-sm leading-relaxed',
-              isCompact && 'text-xs'
-            )}
-          />
+          {isEditing ? (
+            <div className="space-y-2 min-w-[200px]">
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-[80px] text-sm bg-background/50"
+                autoFocus
+              />
+              <div className="flex gap-1">
+                <Button size="sm" type="button" className="h-6 text-xs" onClick={handleSaveEdit}>
+                  <CheckIcon className="h-3 w-3 mr-1" />
+                  {t('common.save')}
+                </Button>
+                <Button size="sm" type="button" variant="ghost" className="h-6 text-xs" onClick={handleCancelEdit}>
+                  <X className="h-3 w-3 mr-1" />
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <TextFormatter 
+              content={message.content} 
+              isUser={isUser}
+              className={cn(
+                'text-sm leading-relaxed',
+                isCompact && 'text-xs'
+              )}
+            />
+          )}
 
           {/* Swipe Indicators */}
-          {!isUser && !isCompact && (
+          {!isUser && !isCompact && !isEditing && (
             <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1">
               <Button
                 variant="ghost"
@@ -286,7 +376,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
         </div>
 
         {/* Action Buttons */}
-        {!isCompact && (
+        {!isCompact && !isEditing && (
           <div className={cn(
             'flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity',
             isUser ? 'justify-end' : 'justify-start'
@@ -309,6 +399,24 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                   title={t('message.viewPrompt')}
                 >
                   <Eye className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={handleStartEdit}
+                  title={t('message.edit')}
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={handleReplay}
+                  title={t('message.replay')}
+                >
+                  <Play className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="ghost"

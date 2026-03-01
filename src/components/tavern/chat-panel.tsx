@@ -5,9 +5,11 @@ import { useTavernStore } from '@/store/tavern-store';
 import { BackgroundWithOverlays } from './background-layer';
 import { NovelChatBox } from './novel-chat-box';
 import { CharacterSprite } from './character-sprite';
-import { useSoundTriggers } from '@/hooks/use-sound-triggers';
+// Unified Trigger System - Single import for all triggers
+import { useTriggerSystem } from '@/lib/triggers';
 import { useBackgroundTriggers } from '@/hooks/use-background-triggers';
 import { GroupSprites } from './group-sprites';
+import { HUDDisplay } from './hud-display';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard } from '@/types';
 import { t } from '@/lib/i18n';
@@ -32,12 +34,19 @@ export function ChatPanel() {
   const activeOverlayFront = useTavernStore((state) => state.activeOverlayFront);
   const personas = useTavernStore((state) => state.personas);
   const activePersonaId = useTavernStore((state) => state.activePersonaId);
+  const hudTemplates = useTavernStore((state) => state.hudTemplates);
+  const hudSessionState = useTavernStore((state) => state.hudSessionState);
+  const setActiveHUD = useTavernStore((state) => state.setActiveHUD);
   
   const setGenerating = useTavernStore((state) => state.setGenerating);
   const addMessage = useTavernStore((state) => state.addMessage);
   const deleteMessage = useTavernStore((state) => state.deleteMessage);
+  const updateMessage = useTavernStore((state) => state.updateMessage);
   const updateSession = useTavernStore((state) => state.updateSession);
   const addSwipeAlternative = useTavernStore((state) => state.addSwipeAlternative);
+  // UNIFIED SPRITE SYSTEM: Use per-character sprite state management
+  const startSpriteGenerationForCharacter = useTavernStore((state) => state.startGenerationForCharacter);
+  const endSpriteGenerationForCharacter = useTavernStore((state) => state.endGenerationForCharacter);
 
   // Ref to track ongoing generation and prevent race conditions
   const generationIdRef = useRef<string | null>(null);
@@ -52,14 +61,41 @@ export function ChatPanel() {
   // Determine if we're in group mode
   const isGroupMode = !!activeGroupId && !!activeGroup;
 
-  // Sound triggers hook
-  const { scanStreamingContent: scanSoundTriggers, resetDetection: resetSoundDetection } = useSoundTriggers();
+  // ============================================
+  // UNIFIED TRIGGER SYSTEM
+  // Single hook for all triggers (sound + sprite)
+  // This replaces separate useSoundTriggers and useSpriteTriggers hooks
+  // ============================================
+  const {
+    processStreamingContent: processTriggers,
+    resetForNewMessage: resetTriggers,
+  } = useTriggerSystem({
+    soundEnabled: settings.sound?.enabled ?? true,
+    spriteEnabled: settings.chatLayout.showCharacterSprite,
+    maxSoundsPerMessage: settings.sound?.maxSoundsPerMessage ?? 10,
+  });
   
-  // Background triggers hook
+  // Background triggers hook (separate for now, will be integrated later)
   const { scanForBackgroundTriggers, resetDetection: resetBgDetection } = useBackgroundTriggers();
   
   // Track current streaming message key for triggers
   const streamingMessageKeyRef = useRef<string>('');
+
+  // ============================================
+  // HUD SYNCHRONIZATION
+  // Auto-activate HUD based on character/group
+  // ============================================
+  useEffect(() => {
+    // Determine the HUD template to use
+    const hudTemplateId = isGroupMode 
+      ? activeGroup?.hudTemplateId 
+      : activeCharacter?.hudTemplateId;
+    
+    // Only update if different from current
+    if (hudTemplateId !== hudSessionState.activeTemplateId) {
+      setActiveHUD(hudTemplateId || null);
+    }
+  }, [isGroupMode, activeGroup?.hudTemplateId, activeCharacter?.hudTemplateId, hudSessionState.activeTemplateId, setActiveHUD]);
 
   // Sync ref with store state
   useEffect(() => {
@@ -92,8 +128,13 @@ export function ChatPanel() {
     // Generate a unique message key for this streaming session
     const messageKey = `stream_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     streamingMessageKeyRef.current = messageKey;
-    resetSoundDetection(messageKey);
     resetBgDetection(messageKey);
+    
+    // Start sprite generation for the character (single mode)
+    // This initializes the per-character state for proper sprite tracking
+    if (!isGroupMode && activeCharacter) {
+      startSpriteGenerationForCharacter(activeCharacter.id);
+    }
 
     // Add user message
     addMessage(activeSessionId, {
@@ -205,7 +246,8 @@ export function ChatPanel() {
                 } else if (parsed.type === 'token' && parsed.content) {
                   currentCharacterContent += parsed.content;
                   setStreamingContent(currentCharacterContent);
-                  scanSoundTriggers(currentCharacterContent, streamingMessageKeyRef.current);
+                  // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
+                  processTriggers(currentCharacterContent, currentCharacter, streamingMessageKeyRef.current, groupCharacters);
                   scanForBackgroundTriggers(currentCharacterContent, streamingMessageKeyRef.current);
                 } else if (parsed.type === 'character_done') {
                   if (parsed.fullContent && activeSessionId && isStillActive()) {
@@ -317,7 +359,8 @@ export function ChatPanel() {
                 } else if (parsed.type === 'token' && parsed.content) {
                   accumulatedContent += parsed.content;
                   setStreamingContent(accumulatedContent);
-                  scanSoundTriggers(accumulatedContent, streamingMessageKeyRef.current);
+                  // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
+                  processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current);
                   scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
                 } else if (parsed.type === 'error') {
                   throw new Error(parsed.error);
@@ -412,9 +455,14 @@ export function ChatPanel() {
         setStreamingContent('');
         isGenerationInProgressRef.current = false;
         generationIdRef.current = null;
+        // End sprite generation for the character
+        // If trigger was activated, keeps trigger sprite; otherwise returns to idle
+        if (activeCharacter) {
+          endSpriteGenerationForCharacter(activeCharacter.id);
+        }
       }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, resetSoundDetection, scanSoundTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context]);
 
   // Handle regenerate - create a new swipe alternative for an existing message
   const handleRegenerate = useCallback(async (messageId: string) => {
@@ -427,6 +475,11 @@ export function ChatPanel() {
 
     setGenerating(true);
     setStreamingContent('');
+
+    // Start sprite generation for the character
+    if (activeCharacter) {
+      startSpriteGenerationForCharacter(activeCharacter.id);
+    }
 
     // Helper to check if this generation is still the active one
     const isStillActive = () => generationIdRef.current === generationId;
@@ -523,9 +576,86 @@ export function ChatPanel() {
         setStreamingContent('');
         isGenerationInProgressRef.current = false;
         generationIdRef.current = null;
+        // End sprite generation for the character
+        if (activeCharacter) {
+          endSpriteGenerationForCharacter(activeCharacter.id);
+        }
       }
     }
   }, [isGenerating, activeSessionId, activeCharacter, activePersona, addSwipeAlternative, setGenerating, settings.context]);
+
+  // Handle edit message
+  const handleEdit = useCallback((messageId: string, newContent: string) => {
+    if (!activeSessionId) return;
+    updateMessage(activeSessionId, messageId, newContent);
+  }, [activeSessionId, updateMessage]);
+
+  // Handle replay - re-simulate the response streaming to trigger sprites and sounds
+  const handleReplay = useCallback(async (messageId: string, content: string, characterId?: string) => {
+    if (isGenerating || isGenerationInProgressRef.current) return;
+    
+    // Generate a unique ID for this replay
+    const replayId = `replay_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    generationIdRef.current = replayId;
+    isGenerationInProgressRef.current = true;
+
+    setGenerating(true);
+    setStreamingContent('');
+
+    // Generate a unique message key for triggers
+    const messageKey = `replay_stream_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    streamingMessageKeyRef.current = messageKey;
+    resetBgDetection(messageKey);
+    resetTriggers(messageKey, null);
+
+    // Set the streaming character
+    const replayChar = characterId ? characters.find(c => c.id === characterId) : activeCharacter;
+    setStreamingCharacter(replayChar || null);
+
+    // Start sprite generation for the character
+    if (replayChar) {
+      startSpriteGenerationForCharacter(replayChar.id);
+    }
+
+    // Helper to check if this replay is still the active one
+    const isStillActive = () => generationIdRef.current === replayId;
+
+    try {
+      // Simulate streaming by gradually revealing the content
+      const words = content.split(' ');
+      let accumulatedContent = '';
+      
+      // Simulate streaming with a delay between words
+      for (let i = 0; i < words.length; i++) {
+        if (!isStillActive()) break;
+        
+        // Add word with space (except for first word)
+        accumulatedContent += (i > 0 ? ' ' : '') + words[i];
+        setStreamingContent(accumulatedContent);
+        
+        // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
+        processTriggers(accumulatedContent, replayChar || null, streamingMessageKeyRef.current);
+        scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
+        
+        // Random delay between 30-80ms to simulate realistic typing
+        await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 50));
+      }
+    } catch (error) {
+      chatLogger.error('Replay error', { error });
+    } finally {
+      if (isStillActive()) {
+        setGenerating(false);
+        setStreamingContent('');
+        setStreamingCharacter(null);
+        isGenerationInProgressRef.current = false;
+        generationIdRef.current = null;
+        // End sprite generation for the character
+        if (replayChar) {
+          endSpriteGenerationForCharacter(replayChar.id);
+        }
+      }
+    }
+  }, [isGenerating, activeCharacter, characters, setGenerating, resetTriggers, resetBgDetection, scanForBackgroundTriggers, processTriggers]);
 
   const handleResetChat = () => {
     if (!activeSessionId) return;
@@ -618,7 +748,8 @@ export function ChatPanel() {
           characterName={activeCharacter.name}
           avatarUrl={activeCharacter.avatar}
           spriteConfig={activeCharacter.spriteConfig}
-          isStreaming={isGenerating && !!streamingContent}
+          isStreaming={isGenerating}
+          hasContent={!!streamingContent}
         />
       )}
 
@@ -633,6 +764,11 @@ export function ChatPanel() {
         />
       )}
 
+      {/* HUD Display */}
+      {hudSessionState.activeTemplateId && (
+        <HUDDisplay />
+      )}
+
       {/* Floating Chat Box */}
       <NovelChatBox 
         onSendMessage={(msg) => handleSend(msg)}
@@ -640,6 +776,8 @@ export function ChatPanel() {
         onResetChat={handleResetChat}
         onClearChat={handleClearChat}
         onRegenerate={handleRegenerate}
+        onEdit={handleEdit}
+        onReplay={handleReplay}
         streamingContent={streamingContent}
         streamingCharacter={streamingCharacter}
         streamingProgress={streamingProgress}

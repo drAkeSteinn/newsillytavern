@@ -4,6 +4,110 @@
 
 // ============ Character Card Types ============
 
+// ============ Sprite Trigger System Types ============
+
+// Return to idle mode for triggers
+export type ReturnToMode = 'idle_collection' | 'custom_sprite';
+
+// Character sprite trigger for automatic sprite changes (simple triggers)
+export interface CharacterSpriteTrigger {
+  id: string;
+  title: string;
+  active: boolean;
+  keywords: string[];
+  requirePipes: boolean;
+  caseSensitive: boolean;
+  spriteUrl: string;         // Sprite to show when triggered
+  spriteState?: SpriteState; // Or reference to a sprite state
+  returnToIdleMs: number;    // Time before returning to idle (0 = no return)
+  returnToMode?: ReturnToMode;  // What to return to: idle collection or custom sprite
+  returnToSpriteUrl?: string;  // Custom sprite URL to return to (if returnToMode is 'custom_sprite')
+  cooldownMs: number;
+  priority: number;          // Higher priority triggers override lower ones
+}
+
+// Sprite Library Entry - reusable action/pose/clothes definitions
+export interface SpriteLibraryEntry {
+  id: string;
+  name: string;              // Display name (e.g., "wave", "sitting", "casual")
+  prefix: string;            // Key prefix (e.g., "act-", "pose-", "cloth-")
+}
+
+// Sprite Libraries collection
+export interface SpriteLibraries {
+  actions: SpriteLibraryEntry[];
+  poses: SpriteLibraryEntry[];
+  clothes: SpriteLibraryEntry[];
+}
+
+// Sprite Pack Item - individual sprite within a pack
+export interface SpritePackItem {
+  id: string;
+  spriteLabel: string;       // Label/name from sprite index
+  spriteUrl?: string;        // Direct URL (can be resolved from index)
+  keys: string;              // CSV of keys that ALL must match (e.g., "act-wave,pose-sitting")
+  actionId?: string;         // Reference to action library entry
+  poseId?: string;           // Reference to pose library entry
+  clothesId?: string;        // Reference to clothes library entry
+  idleSpriteLabel?: string;  // Sprite to return to after delay
+  returnToIdleMs?: number;   // Time before returning to idle (0 = no return)
+  enabled: boolean;
+}
+
+// Sprite Pack - collection of sprites triggered by pack keywords
+export interface SpritePack {
+  id: string;
+  title: string;
+  active: boolean;
+  requirePipes: boolean;     // Keywords must be in |pipes|
+  caseSensitive: boolean;
+  keywords: string[];        // ANY of these triggers the pack
+  cooldownMs: number;
+  items: SpritePackItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Sprite Index Entry - available sprites from filesystem
+export interface SpriteIndexEntry {
+  label: string;             // Unique label for this sprite
+  filename: string;          // Original filename
+  url: string;               // Full URL to the sprite
+  thumb?: string;            // Thumbnail URL
+  pack?: string;             // Pack name this belongs to
+  expressions?: string[];    // Available expressions
+}
+
+// Sprite Index - cached index of available sprites
+export interface SpriteIndex {
+  sprites: SpriteIndexEntry[];
+  lastUpdated: number;
+  source: string;            // Where sprites were scanned from
+}
+
+// Sprite Lock State - keeps sprite fixed for duration
+export interface SpriteLockState {
+  active: boolean;
+  spriteUrl: string;
+  until: number;             // Timestamp ms; 0 = infinite
+  lastApplyAt: number;
+}
+
+// Sprite Trigger Hit - result of matching sprite triggers
+export interface SpriteTriggerHit {
+  packId: string;
+  pack?: SpritePack;
+  item?: SpritePackItem;
+  spriteLabel: string;
+  spriteUrl: string;
+  idleSpriteLabel?: string;
+  returnToIdleMs?: number;
+  returnToMode?: ReturnToMode;        // What to return to: idle_collection or custom_sprite
+  returnToSpriteUrl?: string;         // Custom sprite URL to return to (if returnToMode is 'custom_sprite')
+  cooldownMs?: number;                // Cooldown before this trigger can fire again
+  score?: number;            // For priority sorting
+}
+
 export interface CharacterCard {
   id: string;
   name: string;
@@ -21,13 +125,40 @@ export interface CharacterCard {
   avatar: string;
   sprites: CharacterSprite[];
   spriteConfig?: SpriteConfig;  // Sprite configuration for the character
+  spriteTriggers?: CharacterSpriteTrigger[];  // Simple character-specific sprite triggers
+  spritePacks?: SpritePack[];   // Advanced sprite packs (DOP Tirano style)
+  spriteLibraries?: SpriteLibraries;  // Reusable action/pose/clothes definitions
+  spriteIndex?: SpriteIndex;    // Cached sprite file index
   voice: VoiceSettings | null;
+  hudTemplateId?: string | null;  // HUD template to use for this character
   createdAt: string;
   updatedAt: string;
 }
 
-// Sprite state type
-export type SpriteState = 'idle' | 'talk' | 'thinking' | 'happy' | 'sad' | 'angry';
+// Sprite state type (only standard states)
+export type SpriteState = 'idle' | 'talk' | 'thinking';
+
+// Sprite role in a collection
+export type SpriteRole = 'principal' | 'alternate';
+
+// Collection behavior mode
+export type CollectionBehavior = 'principal' | 'random' | 'list';
+
+// Sprite collection entry (sprite with role in a state collection)
+export interface StateCollectionEntry {
+  id: string;
+  spriteLabel: string;       // Label from custom sprites
+  spriteUrl: string;         // Direct URL to the sprite
+  role: SpriteRole;          // Principal or alternate
+  order: number;             // For list mode ordering
+}
+
+// State sprite collection (for idle, talk, thinking)
+export interface StateSpriteCollection {
+  entries: StateCollectionEntry[];  // Sprites in this collection
+  behavior: CollectionBehavior;     // How to select sprite
+  currentIndex: number;             // Current index for list mode rotation
+}
 
 // Single sprite with state mapping
 export interface CharacterSprite {
@@ -44,7 +175,11 @@ export interface SpriteConfig {
   enabled: boolean;
   collection?: string;  // Selected collection name
   sprites: {
-    [key in SpriteState]?: string;  // URL to sprite for each state
+    [key in SpriteState]?: string;  // Legacy: URL to sprite for each state (backward compatibility)
+  };
+  // New: Collection-based system for idle, talk, thinking
+  stateCollections?: {
+    [key in SpriteState]?: StateSpriteCollection;
   };
 }
 
@@ -143,6 +278,7 @@ export interface CharacterGroup {
   allowMentions: boolean;       // Enable mention detection
   mentionTriggers: string[];    // Additional mention trigger words
   conversationStyle: 'sequential' | 'parallel';  // How responses are generated
+  hudTemplateId?: string | null;  // HUD template to use for this group
   createdAt: string;
   updatedAt: string;
 }
@@ -349,21 +485,172 @@ export interface BackgroundIndex {
   source: string;             // Where backgrounds were scanned from
 }
 
+// ============ Background Collection with Metadata ============
+
+/**
+ * Background entry within a collection (from JSON metadata)
+ */
+export interface BackgroundCollectionEntry {
+  id: string;                 // Unique ID within collection
+  name: string;               // Display name (e.g., "Bosque Nocturno")
+  url: string;                // URL to the background image
+  triggerKeys: string[];      // Primary keywords that trigger this background
+  contextKeys: string[];      // Secondary keywords that must ALSO be present
+  tags?: string[];            // Optional tags for organization
+  transitionDuration?: number; // Override transition duration (ms)
+}
+
+/**
+ * Background file from filesystem
+ */
+export interface BackgroundFile {
+  name: string;               // Filename
+  url: string;                // URL path to the file
+  type: 'image' | 'video';    // Media type
+}
+
+/**
+ * Background collection with JSON metadata
+ * Each collection folder can have a collection.json file
+ */
+export interface BackgroundCollection {
+  name: string;               // Collection name (folder name)
+  path: string;               // Path to collection folder
+  description?: string;       // Optional description
+  version?: string;           // Optional version string
+  transitionDuration?: number; // Default transition duration for this collection
+  entries: BackgroundCollectionEntry[];
+  files: BackgroundFile[];    // All files in the collection with metadata
+}
+
+// ============ Background Trigger Pack (Unified System) ============
+
+/**
+ * Match mode for background triggers
+ * - any_any: ANY trigger key AND ANY context key (default)
+ * - all_any: ALL trigger keys AND ANY context key
+ * - any_all: ANY trigger key AND ALL context keys
+ * - all_all: ALL trigger keys AND ALL context keys
+ */
+export type BackgroundMatchMode = 'any_any' | 'all_any' | 'any_all' | 'all_all';
+
+/**
+ * Transition types for background changes
+ */
+export type BackgroundTransitionType = 
+  | 'none' 
+  | 'fade' 
+  | 'slide-left' 
+  | 'slide-right' 
+  | 'slide-up' 
+  | 'slide-down'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'crossfade';
+
+/**
+ * Overlay positioning
+ */
+export type OverlayPosition = 'back' | 'front' | 'fill';
+
+/**
+ * Background overlay - layer displayed over/under main background
+ */
+export interface BackgroundOverlay {
+  id: string;
+  url: string;                 // URL to overlay image/video
+  name: string;                // Display name
+  position: OverlayPosition;   // back = behind main, front = on top
+  opacity: number;             // 0-1
+  blendMode?: string;          // CSS blend mode (overlay, multiply, screen, etc.)
+  animated?: boolean;          // For animated overlays (rain, snow, etc.)
+  animationSpeed?: number;     // Animation speed multiplier
+}
+
+/**
+ * Background variant - alternative version of same background
+ * e.g., day/night versions of same location
+ */
+export interface BackgroundVariant {
+  id: string;
+  name: string;                // e.g., "Night", "Sunset", "Rain"
+  url: string;                 // URL to variant background
+  timeOfDay?: 'day' | 'night' | 'dawn' | 'dusk' | 'any';
+  weather?: 'clear' | 'rain' | 'snow' | 'storm' | 'any';
+  triggerKeys: string[];       // Keywords that activate this variant
+  contextKeys: string[];       // Additional context required
+  overlays: BackgroundOverlay[]; // Overlays specific to this variant
+}
+
+/**
+ * Individual background item within a trigger pack
+ */
+export interface BackgroundTriggerItem {
+  id: string;
+  backgroundUrl: string;      // URL to the background
+  backgroundName: string;     // Display name
+  triggerKeys: string[];      // Primary keywords
+  contextKeys: string[];      // Secondary keywords
+  matchMode?: BackgroundMatchMode;  // Override pack's default match mode
+  enabled: boolean;
+  priority: number;           // Higher = more important (0-100)
+  transitionDuration?: number; // Custom transition duration
+  transitionType?: BackgroundTransitionType; // Custom transition
+  // Overlays for this background
+  overlays: BackgroundOverlay[];
+  // Variants (day/night, etc.)
+  variants: BackgroundVariant[];
+}
+
+/**
+ * Background Trigger Pack - integrates with unified trigger system
+ * Supports priority, multiple match modes, overlays, variants, and return to default
+ */
+export interface BackgroundTriggerPack {
+  id: string;
+  name: string;
+  active: boolean;
+  collection: string;         // Collection name to use
+  priority: number;           // Pack priority (higher = checked first, 0-100)
+  cooldown: number;           // Cooldown in ms (0 = no cooldown)
+  matchMode: BackgroundMatchMode;  // Default match mode for items
+  transitionDuration: number; // Default transition duration in ms
+  transitionType: BackgroundTransitionType;  // Transition effect
+  items: BackgroundTriggerItem[];
+  // Default overlays applied to all backgrounds in this pack
+  defaultOverlays: BackgroundOverlay[];
+  // Return to default settings
+  returnToDefault: boolean;   // Enable return to default after inactivity
+  returnToDefaultAfter: number; // Time in ms before returning to default
+  defaultBackground: string;  // URL to default background for this pack
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BackgroundTriggerSettings {
   enabled: boolean;
   globalCooldown: number;     // Global cooldown between any background changes
   realtimeEnabled: boolean;   // Detect during streaming
-  transitionDuration: number; // Fade transition duration in ms
+  transitionDuration: number; // Default fade transition duration in ms
+  defaultTransitionType: BackgroundTransitionType; // Default transition
+  // Global return to default
+  returnToDefaultEnabled: boolean;  // Enable global return to default
+  returnToDefaultAfter: number;     // Time in ms (default 5 minutes)
+  defaultBackgroundUrl: string;     // Global default background
+  // Global overlays (always applied)
+  globalOverlays: BackgroundOverlay[];
 }
 
 export interface BackgroundTriggerHit {
   packId: string;
-  pack?: BackgroundPack;
-  backgroundLabel: string;
-  backgroundUrl?: string;
-  overlayLabel?: string;
-  overlayPlacement: OverlayPlacement;
-  overlayUrl?: string;
+  pack?: BackgroundTriggerPack;
+  backgroundUrl: string;
+  backgroundName: string;
+  transitionDuration: number;
+  transitionType: BackgroundTransitionType;
+  priority: number;
+  overlays: BackgroundOverlay[];
+  variant?: BackgroundVariant;
 }
 
 // ============ Settings Types ============
@@ -555,4 +842,94 @@ export interface Lorebook {
 export interface SillyTavernLorebook {
   entries: Record<string, LorebookEntry>;
   settings?: Partial<LorebookSettings>;
+}
+
+// ============ HUD Types ============
+
+// HUD field type
+export type HUDFieldType = 'number' | 'enum' | 'string' | 'boolean';
+
+// HUD field display style
+export type HUDFieldStyle = 
+  | 'default'      // Standard label + value
+  | 'progress'     // Progress bar (for numbers)
+  | 'badge'        // Badge/pill style
+  | 'icon'         // Icon with value
+  | 'chip'         // Small chip/tag
+  | 'status'       // Status indicator with dot
+  | 'gauge'        // Circular gauge (for numbers)
+  | 'separator'    // Horizontal separator line
+  | 'label-only'   // Just the label, no value shown
+  | 'pill'         // Rounded pill with background
+  | 'meter'        // Vertical meter bar
+  | 'dots';        // Dots indicator (for numbers 1-5 or boolean)
+
+// HUD position on screen
+export type HUDPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+// HUD overall style
+export type HUDStyle = 'minimal' | 'card' | 'panel';
+
+// Single HUD field definition
+export interface HUDField {
+  id: string;
+  name: string;              // Display name: "HP", "Turno", "Intensidad"
+  key: string;               // Key to match in [key=value] format
+  type: HUDFieldType;
+  
+  // For number type
+  min?: number;
+  max?: number;
+  
+  // For enum type
+  options?: string[];        // ["baja", "media", "alta", "extrema", "clímax"]
+  
+  // Default value
+  defaultValue: string | number | boolean;
+  
+  // Display settings
+  style: HUDFieldStyle;
+  color?: string;            // Tailwind color: "red", "green", "blue"
+  icon?: string;             // Emoji or icon name
+  showLabel?: boolean;       // Show field name
+  
+  // For progress style
+  showValue?: boolean;
+  unit?: string;             // "%", "pts", etc.
+}
+
+// HUD Template - reusable configuration
+export interface HUDTemplate {
+  id: string;
+  name: string;              // "Sistema Combate RPG", "Romance Stats"
+  description?: string;
+  
+  // Fields
+  fields: HUDField[];
+  
+  // Display settings
+  position: HUDPosition;
+  style: HUDStyle;
+  opacity: number;           // 0-1
+  compact: boolean;          // Compact mode
+  
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Active HUD state in session (runtime, not persisted)
+export interface HUDSessionState {
+  activeTemplateId: string | null;
+  fieldValues: Record<string, string | number | boolean>;
+  lastUpdated: number;
+}
+
+// HUD trigger result
+export interface HUDTriggerHit {
+  templateId: string;
+  fieldId: string;
+  fieldName: string;
+  oldValue: string | number | boolean;
+  newValue: string | number | boolean;
 }

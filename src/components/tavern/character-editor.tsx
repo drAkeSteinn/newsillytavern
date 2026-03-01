@@ -27,10 +27,24 @@ import {
   Image as ImageIcon,
   Loader2,
   HelpCircle,
-  Palette
+  Palette,
+  Zap,
+  Library,
+  Package,
+  Bug,
+  Wand2,
+  Crown,
+  Star,
+  Layers
 } from 'lucide-react';
-import type { CharacterCard } from '@/types';
+import type { CharacterCard, SpriteLibraries } from '@/types';
 import { SpriteManager } from './sprite-manager';
+import { CharacterTriggerEditor } from './character-trigger-editor';
+import { SpriteLibraryEditor } from './sprite-library-editor';
+import { SpritePackEditor } from './sprite-pack-editor';
+import { SpriteDebugPanel } from './sprite-debug-panel';
+import { PresetSelector, presetToData } from './preset-selector';
+import { HUDSelector } from './hud-selector';
 import { getLogger } from '@/lib/logger';
 
 const editorLogger = getLogger('editor');
@@ -75,6 +89,7 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
   const [character, setCharacter] = useState(getInitialCharacter);
   const [newTag, setNewTag] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [appliedPresets, setAppliedPresets] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
@@ -142,6 +157,43 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
       ...prev,
       tags: prev.tags.filter(t => t !== tag)
     }));
+  };
+
+  // Apply preset
+  const handleApplyPreset = (preset: { title: string; libraries?: any; packs?: any }) => {
+    const data = presetToData(preset);
+    
+    setCharacter(prev => {
+      // Merge libraries
+      const mergedLibraries = {
+        actions: [...(prev.spriteLibraries?.actions || []), ...data.libraries.actions],
+        poses: [...(prev.spriteLibraries?.poses || []), ...data.libraries.poses],
+        clothes: [...(prev.spriteLibraries?.clothes || []), ...data.libraries.clothes],
+      };
+      
+      // Remove duplicates by name+prefix
+      const dedupeLibraries = <T extends { name: string; prefix: string }>(arr: T[]): T[] => {
+        const seen = new Set<string>();
+        return arr.filter(item => {
+          const key = `${item.prefix}${item.name}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+      
+      return {
+        ...prev,
+        spriteLibraries: {
+          actions: dedupeLibraries(mergedLibraries.actions),
+          poses: dedupeLibraries(mergedLibraries.poses),
+          clothes: dedupeLibraries(mergedLibraries.clothes),
+        },
+        spritePacks: [...(prev.spritePacks || []), ...data.packs],
+      };
+    });
+    
+    setAppliedPresets(prev => [...prev, preset.title]);
   };
 
   return (
@@ -235,32 +287,79 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                 ))}
               </div>
             )}
+            
+            {/* HUD Selector */}
+            <div className="pt-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                <Label className="text-xs">Plantilla HUD</Label>
+              </div>
+              <HUDSelector
+                value={character.hudTemplateId}
+                onChange={(hudTemplateId) => setCharacter(prev => ({ ...prev, hudTemplateId }))}
+                placeholder="Sin HUD asignado"
+              />
+            </div>
           </div>
         </div>
 
         {/* Tabs */}
         <Tabs defaultValue="description" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid grid-cols-5 w-full flex-shrink-0 h-9">
-            <TabsTrigger value="description" className="text-xs gap-1">
-              <FileText className="w-3.5 h-3.5" />
-              Descripción
-            </TabsTrigger>
-            <TabsTrigger value="dialogue" className="text-xs gap-1">
-              <MessageSquare className="w-3.5 h-3.5" />
-              Diálogo
-            </TabsTrigger>
-            <TabsTrigger value="prompt" className="text-xs gap-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              Prompts
-            </TabsTrigger>
-            <TabsTrigger value="sprites" className="text-xs gap-1">
-              <ImageIcon className="w-3.5 h-3.5" />
-              Sprites
-            </TabsTrigger>
-            <TabsTrigger value="voice" className="text-xs gap-1">
-              <Mic className="w-3.5 h-3.5" />
-              Voz
-            </TabsTrigger>
+          <TabsList className="grid grid-cols-6 w-full flex-shrink-0 h-9">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="description" className="text-xs gap-1">
+                  <FileText className="w-3.5 h-3.5" />
+                  Descripción
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Historia, personalidad y escenario del personaje</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="dialogue" className="text-xs gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Diálogo
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Primer mensaje y ejemplos de diálogo</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="prompt" className="text-xs gap-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Prompts
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Prompts de sistema y notas para la IA</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="sprites" className="text-xs gap-1">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  Sprites
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Colecciones de sprites para estados (idle, talk, thinking)</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="triggers" className="text-xs gap-1">
+                  <Zap className="w-3.5 h-3.5" />
+                  Triggers
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Cambia sprites automáticamente según palabras clave</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="voice" className="text-xs gap-1">
+                  <Mic className="w-3.5 h-3.5" />
+                  Voz
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Configuración de texto-a-voz</p></TooltipContent>
+            </Tooltip>
           </TabsList>
 
           <ScrollArea className="flex-1 mt-3">
@@ -459,21 +558,255 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
             </TabsContent>
 
             {/* Sprites Tab */}
-            <TabsContent value="sprites" className="mt-0">
+            <TabsContent value="sprites" className="mt-0 space-y-3">
+              {/* Explanation Banner */}
+              <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <ImageIcon className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-purple-600">Sistema de Colecciones de Sprites</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Los estados <strong>Idle, Talk y Thinking</strong> ahora son colecciones de sprites. 
+                      Agrega sprites personalizados y define cuál es el principal y cuáles son alternativos.
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs bg-amber-500/10">
+                        <Crown className="w-3 h-3 mr-1 text-amber-500" />
+                        Principal
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-blue-500/10">
+                        <Star className="w-3 h-3 mr-1 text-blue-500" />
+                        Alternativos
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-green-500/10">
+                        Principal/Aleatorio/Lista
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
               <SpriteManager
                 character={character}
                 onChange={(updates) => setCharacter(prev => ({ ...prev, ...updates }))}
               />
             </TabsContent>
 
+            {/* Triggers Tab - Sub-tabs for Simple, Libraries, Packs, Presets, Debug */}
+            <TabsContent value="triggers" className="mt-0 space-y-3">
+              {/* Explanation Banner */}
+              <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg p-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-500/20 rounded-lg">
+                    <Zap className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-amber-600">Sistema de Triggers Dinámicos</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Los triggers detectan <strong>palabras clave</strong> en el chat y cambian el sprite automáticamente. 
+                      Funcionan junto con el sistema de Sprites estáticos.
+                    </p>
+                    <div className="grid grid-cols-4 gap-2 mt-2 text-xs">
+                      <div className="p-1.5 bg-amber-500/10 rounded text-center">
+                        <Zap className="w-3 h-3 mx-auto text-amber-500" />
+                        <span className="block mt-0.5">Simple</span>
+                        <span className="text-muted-foreground">keyword → sprite</span>
+                      </div>
+                      <div className="p-1.5 bg-blue-500/10 rounded text-center">
+                        <Library className="w-3 h-3 mx-auto text-blue-500" />
+                        <span className="block mt-0.5">Libraries</span>
+                        <span className="text-muted-foreground">act-*, pose-*</span>
+                      </div>
+                      <div className="p-1.5 bg-green-500/10 rounded text-center">
+                        <Package className="w-3 h-3 mx-auto text-green-500" />
+                        <span className="block mt-0.5">Packs</span>
+                        <span className="text-muted-foreground">ANY + ALL</span>
+                      </div>
+                      <div className="p-1.5 bg-purple-500/10 rounded text-center">
+                        <Bug className="w-3 h-3 mx-auto text-purple-500" />
+                        <span className="block mt-0.5">Debug</span>
+                        <span className="text-muted-foreground">probar</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <Tabs defaultValue="simple" className="w-full">
+                <TabsList className="grid grid-cols-5 w-full">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="simple" className="text-xs gap-1">
+                        <Zap className="w-3.5 h-3.5" />
+                        Simple
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Triggers básicos: una keyword → un sprite</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="libraries" className="text-xs gap-1">
+                        <Library className="w-3.5 h-3.5" />
+                        Libraries
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Define acciones (act-wave), posturas (pose-sitting), ropa (cloth-casual)</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="packs" className="text-xs gap-1">
+                        <Package className="w-3.5 h-3.5" />
+                        Packs
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Sistema avanzado: CUALQUIER keyword activa + TODAS las keys deben coincidir</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="presets" className="text-xs gap-1">
+                        <Wand2 className="w-3.5 h-3.5" />
+                        Presets
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Configuraciones predefinidas para comenzar rápido</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger value="debug" className="text-xs gap-1">
+                        <Bug className="w-3.5 h-3.5" />
+                        Debug
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Prueba la detección de tokens en tiempo real</p></TooltipContent>
+                  </Tooltip>
+                </TabsList>
+
+                {/* Simple Triggers */}
+                <TabsContent value="simple" className="mt-0">
+                  <CharacterTriggerEditor
+                    character={character}
+                    onChange={(updates) => setCharacter(prev => ({ ...prev, ...updates }))}
+                  />
+                </TabsContent>
+
+                {/* Sprite Libraries */}
+                <TabsContent value="libraries" className="mt-0">
+                  <SpriteLibraryEditor
+                    libraries={character.spriteLibraries || { actions: [], poses: [], clothes: [] }}
+                    onChange={(libraries: SpriteLibraries) => setCharacter(prev => ({ ...prev, spriteLibraries: libraries }))}
+                  />
+                </TabsContent>
+
+                {/* Sprite Packs */}
+                <TabsContent value="packs" className="mt-0">
+                  <SpritePackEditor
+                    packs={character.spritePacks || []}
+                    libraries={character.spriteLibraries || { actions: [], poses: [], clothes: [] }}
+                    spriteIndex={character.spriteIndex}
+                    onChange={(packs) => setCharacter(prev => ({ ...prev, spritePacks: packs }))}
+                  />
+                </TabsContent>
+
+                {/* Presets */}
+                <TabsContent value="presets" className="mt-0">
+                  <PresetSelector
+                    onApplyPreset={handleApplyPreset}
+                    appliedPresets={appliedPresets}
+                  />
+                </TabsContent>
+
+                {/* Debug Panel */}
+                <TabsContent value="debug" className="mt-0">
+                  <SpriteDebugPanel />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+
             {/* Voice Tab */}
             <TabsContent value="voice" className="mt-0">
-              <div className="text-center py-6 text-muted-foreground">
-                <Mic className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Configura texto-a-voz para este personaje.</p>
-                <Button variant="outline" size="sm" className="mt-3">
-                  Activar Voz
-                </Button>
+              <div className="space-y-4">
+                {character.voice?.enabled ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Mic className="w-4 h-4 text-green-500" />
+                        <span className="text-sm font-medium">Voz Activada</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setCharacter(prev => ({
+                          ...prev,
+                          voice: { ...prev.voice, enabled: false, voiceId: '', speed: 1, pitch: 1, emotionMapping: {} }
+                        }))}
+                      >
+                        Desactivar
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Velocidad</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0.5"
+                          max="2"
+                          value={character.voice.speed || 1}
+                          onChange={(e) => setCharacter(prev => ({
+                            ...prev,
+                            voice: { ...prev.voice!, speed: parseFloat(e.target.value) || 1 }
+                          }))}
+                          className="mt-1 h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Tono</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0.5"
+                          max="2"
+                          value={character.voice.pitch || 1}
+                          onChange={(e) => setCharacter(prev => ({
+                            ...prev,
+                            voice: { ...prev.voice!, pitch: parseFloat(e.target.value) || 1 }
+                          }))}
+                          className="mt-1 h-8"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                    <Mic className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Configura texto-a-voz para este personaje.</p>
+                    <p className="text-xs mt-1 mb-3">El personaje hablará con la voz configurada.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCharacter(prev => ({
+                        ...prev,
+                        voice: {
+                          enabled: true,
+                          voiceId: 'default',
+                          speed: 1,
+                          pitch: 1,
+                          emotionMapping: {}
+                        }
+                      }))}
+                    >
+                      Activar Voz
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                  <p>💡 La configuración de voz usará el proveedor TTS activo en configuración.</p>
+                  <p className="mt-1">💡 Puedes mapear emociones a voces específicas en la configuración avanzada.</p>
+                </div>
               </div>
             </TabsContent>
           </ScrollArea>

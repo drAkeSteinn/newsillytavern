@@ -1,0 +1,32 @@
+{
+  "name": "Comedor",
+  "description": "Escenas del comedor - comidas y reuniones",
+  "version": "1.0",
+  "transitionDuration": 500,
+  "entries": [
+    {
+      "id": "dining_default",
+      "name": "Comedor",
+      "url": "/backgrounds/Comedor/ComfyUI_00184_.png",
+      "triggerKeys": ["comedor", "dining", "cocina", "kitchen"],
+      "contextKeys": [],
+      "tags": ["interior", "comida"]
+    },
+    {
+      "id": "dining_breakfast",
+      "name": "Desayuno",
+      "url": "/backgrounds/Comedor/ComfyUI_temp_rikdt_00229_.png",
+      "triggerKeys": ["comedor", "dining", "mesa"],
+      "contextKeys": ["desayuno", "breakfast", "mañana", "café", "pan"],
+      "tags": ["interior", "comida", "mañana"]
+    },
+    {
+      "id": "dining_dinner",
+      "name": "Cena",
+      "url": "/backgrounds/Comedor/ComfyUI_temp_rikdt_00230_.png",
+      "triggerKeys": ["comedor", "dining", "mesa"],
+      "contextKeys": ["cena", "dinner", "noche", "velas", "romántico"],
+      "tags": ["interior", "comida", "noche"]
+    }
+  ]
+}

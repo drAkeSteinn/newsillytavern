@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "collectionName": "Moon",
+  "sprites": {
+    "1772240870166-656lst.webm": {
+      "label": "01",
+      "filename": "1772240870166-656lst.webm",
+      "createdAt": "2026-03-01T00:08:23.741Z",
+      "updatedAt": "2026-03-01T00:08:23.741Z"
+    },
+    "1772241191129-43nt0y.webm": {
+      "label": "talk",
+      "filename": "1772241191129-43nt0y.webm",
+      "createdAt": "2026-03-01T00:09:32.794Z",
+      "updatedAt": "2026-03-01T00:09:32.794Z"
+    },
+    "d4215817-2000-4ab4-9da9-0542e68cad77.png": {
+      "label": "BLACK",
+      "filename": "d4215817-2000-4ab4-9da9-0542e68cad77.png",
+      "createdAt": "2026-03-01T00:42:59.878Z"
+    },
+    "1772325779628-igzukb.png": {
+      "label": "goth",
+      "filename": "1772325779628-igzukb.png",
+      "createdAt": "2026-03-01T00:43:12.413Z",
+      "updatedAt": "2026-03-01T00:43:12.413Z"
+    }
+  },
+  "createdAt": "2026-03-01T00:08:23.740Z",
+  "updatedAt": "2026-03-01T00:43:12.414Z"
+}

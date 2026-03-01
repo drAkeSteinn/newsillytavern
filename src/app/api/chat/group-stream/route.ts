@@ -21,7 +21,6 @@ import {
 } from '@/lib/llm';
 import {
   validateRequest,
-  groupStreamRequestSchema,
   sanitizeInput
 } from '@/lib/validations';
 import {
@@ -153,8 +152,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validate request
-    const validation = validateRequest(groupStreamRequestSchema, body);
+    // Validate request (automatically detects group request)
+    const validation = validateRequest(null, body);
     if (!validation.success) {
       return createErrorResponse(validation.error, 400);
     }

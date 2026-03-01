@@ -12,3 +12,5 @@ export { PersonaSlice, createPersonaSlice } from './personaSlice';
 export { BackgroundSlice, createBackgroundSlice } from './backgroundSlice';
 export { SoundSlice, createSoundSlice } from './soundSlice';
 export { UISlice, createUISlice } from './uiSlice';
+export { SpriteSlice, createSpriteSlice, CharacterSpriteState, setReturnToIdleCallback } from './spriteSlice';
+export { HUDSlice, createHUDSlice } from './hudSlice';

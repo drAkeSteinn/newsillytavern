@@ -18,6 +18,8 @@ import {
   createBackgroundSlice,
   createSoundSlice,
   createUISlice,
+  createSpriteSlice,
+  createHUDSlice,
 } from './slices';
 
 // Import slice types
@@ -32,6 +34,8 @@ import type {
   BackgroundSlice,
   SoundSlice,
   UISlice,
+  SpriteSlice,
+  HUDSlice,
 } from './slices';
 
 // Import defaults for merge function
@@ -47,7 +51,9 @@ export type TavernState = CharacterSlice &
   PersonaSlice &
   BackgroundSlice &
   SoundSlice &
-  UISlice;
+  UISlice &
+  SpriteSlice &
+  HUDSlice;
 
 // Create the combined store
 export const useTavernStore = create<TavernState>()(
@@ -64,6 +70,8 @@ export const useTavernStore = create<TavernState>()(
       ...createBackgroundSlice(set, get),
       ...createSoundSlice(set, get),
       ...createUISlice(set, get),
+      ...createSpriteSlice(set, get),
+      ...createHUDSlice(set, get),
     }),
     {
       name: 'tavernflow-storage', // Same name for backward compatibility
@@ -84,6 +92,12 @@ export const useTavernStore = create<TavernState>()(
         backgroundIndex: state.backgroundIndex,
         lorebooks: state.lorebooks,
         activeLorebookIds: state.activeLorebookIds,
+        // Sprite data
+        spritePacks: state.spritePacks,
+        spriteIndex: state.spriteIndex,
+        spriteLibraries: state.spriteLibraries,
+        // HUD data (templates only, not session state)
+        hudTemplates: state.hudTemplates,
         // Active states
         activeSessionId: state.activeSessionId,
         activeCharacterId: state.activeCharacterId,
@@ -186,4 +200,4 @@ export const useTavernStore = create<TavernState>()(
 );
 
 // Export types
-export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice };
+export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice };

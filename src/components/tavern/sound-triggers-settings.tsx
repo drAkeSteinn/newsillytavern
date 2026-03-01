@@ -86,7 +86,7 @@ export function SoundTriggersSettings() {
       collection: soundCollections[0]?.name || '',
       playMode: 'random',
       volume: 0.8,
-      cooldown: 1000,
+      cooldown: 0,  // 0 = no cooldown, play all sounds
       delay: 0
     };
     addSoundTrigger(newTrigger);
@@ -198,15 +198,16 @@ export function SoundTriggersSettings() {
             <Input
               type="number"
               min={1}
-              max={10}
-              value={settings.sound?.maxSoundsPerMessage ?? 3}
+              max={20}
+              value={settings.sound?.maxSoundsPerMessage ?? 10}
               onChange={(e) => 
                 updateSettings({ 
-                  sound: { ...settings.sound, maxSoundsPerMessage: parseInt(e.target.value) || 3 } 
+                  sound: { ...settings.sound, maxSoundsPerMessage: parseInt(e.target.value) || 10 } 
                 })
               }
               className="mt-1 h-8"
             />
+            <p className="text-xs text-muted-foreground mt-1">0 = sin límite</p>
           </div>
           <div>
             <Label className="text-xs">Enfriamiento Global (ms)</Label>
@@ -214,14 +215,15 @@ export function SoundTriggersSettings() {
               type="number"
               min={0}
               step={50}
-              value={settings.sound?.globalCooldown ?? 150}
+              value={settings.sound?.globalCooldown ?? 0}
               onChange={(e) => 
                 updateSettings({ 
-                  sound: { ...settings.sound, globalCooldown: parseInt(e.target.value) || 150 } 
+                  sound: { ...settings.sound, globalCooldown: parseInt(e.target.value) || 0 } 
                 })
               }
               className="mt-1 h-8"
             />
+            <p className="text-xs text-muted-foreground mt-1">0 = sin límite</p>
           </div>
           <div className="flex items-end">
             <Button
@@ -427,12 +429,13 @@ export function SoundTriggersSettings() {
                             type="number"
                             min={0}
                             step={100}
-                            value={trigger.cooldown}
+                            value={trigger.cooldown ?? 0}
                             onChange={(e) => 
                               updateSoundTrigger(trigger.id, { cooldown: parseInt(e.target.value) || 0 })
                             }
                             className="mt-1 h-8"
                           />
+                          <p className="text-xs text-muted-foreground mt-0.5">0 = sin límite</p>
                         </div>
                         <div>
                           <Label className="text-xs">Retardo (ms)</Label>
@@ -440,12 +443,13 @@ export function SoundTriggersSettings() {
                             type="number"
                             min={0}
                             step={50}
-                            value={trigger.delay}
+                            value={trigger.delay ?? 0}
                             onChange={(e) => 
                               updateSoundTrigger(trigger.id, { delay: parseInt(e.target.value) || 0 })
                             }
                             className="mt-1 h-8"
                           />
+                          <p className="text-xs text-muted-foreground mt-0.5">Pausa antes de reproducir</p>
                         </div>
                       </div>
 

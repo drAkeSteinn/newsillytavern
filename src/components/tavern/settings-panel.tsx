@@ -25,7 +25,8 @@ import {
   User,
   BookOpen,
   Download,
-  Upload
+  Upload,
+  Layers
 } from 'lucide-react';
 import {
   Dialog,
@@ -37,8 +38,10 @@ import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { LLMProvider } from '@/types';
 import { SoundTriggersSettings } from './sound-triggers-settings';
+import { BackgroundTriggersSettings } from './background-triggers-settings';
 import { PersonaPanel } from './persona-panel';
 import { LorebookPanel } from './lorebook-panel';
+import { HUDManager } from '@/components/settings/hud-manager';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean }[] = [
   { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false },
@@ -252,6 +255,10 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               <TabsTrigger value="data" className="gap-1.5 text-xs">
                 <Database className="w-4 h-4" />
                 Datos
+              </TabsTrigger>
+              <TabsTrigger value="hud" className="gap-1.5 text-xs">
+                <Layers className="w-4 h-4" />
+                HUD
               </TabsTrigger>
             </TabsList>
           </div>
@@ -954,34 +961,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             </TabsContent>
 
             {/* Background Triggers Settings */}
-            <TabsContent value="backgrounds" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Triggers de Fondo</h3>
-                    <Button size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Agregar
-                    </Button>
-                  </div>
-                  <div className="text-center py-8 text-muted-foreground border rounded-lg">
-                    <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Sin triggers de fondo configurados</p>
-                    <p className="text-xs mt-1">Los triggers cambian el fondo según palabras clave</p>
-                  </div>
-                </div>
-                <div className="p-4 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
-                  <h4 className="font-medium text-foreground mb-2">Acerca de Triggers de Fondo</h4>
-                  <p>
-                    Los triggers de fondo permiten cambiar automáticamente el fondo del chat 
-                    cuando se detectan ciertas palabras clave en los mensajes del personaje.
-                  </p>
-                  <p className="mt-2">
-                    Por ejemplo, puedes configurar un fondo de "noche" cuando aparezca 
-                    "luna" o "estrellas" en la conversación.
-                  </p>
-                </div>
-              </div>
+            <TabsContent value="backgrounds" className="h-full overflow-hidden p-6 m-0 data-[state=inactive]:hidden">
+              <BackgroundTriggersSettings />
             </TabsContent>
 
             {/* Voice Settings */}
@@ -1162,6 +1143,11 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   </div>
                 </div>
               </div>
+            </TabsContent>
+
+            {/* HUD Settings */}
+            <TabsContent value="hud" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+              <HUDManager />
             </TabsContent>
           </div>
         </Tabs>

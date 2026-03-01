@@ -24,33 +24,57 @@ import {
   streamTextGenerationWebUI
 } from '@/lib/llm';
 import {
-  validateRequest,
   sanitizeInput
 } from '@/lib/validations';
+
 import {
   selectContextMessages,
   type ContextConfig
 } from '@/lib/context-manager';
-import { z } from 'zod';
 
-// Request schema for regenerate
-const regenerateRequestSchema = z.object({
-  sessionId: z.string().min(1),
-  messageId: z.string().min(1),
-  character: z.any().optional(),
-  messages: z.array(z.any()).optional(),
-  llmConfig: z.any(),
-  userName: z.string().optional(),
-  persona: z.any().optional(),
-  contextConfig: z.any().optional()
-});
+// Validate regenerate request manually
+function validateRegenerateRequest(data: unknown) {
+  if (typeof data !== 'object' || data === null) {
+    return { success: false, error: 'Request body must be an object' } as const;
+  }
+  const obj = data as Record<string, unknown>;
+  
+  // sessionId is required
+  if (typeof obj.sessionId !== 'string' || !obj.sessionId) {
+    return { success: false, error: 'sessionId is required' } as const;
+  }
+  
+  // messageId is required
+  if (typeof obj.messageId !== 'string' || !obj.messageId) {
+    return { success: false, error: 'messageId is required' } as const;
+  }
+  
+  // llmConfig is required
+  if (typeof obj.llmConfig !== 'object' || obj.llmConfig === null) {
+    return { success: false, error: 'llmConfig is required' } as const;
+  }
+  
+  return {
+    success: true,
+    data: {
+      sessionId: obj.sessionId,
+      messageId: obj.messageId,
+      character: obj.character as Record<string, unknown> | undefined,
+      messages: Array.isArray(obj.messages) ? obj.messages : [],
+      llmConfig: obj.llmConfig as Record<string, unknown>,
+      userName: typeof obj.userName === 'string' ? obj.userName : 'User',
+      persona: obj.persona as Record<string, unknown> | undefined,
+      contextConfig: obj.contextConfig as Record<string, unknown> | undefined
+    }
+  } as const;
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validate request
-    const validation = validateRequest(regenerateRequestSchema, body);
+    // Validate request manually (no Zod)
+    const validation = validateRegenerateRequest(body);
     if (!validation.success) {
       return createErrorResponse(validation.error, 400);
     }

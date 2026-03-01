@@ -28,7 +28,7 @@
     "enabled": true,
     "globalVolume": 0.85,
     "maxSoundsPerMessage": 3,
-    "globalCooldown": 150,
+    "globalCooldown": 0,
     "realtimeEnabled": true
   },
   "backgroundTriggers": {
