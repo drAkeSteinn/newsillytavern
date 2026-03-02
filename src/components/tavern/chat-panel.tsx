@@ -14,6 +14,7 @@ import { Sparkles } from 'lucide-react';
 import type { CharacterCard } from '@/types';
 import { t } from '@/lib/i18n';
 import { chatLogger } from '@/lib/logger';
+import { generateId } from '@/lib/utils';
 
 export function ChatPanel() {
   const [streamingContent, setStreamingContent] = useState('');
@@ -145,7 +146,7 @@ export function ChatPanel() {
       role: 'user',
       content: userMessage.trim(),
       isDeleted: false,
-      swipeId: crypto.randomUUID(),
+      swipeId: generateId(),
       swipeIndex: 0
     });
 
@@ -263,7 +264,7 @@ export function ChatPanel() {
                       role: 'assistant',
                       content: parsed.fullContent,
                       isDeleted: false,
-                      swipeId: crypto.randomUUID(),
+                      swipeId: generateId(),
                       swipeIndex: 0,
                       metadata: {
                         promptData: parsed.promptSections || []
@@ -280,7 +281,7 @@ export function ChatPanel() {
                       role: 'system',
                       content: `⚠️ ${parsed.characterName}: ${parsed.error}`,
                       isDeleted: false,
-                      swipeId: crypto.randomUUID(),
+                      swipeId: generateId(),
                       swipeIndex: 0
                     });
                   }
@@ -389,7 +390,7 @@ export function ChatPanel() {
                       role: 'assistant',
                       content: cleanedMessage,
                       isDeleted: false,
-                      swipeId: crypto.randomUUID(),
+                      swipeId: generateId(),
                       swipeIndex: 0,
                       metadata: {
                         promptData: promptSections
@@ -439,7 +440,7 @@ export function ChatPanel() {
             role: 'assistant',
             content: data.message,
             isDeleted: false,
-            swipeId: crypto.randomUUID(),
+            swipeId: generateId(),
             swipeIndex: 0,
             metadata: {
               tokens: data.usage?.totalTokens,
@@ -456,7 +457,7 @@ export function ChatPanel() {
           role: 'system',
           content: `⚠️ ${error instanceof Error ? error.message : t('chat.error.generation')}`,
           isDeleted: false,
-          swipeId: crypto.randomUUID(),
+          swipeId: generateId(),
           swipeIndex: 0
         });
       }
@@ -692,13 +693,13 @@ export function ChatPanel() {
     
     if (confirm(t('chat.resetFirstConfirm'))) {
       const firstMessage = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         characterId: activeCharacter.id,
         role: 'assistant' as const,
         content: activeCharacter.firstMes || `*${activeCharacter.name} looks at you expectantly, waiting for you to speak.*`,
         timestamp: new Date().toISOString(),
         isDeleted: false,
-        swipeId: crypto.randomUUID(),
+        swipeId: generateId(),
         swipeIndex: 0
       };
       

@@ -3,11 +3,9 @@ import {
   readAllPersistentData,
   writePersistentData,
   initializeDataFiles,
+  VALID_DATA_TYPES,
+  type DataType,
 } from '@/lib/persistence';
-
-// Valid data types for persistence
-const VALID_DATA_TYPES = ['characters', 'sessions', 'groups', 'personas', 'settings', 'lorebooks'] as const;
-type DataType = typeof VALID_DATA_TYPES[number];
 
 // Initialize data files on server start
 initializeDataFiles();
@@ -85,10 +83,18 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { characters, sessions, groups, personas, settings, lorebooks } = body;
+    const {
+      // Core data
+      characters, sessions, groups, personas, settings, lorebooks,
+      // Sound system
+      soundTriggers, soundCollections,
+      // Visual systems
+      backgroundPacks, spritePacks, hudTemplates,
+    } = body;
 
     const results: Record<string, boolean> = {};
 
+    // Core data
     if (characters !== undefined) {
       results.characters = writePersistentData('characters', characters);
     }
@@ -106,6 +112,25 @@ export async function PUT(request: NextRequest) {
     }
     if (lorebooks !== undefined) {
       results.lorebooks = writePersistentData('lorebooks', lorebooks);
+    }
+
+    // Sound system
+    if (soundTriggers !== undefined) {
+      results.soundTriggers = writePersistentData('soundTriggers', soundTriggers);
+    }
+    if (soundCollections !== undefined) {
+      results.soundCollections = writePersistentData('soundCollections', soundCollections);
+    }
+
+    // Visual systems
+    if (backgroundPacks !== undefined) {
+      results.backgroundPacks = writePersistentData('backgroundPacks', backgroundPacks);
+    }
+    if (spritePacks !== undefined) {
+      results.spritePacks = writePersistentData('spritePacks', spritePacks);
+    }
+    if (hudTemplates !== undefined) {
+      results.hudTemplates = writePersistentData('hudTemplates', hudTemplates);
     }
 
     const allSuccess = Object.values(results).every(v => v);

@@ -1,6 +1,7 @@
 /**
  * Character Card Import/Export Utilities
  * Handles parsing PNG files with embedded character data (TavernCard format)
+ * Extended to support TavernFlow-specific data (sprites, stats, etc.)
  */
 
 import type { CharacterCard, CharacterCardV2 } from '@/types';
@@ -101,12 +102,14 @@ export async function parseCharacterCardFromPng(file: File): Promise<{
 }
 
 /**
- * Parse character data from various formats (V1, V2)
+ * Parse character data from various formats (V1, V2, TavernFlow extended)
  */
 function parseCharacterData(data: unknown): Partial<CharacterCard> {
-  // Handle V2 format
+  // Handle V2 format (including TavernFlow extended)
   if (typeof data === 'object' && data !== null && 'spec' in data && (data as Record<string, unknown>).spec === 'chara_card_v2') {
     const v2Data = data as CharacterCardV2;
+    const extensions = v2Data.data.extensions as Record<string, unknown> | undefined;
+    
     return {
       name: v2Data.data.name || '',
       description: v2Data.data.description || '',
@@ -120,6 +123,16 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       postHistoryInstructions: v2Data.data.post_history_instructions || '',
       alternateGreetings: v2Data.data.alternate_greetings || [],
       tags: v2Data.data.tags || [],
+      // TavernFlow extended fields from extensions
+      avatar: (extensions?.avatar as string) || '',
+      sprites: (extensions?.sprites as CharacterCard['sprites']) || [],
+      spriteConfig: extensions?.spriteConfig as CharacterCard['spriteConfig'],
+      spriteTriggers: extensions?.spriteTriggers as CharacterCard['spriteTriggers'],
+      spritePacks: extensions?.spritePacks as CharacterCard['spritePacks'],
+      spriteLibraries: extensions?.spriteLibraries as CharacterCard['spriteLibraries'],
+      voice: extensions?.voice as CharacterCard['voice'],
+      hudTemplateId: extensions?.hudTemplateId as string | null,
+      statsConfig: extensions?.statsConfig as CharacterCard['statsConfig'],
     };
   }
   
@@ -139,6 +152,15 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       postHistoryInstructions: (v1Data.post_history_instructions as string) || '',
       alternateGreetings: (v1Data.alternate_greetings as string[]) || [],
       tags: (v1Data.tags as string[]) || [],
+      // Extended fields
+      avatar: (v1Data.avatar as string) || '',
+      sprites: (v1Data.sprites as CharacterCard['sprites']) || [],
+      spriteConfig: v1Data.spriteConfig as CharacterCard['spriteConfig'],
+      spriteTriggers: v1Data.spriteTriggers as CharacterCard['spriteTriggers'],
+      spritePacks: v1Data.spritePacks as CharacterCard['spritePacks'],
+      voice: v1Data.voice as CharacterCard['voice'],
+      hudTemplateId: v1Data.hudTemplateId as string | null,
+      statsConfig: v1Data.statsConfig as CharacterCard['statsConfig'],
     };
   }
   
@@ -266,12 +288,12 @@ export async function importCharacterCard(file: File): Promise<{
 }
 
 /**
- * Create a PNG with embedded character data
+ * Create a PNG with embedded character data (includes all TavernFlow extensions)
  */
 export async function exportCharacterCardAsPng(
   character: CharacterCard
 ): Promise<Blob> {
-  // Create character data object (V2 format)
+  // Create character data object (V2 format with TavernFlow extensions)
   const characterData: CharacterCardV2 = {
     spec: 'chara_card_v2',
     spec_version: '2.0',
@@ -286,11 +308,22 @@ export async function exportCharacterCardAsPng(
       character_note: character.characterNote,
       system_prompt: character.systemPrompt,
       post_history_instructions: character.postHistoryInstructions,
-      alternate_greetings: character.alternateGreetings,
+      alternateGreetings: character.alternateGreetings,
       tags: character.tags,
       creator: '',
       character_version: '1.0',
-      extensions: {}
+      extensions: {
+        // TavernFlow extended data
+        avatar: character.avatar,
+        sprites: character.sprites,
+        spriteConfig: character.spriteConfig,
+        spriteTriggers: character.spriteTriggers,
+        spritePacks: character.spritePacks,
+        spriteLibraries: character.spriteLibraries,
+        voice: character.voice,
+        hudTemplateId: character.hudTemplateId,
+        statsConfig: character.statsConfig,
+      }
     }
   };
   
@@ -506,7 +539,7 @@ function getCrc32Table(): Uint32Array {
 }
 
 /**
- * Export character as JSON
+ * Export character as JSON (includes all TavernFlow extensions)
  */
 export function exportCharacterCardAsJson(character: CharacterCard): string {
   const data: CharacterCardV2 = {
@@ -527,14 +560,20 @@ export function exportCharacterCardAsJson(character: CharacterCard): string {
       tags: character.tags,
       creator: '',
       character_version: '1.0',
-      extensions: {}
+      extensions: {
+        // TavernFlow extended data
+        avatar: character.avatar,
+        sprites: character.sprites,
+        spriteConfig: character.spriteConfig,
+        spriteTriggers: character.spriteTriggers,
+        spritePacks: character.spritePacks,
+        spriteLibraries: character.spriteLibraries,
+        voice: character.voice,
+        hudTemplateId: character.hudTemplateId,
+        statsConfig: character.statsConfig,
+      }
     }
   };
-  
-  // Add avatar if available
-  if (character.avatar) {
-    (data.data.extensions as Record<string, unknown>).avatar = character.avatar;
-  }
   
   return JSON.stringify(data, null, 2);
 }

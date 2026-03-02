@@ -10,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useTavernStore } from '@/store';
 import type { HUDTemplate, HUDField, HUDFieldType, HUDPosition, HUDStyle, HUDFieldStyle } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, generateId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -528,7 +528,7 @@ function HUDFieldEditorDialog({ field, onSave, onClose }: HUDFieldEditorDialogPr
   
   const handleSave = () => {
     const newField: HUDField = {
-      id: field?.id || crypto.randomUUID(),
+      id: field?.id || generateId(),
       name: name.trim() || 'Campo',
       key: key.trim() || name.trim().toLowerCase().replace(/\s+/g, '_'),
       type,

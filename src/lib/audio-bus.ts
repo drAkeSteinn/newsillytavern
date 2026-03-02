@@ -5,6 +5,7 @@
  */
 
 import type { AudioTask, AudioBusState } from '@/types/triggers';
+import { generateId } from '@/lib/utils';
 
 // Singleton audio bus
 const GLOBAL_KEY = '__TAVERNFLOW_AUDIO_BUS__';
@@ -108,7 +109,7 @@ export async function enqueueAudio(task: Omit<AudioTask, 'id'>): Promise<void> {
 
   const fullTask: AudioTask = {
     ...task,
-    id: crypto.randomUUID(),
+    id: generateId(),
   };
 
   // Add to queue sorted by priority

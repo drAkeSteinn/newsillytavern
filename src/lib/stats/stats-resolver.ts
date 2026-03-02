@@ -8,7 +8,7 @@
 // Keys resolved:
 // - {{attributeKey}} → "AttributeName: value" (e.g., {{vida}} → "Vida: 50")
 // - {{habilidades}} → Block of available skills
-// - {{intensiones}} → Block of available intentions
+// - {{intenciones}} → Block of available intentions
 // - {{invitaciones}} → Block of available invitations
 
 import type {
@@ -271,10 +271,11 @@ export function resolveStats(
 const STATS_KEY_PATTERN = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
 
 /**
- * Check if a key is a block key (habilidades, intensiones, invitaciones)
+ * Check if a key is a block key (habilidades, intenciones, invitaciones)
+ * Also accepts alternate spellings (intensiones) for backward compatibility
  */
 export function isBlockKey(key: string): boolean {
-  return key === 'habilidades' || key === 'intensiones' || key === 'invitaciones';
+  return key === 'habilidades' || key === 'intenciones' || key === 'intensiones' || key === 'invitaciones';
 }
 
 /**
@@ -285,12 +286,13 @@ export function resolveStatsInText(
   resolvedStats: ResolvedStats | null
 ): string {
   return text.replace(STATS_KEY_PATTERN, (match, key) => {
-    // Block keys (habilidades, intensiones, invitaciones) - always handle these
+    // Block keys (habilidades, intenciones, invitaciones) - always handle these
     // Return empty string if stats disabled, empty, or no items available
     if (key === 'habilidades') {
       return resolvedStats?.skillsBlock ?? '';
     }
-    if (key === 'intensiones') {
+    // Accept both "intenciones" (correct Spanish) and "intensiones" (typo, for backward compatibility)
+    if (key === 'intenciones' || key === 'intensiones') {
       return resolvedStats?.intentionsBlock ?? '';
     }
     if (key === 'invitaciones') {

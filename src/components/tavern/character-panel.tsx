@@ -14,7 +14,9 @@ import {
   Edit,
   Download,
   Upload,
-  FileUp
+  FileUp,
+  Package,
+  PackageOpen
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,11 +37,19 @@ import {
 import { CharacterEditor } from './character-editor';
 import { GroupEditor } from './group-editor';
 import { importCharacterCard, exportCharacterCardAsPng, exportCharacterCardAsJson } from '@/lib/character-card';
-import type { CharacterCard, ChatSession } from '@/types';
+import type { CharacterCard, ChatSession, CharacterGroup } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { getLogger } from '@/lib/logger';
 
 const charLogger = getLogger('character');
+
+// Type for exported data
+interface ExportedData {
+  version: string;
+  exportedAt: string;
+  characters: CharacterCard[];
+  groups: CharacterGroup[];
+}
 
 export function CharacterPanel() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +60,7 @@ export function CharacterPanel() {
   const [isImporting, setIsImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkImportRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const {
@@ -65,6 +76,7 @@ export function CharacterPanel() {
     deleteCharacter,
     deleteGroup,
     addCharacter,
+    addGroup,
     sidebarOpen
   } = useTavernStore();
 
@@ -246,6 +258,151 @@ export function CharacterPanel() {
     }
   };
 
+  // ============================================
+  // Bulk Export/Import Functions
+  // ============================================
+
+  const handleExportAll = () => {
+    try {
+      const exportData: ExportedData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        characters: characters,
+        groups: groups
+      };
+
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `tavernflow_backup_${timestamp}.json`;
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Exportación Completa',
+        description: `Exportados ${characters.length} personajes y ${groups.length} grupos.`
+      });
+    } catch (error) {
+      charLogger.error('Bulk export error', { error });
+      toast({
+        title: 'Error de Exportación',
+        description: 'Ocurrió un error al exportar los datos.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleBulkImportClick = () => {
+    bulkImportRef.current?.click();
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as ExportedData;
+
+      // Validate structure
+      if (!data.version || !Array.isArray(data.characters)) {
+        toast({
+          title: 'Error de Importación',
+          description: 'El archivo no tiene el formato correcto. Debe ser un backup de TavernFlow.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      let importedCharacters = 0;
+      let importedGroups = 0;
+      let skippedCharacters = 0;
+
+      // Import characters
+      for (const character of data.characters) {
+        // Check if character with same ID already exists
+        const exists = characters.some(c => c.id === character.id);
+        if (exists) {
+          skippedCharacters++;
+          continue;
+        }
+
+        // Add character using store action
+        addCharacter({
+          name: character.name || 'Personaje sin nombre',
+          description: character.description || '',
+          personality: character.personality || '',
+          scenario: character.scenario || '',
+          firstMes: character.firstMes || '',
+          mesExample: character.mesExample || '',
+          creatorNotes: character.creatorNotes || '',
+          characterNote: character.characterNote || '',
+          systemPrompt: character.systemPrompt || '',
+          postHistoryInstructions: character.postHistoryInstructions || '',
+          alternateGreetings: character.alternateGreetings || [],
+          tags: character.tags || [],
+          avatar: character.avatar || '',
+          sprites: character.sprites || [],
+          voice: character.voice || null,
+          statsConfig: character.statsConfig
+        });
+        importedCharacters++;
+      }
+
+      // Import groups
+      if (data.groups && Array.isArray(data.groups)) {
+        for (const group of data.groups) {
+          // Check if group with same ID already exists
+          const exists = groups.some(g => g.id === group.id);
+          if (exists) continue;
+
+          // Add group using store action
+          addGroup({
+            name: group.name || 'Grupo sin nombre',
+            description: group.description || '',
+            characterIds: group.characterIds || [],
+            members: group.members || [],
+            avatar: group.avatar || '',
+            systemPrompt: group.systemPrompt || '',
+            activationStrategy: group.activationStrategy || 'all',
+            maxResponsesPerTurn: group.maxResponsesPerTurn || 3,
+            allowMentions: group.allowMentions ?? true,
+            mentionTriggers: group.mentionTriggers || [],
+            conversationStyle: group.conversationStyle || 'sequential'
+          });
+          importedGroups++;
+        }
+      }
+
+      toast({
+        title: 'Importación Completa',
+        description: `Importados ${importedCharacters} personajes y ${importedGroups} grupos.${skippedCharacters > 0 ? ` (${skippedCharacters} personajes omitidos por duplicados)` : ''}`
+      });
+    } catch (error) {
+      charLogger.error('Bulk import error', { error });
+      toast({
+        title: 'Error de Importación',
+        description: 'No se pudo leer el archivo. Asegúrate de que sea un JSON válido.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsImporting(false);
+      if (bulkImportRef.current) {
+        bulkImportRef.current.value = '';
+      }
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -319,12 +476,21 @@ export function CharacterPanel() {
 
   return (
     <>
-      {/* Hidden file input for import */}
+      {/* Hidden file input for single character import */}
       <input
         ref={fileInputRef}
         type="file"
         accept=".png,.json,image/png,application/json"
         onChange={handleFileChange}
+        className="hidden"
+      />
+      
+      {/* Hidden file input for bulk import */}
+      <input
+        ref={bulkImportRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleBulkImport}
         className="hidden"
       />
       
@@ -397,6 +563,7 @@ export function CharacterPanel() {
             <div className="flex items-center gap-2 px-2 py-1 text-muted-foreground">
               <MessageSquare className="w-4 h-4" />
               <span className="text-sm font-medium">Personajes</span>
+              <span className="text-xs ml-auto">{characters.length}</span>
             </div>
             {filteredCharacters.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -507,6 +674,7 @@ export function CharacterPanel() {
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 <span className="text-sm font-medium">Grupos</span>
+                <span className="text-xs">{groups.length}</span>
               </div>
               <Button 
                 variant="ghost" 
@@ -589,6 +757,7 @@ export function CharacterPanel() {
 
         {/* Footer */}
         <div className="p-3 border-t space-y-2">
+          {/* Single character actions */}
           <Button 
             variant="outline" 
             className="w-full justify-start gap-2"
@@ -605,6 +774,36 @@ export function CharacterPanel() {
             <Users className="w-4 h-4" />
             Nuevo Grupo
           </Button>
+          
+          {/* Bulk actions */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+            <Button 
+              variant="secondary" 
+              size="sm"
+              className="justify-start gap-1.5"
+              onClick={handleExportAll}
+              disabled={characters.length === 0 && groups.length === 0}
+              title="Exportar todos los personajes y grupos"
+            >
+              <Package className="w-4 h-4" />
+              Exportar Todo
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="sm"
+              className="justify-start gap-1.5"
+              onClick={handleBulkImportClick}
+              disabled={isImporting}
+              title="Importar personajes y grupos desde backup"
+            >
+              {isImporting ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent animate-spin" />
+              ) : (
+                <PackageOpen className="w-4 h-4" />
+              )}
+              Importar Todo
+            </Button>
+          </div>
         </div>
       </div>
 

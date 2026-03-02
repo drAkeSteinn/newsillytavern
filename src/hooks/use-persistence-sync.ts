@@ -7,7 +7,16 @@ import { useTavernStore } from '@/store/tavern-store';
 const DEBOUNCE_TIME = 2000;
 
 // Data types that should be persisted to files
-const PERSIST_KEYS = ['characters', 'sessions', 'groups', 'personas', 'settings', 'lorebooks'] as const;
+const PERSIST_KEYS = [
+  // Core data
+  'characters', 'sessions', 'groups', 'personas', 'settings', 'lorebooks',
+  // Sound system
+  'soundTriggers', 'soundCollections',
+  // Visual systems
+  'backgroundPacks', 'spritePacks', 'hudTemplates',
+] as const;
+
+type PersistKey = typeof PERSIST_KEYS[number];
 
 /**
  * Hook to synchronize store data with server-side JSON files
@@ -37,6 +46,7 @@ export function usePersistenceSync() {
       if (data) {
         const updates: Record<string, unknown> = {};
 
+        // Core data
         if (data.characters && Array.isArray(data.characters)) {
           updates.characters = data.characters;
         }
@@ -54,6 +64,25 @@ export function usePersistenceSync() {
         }
         if (data.lorebooks && Array.isArray(data.lorebooks)) {
           updates.lorebooks = data.lorebooks;
+        }
+
+        // Sound system
+        if (data.soundTriggers && Array.isArray(data.soundTriggers)) {
+          updates.soundTriggers = data.soundTriggers;
+        }
+        if (data.soundCollections && Array.isArray(data.soundCollections)) {
+          updates.soundCollections = data.soundCollections;
+        }
+
+        // Visual systems
+        if (data.backgroundPacks && Array.isArray(data.backgroundPacks)) {
+          updates.backgroundPacks = data.backgroundPacks;
+        }
+        if (data.spritePacks && Array.isArray(data.spritePacks)) {
+          updates.spritePacks = data.spritePacks;
+        }
+        if (data.hudTemplates && Array.isArray(data.hudTemplates)) {
+          updates.hudTemplates = data.hudTemplates;
         }
 
         // Apply updates to store
@@ -78,13 +107,21 @@ export function usePersistenceSync() {
 
       const state = useTavernStore.getState();
 
-      const dataToSave = {
+      const dataToSave: Record<string, unknown> = {
+        // Core data
         characters: state.characters,
         sessions: state.sessions,
         groups: state.groups,
         personas: state.personas,
         settings: state.settings,
         lorebooks: state.lorebooks,
+        // Sound system
+        soundTriggers: state.soundTriggers,
+        soundCollections: state.soundCollections,
+        // Visual systems
+        backgroundPacks: state.backgroundPacks,
+        spritePacks: state.spritePacks,
+        hudTemplates: state.hudTemplates,
       };
 
       const response = await fetch('/api/persistence', {
@@ -127,7 +164,7 @@ export function usePersistenceSync() {
     const unsubscribe = useTavernStore.subscribe((state, prevState) => {
       // Check if any persistent data has changed
       const hasChanges = PERSIST_KEYS.some(key => {
-        return JSON.stringify(state[key]) !== JSON.stringify(prevState[key]);
+        return JSON.stringify(state[key as PersistKey]) !== JSON.stringify(prevState[key as PersistKey]);
       });
 
       if (hasChanges) {

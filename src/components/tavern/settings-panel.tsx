@@ -52,15 +52,15 @@ import { QuestSettingsPanel } from '@/components/quests';
 import { DialogueSettingsPanel } from '@/components/dialogue';
 import { InventoryPanel } from '@/components/inventory';
 
-const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean }[] = [
-  { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false },
-  { value: 'text-generation-webui', label: 'Text Generation WebUI', defaultEndpoint: 'http://localhost:7860', needsEndpoint: true },
-  { value: 'ollama', label: 'Ollama', defaultEndpoint: 'http://localhost:11434', needsEndpoint: true },
-  { value: 'koboldcpp', label: 'KoboldCPP', defaultEndpoint: 'http://localhost:5001', needsEndpoint: true },
-  { value: 'vllm', label: 'vLLM', defaultEndpoint: 'http://localhost:8000', needsEndpoint: true },
-  { value: 'openai', label: 'OpenAI', defaultEndpoint: 'https://api.openai.com/v1', needsEndpoint: true },
-  { value: 'anthropic', label: 'Anthropic', defaultEndpoint: 'https://api.anthropic.com/v1', needsEndpoint: true },
-  { value: 'custom', label: 'Personalizado', defaultEndpoint: '', needsEndpoint: true }
+const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean; description: string }[] = [
+  { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false, description: 'SDK integrado, sin configuración' },
+  { value: 'text-generation-webui', label: 'Text Generation WebUI', defaultEndpoint: 'http://localhost:5000', needsEndpoint: true, description: 'API en puerto 5000 (iniciar con --api)' },
+  { value: 'ollama', label: 'Ollama', defaultEndpoint: 'http://localhost:11434', needsEndpoint: true, description: 'Servidor Ollama local' },
+  { value: 'koboldcpp', label: 'KoboldCPP', defaultEndpoint: 'http://localhost:5001', needsEndpoint: true, description: 'Servidor KoboldCPP' },
+  { value: 'vllm', label: 'vLLM', defaultEndpoint: 'http://localhost:8000', needsEndpoint: true, description: 'Servidor vLLM' },
+  { value: 'openai', label: 'OpenAI', defaultEndpoint: 'https://api.openai.com/v1', needsEndpoint: true, description: 'API de OpenAI' },
+  { value: 'anthropic', label: 'Anthropic', defaultEndpoint: 'https://api.anthropic.com/v1', needsEndpoint: true, description: 'API de Anthropic' },
+  { value: 'custom', label: 'Personalizado', defaultEndpoint: '', needsEndpoint: true, description: 'Endpoint personalizado OpenAI-compatible' }
 ];
 
 interface SettingsPanelProps {
@@ -368,9 +368,76 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   {llmConfigs.find(c => c.isActive) ? (
                     (() => {
                       const config = llmConfigs.find(c => c.isActive)!;
+                      const providerInfo = LLM_PROVIDERS.find(p => p.value === config.provider);
                       return (
                         <div className="space-y-4">
                           <h3 className="font-medium">Parámetros de {config.name}</h3>
+                          
+                          {/* Connection Settings - Show endpoint/model/apiKey */}
+                          <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
+                            <h4 className="text-sm font-medium text-muted-foreground">Configuración de Conexión</h4>
+                            
+                            {/* Provider badge */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Proveedor:</span>
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                                {providerInfo?.label || config.provider}
+                              </span>
+                            </div>
+                            
+                            {/* Endpoint field - for providers that need it */}
+                            {providerInfo?.needsEndpoint && (
+                              <div>
+                                <Label className="text-xs">URL del Endpoint</Label>
+                                <Input
+                                  value={config.endpoint || ''}
+                                  onChange={(e) => 
+                                    updateLLMConfig(config.id, { endpoint: e.target.value })
+                                  }
+                                  placeholder={providerInfo.defaultEndpoint}
+                                  className="mt-1 h-8 text-sm"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Model field - for providers that need model selection */}
+                            {config.provider !== 'z-ai' && (
+                              <div>
+                                <Label className="text-xs">Modelo (opcional)</Label>
+                                <Input
+                                  value={config.model || ''}
+                                  onChange={(e) => 
+                                    updateLLMConfig(config.id, { model: e.target.value })
+                                  }
+                                  placeholder={config.provider === 'openai' ? 'gpt-4o-mini' : config.provider === 'anthropic' ? 'claude-3-sonnet' : ''}
+                                  className="mt-1 h-8 text-sm"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* API Key field - for providers that need it */}
+                            {config.provider !== 'z-ai' && (
+                              <div>
+                                <Label className="text-xs">API Key {config.provider === 'openai' || config.provider === 'anthropic' ? '(requerido)' : '(opcional)'}</Label>
+                                <Input
+                                  type="password"
+                                  value={config.apiKey || ''}
+                                  onChange={(e) => 
+                                    updateLLMConfig(config.id, { apiKey: e.target.value })
+                                  }
+                                  placeholder="sk-..."
+                                  className="mt-1 h-8 text-sm"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Z.ai info */}
+                            {config.provider === 'z-ai' && (
+                              <div className="p-2 bg-green-500/10 rounded text-xs text-green-600 dark:text-green-400">
+                                ✓ Z.ai usa el SDK integrado. No requiere configuración adicional.
+                              </div>
+                            )}
+                          </div>
                           
                           {/* Sliders in 2 columns */}
                           <div className="grid grid-cols-2 gap-4">
