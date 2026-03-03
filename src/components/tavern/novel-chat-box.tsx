@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
+import { Badge } from '@/components/ui/badge';
 import { EmojiPicker } from './emoji-picker';
 import { StreamingText } from './streaming-text';
 import { useHotkeys, formatHotkey } from '@/hooks/use-hotkeys';
-import { 
-  Send, 
+import {
+  Send,
   Loader2,
   GripVertical,
   Settings,
@@ -23,7 +24,8 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Database,
 } from 'lucide-react';
 import {
   Popover,
@@ -73,6 +75,7 @@ export function NovelChatBox({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showVariables, setShowVariables] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,11 +93,15 @@ export function NovelChatBox({
     deleteMessage,
     swipeMessage,
     getSwipeCount,
+    characters: allCharacters,
   } = useTavernStore();
 
   const activeSession = getActiveSession();
   const layout = settings.chatLayout;
   const hotkeys = settings.hotkeys;
+
+  // Get session stats for the variables panel
+  const sessionStats = activeSession?.sessionStats;
 
   // Determine display name for header
   const headerName = isGroupMode 
@@ -329,6 +336,95 @@ export function NovelChatBox({
         </div>
         
         <div className="flex items-center gap-1">
+          {/* Session Variables Popover */}
+          <Popover open={showVariables} onOpenChange={setShowVariables}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Database className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 max-h-96 overflow-y-auto" align="end">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  {t('chatbox.sessionVariables')}
+                </h4>
+                
+                {!sessionStats?.initialized ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    <Database className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    {t('chatbox.noVariables')}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* For each character with stats */}
+                    {Object.entries(sessionStats.characterStats).map(([charId, charStats]) => {
+                      const character = allCharacters.find(c => c.id === charId);
+                      if (!character) return null;
+                      
+                      const attributeValues = charStats.attributeValues;
+                      const attributeDefs = character.statsConfig?.attributes || [];
+                      
+                      if (Object.keys(attributeValues).length === 0) return null;
+                      
+                      return (
+                        <div key={charId} className="space-y-2">
+                          {/* Character Header */}
+                          <div className="flex items-center gap-2 pb-1 border-b">
+                            <div className="w-5 h-5 rounded-full overflow-hidden">
+                              {character.avatar ? (
+                                <img src={character.avatar} alt={character.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+                                  <span className="text-white font-bold text-[10px]">{character.name?.[0]?.toUpperCase()}</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium">{character.name}</span>
+                          </div>
+                          
+                          {/* Attributes Grid */}
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {Object.entries(attributeValues).map(([key, value]) => {
+                              const attrDef = attributeDefs.find(a => a.key === key);
+                              const icon = attrDef?.icon;
+                              const color = attrDef?.color || 'default';
+                              
+                              const colorClasses: Record<string, string> = {
+                                red: 'bg-red-500/20 border-red-500/30 text-red-400',
+                                green: 'bg-green-500/20 border-green-500/30 text-green-400',
+                                blue: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
+                                yellow: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
+                                purple: 'bg-purple-500/20 border-purple-500/30 text-purple-400',
+                                orange: 'bg-orange-500/20 border-orange-500/30 text-orange-400',
+                                cyan: 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400',
+                                default: 'bg-white/10 border-white/20 text-white/80',
+                              };
+                              
+                              return (
+                                <div
+                                  key={key}
+                                  className={cn(
+                                    'flex items-center gap-1.5 px-2 py-1 rounded border text-xs',
+                                    colorClasses[color] || colorClasses.default
+                                  )}
+                                >
+                                  {icon && <span className="text-xs">{icon}</span>}
+                                  <span className="text-muted-foreground truncate">{attrDef?.name || key}:</span>
+                                  <span className="font-medium">{String(value)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Settings Popover */}
           <Popover open={showSettings} onOpenChange={setShowSettings}>
             <PopoverTrigger asChild>

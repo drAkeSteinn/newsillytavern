@@ -37,20 +37,19 @@ import {
   EyeOff,
   MessageSquare,
   HelpCircle,
-  Crown,
-  User,
-  Binoculars,
   Sparkles,
   RefreshCw,
   Shuffle,
   Zap,
   Brain,
   Settings,
-  Layers
+  Layers,
+  BookOpen
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { GroupMember, GroupActivationStrategy } from '@/types';
 import { HUDSelector } from './hud-selector';
+import { LorebookSelector } from './lorebook-selector';
 
 interface GroupEditorProps {
   groupId: string | null;
@@ -124,7 +123,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
         allowMentions: existingGroup.allowMentions ?? true,
         mentionTriggers: existingGroup.mentionTriggers || [],
         conversationStyle: existingGroup.conversationStyle || 'sequential' as 'sequential' | 'parallel',
-        hudTemplateId: existingGroup?.hudTemplateId || null
+        hudTemplateId: existingGroup?.hudTemplateId || null,
+        lorebookIds: existingGroup?.lorebookIds || []
       };
     }
     return {
@@ -136,7 +136,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       allowMentions: true,
       mentionTriggers: [],
       conversationStyle: 'sequential' as 'sequential' | 'parallel',
-      hudTemplateId: null
+      hudTemplateId: null,
+      lorebookIds: []
     };
   }, [existingGroup]);
 
@@ -152,6 +153,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   const [allowMentions, setAllowMentions] = useState(initialValues.allowMentions);
   const [conversationStyle, setConversationStyle] = useState<'sequential' | 'parallel'>(initialValues.conversationStyle);
   const [hudTemplateId, setHudTemplateId] = useState<string | null>(initialValues.hudTemplateId);
+  const [lorebookIds, setLorebookIds] = useState<string[]>(initialValues.lorebookIds);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>('');
 
   // Get members - either from existing group or local state
@@ -180,10 +182,9 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   );
 
   // Local handlers for new groups
-  const handleLocalAddMember = (characterId: string, role: 'leader' | 'member' | 'observer' = 'member') => {
+  const handleLocalAddMember = (characterId: string) => {
     const newMember: GroupMember = {
       characterId,
-      role,
       isActive: true,
       isPresent: true,
       joinOrder: localMembers.length
@@ -204,12 +205,6 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   const handleLocalTogglePresent = (characterId: string) => {
     setLocalMembers(localMembers.map(m => 
       m.characterId === characterId ? { ...m, isPresent: !m.isPresent } : m
-    ));
-  };
-
-  const handleLocalRoleChange = (characterId: string, role: 'leader' | 'member' | 'observer') => {
-    setLocalMembers(localMembers.map(m => 
-      m.characterId === characterId ? { ...m, role } : m
     ));
   };
 
@@ -236,7 +231,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       characterIds: memberIds,
       members,
       avatar: existingGroup?.avatar || '',
-      hudTemplateId
+      hudTemplateId,
+      lorebookIds
     };
 
     if (isNewGroup) {
@@ -259,9 +255,9 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
     if (!selectedCharacterId) return;
     
     if (isNewGroup) {
-      handleLocalAddMember(selectedCharacterId, 'member');
+      handleLocalAddMember(selectedCharacterId);
     } else {
-      addGroupMember(groupId, selectedCharacterId, 'member');
+      addGroupMember(groupId, selectedCharacterId);
     }
     setSelectedCharacterId('');
   };
@@ -287,14 +283,6 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       handleLocalTogglePresent(characterId);
     } else {
       toggleGroupMemberPresent(groupId, characterId);
-    }
-  };
-
-  const handleRoleChange = (characterId: string, role: 'leader' | 'member' | 'observer') => {
-    if (isNewGroup) {
-      handleLocalRoleChange(characterId, role);
-    } else {
-      updateGroupMember(groupId, characterId, { role });
     }
   };
 
@@ -368,6 +356,19 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                     value={hudTemplateId}
                     onChange={setHudTemplateId}
                     placeholder="Sin HUD asignado"
+                  />
+                </div>
+
+                {/* Lorebook Selector */}
+                <div className="pt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Label className="text-xs">Lorebooks</Label>
+                  </div>
+                  <LorebookSelector
+                    value={lorebookIds}
+                    onChange={setLorebookIds}
+                    placeholder="Sin lorebooks asignados"
                   />
                 </div>
               </div>
@@ -448,37 +449,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm truncate">{member.character?.name}</p>
-                          <Select
-                            value={member.role}
-                            onValueChange={(v) => handleRoleChange(member.characterId, v as 'leader' | 'member' | 'observer')}
-                          >
-                            <SelectTrigger className="w-20 h-6 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="leader">
-                                <div className="flex items-center gap-1 text-xs">
-                                  <Crown className="w-2.5 h-2.5 text-amber-500" />
-                                  Líder
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="member">
-                                <div className="flex items-center gap-1 text-xs">
-                                  <User className="w-2.5 h-2.5" />
-                                  Miembro
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="observer">
-                                <div className="flex items-center gap-1 text-xs">
-                                  <Binoculars className="w-2.5 h-2.5 text-blue-500" />
-                                  Obs.
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <p className="font-medium text-sm truncate">{member.character?.name}</p>
                         
                         {/* Status */}
                         <div className="flex items-center gap-1.5 mt-0.5">

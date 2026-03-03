@@ -45,7 +45,10 @@ import { QuestLogPanel } from './quest-log-panel';
 export function QuestSettingsPanel() {
   const { questSettings, setQuestSettings, activeSessionId } = useTavernStore();
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
-  const [localPrompt, setLocalPrompt] = useState(questSettings.promptTemplate);
+  
+  // Ensure promptTemplate exists with default fallback
+  const promptTemplate = questSettings.promptTemplate ?? DEFAULT_QUEST_SETTINGS.promptTemplate ?? '';
+  const [localPrompt, setLocalPrompt] = useState(promptTemplate);
 
   const handlePromptSave = useCallback(() => {
     setQuestSettings({ promptTemplate: localPrompt });
@@ -53,8 +56,9 @@ export function QuestSettingsPanel() {
   }, [localPrompt, setQuestSettings]);
 
   const handleResetPrompt = useCallback(() => {
-    setLocalPrompt(DEFAULT_QUEST_SETTINGS.promptTemplate);
-    setQuestSettings({ promptTemplate: DEFAULT_QUEST_SETTINGS.promptTemplate });
+    const defaultPrompt = DEFAULT_QUEST_SETTINGS.promptTemplate ?? '';
+    setLocalPrompt(defaultPrompt);
+    setQuestSettings({ promptTemplate: defaultPrompt });
   }, [setQuestSettings]);
 
   return (
@@ -315,7 +319,7 @@ export function QuestSettingsPanel() {
                     <Button 
                       size="sm"
                       onClick={handlePromptSave}
-                      disabled={!questSettings.enabled || localPrompt === questSettings.promptTemplate}
+                      disabled={!questSettings.enabled || localPrompt === promptTemplate}
                     >
                       <Save className="w-4 h-4 mr-2" />
                       Guardar
@@ -328,9 +332,9 @@ export function QuestSettingsPanel() {
                 <div className="mt-3">
                   <Label className="text-xs text-muted-foreground mb-2 block">Vista previa:</Label>
                   <div className="p-3 rounded-lg bg-muted/50 text-xs font-mono max-h-[80px] overflow-y-auto text-muted-foreground">
-                    {questSettings.promptTemplate.length > 200 
-                      ? `${questSettings.promptTemplate.slice(0, 200)}...`
-                      : questSettings.promptTemplate
+                    {promptTemplate.length > 200 
+                      ? `${promptTemplate.slice(0, 200)}...`
+                      : promptTemplate
                     }
                   </div>
                 </div>

@@ -4,6 +4,9 @@
 
 import type { LLMConfig, ChatApiMessage, GenerateResponse } from '../types';
 
+// Default timeout: 5 minutes for long group chats
+const DEFAULT_TIMEOUT = 300000;
+
 /**
  * Stream from Anthropic API
  */
@@ -12,6 +15,9 @@ export async function* streamAnthropic(
   config: LLMConfig
 ): AsyncGenerator<string> {
   const endpoint = config.endpoint.replace(/\/$/, '');
+  
+  // Use configurable timeout or default (5 minutes)
+  const timeoutMs = DEFAULT_TIMEOUT;
 
   const systemMessage = messages.find(m => m.role === 'system');
   const chatMessages = messages.filter(m => m.role !== 'system');
@@ -35,7 +41,7 @@ export async function* streamAnthropic(
       top_p: config.parameters.topP,
       stream: true
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) {
@@ -87,6 +93,9 @@ export async function callAnthropic(
   config: LLMConfig
 ): Promise<GenerateResponse> {
   const endpoint = config.endpoint.replace(/\/$/, '');
+  
+  // Use default timeout (5 minutes)
+  const timeoutMs = DEFAULT_TIMEOUT;
 
   const systemMessage = messages.find(m => m.role === 'system');
   const chatMessages = messages.filter(m => m.role !== 'system');
@@ -109,7 +118,7 @@ export async function callAnthropic(
       temperature: config.parameters.temperature,
       top_p: config.parameters.topP
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) {

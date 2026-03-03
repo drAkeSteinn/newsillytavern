@@ -2,7 +2,7 @@
   {
     "name": "Clinica",
     "description": "Una celda fria y oscura en la prision",
-    "systemPrompt": "",
+    "systemPrompt": "asd",
     "activationStrategy": "all",
     "maxResponsesPerTurn": 3,
     "allowMentions": true,
@@ -29,9 +29,10 @@
       }
     ],
     "avatar": "",
-    "hudTemplateId": null,
+    "hudTemplateId": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da",
     "id": "e1ef8f7f-f8ea-45e4-ae78-d6d8b57b5bc4",
     "createdAt": "2026-03-01T21:45:26.755Z",
-    "updatedAt": "2026-03-01T21:45:26.755Z"
+    "updatedAt": "2026-03-02T18:19:25.596Z",
+    "lorebookIds": []
   }
 ]

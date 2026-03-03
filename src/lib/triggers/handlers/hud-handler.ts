@@ -7,6 +7,8 @@
 //
 // The HUD system uses the existing TokenDetector which already
 // extracts HUD tokens with their key/value pairs.
+//
+// Supports multiple detection keys per field with optional case sensitivity.
 
 import type { TriggerMatch } from '../types';
 import type { DetectedToken } from '../token-detector';
@@ -18,7 +20,7 @@ import type { HUDTemplate, HUDField } from '@/types';
 // ============================================
 
 export interface HUDHandlerState {
-  updatedFields: Map<string, Set<string>>; // messageKey -> set of fieldIds updated
+  updatedFields: Map<string, Map<string, { value: string | number | boolean; token: DetectedToken }>>; // messageKey -> fieldId -> last update
 }
 
 export function createHUDHandlerState(): HUDHandlerState {
@@ -54,9 +56,12 @@ export interface HUDHandlerResult {
  * 
  * Logic:
  * 1. Only process tokens of type 'hud'
- * 2. Match token.metadata.hudKey to field.key
- * 3. Validate value based on field type
- * 4. Return first valid match (HUD updates are immediate)
+ * 2. Match token.metadata.hudKey to field.key or field.keys[]
+ * 3. Apply case sensitivity if field.caseSensitive is true
+ * 4. Validate value based on field type
+ * 5. Collect ALL valid matches (process all, return the last one per field)
+ * 
+ * Note: Multiple updates to the same field in one message will use the LAST value
  */
 export function checkHUDTriggers(
   tokens: DetectedToken[],
@@ -70,54 +75,61 @@ export function checkHUDTriggers(
     return null;
   }
   
-  // Get already updated fields for this message
-  const updatedForMessage = state.updatedFields.get(context.messageKey) ?? new Set();
+  // Get updates map for this message
+  if (!state.updatedFields.has(context.messageKey)) {
+    state.updatedFields.set(context.messageKey, new Map());
+  }
+  const updatesForMessage = state.updatedFields.get(context.messageKey)!;
   
-  // Filter to only HUD tokens
-  const hudTokens = tokens.filter(t => t.type === 'hud');
+  // Filter to only HUD tokens with value
+  const hudTokens = tokens.filter(t => t.type === 'hud' && t.metadata?.hudKey && t.metadata?.hudValue !== undefined);
+  
+  // Process ALL HUD tokens, keeping the last value for each field
+  let lastMatch: { field: HUDField; token: DetectedToken; value: string | number | boolean } | null = null;
   
   for (const token of hudTokens) {
     const { hudKey, hudValue } = token.metadata || {};
     
     if (!hudKey || hudValue === undefined) continue;
     
-    // Find matching field by key (case-insensitive)
-    const field = activeHUDTemplate.fields.find(f => 
-      normalizeKey(f.key) === normalizeKey(hudKey)
-    );
+    // Find matching field using all available keys
+    const field = findMatchingField(activeHUDTemplate.fields, hudKey);
     
     if (!field) continue;
-    
-    // Skip if already updated this field in this message
-    if (updatedForMessage.has(field.id)) continue;
     
     // Validate and convert value based on field type
     const validatedValue = validateHUDValue(hudValue, field);
     
     if (validatedValue === null) continue;
     
-    // Check if value actually changed
-    const currentValue = currentValues[field.id];
-    if (currentValue === validatedValue) continue;
-    
-    // Mark as updated
-    updatedForMessage.add(field.id);
-    state.updatedFields.set(context.messageKey, updatedForMessage);
+    // Store this update (will overwrite previous updates to same field)
+    updatesForMessage.set(field.id, { value: validatedValue, token });
+    lastMatch = { field, token, value: validatedValue };
+  }
+  
+  // If we have any updates, return the last one as the trigger
+  // (The actual updates will be processed by executeHUDTrigger for ALL fields)
+  if (lastMatch) {
+    const currentValue = currentValues[lastMatch.field.id];
     
     return {
       matched: true,
       trigger: {
-        triggerId: `hud_${field.id}`,
+        triggerId: `hud_${lastMatch.field.id}`,
         triggerType: 'hud',
-        keyword: hudKey,
+        keyword: lastMatch.token.metadata?.hudKey || '',
         data: {
-          fieldId: field.id,
-          fieldName: field.name,
-          newValue: validatedValue,
+          fieldId: lastMatch.field.id,
+          fieldName: lastMatch.field.name,
+          newValue: lastMatch.value,
           oldValue: currentValue,
+          allUpdates: Array.from(updatesForMessage.entries()).map(([fieldId, data]) => ({
+            fieldId,
+            value: data.value,
+          })),
         },
       },
-      tokens: [token],
+      tokens: [lastMatch.token],
     };
   }
   
@@ -125,7 +137,41 @@ export function checkHUDTriggers(
 }
 
 /**
+ * Find a field that matches the given HUD key
+ * 
+ * Checks both field.key and field.keys[] array
+ * Respects field.caseSensitive setting
+ */
+function findMatchingField(
+  fields: HUDField[],
+  hudKey: string
+): HUDField | undefined {
+  for (const field of fields) {
+    // Get all keys to check (primary key + alternative keys)
+    const allKeys = [field.key, ...(field.keys || [])];
+    
+    for (const key of allKeys) {
+      if (field.caseSensitive) {
+        // Case-sensitive: exact match
+        if (key === hudKey) {
+          return field;
+        }
+      } else {
+        // Case-insensitive: normalize both
+        if (normalizeKey(key) === normalizeKey(hudKey)) {
+          return field;
+        }
+      }
+    }
+  }
+  
+  return undefined;
+}
+
+/**
  * Execute HUD trigger - update the field value in store
+ * 
+ * If allUpdates is present in match.data, updates ALL fields
  */
 export function executeHUDTrigger(
   match: TriggerMatch,
@@ -134,12 +180,21 @@ export function executeHUDTrigger(
     updateHUDFieldValue: (fieldId: string, value: string | number | boolean) => void;
   }
 ): void {
-  const { fieldId, newValue } = match.data as {
+  const data = match.data as {
     fieldId: string;
     newValue: string | number | boolean;
+    allUpdates?: Array<{ fieldId: string; value: string | number | boolean }>;
   };
   
-  storeActions.updateHUDFieldValue(fieldId, newValue);
+  // If we have allUpdates, process them all
+  if (data.allUpdates && data.allUpdates.length > 0) {
+    for (const update of data.allUpdates) {
+      storeActions.updateHUDFieldValue(update.fieldId, update.value);
+    }
+  } else {
+    // Fallback: single update
+    storeActions.updateHUDFieldValue(data.fieldId, data.newValue);
+  }
 }
 
 /**

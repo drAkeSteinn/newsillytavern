@@ -18,6 +18,7 @@ export interface ValidatedStreamRequest {
   userName?: string;
   persona?: unknown;
   contextConfig?: unknown;
+  sessionStats?: unknown;  // Session stats for attribute values
 }
 
 export interface ValidatedGroupStreamRequest {
@@ -32,6 +33,7 @@ export interface ValidatedGroupStreamRequest {
   persona?: unknown;
   lastResponderId?: string;
   contextConfig?: unknown;
+  sessionStats?: unknown;  // Session stats for attribute values
 }
 
 export interface ValidatedGenerateRequest {
@@ -44,6 +46,7 @@ export interface ValidatedGenerateRequest {
   userName?: string;
   persona?: unknown;
   contextConfig?: unknown;
+  sessionStats?: unknown;  // Session stats for attribute values
 }
 
 // ============================================
@@ -112,6 +115,7 @@ export function validateStreamRequest(data: unknown): ValidationResult<Validated
     if (isString(data.userName)) result.userName = data.userName;
     if (data.persona) result.persona = data.persona;
     if (data.contextConfig) result.contextConfig = data.contextConfig;
+    if (data.sessionStats) result.sessionStats = data.sessionStats;
 
     return { success: true, data: result };
   } catch (error) {
@@ -181,6 +185,7 @@ export function validateGroupStreamRequest(data: unknown): ValidationResult<Vali
     if (data.persona) result.persona = data.persona;
     if (isString(data.lastResponderId)) result.lastResponderId = data.lastResponderId;
     if (data.contextConfig) result.contextConfig = data.contextConfig;
+    if (data.sessionStats) result.sessionStats = data.sessionStats;
 
     return { success: true, data: result };
   } catch (error) {

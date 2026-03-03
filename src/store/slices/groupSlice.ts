@@ -17,7 +17,7 @@ export interface GroupSlice {
   setActiveGroup: (id: string | null) => void;
 
   // Member Actions
-  addGroupMember: (groupId: string, characterId: string, role?: 'leader' | 'member' | 'observer') => void;
+  addGroupMember: (groupId: string, characterId: string) => void;
   removeGroupMember: (groupId: string, characterId: string) => void;
   updateGroupMember: (groupId: string, characterId: string, updates: Partial<GroupMember>) => void;
   toggleGroupMemberActive: (groupId: string, characterId: string) => void;
@@ -40,7 +40,6 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
       // Ensure members array is initialized from characterIds if not provided
       members: group.members || (group.characterIds || []).map((id, index) => ({
         characterId: id,
-        role: 'member' as const,
         isActive: true,
         isPresent: true,
         joinOrder: index
@@ -69,14 +68,13 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
   setActiveGroup: (id) => set({ activeGroupId: id }),
 
   // Member Actions
-  addGroupMember: (groupId, characterId, role = 'member') => set((state: any) => ({
+  addGroupMember: (groupId, characterId) => set((state: any) => ({
     groups: state.groups.map((g: CharacterGroup) => {
       if (g.id !== groupId) return g;
       const existingMember = g.members?.find(m => m.characterId === characterId);
       if (existingMember) return g; // Already a member
       const newMember: GroupMember = {
         characterId,
-        role,
         isActive: true,
         isPresent: true,
         joinOrder: g.members?.length || 0

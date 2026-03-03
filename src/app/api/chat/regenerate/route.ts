@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { CharacterCard, PromptSection, Lorebook } from '@/types';
+import type { CharacterCard, PromptSection, Lorebook, SessionStats, HUDContextConfig } from '@/types';
 import {
   DEFAULT_CHARACTER,
   createSSEJSON,
@@ -22,7 +22,10 @@ import {
   streamAnthropic,
   streamOllama,
   streamTextGenerationWebUI,
-  buildLorebookSectionForPrompt
+  buildLorebookSectionForPrompt,
+  buildHUDContextSection,
+  injectHUDContextIntoMessages,
+  injectHUDContextIntoSections
 } from '@/lib/llm';
 import {
   sanitizeInput
@@ -66,7 +69,9 @@ function validateRegenerateRequest(data: unknown) {
       userName: typeof obj.userName === 'string' ? obj.userName : 'User',
       persona: obj.persona as Record<string, unknown> | undefined,
       contextConfig: obj.contextConfig as Record<string, unknown> | undefined,
-      lorebooks: Array.isArray(obj.lorebooks) ? obj.lorebooks : []
+      lorebooks: Array.isArray(obj.lorebooks) ? obj.lorebooks : [],
+      sessionStats: obj.sessionStats,
+      hudContext: obj.hudContext as HUDContextConfig | undefined
     }
   } as const;
 }
@@ -90,11 +95,16 @@ export async function POST(request: NextRequest) {
       userName = 'User',
       persona,
       contextConfig,
-      lorebooks = []
+      lorebooks = [],
+      sessionStats,
+      hudContext
     } = validation.data;
 
     // Extract lorebooks for processing
     const typedLorebooks: Lorebook[] = lorebooks;
+    
+    // Cast sessionStats to proper type
+    const typedSessionStats = sessionStats as SessionStats | undefined;
 
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
@@ -145,19 +155,28 @@ export async function POST(request: NextRequest) {
       processedCharacter,
       effectiveUserName,
       persona,
-      lorebookSection
+      lorebookSection,
+      typedSessionStats  // Pass session stats for attribute values
     );
+
+    // Build HUD context section if enabled
+    const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
 
     // Build all prompt sections for storage
     const chatHistorySections = buildChatHistorySections(contextWindow.messages, processedCharacter.name, effectiveUserName);
     const postHistorySection = buildPostHistorySection(processedCharacter.postHistoryInstructions);
 
     // Combine all sections in order
-    const allPromptSections: PromptSection[] = [
+    let allPromptSections: PromptSection[] = [
       ...systemSections,
       ...chatHistorySections,
       ...(postHistorySection ? [postHistorySection] : [])
     ];
+
+    // Inject HUD context into sections if enabled
+    if (hudContextSection && hudContext) {
+      allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
+    }
 
     // Create a TransformStream for SSE
     const stream = new ReadableStream({
@@ -174,13 +193,17 @@ export async function POST(request: NextRequest) {
           // Route to appropriate provider
           switch (llmConfig.provider) {
             case 'z-ai': {
-              const chatMessages = buildChatMessages(
+              let chatMessages = buildChatMessages(
                 systemPrompt,
                 contextWindow.messages,
                 processedCharacter,
                 effectiveUserName,
                 processedCharacter.postHistoryInstructions
               );
+              // Inject HUD context into chat messages if enabled
+              if (hudContextSection && hudContext) {
+                chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+              }
               generator = streamZAI(chatMessages);
               break;
             }
@@ -191,7 +214,7 @@ export async function POST(request: NextRequest) {
               if (!llmConfig.endpoint) {
                 throw new Error(`${llmConfig.provider} requires an endpoint URL`);
               }
-              const chatMessages = buildChatMessages(
+              let chatMessages = buildChatMessages(
                 systemPrompt,
                 contextWindow.messages,
                 processedCharacter,
@@ -199,6 +222,10 @@ export async function POST(request: NextRequest) {
                 processedCharacter.postHistoryInstructions,
                 true
               );
+              // Inject HUD context into chat messages if enabled
+              if (hudContextSection && hudContext) {
+                chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+              }
               generator = streamOpenAICompatible(chatMessages, llmConfig, llmConfig.provider);
               break;
             }
@@ -207,7 +234,7 @@ export async function POST(request: NextRequest) {
               if (!llmConfig.apiKey) {
                 throw new Error('Anthropic requires an API key');
               }
-              const chatMessages = buildChatMessages(
+              let chatMessages = buildChatMessages(
                 systemPrompt,
                 contextWindow.messages,
                 processedCharacter,
@@ -215,6 +242,10 @@ export async function POST(request: NextRequest) {
                 processedCharacter.postHistoryInstructions,
                 true
               );
+              // Inject HUD context into chat messages if enabled
+              if (hudContextSection && hudContext) {
+                chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+              }
               generator = streamAnthropic(chatMessages, llmConfig);
               break;
             }

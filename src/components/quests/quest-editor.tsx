@@ -173,8 +173,8 @@ export function QuestEditor({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] p-0 gap-0 flex flex-col">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="max-w-4xl w-[90vw] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="p-4 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
             {quest ? 'Editar Misión' : 'Nueva Misión'}
@@ -184,7 +184,7 @@ export function QuestEditor({
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 grid grid-cols-2 gap-4">
             {/* LEFT COLUMN */}
             <div className="space-y-4">
@@ -512,7 +512,7 @@ export function QuestEditor({
           </div>
         </ScrollArea>
         
-        <DialogFooter className="p-3 border-t flex-row justify-end gap-2">
+        <DialogFooter className="p-3 border-t shrink-0 flex flex-row justify-end gap-2 bg-background">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             <X className="w-4 h-4 mr-1.5" />
             Cancelar

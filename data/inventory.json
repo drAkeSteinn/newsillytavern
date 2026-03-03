@@ -1,0 +1,75 @@
+{
+  "items": [],
+  "containers": [],
+  "currencies": [
+    {
+      "name": "Nueva Divisa",
+      "amount": 0,
+      "id": "currency-1772463805729-gwaywlf7e"
+    },
+    {
+      "name": "Nueva Divisa",
+      "amount": 0,
+      "id": "currency-1772463812075-powlaeypw"
+    }
+  ],
+  "inventorySettings": {
+    "enabled": false
+  },
+  "inventoryNotifications": [
+    {
+      "type": "currency_changed",
+      "itemName": "Nueva Divisa",
+      "quantity": -10,
+      "message": "Nueva Divisa: -10 (Total: 0)",
+      "id": "notif-1772463810325-1kl2ws95g",
+      "timestamp": "2026-03-02T15:03:30.325Z",
+      "read": false
+    },
+    {
+      "type": "currency_changed",
+      "itemName": "Nueva Divisa",
+      "quantity": 10,
+      "message": "Nueva Divisa: +10 (Total: 10)",
+      "id": "notif-1772463810010-q3wbbvw0h",
+      "timestamp": "2026-03-02T15:03:30.010Z",
+      "read": false
+    },
+    {
+      "type": "currency_changed",
+      "itemName": "Nueva Divisa",
+      "quantity": -10,
+      "message": "Nueva Divisa: -10 (Total: 0)",
+      "id": "notif-1772463809725-odo3nrcca",
+      "timestamp": "2026-03-02T15:03:29.725Z",
+      "read": false
+    },
+    {
+      "type": "currency_changed",
+      "itemName": "Nueva Divisa",
+      "quantity": 10,
+      "message": "Nueva Divisa: +10 (Total: 10)",
+      "id": "notif-1772463809433-spp2ky6j7",
+      "timestamp": "2026-03-02T15:03:29.433Z",
+      "read": false
+    },
+    {
+      "type": "currency_changed",
+      "itemName": "Nueva Divisa",
+      "quantity": -10,
+      "message": "Nueva Divisa: -10 (Total: 0)",
+      "id": "notif-1772463809072-ws55wgq0q",
+      "timestamp": "2026-03-02T15:03:29.072Z",
+      "read": false
+    },
+    {
+      "type": "currency_changed",
+      "itemName": "Nueva Divisa",
+      "quantity": 10,
+      "message": "Nueva Divisa: +10 (Total: 10)",
+      "id": "notif-1772463808724-3s1155prg",
+      "timestamp": "2026-03-02T15:03:28.724Z",
+      "read": false
+    }
+  ]
+}

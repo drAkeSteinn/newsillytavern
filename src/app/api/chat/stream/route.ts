@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook } from '@/types';
+import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, Quest, QuestSettings } from '@/types';
 import {
   StreamRequest,
   DEFAULT_CHARACTER,
@@ -23,7 +23,10 @@ import {
   streamAnthropic,
   streamOllama,
   streamTextGenerationWebUI,
-  buildLorebookSectionForPrompt
+  buildLorebookSectionForPrompt,
+  buildHUDContextSection,
+  injectHUDContextIntoMessages,
+  injectHUDContextIntoSections
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -34,28 +37,40 @@ import {
   getContextStats,
   type ContextConfig
 } from '@/lib/context-manager';
+import { buildQuestPromptSection } from '@/lib/triggers/handlers/quest-handler';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Validate request (automatically detects request type)
     const validation = validateRequest(null, body);
     if (!validation.success) {
       return createErrorResponse(validation.error, 400);
     }
-    
+
     const {
       message,
       character,
       messages = [],
       llmConfig,
       userName = 'User',
-      persona
+      persona,
+      sessionStats
     } = validation.data;
 
     // Extract lorebooks from body (not validated by validation.ts)
     const lorebooks: Lorebook[] = body.lorebooks || [];
+
+    // Extract HUD context from body
+    const hudContext: HUDContextConfig | undefined = body.hudContext;
+
+    // Extract Quest data for pre-LLM integration
+    const quests: Quest[] = body.quests || [];
+    const questSettings: QuestSettings | undefined = body.questSettings;
+
+    // Cast sessionStats to proper type
+    const typedSessionStats = sessionStats as SessionStats | undefined;
 
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
@@ -97,19 +112,49 @@ export async function POST(request: NextRequest) {
       processedCharacter,
       effectiveUserName,
       persona,
-      lorebookSection
+      lorebookSection,
+      typedSessionStats  // Pass session stats for attribute values
     );
+
+    // Build HUD context section if enabled
+    const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
+
+    // Build quest section if enabled (pre-LLM integration)
+    let questSection: PromptSection | null = null;
+    if (questSettings?.enabled && questSettings?.promptInclude && quests.length > 0) {
+      const questPromptContent = buildQuestPromptSection(quests, questSettings.promptTemplate);
+      if (questPromptContent) {
+        questSection = {
+          type: 'lorebook',
+          label: 'Active Quests',
+          content: questPromptContent,
+          color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+        };
+      }
+    }
 
     // Build all prompt sections for storage
     const chatHistorySections = buildChatHistorySections(contextWindow.messages, processedCharacter.name, effectiveUserName);
     const postHistorySection = buildPostHistorySection(processedCharacter.postHistoryInstructions);
 
     // Combine all sections in order
-    const allPromptSections: PromptSection[] = [
+    let allPromptSections: PromptSection[] = [
       ...systemSections,
+      ...(questSection ? [questSection] : []),
       ...chatHistorySections,
       ...(postHistorySection ? [postHistorySection] : [])
     ];
+
+    // Inject HUD context into sections if enabled
+    if (hudContextSection && hudContext) {
+      allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
+    }
+
+    // Build the final system prompt (include quest section if present)
+    let finalSystemPrompt = systemPrompt;
+    if (questSection) {
+      finalSystemPrompt += `\n\n[${questSection.label}]\n${questSection.content}`;
+    }
 
     // Prepare messages with new user message (use context-windowed messages)
     const allMessages = [...contextWindow.messages, createUserMessage(sanitizedMessage)];
@@ -130,13 +175,17 @@ export async function POST(request: NextRequest) {
           switch (llmConfig.provider) {
             case 'z-ai': {
               // Z.ai uses its own SDK
-              const chatMessages = buildChatMessages(
-                systemPrompt,
+              let chatMessages = buildChatMessages(
+                finalSystemPrompt,
                 allMessages,
                 processedCharacter,
                 effectiveUserName,
                 processedCharacter.postHistoryInstructions
               );
+              // Inject HUD context into chat messages if enabled
+              if (hudContextSection && hudContext) {
+                chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+              }
               generator = streamZAI(chatMessages);
               break;
             }
@@ -148,14 +197,18 @@ export async function POST(request: NextRequest) {
               if (!llmConfig.endpoint) {
                 throw new Error(`${llmConfig.provider} requires an endpoint URL`);
               }
-              const chatMessages = buildChatMessages(
-                systemPrompt,
+              let chatMessages = buildChatMessages(
+                finalSystemPrompt,
                 allMessages,
                 processedCharacter,
                 effectiveUserName,
                 processedCharacter.postHistoryInstructions,
                 true // Use system role for OpenAI
               );
+              // Inject HUD context into chat messages if enabled
+              if (hudContextSection && hudContext) {
+                chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+              }
               generator = streamOpenAICompatible(chatMessages, llmConfig, llmConfig.provider);
               break;
             }
@@ -164,21 +217,25 @@ export async function POST(request: NextRequest) {
               if (!llmConfig.apiKey) {
                 throw new Error('Anthropic requires an API key');
               }
-              const chatMessages = buildChatMessages(
-                systemPrompt,
+              let chatMessages = buildChatMessages(
+                finalSystemPrompt,
                 allMessages,
                 processedCharacter,
                 effectiveUserName,
                 processedCharacter.postHistoryInstructions,
                 true // Use system role for Anthropic
               );
+              // Inject HUD context into chat messages if enabled
+              if (hudContextSection && hudContext) {
+                chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+              }
               generator = streamAnthropic(chatMessages, llmConfig);
               break;
             }
 
             case 'ollama': {
               const prompt = buildCompletionPrompt({
-                systemPrompt,
+                systemPrompt: finalSystemPrompt,
                 messages: allMessages,
                 character: processedCharacter,
                 userName: effectiveUserName,
@@ -192,7 +249,7 @@ export async function POST(request: NextRequest) {
             case 'koboldcpp':
             default: {
               const prompt = buildCompletionPrompt({
-                systemPrompt,
+                systemPrompt: finalSystemPrompt,
                 messages: allMessages,
                 character: processedCharacter,
                 userName: effectiveUserName,

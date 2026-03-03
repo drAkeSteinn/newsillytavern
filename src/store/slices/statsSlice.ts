@@ -169,11 +169,35 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         characterId?: string;
         groupId?: string;
       }>;
-      const session = sessions.find(s => s.id === sessionId);
+      const sessionIndex = sessions.findIndex(s => s.id === sessionId);
       
-      if (!session?.sessionStats) return state;
+      if (sessionIndex === -1) return state;
       
-      const stats = session.sessionStats.characterStats[characterId];
+      const session = sessions[sessionIndex];
+      let sessionStats = session.sessionStats;
+      
+      // Auto-initialize sessionStats if missing
+      if (!sessionStats) {
+        sessionStats = {
+          characterStats: {},
+          initialized: true,
+          lastModified: Date.now(),
+        };
+      }
+      
+      // Auto-initialize character stats if missing
+      if (!sessionStats.characterStats[characterId]) {
+        const character = state.characters.find((c: any) => c.id === characterId);
+        sessionStats = {
+          ...sessionStats,
+          characterStats: {
+            ...sessionStats.characterStats,
+            [characterId]: createDefaultCharacterStats(character?.statsConfig),
+          },
+        };
+      }
+      
+      const stats = sessionStats.characterStats[characterId];
       if (!stats) return state;
       
       const oldValue = stats.attributeValues[attributeKey];
@@ -186,7 +210,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       
       // Update the value
       const updatedCharacterStats = {
-        ...session.sessionStats.characterStats,
+        ...sessionStats.characterStats,
         [characterId]: {
           ...stats,
           attributeValues: {
@@ -211,7 +235,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       );
       
       const newSessionStats: SessionStats = {
-        ...session.sessionStats,
+        ...sessionStats,
         characterStats: updatedCharacterStats,
         lastModified: Date.now(),
       };
@@ -236,11 +260,35 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         id: string; 
         sessionStats?: SessionStats;
       }>;
-      const session = sessions.find(s => s.id === sessionId);
+      const sessionIndex = sessions.findIndex(s => s.id === sessionId);
       
-      if (!session?.sessionStats) return state;
+      if (sessionIndex === -1) return state;
       
-      const stats = session.sessionStats.characterStats[characterId];
+      const session = sessions[sessionIndex];
+      let sessionStats = session.sessionStats;
+      
+      // Auto-initialize sessionStats if missing
+      if (!sessionStats) {
+        sessionStats = {
+          characterStats: {},
+          initialized: true,
+          lastModified: Date.now(),
+        };
+      }
+      
+      // Auto-initialize character stats if missing
+      if (!sessionStats.characterStats[characterId]) {
+        const character = state.characters.find((c: any) => c.id === characterId);
+        sessionStats = {
+          ...sessionStats,
+          characterStats: {
+            ...sessionStats.characterStats,
+            [characterId]: createDefaultCharacterStats(character?.statsConfig),
+          },
+        };
+      }
+      
+      const stats = sessionStats.characterStats[characterId];
       if (!stats) return state;
       
       const character = state.characters.find((c: any) => c.id === characterId);
@@ -275,7 +323,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       const trimmedChangeLog = newChangeLog.slice(-100);
       
       const updatedCharacterStats = {
-        ...session.sessionStats.characterStats,
+        ...sessionStats.characterStats,
         [characterId]: {
           ...stats,
           attributeValues: newAttributeValues,
@@ -285,7 +333,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       };
       
       const newSessionStats: SessionStats = {
-        ...session.sessionStats,
+        ...sessionStats,
         characterStats: updatedCharacterStats,
         lastModified: now,
       };

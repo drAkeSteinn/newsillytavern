@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTavernStore } from '@/store/tavern-store';
 import { BackgroundWithOverlays } from './background-layer';
 import { NovelChatBox } from './novel-chat-box';
@@ -40,7 +40,7 @@ export function ChatPanel() {
   const setActiveHUD = useTavernStore((state) => state.setActiveHUD);
   // Lorebooks for prompt injection
   const lorebooks = useTavernStore((state) => state.lorebooks);
-  const activeLorebookIds = useTavernStore((state) => state.activeLorebookIds);
+  const globalActiveLorebookIds = useTavernStore((state) => state.activeLorebookIds);
   
   const setGenerating = useTavernStore((state) => state.setGenerating);
   const addMessage = useTavernStore((state) => state.addMessage);
@@ -64,6 +64,60 @@ export function ChatPanel() {
   
   // Determine if we're in group mode
   const isGroupMode = !!activeGroupId && !!activeGroup;
+
+  // ============================================
+  // LOREBOOK SELECTION LOGIC
+  // ============================================
+  // Normal Chat:
+  //   - Character has lorebooks → use those
+  //   - Character has NO lorebooks → use empty (no fallback to global)
+  //
+  // Group Chat:
+  //   - Group has lorebooks → use ONLY those (for all characters)
+  //   - Group has NO lorebooks → each character uses their own
+  //   - Characters without lorebooks get empty (no fallback)
+  // ============================================
+  
+  // Get effective lorebook IDs based on character or group
+  const effectiveLorebookIds = useMemo(() => {
+    if (isGroupMode) {
+      // Group mode: group lorebooks take priority
+      if (activeGroup?.lorebookIds && activeGroup.lorebookIds.length > 0) {
+        // Group has lorebooks → use only those
+        return activeGroup.lorebookIds;
+      }
+      // Group has NO lorebooks → return empty (will be handled per-character in API)
+      return [];
+    } else {
+      // Normal chat: character lorebooks only, no fallback
+      if (activeCharacter?.lorebookIds && activeCharacter.lorebookIds.length > 0) {
+        return activeCharacter.lorebookIds;
+      }
+      // No lorebooks for this character
+      return [];
+    }
+  }, [isGroupMode, activeGroup?.lorebookIds, activeCharacter?.lorebookIds]);
+
+  // For group chat without group lorebooks: build per-character lorebook map
+  const characterLorebooksMap = useMemo(() => {
+    if (!isGroupMode) return null;
+    
+    // If group has lorebooks, all characters use those (handled by effectiveLorebookIds)
+    if (activeGroup?.lorebookIds && activeGroup.lorebookIds.length > 0) {
+      return null;
+    }
+    
+    // Group has NO lorebooks → build per-character map
+    const map: Record<string, string[]> = {};
+    const groupCharacterIds = activeGroup?.characterIds ?? [];
+    
+    for (const charId of groupCharacterIds) {
+      const char = characters.find(c => c.id === charId);
+      map[charId] = char?.lorebookIds ?? []; // Empty if no lorebooks
+    }
+    
+    return map;
+  }, [isGroupMode, activeGroup, characters]);
 
   // ============================================
   // UNIFIED TRIGGER SYSTEM
@@ -91,15 +145,24 @@ export function ChatPanel() {
   // ============================================
   useEffect(() => {
     // Determine the HUD template to use
-    const hudTemplateId = isGroupMode 
-      ? activeGroup?.hudTemplateId 
+    const hudTemplateId = isGroupMode
+      ? activeGroup?.hudTemplateId
       : activeCharacter?.hudTemplateId;
-    
+
     // Only update if different from current
     if (hudTemplateId !== hudSessionState.activeTemplateId) {
       setActiveHUD(hudTemplateId || null);
     }
   }, [isGroupMode, activeGroup?.hudTemplateId, activeCharacter?.hudTemplateId, hudSessionState.activeTemplateId, setActiveHUD]);
+
+  // Get active HUD context for prompt injection
+  const activeHUDContext = useMemo(() => {
+    const activeTemplate = hudTemplates.find(t => t.id === hudSessionState.activeTemplateId);
+    if (activeTemplate?.context?.enabled && activeTemplate.context.content.trim()) {
+      return activeTemplate.context;
+    }
+    return undefined;
+  }, [hudTemplates, hudSessionState.activeTemplateId]);
 
   // Sync ref with store state
   useEffect(() => {
@@ -183,7 +246,10 @@ export function ChatPanel() {
         }
 
         // Get active lorebooks for prompt injection
-        const activeLorebooks = lorebooks.filter(lb => activeLorebookIds.includes(lb.id) && lb.active);
+        const activeLorebooks = lorebooks.filter(lb => effectiveLorebookIds.includes(lb.id) && lb.active);
+        
+        // Get session stats for attribute values
+        const sessionStats = currentSession?.sessionStats;
 
         // Use group streaming endpoint
         const response = await fetch('/api/chat/group-stream', {
@@ -200,7 +266,11 @@ export function ChatPanel() {
             userName: activePersona?.name || 'User',
             persona: activePersona,
             contextConfig,
-            lorebooks: activeLorebooks
+            lorebooks: activeLorebooks,
+            // Pass per-character lorebooks when group has no lorebooks
+            characterLorebooksMap: characterLorebooksMap,
+            sessionStats,  // Pass session stats for attribute values
+            hudContext: activeHUDContext  // Pass HUD context for prompt injection
           })
         });
 
@@ -308,7 +378,10 @@ export function ChatPanel() {
       if (!activeCharacter) return;
 
       // Get active lorebooks for prompt injection
-      const activeLorebooks = lorebooks.filter(lb => activeLorebookIds.includes(lb.id) && lb.active);
+      const activeLorebooks = lorebooks.filter(lb => effectiveLorebookIds.includes(lb.id) && lb.active);
+      
+      // Get session stats for attribute values
+      const sessionStats = currentSession?.sessionStats;
 
       if (useStreaming) {
         const response = await fetch('/api/chat/stream', {
@@ -324,7 +397,9 @@ export function ChatPanel() {
             userName: activePersona?.name || 'User',
             persona: activePersona,
             contextConfig,
-            lorebooks: activeLorebooks
+            lorebooks: activeLorebooks,
+            sessionStats,  // Pass session stats for attribute values
+            hudContext: activeHUDContext  // Pass HUD context for prompt injection
           })
         });
 
@@ -424,7 +499,9 @@ export function ChatPanel() {
             userName: activePersona?.name || 'User',
             persona: activePersona,
             contextConfig,
-            lorebooks: activeLorebooks
+            lorebooks: activeLorebooks,
+            sessionStats,  // Pass session stats for attribute values
+            hudContext: activeHUDContext  // Pass HUD context for prompt injection
           })
         });
 
@@ -475,7 +552,7 @@ export function ChatPanel() {
         }
       }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context, lorebooks, activeLorebookIds]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context, lorebooks, effectiveLorebookIds]);
 
   // Handle regenerate - create a new swipe alternative for an existing message
   const handleRegenerate = useCallback(async (messageId: string) => {
@@ -512,7 +589,10 @@ export function ChatPanel() {
       const contextConfig = settings.context;
 
       // Get active lorebooks for prompt injection
-      const activeLorebooks = lorebooks.filter(lb => activeLorebookIds.includes(lb.id) && lb.active);
+      const activeLorebooks = lorebooks.filter(lb => effectiveLorebookIds.includes(lb.id) && lb.active);
+      
+      // Get session stats for attribute values
+      const sessionStats = currentSession?.sessionStats;
 
       // Use regenerate endpoint
       const response = await fetch('/api/chat/regenerate', {
@@ -527,7 +607,9 @@ export function ChatPanel() {
           userName: activePersona?.name || 'User',
           persona: activePersona,
           contextConfig,
-          lorebooks: activeLorebooks
+          lorebooks: activeLorebooks,
+          sessionStats,  // Pass session stats for attribute values
+          hudContext: activeHUDContext  // Pass HUD context for prompt injection
         })
       });
 
@@ -599,7 +681,7 @@ export function ChatPanel() {
         }
       }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, addSwipeAlternative, setGenerating, settings.context, lorebooks, activeLorebookIds]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, addSwipeAlternative, setGenerating, settings.context, lorebooks, effectiveLorebookIds]);
 
   // Handle edit message
   const handleEdit = useCallback((messageId: string, newContent: string) => {

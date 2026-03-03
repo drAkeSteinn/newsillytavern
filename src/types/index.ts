@@ -230,6 +230,7 @@ export interface CharacterCard {
   spriteIndex?: SpriteIndex;    // Cached sprite file index
   voice: VoiceSettings | null;
   hudTemplateId?: string | null;  // HUD template to use for this character
+  lorebookIds?: string[];         // Lorebooks to use for this character
   statsConfig?: CharacterStatsConfig;  // Stats system configuration (attributes, skills, etc.)
   createdAt: string;
   updatedAt: string;
@@ -349,11 +350,8 @@ export interface ChatSession {
 
 // ============ Group Types ============
 
-export type GroupRole = 'leader' | 'member' | 'observer';
-
 export interface GroupMember {
   characterId: string;
-  role: GroupRole;
   isActive: boolean;      // Can respond
   isPresent: boolean;     // Is in the scene
   joinOrder: number;      // Order they joined the group
@@ -380,6 +378,7 @@ export interface CharacterGroup {
   mentionTriggers: string[];    // Additional mention trigger words
   conversationStyle: 'sequential' | 'parallel';  // How responses are generated
   hudTemplateId?: string | null;  // HUD template to use for this group
+  lorebookIds?: string[];         // Lorebooks to use for this group
   createdAt: string;
   updatedAt: string;
 }
@@ -969,13 +968,23 @@ export type HUDFieldStyle =
 export type HUDPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 // HUD overall style
-export type HUDStyle = 'minimal' | 'card' | 'panel';
+export type HUDStyle =
+  | 'minimal'     // Sin fondo, solo texto
+  | 'card'        // Fondo con bordes
+  | 'panel'       // Panel expandido
+  | 'glass'       // Efecto cristal/glassmorphism
+  | 'neon'        // Brillo neón cyberpunk
+  | 'holographic' // Efecto holográfico futurista
+  | 'fantasy'     // Estilo medieval/fantasía
+  | 'retro';      // Estilo retro pixelado
 
 // Single HUD field definition
 export interface HUDField {
   id: string;
   name: string;              // Display name: "HP", "Turno", "Intensidad"
-  key: string;               // Key to match in [key=value] format
+  key: string;               // Primary key to match (backward compatibility)
+  keys?: string[];           // Multiple keys to match: ["HP:", "HP=", "hp:", "hp="]
+  caseSensitive?: boolean;   // Whether to distinguish uppercase/lowercase (default: false)
   type: HUDFieldType;
   
   // For number type
@@ -999,6 +1008,20 @@ export interface HUDField {
   unit?: string;             // "%", "pts", etc.
 }
 
+// HUD Context injection position (reuses LorebookPosition values)
+// 0 = After system prompt, 1 = After user message, 2 = Before user message
+// 3 = After assistant message, 4 = Before assistant message
+// 5 = At top of chat, 6 = At bottom of chat, 7 = Custom/outlet
+export type HUDContextPosition = LorebookPosition;
+
+// HUD Context configuration - text to inject into prompt
+export interface HUDContextConfig {
+  enabled: boolean;              // Whether context injection is active
+  content: string;               // The text content to inject
+  position: HUDContextPosition;  // Where to inject in the prompt
+  scanDepth?: number;            // How many messages back to consider (optional)
+}
+
 // HUD Template - reusable configuration
 export interface HUDTemplate {
   id: string;
@@ -1007,6 +1030,9 @@ export interface HUDTemplate {
   
   // Fields
   fields: HUDField[];
+  
+  // Context injection (new feature)
+  context?: HUDContextConfig;
   
   // Display settings
   position: HUDPosition;
@@ -1331,6 +1357,122 @@ export interface CharacterDialogueStyle {
   customClass?: string;         // Custom CSS class
 }
 
+// Typography settings for dialogue display
+export interface TypographySettings {
+  // Font family
+  fontFamily: 'system' | 'serif' | 'sans' | 'mono' | 'custom';
+  customFontFamily?: string;   // Custom font family name
+
+  // Font size
+  fontSize: 'xs' | 'sm' | 'base' | 'lg' | 'xl';
+  customFontSize?: number;     // Custom size in pixels
+
+  // Font weight
+  fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+
+  // Line height
+  lineHeight: 'tight' | 'normal' | 'relaxed' | 'loose';
+
+  // Letter spacing
+  letterSpacing: 'tighter' | 'tight' | 'normal' | 'wide' | 'wider';
+}
+
+// Content style settings for different text types
+export interface ContentStyleSettings {
+  // Dialogue style (text in quotes)
+  dialogue: {
+    color: string;            // Text color (hex or Tailwind class)
+    fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline';
+  };
+
+  // Action style (text in asterisks)
+  action: {
+    color: string;
+    fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline';
+  };
+
+  // Thought style (text in parentheses)
+  thought: {
+    color: string;
+    fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline';
+  };
+
+  // Whisper style (text in tildes)
+  whisper: {
+    color: string;
+    fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline';
+    opacity: number;          // 0-100
+  };
+
+  // Emotion style (text in asterisks with emotion context)
+  emotion: {
+    showIndicator: boolean;   // Show emotion emoji/indicator
+    highlightText: boolean;   // Highlight text with emotion color
+  };
+
+  // Narration style (plain text)
+  narration: {
+    color: string;
+    fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+    fontStyle: 'normal' | 'italic';
+  };
+}
+
+// Default typography settings
+export const DEFAULT_TYPOGRAPHY_SETTINGS: TypographySettings = {
+  fontFamily: 'system',
+  fontSize: 'base',
+  fontWeight: 'normal',
+  lineHeight: 'normal',
+  letterSpacing: 'normal',
+};
+
+// Default content style settings
+export const DEFAULT_CONTENT_STYLE_SETTINGS: ContentStyleSettings = {
+  dialogue: {
+    color: 'text-foreground',
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    textDecoration: 'none',
+  },
+  action: {
+    color: 'text-purple-600 dark:text-purple-400',
+    fontWeight: 'normal',
+    fontStyle: 'italic',
+    textDecoration: 'none',
+  },
+  thought: {
+    color: 'text-blue-600 dark:text-blue-400',
+    fontWeight: 'normal',
+    fontStyle: 'italic',
+    textDecoration: 'none',
+  },
+  whisper: {
+    color: 'text-muted-foreground',
+    fontWeight: 'normal',
+    fontStyle: 'italic',
+    textDecoration: 'none',
+    opacity: 80,
+  },
+  emotion: {
+    showIndicator: true,
+    highlightText: false,
+  },
+  narration: {
+    color: 'text-muted-foreground',
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+  },
+};
+
 // Typewriter effect settings
 export interface TypewriterSettings {
   enabled: boolean;
@@ -1368,36 +1510,42 @@ export interface DialogueFormatSettings {
 export interface DialogueSettings {
   // Main settings
   enabled: boolean;
-  
+
   // Bubble style
   bubbleStyle: SpeechBubbleStyle;
   showCharacterAvatar: boolean;
   avatarPosition: 'left' | 'right' | 'hidden';
   avatarSize: 'sm' | 'md' | 'lg';
-  
+
   // Formatting
   formatting: DialogueFormatSettings;
-  
+
   // Typewriter
   typewriter: TypewriterSettings;
-  
+
+  // Typography (font settings)
+  typography: TypographySettings;
+
+  // Content styles (colors for different content types)
+  contentStyles: ContentStyleSettings;
+
   // Character overrides
   characterStyles: CharacterDialogueStyle[];
-  
+
   // Colors
   userBubbleColor: string;
   assistantBubbleColor: string;
   systemBubbleColor: string;
-  
+
   // Spacing
   messageSpacing: 'compact' | 'normal' | 'spacious';
   bubbleMaxWidth: number;      // Percentage (50-100)
-  
+
   // Animation
   animateEntry: boolean;
   entryAnimation: 'fade' | 'slide' | 'scale' | 'none';
   animationDurationMs: number;
-  
+
   // Advanced
   parseEmotions: boolean;
   highlightActions: boolean;
@@ -1426,6 +1574,49 @@ export const DEFAULT_DIALOGUE_SETTINGS: DialogueSettings = {
     cursorChar: '▋',
     showCursor: true,
     cursorBlinkMs: 530,
+  },
+  typography: {
+    fontFamily: 'system',
+    fontSize: 'base',
+    fontWeight: 'normal',
+    lineHeight: 'normal',
+    letterSpacing: 'normal',
+  },
+  contentStyles: {
+    dialogue: {
+      color: 'text-foreground',
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+    },
+    action: {
+      color: 'text-purple-600 dark:text-purple-400',
+      fontWeight: 'normal',
+      fontStyle: 'italic',
+      textDecoration: 'none',
+    },
+    thought: {
+      color: 'text-blue-600 dark:text-blue-400',
+      fontWeight: 'normal',
+      fontStyle: 'italic',
+      textDecoration: 'none',
+    },
+    whisper: {
+      color: 'text-muted-foreground',
+      fontWeight: 'normal',
+      fontStyle: 'italic',
+      textDecoration: 'none',
+      opacity: 80,
+    },
+    emotion: {
+      showIndicator: true,
+      highlightText: false,
+    },
+    narration: {
+      color: 'text-muted-foreground',
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+    },
   },
   characterStyles: [],
   userBubbleColor: 'bg-blue-500/20',
@@ -1698,7 +1889,7 @@ export interface StatRequirement {
 export interface AttributeDefinition {
   id: string;
   name: string;              // Display name: "Vida", "Maná", "Resistencia"
-  key: string;               // Template key: "vida" → {{vida}}
+  key: string;               // Template key: "vida" → {{vida}} - Also used as primary detection key
   type: AttributeType;
   
   // Para tipo number
@@ -1707,20 +1898,28 @@ export interface AttributeDefinition {
   max?: number;
   
   // Para detección Post-LLM (detección automática de cambios)
-  detectionTags?: string;    // Tags simples separados por coma: "Vida:, vida:, HP:, ❤️"
+  // Sistema similar a HUD: key es la key principal, keys son alternativas
+  keys?: string[];           // Alternative detection keys: ["HP:", "hp:", "❤️"] - key is always checked first
   caseSensitive?: boolean;   // Distinguir mayúsculas/minúsculas (default: false)
+  
+  // Legacy - mantener por compatibilidad
+  detectionTags?: string;    // Tags simples separados por coma: "Vida:, vida:, HP:, ❤️" (convertido a keys[])
   
   // Formato de salida cuando se inyecta en el prompt
   outputFormat?: string;     // Formato: "Vida: {value}" → "Vida: 50"
   
-  // Legacy (deprecated, use detectionTags instead)
+  // Legacy (deprecated)
   keywordPattern?: string;   // Regex pattern: "Vida:\\s*(\\d+)"
   keywordFormat?: string;    // Output format: "Vida: {value}"
   
   // UI
   icon?: string;             // Emoji or icon name
   color?: string;            // Tailwind color for HUD
-  showInHUD?: boolean;       // Show in HUD overlay
+  
+  // HUD Display Configuration
+  showInHUD?: boolean;       // Show this attribute in the HUD overlay (default: true if color/icon set)
+  hudStyle?: HUDFieldStyle;  // How to display in HUD: 'progress', 'badge', 'gauge', etc.
+  hudUnit?: string;          // Unit to show after value: "%", "pts", etc.
 }
 
 // Skill definition (stored in CharacterCard)

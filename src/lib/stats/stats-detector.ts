@@ -3,13 +3,20 @@
 // ============================================
 //
 // This module detects stat changes in LLM responses using
-// detection tags defined in CharacterStatsConfig.attributes
+// detection keys defined in CharacterStatsConfig.attributes
+//
+// Uses the same system as HUD fields:
+// - key: Primary detection key (always checked first)
+// - keys: Alternative detection keys (optional)
+// - caseSensitive: Whether to distinguish case
 //
 // For example, if an attribute has:
-//   detectionTags: "Vida:, HP:, ❤️"
+//   key: "vida"
+//   keys: ["HP:", "hp:", "❤️"]
+//   caseSensitive: false
 //
-// And the LLM response contains:
-//   "...El golpe te afecta. Vida: 35..."
+// And the LLM response contains any of:
+//   "...Vida: 35..." or "...HP: 35..." or "...hp: 35..."
 //
 // It will detect the change from current value to 35
 
@@ -42,6 +49,85 @@ export interface StatsDetectionResult {
 }
 
 // ============================================
+// Key Extraction (Similar to HUD Handler)
+// ============================================
+
+/**
+ * Get all detection keys for an attribute
+ * 
+ * Priority:
+ * 1. Use attribute.key as primary key
+ * 2. Add attribute.keys[] as alternative keys
+ * 3. Fallback: parse detectionTags (legacy format)
+ */
+export function getDetectionKeys(attribute: AttributeDefinition): string[] {
+  const allKeys: string[] = [];
+  
+  // Primary key is always included
+  if (attribute.key) {
+    allKeys.push(attribute.key);
+  }
+  
+  // Add alternative keys from keys[] array
+  if (attribute.keys && attribute.keys.length > 0) {
+    for (const key of attribute.keys) {
+      if (key && !allKeys.includes(key)) {
+        allKeys.push(key);
+      }
+    }
+  }
+  
+  // Fallback: parse legacy detectionTags
+  if (allKeys.length === 0 && attribute.detectionTags) {
+    const tags = attribute.detectionTags
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    
+    for (const tag of tags) {
+      if (!allKeys.includes(tag)) {
+        allKeys.push(tag);
+      }
+    }
+  }
+  
+  return allKeys;
+}
+
+/**
+ * Normalize a key for case-insensitive matching
+ */
+function normalizeKey(key: string): string {
+  return key.trim().toLowerCase();
+}
+
+/**
+ * Check if a detected key matches an attribute's keys
+ */
+export function keyMatchesAttribute(
+  detectedKey: string,
+  attribute: AttributeDefinition
+): boolean {
+  const allKeys = getDetectionKeys(attribute);
+  
+  for (const key of allKeys) {
+    if (attribute.caseSensitive) {
+      // Case-sensitive: exact match
+      if (key === detectedKey) {
+        return true;
+      }
+    } else {
+      // Case-insensitive: normalize both
+      if (normalizeKey(key) === normalizeKey(detectedKey)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+// ============================================
 // Detection Functions
 // ============================================
 
@@ -60,27 +146,23 @@ export function parseStatValue(
 }
 
 /**
- * Build regex pattern from detection tags
- * Converts "Vida:, HP:, ❤️" into a pattern that matches any tag followed by a value
+ * Build regex pattern from detection keys
+ * Similar to HUD token detection
  */
-export function buildPatternFromTags(
-  tags: string,
+export function buildPatternFromKeys(
+  keys: string[],
   caseSensitive: boolean = false
 ): RegExp | null {
-  if (!tags.trim()) return null;
+  if (keys.length === 0) return null;
   
-  // Split by comma and clean up
-  const tagList = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
-  if (tagList.length === 0) return null;
-  
-  // Escape special regex characters in each tag
-  const escapedTags = tagList.map(tag => {
-    return tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Escape special regex characters in each key
+  const escapedKeys = keys.map(key => {
+    return key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   });
   
-  // Build pattern: (tag1|tag2|tag3)\s*(\S+)
-  // This matches any tag followed by optional whitespace and then captures the value
-  const patternStr = `(${escapedTags.join('|')})\\s*(-?\\d+(?:\\.\\d+)?|[^\\s,;.!?\\n]+)`;
+  // Build pattern: (key1|key2|key3)\s*[:=]?\s*(value)
+  // This matches any key followed by optional colon/equals and then captures the value
+  const patternStr = `(${escapedKeys.join('|')})\\s*[:=]?\\s*(-?\\d+(?:\\.\\d+)?|[^\\s,;.!?\\n\\[\\]]{1,50})`;
   
   try {
     return new RegExp(patternStr, caseSensitive ? 'g' : 'gi');
@@ -90,7 +172,13 @@ export function buildPatternFromTags(
 }
 
 /**
- * Detect attribute updates in text using detection tags
+ * Detect attribute updates in text using detection keys
+ * 
+ * This function detects patterns like:
+ * - [Vida=35] - bracketed format
+ * - Vida: 35 - colon format  
+ * - HP: 35 - alternative key
+ * - vida 35 - space separated
  */
 export function detectAttributeUpdates(
   text: string,
@@ -100,35 +188,27 @@ export function detectAttributeUpdates(
   const detections: AttributeDetection[] = [];
   
   for (const attribute of attributes) {
-    // Try new detectionTags format first
-    let regex: RegExp | null = null;
-    let patternSource: string = '';
+    // Get all detection keys for this attribute
+    const keys = getDetectionKeys(attribute);
     
-    if (attribute.detectionTags) {
-      regex = buildPatternFromTags(attribute.detectionTags, attribute.caseSensitive);
-      patternSource = attribute.detectionTags;
-    } 
-    // Fallback to legacy keywordPattern for backward compatibility
-    else if (attribute.keywordPattern) {
-      try {
-        regex = new RegExp(attribute.keywordPattern, 'gi');
-        patternSource = attribute.keywordPattern;
-      } catch (error) {
-        console.error(`[StatsDetector] Invalid regex for attribute ${attribute.key}:`, error);
-        continue;
-      }
-    }
+    if (keys.length === 0) continue;
     
+    // Build regex pattern
+    const regex = buildPatternFromKeys(keys, attribute.caseSensitive);
     if (!regex) continue;
     
     try {
       let match;
       
       while ((match = regex.exec(text)) !== null) {
-        // For new format: match[1] is the tag, match[2] is the value
-        // For legacy format: match[1] is the value
-        const rawValue = match[2] || match[1];
+        // match[1] is the matched key, match[2] is the value
+        const matchedKey = match[1];
+        const rawValue = match[2];
+        
         if (!rawValue) continue;
+        
+        // Verify this key actually matches this attribute (for case sensitivity)
+        if (!keyMatchesAttribute(matchedKey, attribute)) continue;
         
         const newValue = parseStatValue(rawValue, attribute.type);
         const oldValue = currentValues?.[attribute.key] ?? null;
@@ -142,7 +222,7 @@ export function detectAttributeUpdates(
             oldValue,
             newValue,
             matchedText: match[0],
-            matchedPattern: patternSource,
+            matchedPattern: matchedKey,
             position: match.index,
           });
         }
@@ -215,13 +295,23 @@ export function detectionsToTriggerHits(
 
 /**
  * Stats detection state for streaming
+ * 
+ * Keeps track of the LAST value detected for each attribute.
+ * Multiple updates to the same attribute in one message will use the last value.
+ * 
+ * IMPORTANT: Uses position-based tracking to avoid re-detecting the same pattern
+ * when streaming causes text windows to overlap.
  */
 export class StatsDetectionState {
   private processedLength: number = 0;
-  private detectedUpdates: Map<string, AttributeDetection> = new Map();
+  private lastDetectedValue: Map<string, AttributeDetection> = new Map(); // attributeKey -> last detection
+  private processedPositions: Set<number> = new Set(); // Track which positions have been processed
   
   /**
    * Process new text incrementally
+   * 
+   * Returns detections that have changed from the current stored value.
+   * If an attribute is detected multiple times, only the last value is kept.
    */
   processNewText(
     newText: string,
@@ -229,30 +319,50 @@ export class StatsDetectionState {
     attributes: AttributeDefinition[],
     currentValues: Record<string, number | string> | undefined
   ): AttributeDetection[] {
-    // Look for patterns in recently added text
-    // Use a window of the last 200 characters plus new text
-    const windowStart = Math.max(0, this.processedLength - 200);
-    const windowText = fullText.slice(windowStart);
+    // Only process NEW text (from processedLength onwards)
+    const newContent = fullText.slice(this.processedLength);
+    
+    if (!newContent.trim()) {
+      this.processedLength = fullText.length;
+      return [];
+    }
     
     const newDetections = detectAttributeUpdates(
-      windowText,
+      newContent,
       attributes,
       currentValues
     );
     
-    // Filter to only new detections
-    const trulyNew = newDetections.filter(d => {
-      const key = `${d.attributeKey}:${d.newValue}`;
-      if (this.detectedUpdates.has(key)) {
-        return false;
+    // Adjust positions to be relative to full text
+    for (const detection of newDetections) {
+      detection.position += this.processedLength;
+    }
+    
+    // Process all detections, keeping track of the last value for each attribute
+    const changedDetections: AttributeDetection[] = [];
+    
+    for (const detection of newDetections) {
+      // Skip if we've already processed this exact position
+      if (this.processedPositions.has(detection.position)) {
+        continue;
       }
-      this.detectedUpdates.set(key, d);
-      return true;
-    });
+      this.processedPositions.add(detection.position);
+      
+      const key = detection.attributeKey;
+      const existingDetection = this.lastDetectedValue.get(key);
+      
+      // Always update to the latest detection (later in text = more recent)
+      this.lastDetectedValue.set(key, detection);
+      
+      // Only return as changed if value is different from what we had
+      if (!existingDetection || existingDetection.newValue !== detection.newValue) {
+        changedDetections.push(detection);
+      }
+    }
     
     this.processedLength = fullText.length;
     
-    return trulyNew;
+    return changedDetections;
   }
   
   /**
@@ -260,14 +370,15 @@ export class StatsDetectionState {
    */
   reset(): void {
     this.processedLength = 0;
-    this.detectedUpdates.clear();
+    this.lastDetectedValue.clear();
+    this.processedPositions.clear();
   }
   
   /**
-   * Get all detected updates
+   * Get the last detected value for each attribute
    */
-  getAllDetections(): AttributeDetection[] {
-    return Array.from(this.detectedUpdates.values());
+  getLastDetections(): AttributeDetection[] {
+    return Array.from(this.lastDetectedValue.values());
   }
 }
 

@@ -30,7 +30,11 @@ import {
   Cloud,
   Brain,
   Target,
-  Package
+  Package,
+  FileJson,
+  Settings2,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import {
   Dialog,
@@ -41,6 +45,7 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { LLMProvider, AppSettings } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 import { SoundTriggersSettings } from './sound-triggers-settings';
 import { BackgroundTriggersSettings } from './background-triggers-settings';
 import { PersonaPanel } from './persona-panel';
@@ -70,6 +75,8 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: SettingsPanelProps) {
+  const { toast } = useToast();
+  const store = useTavernStore();
   const { 
     settings, 
     updateSettings, 
@@ -78,17 +85,289 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
     updateLLMConfig, 
     setActiveLLMConfig,
     deleteLLMConfig 
-  } = useTavernStore();
+  } = store;
 
   const [newConfigOpen, setNewConfigOpen] = useState(false);
   const [recordingHotkey, setRecordingHotkey] = useState<string | null>(null);
   const hotkeyContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newConfig, setNewConfig] = useState({
     name: '',
     provider: 'z-ai' as LLMProvider,
     endpoint: '',
     apiKey: ''
   });
+
+  // Export all configuration (without characters/sessions)
+  const handleExportConfig = () => {
+    try {
+      const configData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        type: 'config',
+        data: {
+          // Settings
+          settings: store.settings,
+          // LLM & TTS
+          llmConfigs: store.llmConfigs,
+          ttsConfigs: store.ttsConfigs,
+          promptTemplates: store.promptTemplates,
+          // Personas
+          personas: store.personas,
+          // Lorebooks
+          lorebooks: store.lorebooks,
+          // Sound system
+          soundTriggers: store.soundTriggers,
+          soundCollections: store.soundCollections,
+          // Visual systems
+          backgrounds: store.backgrounds,
+          backgroundPacks: store.backgroundPacks,
+          spritePacks: store.spritePacks,
+          hudTemplates: store.hudTemplates,
+          // Advanced systems
+          atmosphereSettings: store.atmosphereSettings,
+          summarySettings: store.summarySettings,
+          questSettings: store.questSettings,
+          dialogueSettings: store.dialogueSettings,
+          inventorySettings: store.inventorySettings,
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tavernflow-config-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Configuración exportada',
+        description: 'El archivo de configuración se ha descargado correctamente.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error al exportar',
+        description: 'No se pudo exportar la configuración.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Import configuration
+  const handleImportConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const imported = JSON.parse(content);
+
+        // Validate structure
+        if (!imported.data) {
+          throw new Error('Invalid config file structure');
+        }
+
+        const { data } = imported;
+
+        // Import each section if present
+        if (data.settings) {
+          useTavernStore.setState({ settings: data.settings });
+        }
+        if (data.llmConfigs && Array.isArray(data.llmConfigs)) {
+          useTavernStore.setState({ llmConfigs: data.llmConfigs });
+        }
+        if (data.ttsConfigs && Array.isArray(data.ttsConfigs)) {
+          useTavernStore.setState({ ttsConfigs: data.ttsConfigs });
+        }
+        if (data.promptTemplates && Array.isArray(data.promptTemplates)) {
+          useTavernStore.setState({ promptTemplates: data.promptTemplates });
+        }
+        if (data.personas && Array.isArray(data.personas)) {
+          useTavernStore.setState({ personas: data.personas });
+        }
+        if (data.lorebooks && Array.isArray(data.lorebooks)) {
+          useTavernStore.setState({ lorebooks: data.lorebooks });
+        }
+        if (data.soundTriggers && Array.isArray(data.soundTriggers)) {
+          useTavernStore.setState({ soundTriggers: data.soundTriggers });
+        }
+        if (data.soundCollections && Array.isArray(data.soundCollections)) {
+          useTavernStore.setState({ soundCollections: data.soundCollections });
+        }
+        if (data.backgrounds && Array.isArray(data.backgrounds)) {
+          useTavernStore.setState({ backgrounds: data.backgrounds });
+        }
+        if (data.backgroundPacks && Array.isArray(data.backgroundPacks)) {
+          useTavernStore.setState({ backgroundPacks: data.backgroundPacks });
+        }
+        if (data.spritePacks && Array.isArray(data.spritePacks)) {
+          useTavernStore.setState({ spritePacks: data.spritePacks });
+        }
+        if (data.hudTemplates && Array.isArray(data.hudTemplates)) {
+          useTavernStore.setState({ hudTemplates: data.hudTemplates });
+        }
+        if (data.atmosphereSettings) {
+          useTavernStore.setState({ atmosphereSettings: data.atmosphereSettings });
+        }
+        if (data.summarySettings) {
+          useTavernStore.setState({ summarySettings: data.summarySettings });
+        }
+        if (data.questSettings) {
+          useTavernStore.setState({ questSettings: data.questSettings });
+        }
+        if (data.dialogueSettings) {
+          useTavernStore.setState({ dialogueSettings: data.dialogueSettings });
+        }
+        if (data.inventorySettings) {
+          useTavernStore.setState({ inventorySettings: data.inventorySettings });
+        }
+
+        toast({
+          title: 'Configuración importada',
+          description: 'La configuración se ha importado correctamente.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Error al importar',
+          description: 'El archivo no tiene un formato válido.',
+          variant: 'destructive',
+        });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Export everything (config + characters + sessions + groups)
+  const handleExportAll = () => {
+    try {
+      const allData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        type: 'full',
+        data: {
+          // Configuration
+          settings: store.settings,
+          llmConfigs: store.llmConfigs,
+          ttsConfigs: store.ttsConfigs,
+          promptTemplates: store.promptTemplates,
+          personas: store.personas,
+          lorebooks: store.lorebooks,
+          soundTriggers: store.soundTriggers,
+          soundCollections: store.soundCollections,
+          backgrounds: store.backgrounds,
+          backgroundPacks: store.backgroundPacks,
+          spritePacks: store.spritePacks,
+          hudTemplates: store.hudTemplates,
+          atmosphereSettings: store.atmosphereSettings,
+          summarySettings: store.summarySettings,
+          questSettings: store.questSettings,
+          dialogueSettings: store.dialogueSettings,
+          inventorySettings: store.inventorySettings,
+          // Data
+          characters: store.characters,
+          sessions: store.sessions,
+          groups: store.groups,
+          // Advanced data
+          quests: store.quests,
+          items: store.items,
+          containers: store.containers,
+          currencies: store.currencies,
+          summaries: store.summaries,
+          characterMemories: store.characterMemories,
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tavernflow-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Backup completo exportado',
+        description: 'Todos los datos se han exportado correctamente.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error al exportar',
+        description: 'No se pudo crear el backup.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Import everything
+  const handleImportAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const imported = JSON.parse(content);
+
+        if (!imported.data) {
+          throw new Error('Invalid backup file structure');
+        }
+
+        const { data } = imported;
+        const updates: Record<string, unknown> = {};
+
+        // Import all data sections
+        const dataKeys = [
+          'settings', 'llmConfigs', 'ttsConfigs', 'promptTemplates',
+          'personas', 'lorebooks', 'soundTriggers', 'soundCollections',
+          'backgrounds', 'backgroundPacks', 'spritePacks', 'hudTemplates',
+          'atmosphereSettings', 'summarySettings', 'questSettings',
+          'dialogueSettings', 'inventorySettings',
+          'characters', 'sessions', 'groups',
+          'quests', 'items', 'containers', 'currencies',
+          'summaries', 'characterMemories'
+        ];
+
+        dataKeys.forEach(key => {
+          if (data[key] !== undefined) {
+            updates[key] = data[key];
+          }
+        });
+
+        if (Object.keys(updates).length > 0) {
+          useTavernStore.setState(updates);
+        }
+
+        toast({
+          title: 'Backup importado',
+          description: `${Object.keys(updates).length} secciones importadas correctamente.`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Error al importar',
+          description: 'El archivo no tiene un formato válido.',
+          variant: 'destructive',
+        });
+      }
+    };
+    reader.readAsText(file);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Cancel hotkey recording when clicking outside or pressing Escape
   useEffect(() => {
@@ -1000,56 +1279,155 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
 
             {/* Data Settings */}
             <TabsContent value="data" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6">
+              {/* Hidden file inputs */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImportConfig}
+                className="hidden"
+                id="import-config-input"
+              />
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportAll}
+                className="hidden"
+                id="import-all-input"
+              />
+              
+              <div className="space-y-6">
                 {/* Settings Toggles */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Preferencias de Datos</h3>
-                  
-                  <label className="flex items-center justify-between p-4 rounded-lg border cursor-pointer hover:bg-muted/50">
-                    <div>
-                      <Label className="font-medium">Auto-guardado</Label>
-                      <p className="text-xs text-muted-foreground">Guardar cambios automáticamente</p>
-                    </div>
-                    <Switch
-                      checked={settings.autoSave}
-                      onCheckedChange={(autoSave) => updateSettings({ autoSave })}
-                    />
-                  </label>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Preferencias de Datos</h3>
+                    
+                    <label className="flex items-center justify-between p-4 rounded-lg border cursor-pointer hover:bg-muted/50">
+                      <div>
+                        <Label className="font-medium">Auto-guardado</Label>
+                        <p className="text-xs text-muted-foreground">Guardar cambios automáticamente</p>
+                      </div>
+                      <Switch
+                        checked={settings.autoSave}
+                        onCheckedChange={(autoSave) => updateSettings({ autoSave })}
+                      />
+                    </label>
 
-                  <label className="flex items-center justify-between p-4 rounded-lg border cursor-pointer hover:bg-muted/50">
-                    <div>
-                      <Label className="font-medium">Confirmar Eliminación</Label>
-                      <p className="text-xs text-muted-foreground">Preguntar antes de eliminar</p>
-                    </div>
-                    <Switch
-                      checked={settings.confirmDelete}
-                      onCheckedChange={(confirmDelete) => updateSettings({ confirmDelete })}
-                    />
-                  </label>
-                </div>
-
-                {/* Export/Import */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Exportar/Importar</h3>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2">
-                      <Download className="w-5 h-5" />
-                      <span>Exportar Todo</span>
-                      <span className="text-xs text-muted-foreground">Personajes, chats, configs</span>
-                    </Button>
-                    <Button variant="outline" className="h-auto py-4 flex flex-col gap-2">
-                      <Upload className="w-5 h-5" />
-                      <span>Importar Datos</span>
-                      <span className="text-xs text-muted-foreground">Desde archivo JSON</span>
-                    </Button>
+                    <label className="flex items-center justify-between p-4 rounded-lg border cursor-pointer hover:bg-muted/50">
+                      <div>
+                        <Label className="font-medium">Confirmar Eliminación</Label>
+                        <p className="text-xs text-muted-foreground">Preguntar antes de eliminar</p>
+                      </div>
+                      <Switch
+                        checked={settings.confirmDelete}
+                        onCheckedChange={(confirmDelete) => updateSettings({ confirmDelete })}
+                      />
+                    </label>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-muted/30 text-sm text-muted-foreground">
-                    <p>
-                      Los datos se guardan localmente en tu navegador. 
-                      Exporta regularmente para respaldar tu información.
+                  <div className="p-4 rounded-lg border bg-muted/30 text-sm space-y-2">
+                    <h4 className="font-medium text-foreground">Almacenamiento</h4>
+                    <p className="text-muted-foreground">
+                      Los datos se guardan en archivos JSON locales y se sincronizan automáticamente.
                     </p>
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Sincronización activa</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Export/Import Configuration */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="w-5 h-5" />
+                    <h3 className="font-medium">Configuración</h3>
+                    <span className="text-xs text-muted-foreground">(Sin datos de personajes/sesiones)</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="h-auto py-4 flex flex-col gap-2"
+                      onClick={handleExportConfig}
+                    >
+                      <FileJson className="w-5 h-5" />
+                      <span>Exportar Config</span>
+                      <span className="text-xs text-muted-foreground">LLM, sonidos, fondos, etc.</span>
+                    </Button>
+                    <label className="cursor-pointer">
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-4 flex flex-col gap-2 w-full"
+                        asChild
+                      >
+                        <span>
+                          <Upload className="w-5 h-5" />
+                          <span>Importar Config</span>
+                          <span className="text-xs text-muted-foreground">Restaurar configuración</span>
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportConfig}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Export/Import All Data */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Database className="w-5 h-5" />
+                    <h3 className="font-medium">Backup Completo</h3>
+                    <span className="text-xs text-muted-foreground">(Todo: config + personajes + sesiones)</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="h-auto py-4 flex flex-col gap-2"
+                      onClick={handleExportAll}
+                    >
+                      <Download className="w-5 h-5" />
+                      <span>Exportar Todo</span>
+                      <span className="text-xs text-muted-foreground">Backup completo</span>
+                    </Button>
+                    <label className="cursor-pointer">
+                      <Button 
+                        variant="outline" 
+                        className="h-auto py-4 flex flex-col gap-2 w-full"
+                        asChild
+                      >
+                        <span>
+                          <Upload className="w-5 h-5" />
+                          <span>Importar Todo</span>
+                          <span className="text-xs text-muted-foreground">Restaurar backup</span>
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportAll}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Info box */}
+                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-medium text-amber-600 dark:text-amber-400">Recomendación</p>
+                      <p className="text-muted-foreground">
+                        Exporta regularmente un backup completo para respaldar toda tu información.
+                        El archivo de configuración es más ligero y solo incluye ajustes.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook } from '@/types';
+import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, Quest, QuestSettings } from '@/types';
 import {
   createSSEJSON,
   createErrorResponse,
@@ -18,7 +18,9 @@ import {
   streamAnthropic,
   streamOllama,
   streamTextGenerationWebUI,
-  buildLorebookSectionForPrompt
+  buildLorebookSectionForPrompt,
+  buildHUDContextSection,
+  injectHUDContextIntoMessages
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -29,6 +31,7 @@ import {
   type ContextConfig
 } from '@/lib/context-manager';
 import { detectMentions } from '@/lib/mention-detector';
+import { buildQuestPromptSection } from '@/lib/triggers/handlers/quest-handler';
 
 // ============================================
 // Responder Selection Logic
@@ -167,11 +170,29 @@ export async function POST(request: NextRequest) {
       llmConfig,
       userName = 'User',
       persona,
-      lastResponderId
+      lastResponderId,
+      sessionStats,
+      hudContext
     } = validation.data;
 
     // Extract lorebooks from body (not validated by validation.ts)
     const lorebooks: Lorebook[] = body.lorebooks || [];
+
+    // Extract Quest data for pre-LLM integration
+    const quests: Quest[] = body.quests || [];
+    const questSettings: QuestSettings | undefined = body.questSettings;
+
+    // Cast sessionStats to proper type
+    const typedSessionStats = sessionStats as SessionStats | undefined;
+    
+    // Extract per-character lorebook map for when group has no lorebooks
+    // characterLorebooksMap: { [characterId]: lorebookId[] }
+    const characterLorebooksMap: Record<string, string[]> = body.characterLorebooksMap || {};
+    
+    // Determine if we should use per-character lorebooks
+    // If group has lorebooks → use group lorebooks for all
+    // If group has NO lorebooks → use per-character lorebooks
+    const useGroupLorebooks = lorebooks.length > 0;
 
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
@@ -196,15 +217,37 @@ export async function POST(request: NextRequest) {
     // Apply sliding window to messages
     const contextWindow = selectContextMessages(messages, llmConfig, contextConfig);
 
-    // Process lorebooks and get matched entries
-    const { section: lorebookSection } = buildLorebookSectionForPrompt(
-      messages,
-      lorebooks,
-      {
-        scanDepth: contextConfig.scanDepth,
-        tokenBudget: 2048
+    // Build group-level lorebook section if group has lorebooks
+    // This will be used for all characters if group has lorebooks
+    let groupLorebookSection: PromptSection | null = null;
+    if (useGroupLorebooks && lorebooks.length > 0) {
+      const result = buildLorebookSectionForPrompt(
+        messages,
+        lorebooks,
+        {
+          scanDepth: contextConfig.scanDepth,
+          tokenBudget: 2048
+        }
+      );
+      groupLorebookSection = result.section;
+    }
+
+    // Build HUD context section if enabled
+    const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
+
+    // Build quest section if enabled (pre-LLM integration)
+    let questSection: PromptSection | null = null;
+    if (questSettings?.enabled && questSettings?.promptInclude && quests.length > 0) {
+      const questPromptContent = buildQuestPromptSection(quests, questSettings.promptTemplate);
+      if (questPromptContent) {
+        questSection = {
+          type: 'lorebook',
+          label: 'Active Quests',
+          content: questPromptContent,
+          color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+        };
       }
-    );
+    }
 
     // Create a TransformStream for SSE
     const stream = new ReadableStream({
@@ -225,15 +268,50 @@ export async function POST(request: NextRequest) {
               totalResponses: responders.length
             }));
 
+            // Determine lorebook section for this character
+            let lorebookSectionForCharacter: PromptSection | null = groupLorebookSection;
+            
+            // If group has no lorebooks, use character's own lorebooks
+            if (!useGroupLorebooks) {
+              const characterLorebookIds = characterLorebooksMap[responder.id] || [];
+              if (characterLorebookIds.length > 0) {
+                // Filter to get only this character's lorebooks
+                const characterLorebooksFiltered = lorebooks.filter(lb => 
+                  characterLorebookIds.includes(lb.id) && lb.active
+                );
+                
+                if (characterLorebooksFiltered.length > 0) {
+                  const result = buildLorebookSectionForPrompt(
+                    messages,
+                    characterLorebooksFiltered,
+                    {
+                      scanDepth: contextConfig.scanDepth,
+                      tokenBudget: 2048
+                    }
+                  );
+                  lorebookSectionForCharacter = result.section;
+                }
+              } else {
+                // Character has no lorebooks
+                lorebookSectionForCharacter = null;
+              }
+            }
+
             // Build system prompt for this character
             const { prompt: systemPrompt, sections: promptSections } = buildGroupSystemPrompt(
               responder,
-              characters,
               group,
               effectiveUserName,
               persona,
-              lorebookSection
+              lorebookSectionForCharacter,
+              typedSessionStats  // Pass session stats for attribute values
             );
+
+            // Add quest section to the system prompt if present
+            let finalSystemPrompt = systemPrompt;
+            if (questSection) {
+              finalSystemPrompt += `\n\n[${questSection.label}]\n${questSection.content}`;
+            }
 
             // Build chat messages with previous responses from this turn
             const previousResponses = responsesThisTurn.map(r => ({
@@ -242,7 +320,7 @@ export async function POST(request: NextRequest) {
             }));
 
             const { chatMessages, chatHistorySection } = buildGroupChatMessages(
-              systemPrompt,
+              finalSystemPrompt,
               [...contextWindow.messages, createUserMessage(sanitizedMessage)],
               responder,
               characters,
@@ -252,8 +330,8 @@ export async function POST(request: NextRequest) {
 
             // Combine prompt sections with chat history for the viewer
             const allPromptSections: PromptSection[] = chatHistorySection
-              ? [...promptSections, chatHistorySection]
-              : promptSections;
+              ? [...promptSections, ...(questSection ? [questSection] : []), chatHistorySection]
+              : [...promptSections, ...(questSection ? [questSection] : [])];
 
             // Generate response
             let fullContent = '';
@@ -262,9 +340,14 @@ export async function POST(request: NextRequest) {
               // Get the appropriate streaming generator based on provider
               let generator: AsyncGenerator<string>;
 
+              // Inject HUD context into chat messages if enabled
+              const finalChatMessages = hudContextSection && hudContext
+                ? injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position)
+                : chatMessages;
+
               switch (llmConfig.provider) {
                 case 'z-ai': {
-                  generator = streamZAI(chatMessages);
+                  generator = streamZAI(finalChatMessages);
                   break;
                 }
 
@@ -275,7 +358,7 @@ export async function POST(request: NextRequest) {
                     throw new Error(`${llmConfig.provider} requires an endpoint URL`);
                   }
                   // Convert assistant role to system for first message
-                  const openaiMessages = chatMessages.map((m, idx) => ({
+                  const openaiMessages = finalChatMessages.map((m, idx) => ({
                     role: m.role === 'assistant' && idx === 0 ? 'system' : m.role,
                     content: m.content
                   }));
@@ -288,7 +371,7 @@ export async function POST(request: NextRequest) {
                     throw new Error('Anthropic requires an API key');
                   }
                   // Convert assistant role to system for first message
-                  const anthropicMessages = chatMessages.map((m, idx) => ({
+                  const anthropicMessages = finalChatMessages.map((m, idx) => ({
                     role: m.role === 'assistant' && idx === 0 ? 'system' : m.role,
                     content: m.content
                   }));
@@ -299,7 +382,7 @@ export async function POST(request: NextRequest) {
                 case 'ollama': {
                   // Build completion prompt for Ollama
                   const prompt = buildGroupCompletionPrompt(
-                    systemPrompt,
+                    finalSystemPrompt,
                     [...contextWindow.messages, createUserMessage(sanitizedMessage)],
                     responder,
                     effectiveUserName,
@@ -314,7 +397,7 @@ export async function POST(request: NextRequest) {
                 default: {
                   // Build completion prompt for Text Generation WebUI
                   const prompt = buildGroupCompletionPrompt(
-                    systemPrompt,
+                    finalSystemPrompt,
                     [...contextWindow.messages, createUserMessage(sanitizedMessage)],
                     responder,
                     effectiveUserName,

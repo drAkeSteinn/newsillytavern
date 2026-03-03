@@ -10,10 +10,24 @@ const DEBOUNCE_TIME = 2000;
 const PERSIST_KEYS = [
   // Core data
   'characters', 'sessions', 'groups', 'personas', 'settings', 'lorebooks',
+  // LLM & TTS
+  'llmConfigs', 'ttsConfigs', 'promptTemplates',
   // Sound system
   'soundTriggers', 'soundCollections',
   // Visual systems
-  'backgroundPacks', 'spritePacks', 'hudTemplates',
+  'backgrounds', 'backgroundPacks', 'spritePacks', 'hudTemplates',
+  // Advanced systems
+  'activeAtmospherePresetId', 'atmosphereSettings',
+  'summaries', 'summarySettings', 'characterMemories', 'sessionTracking',
+  'quests', 'questSettings', 'questNotifications',
+  'dialogueSettings',
+  'items', 'containers', 'currencies', 'inventorySettings', 'inventoryNotifications',
+  // Active states
+  'activeSessionId', 'activeCharacterId', 'activeGroupId',
+  'activeBackground', 'activeOverlayBack', 'activeOverlayFront',
+  'activePersonaId', 'activeLorebookIds',
+  // Sprite data
+  'spriteIndex', 'spriteLibraries',
 ] as const;
 
 type PersistKey = typeof PERSIST_KEYS[number];
@@ -66,6 +80,17 @@ export function usePersistenceSync() {
           updates.lorebooks = data.lorebooks;
         }
 
+        // LLM & TTS
+        if (data.llmConfigs && Array.isArray(data.llmConfigs)) {
+          updates.llmConfigs = data.llmConfigs;
+        }
+        if (data.ttsConfigs && Array.isArray(data.ttsConfigs)) {
+          updates.ttsConfigs = data.ttsConfigs;
+        }
+        if (data.promptTemplates && Array.isArray(data.promptTemplates)) {
+          updates.promptTemplates = data.promptTemplates;
+        }
+
         // Sound system
         if (data.soundTriggers && Array.isArray(data.soundTriggers)) {
           updates.soundTriggers = data.soundTriggers;
@@ -75,14 +100,110 @@ export function usePersistenceSync() {
         }
 
         // Visual systems
+        if (data.backgrounds && Array.isArray(data.backgrounds)) {
+          updates.backgrounds = data.backgrounds;
+        }
         if (data.backgroundPacks && Array.isArray(data.backgroundPacks)) {
           updates.backgroundPacks = data.backgroundPacks;
         }
         if (data.spritePacks && Array.isArray(data.spritePacks)) {
           updates.spritePacks = data.spritePacks;
         }
+        if (data.sprites) {
+          if (data.sprites.spriteIndex) {
+            updates.spriteIndex = data.sprites.spriteIndex;
+          }
+          if (data.sprites.spriteLibraries) {
+            updates.spriteLibraries = data.sprites.spriteLibraries;
+          }
+        }
         if (data.hudTemplates && Array.isArray(data.hudTemplates)) {
           updates.hudTemplates = data.hudTemplates;
+        }
+
+        // Advanced systems
+        if (data.atmosphere) {
+          if (data.atmosphere.activeAtmospherePresetId !== undefined) {
+            updates.activeAtmospherePresetId = data.atmosphere.activeAtmospherePresetId;
+          }
+          if (data.atmosphere.atmosphereSettings) {
+            updates.atmosphereSettings = data.atmosphere.atmosphereSettings;
+          }
+        }
+        if (data.memory) {
+          if (data.memory.summaries) {
+            updates.summaries = data.memory.summaries;
+          }
+          if (data.memory.summarySettings) {
+            updates.summarySettings = data.memory.summarySettings;
+          }
+          if (data.memory.characterMemories) {
+            updates.characterMemories = data.memory.characterMemories;
+          }
+          if (data.memory.sessionTracking) {
+            updates.sessionTracking = data.memory.sessionTracking;
+          }
+        }
+        if (data.quests) {
+          if (data.quests.quests) {
+            updates.quests = data.quests.quests;
+          }
+          if (data.quests.questSettings) {
+            updates.questSettings = data.quests.questSettings;
+          }
+          if (data.quests.questNotifications) {
+            updates.questNotifications = data.quests.questNotifications;
+          }
+        }
+        if (data.dialogue) {
+          if (data.dialogue.dialogueSettings) {
+            updates.dialogueSettings = data.dialogue.dialogueSettings;
+          }
+        }
+        if (data.inventory) {
+          if (data.inventory.items) {
+            updates.items = data.inventory.items;
+          }
+          if (data.inventory.containers) {
+            updates.containers = data.inventory.containers;
+          }
+          if (data.inventory.currencies) {
+            updates.currencies = data.inventory.currencies;
+          }
+          if (data.inventory.inventorySettings) {
+            updates.inventorySettings = data.inventory.inventorySettings;
+          }
+          if (data.inventory.inventoryNotifications) {
+            updates.inventoryNotifications = data.inventory.inventoryNotifications;
+          }
+        }
+
+        // Active states
+        if (data.activeStates) {
+          if (data.activeStates.activeSessionId !== undefined) {
+            updates.activeSessionId = data.activeStates.activeSessionId;
+          }
+          if (data.activeStates.activeCharacterId !== undefined) {
+            updates.activeCharacterId = data.activeStates.activeCharacterId;
+          }
+          if (data.activeStates.activeGroupId !== undefined) {
+            updates.activeGroupId = data.activeStates.activeGroupId;
+          }
+          if (data.activeStates.activeBackground !== undefined) {
+            updates.activeBackground = data.activeStates.activeBackground;
+          }
+          if (data.activeStates.activeOverlayBack !== undefined) {
+            updates.activeOverlayBack = data.activeStates.activeOverlayBack;
+          }
+          if (data.activeStates.activeOverlayFront !== undefined) {
+            updates.activeOverlayFront = data.activeStates.activeOverlayFront;
+          }
+          if (data.activeStates.activePersonaId !== undefined) {
+            updates.activePersonaId = data.activeStates.activePersonaId;
+          }
+          if (data.activeStates.activeLorebookIds !== undefined) {
+            updates.activeLorebookIds = data.activeStates.activeLorebookIds;
+          }
         }
 
         // Apply updates to store
@@ -115,13 +236,59 @@ export function usePersistenceSync() {
         personas: state.personas,
         settings: state.settings,
         lorebooks: state.lorebooks,
+        // LLM & TTS
+        llmConfigs: state.llmConfigs,
+        ttsConfigs: state.ttsConfigs,
+        promptTemplates: state.promptTemplates,
         // Sound system
         soundTriggers: state.soundTriggers,
         soundCollections: state.soundCollections,
         // Visual systems
+        backgrounds: state.backgrounds,
         backgroundPacks: state.backgroundPacks,
         spritePacks: state.spritePacks,
+        sprites: {
+          spriteIndex: state.spriteIndex,
+          spriteLibraries: state.spriteLibraries,
+        },
         hudTemplates: state.hudTemplates,
+        // Advanced systems
+        atmosphere: {
+          activeAtmospherePresetId: state.activeAtmospherePresetId,
+          atmosphereSettings: state.atmosphereSettings,
+        },
+        memory: {
+          summaries: state.summaries,
+          summarySettings: state.summarySettings,
+          characterMemories: state.characterMemories,
+          sessionTracking: state.sessionTracking,
+        },
+        quests: {
+          quests: state.quests,
+          questSettings: state.questSettings,
+          questNotifications: state.questNotifications,
+        },
+        dialogue: {
+          dialogueSettings: state.dialogueSettings,
+        },
+        inventory: {
+          items: state.items,
+          containers: state.containers,
+          currencies: state.currencies,
+          inventorySettings: state.inventorySettings,
+          inventoryNotifications: state.inventoryNotifications,
+        },
+        // Active states
+        activeStates: {
+          activeSessionId: state.activeSessionId,
+          activeCharacterId: state.activeCharacterId,
+          activeGroupId: state.activeGroupId,
+          activeBackground: state.activeBackground,
+          activeOverlayBack: state.activeOverlayBack,
+          activeOverlayFront: state.activeOverlayFront,
+          activePersonaId: state.activePersonaId,
+          activeLorebookIds: state.activeLorebookIds,
+        },
       };
 
       const response = await fetch('/api/persistence', {

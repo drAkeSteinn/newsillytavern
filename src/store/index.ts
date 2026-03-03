@@ -52,6 +52,7 @@ import type {
 
 // Import defaults for merge function
 import { defaultSettings, defaultPersona } from './defaults';
+import { DEFAULT_DIALOGUE_SETTINGS, DEFAULT_SUMMARY_SETTINGS, DEFAULT_QUEST_SETTINGS } from '@/types';
 
 // Combined store type
 export type TavernState = CharacterSlice &
@@ -229,6 +230,36 @@ export const useTavernStore = create<TavernState>()(
           return s;
         });
 
+        // Ensure dialogueSettings has complete structure
+        const persistedDialogue = persisted.dialogueSettings as Record<string, unknown> | undefined;
+        const mergedDialogue = {
+          ...DEFAULT_DIALOGUE_SETTINGS,
+          ...(persistedDialogue || {}),
+          // Ensure nested objects exist
+          typewriter: {
+            ...DEFAULT_DIALOGUE_SETTINGS.typewriter,
+            ...((persistedDialogue?.typewriter as Record<string, unknown>) || {})
+          },
+          formatting: {
+            ...DEFAULT_DIALOGUE_SETTINGS.formatting,
+            ...((persistedDialogue?.formatting as Record<string, unknown>) || {})
+          }
+        };
+
+        // Ensure summarySettings has complete structure
+        const persistedSummary = persisted.summarySettings as Record<string, unknown> | undefined;
+        const mergedSummary = {
+          ...DEFAULT_SUMMARY_SETTINGS,
+          ...(persistedSummary || {})
+        };
+
+        // Ensure questSettings has complete structure
+        const persistedQuest = persisted.questSettings as Record<string, unknown> | undefined;
+        const mergedQuest = {
+          ...DEFAULT_QUEST_SETTINGS,
+          ...(persistedQuest || {})
+        };
+
         // Return merged state
         return {
           ...currentState,
@@ -238,6 +269,9 @@ export const useTavernStore = create<TavernState>()(
           personas: mergedPersonas,
           groups: mergedGroups,
           sessions: mergedSessions,
+          dialogueSettings: mergedDialogue,
+          summarySettings: mergedSummary,
+          questSettings: mergedQuest,
         };
       },
     }

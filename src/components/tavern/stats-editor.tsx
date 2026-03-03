@@ -249,8 +249,8 @@ function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEdit
             </div>
           )}
           
-          {/* Detection Tags (Post-LLM) */}
-          <div className="space-y-2 p-3 bg-muted/50 rounded-lg border">
+          {/* Detection Keys (Post-LLM) - Similar to HUD Field System */}
+          <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
               <Label className="text-xs font-medium">Detección automática (Post-LLM)</Label>
@@ -259,33 +259,61 @@ function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEdit
                   <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-sm">
-                  <p>Cuando el LLM escriba estos tags en su respuesta, el valor se actualizará automáticamente.</p>
-                  <p className="mt-1 text-xs text-muted-foreground">El sistema busca el número/texto que viene DESPUÉS del tag.</p>
+                  <p>Cuando el LLM escriba estas keys en su respuesta, el valor se actualizará automáticamente.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">El sistema detecta: key=valor, key: valor, [key=valor]</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             
+            {/* Primary Key Display */}
+            <div className="flex items-center gap-2 p-2 bg-amber-500/10 rounded border border-amber-500/20">
+              <span className="text-xs text-muted-foreground">Key principal:</span>
+              <code className="text-xs bg-background px-2 py-0.5 rounded font-mono">
+                {attribute.key || '(sin key)'}
+              </code>
+              <span className="text-[10px] text-muted-foreground">
+                (siempre detectada)
+              </span>
+            </div>
+            
+            {/* Alternative Keys */}
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <Label className="text-xs">Tags de detección</Label>
+                <Label className="text-xs">Keys alternativas</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    <p>Palabras o símbolos que preceden al valor. Separa múltiples con comas.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Ejemplo: "Vida:, HP:, ❤️" detectará "Vida: 50", "HP: 30", "❤️ 100"</p>
+                    <p>Keys adicionales que también actualizarán este atributo.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Ejemplo: HP, hp, ❤️ detectará "HP: 50", "hp=30", "❤️ 100"</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Input
-                value={attribute.detectionTags || ''}
-                onChange={(e) => onChange(index, { detectionTags: e.target.value || undefined })}
-                placeholder="Vida:, HP:, ❤️"
-                className="h-8"
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={(attribute.keys || []).join(', ')}
+                  onChange={(e) => {
+                    const keys = e.target.value.split(',').map(k => k.trim()).filter(Boolean);
+                    onChange(index, { keys: keys.length > 0 ? keys : undefined });
+                  }}
+                  placeholder="HP, hp, ❤️ (separar con comas)"
+                  className="h-8 flex-1"
+                />
+              </div>
+              {/* Show detected keys preview */}
+              {((attribute.keys?.length || 0) > 0 || attribute.key) && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {[attribute.key, ...(attribute.keys || [])].filter(Boolean).map((key, i) => (
+                    <Badge key={i} variant="outline" className="text-[10px] font-mono">
+                      {key}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
             
+            {/* Case Sensitivity */}
             <div className="flex items-center gap-2">
               <Switch
                 checked={attribute.caseSensitive ?? false}
@@ -295,6 +323,25 @@ function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEdit
                 <CaseSensitive className="w-3 h-3" />
                 Distinguir mayúsculas/minúsculas
               </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Si está desactivado (por defecto), "HP: 50" y "hp: 50" serán equivalentes.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            
+            {/* Detection Examples */}
+            <div className="text-[10px] text-muted-foreground space-y-1 p-2 bg-background/50 rounded">
+              <p className="font-medium text-foreground/70">Formatos detectados:</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                <p>• <code>[Vida=50]</code></p>
+                <p>• <code>Vida: 50</code></p>
+                <p>• <code>HP=50</code></p>
+                <p>• <code>hp: 50</code></p>
+              </div>
             </div>
           </div>
           
@@ -354,10 +401,250 @@ function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEdit
               <Label className="text-xs">Mostrar en HUD</Label>
             </div>
           </div>
+          
+          {/* HUD Customization */}
+          {attribute.showInHUD !== false && (
+            <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-cyan-500" />
+                <Label className="text-xs font-medium">Personalización del HUD</Label>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {/* HUD Style */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Estilo visual</Label>
+                  <Select
+                    value={attribute.hudStyle || 'default'}
+                    onValueChange={(value) => onChange(index, { hudStyle: value as any })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">📝 Por defecto</SelectItem>
+                      <SelectItem value="progress">📊 Barra progreso</SelectItem>
+                      <SelectItem value="badge">🏷️ Badge</SelectItem>
+                      <SelectItem value="gauge">⭕ Gauge circular</SelectItem>
+                      <SelectItem value="pill">💊 Píldora</SelectItem>
+                      <SelectItem value="status">🟢 Estado</SelectItem>
+                      <SelectItem value="dots">••• Puntos</SelectItem>
+                      <SelectItem value="meter">📈 Medidor vertical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* HUD Unit */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Unidad</Label>
+                  <Input
+                    value={attribute.hudUnit || ''}
+                    onChange={(e) => onChange(index, { hudUnit: e.target.value || undefined })}
+                    placeholder="%, pts, ❤️"
+                    className="h-8"
+                  />
+                </div>
+              </div>
+              
+              {/* Preview */}
+              <div className="mt-2 p-2 bg-slate-900/50 rounded border border-white/10">
+                <p className="text-[10px] text-muted-foreground mb-1">Vista previa:</p>
+                <AttributeHUDPreview attribute={attribute} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+// ============================================
+// Attribute HUD Preview Component
+// ============================================
+
+interface AttributeHUDPreviewProps {
+  attribute: AttributeDefinition;
+}
+
+function AttributeHUDPreview({ attribute }: AttributeHUDPreviewProps) {
+  const value = attribute.defaultValue ?? (attribute.type === 'number' ? 0 : '');
+  const style = attribute.hudStyle || 'default';
+  const color = attribute.color || 'default';
+  const icon = attribute.icon;
+  const unit = attribute.hudUnit;
+  const min = attribute.min ?? 0;
+  const max = attribute.max ?? 100;
+  
+  // Color classes
+  const colorClasses: Record<string, string> = {
+    red: 'text-red-400',
+    green: 'text-green-400',
+    blue: 'text-blue-400',
+    yellow: 'text-yellow-400',
+    purple: 'text-purple-400',
+    orange: 'text-orange-400',
+    pink: 'text-pink-400',
+    cyan: 'text-cyan-400',
+    default: 'text-white/80',
+  };
+  
+  const bgColorClasses: Record<string, string> = {
+    red: 'bg-red-500/20 border-red-500/30',
+    green: 'bg-green-500/20 border-green-500/30',
+    blue: 'bg-blue-500/20 border-blue-500/30',
+    yellow: 'bg-yellow-500/20 border-yellow-500/30',
+    purple: 'bg-purple-500/20 border-purple-500/30',
+    orange: 'bg-orange-500/20 border-orange-500/30',
+    pink: 'bg-pink-500/20 border-pink-500/30',
+    cyan: 'bg-cyan-500/20 border-cyan-500/30',
+    default: 'bg-white/10 border-white/20',
+  };
+  
+  const progressColorClasses: Record<string, string> = {
+    red: 'bg-red-500',
+    green: 'bg-green-500',
+    blue: 'bg-blue-500',
+    yellow: 'bg-yellow-500',
+    purple: 'bg-purple-500',
+    orange: 'bg-orange-500',
+    pink: 'bg-pink-500',
+    cyan: 'bg-cyan-500',
+    default: 'bg-white/50',
+  };
+  
+  const textColor = colorClasses[color] || colorClasses.default;
+  const bgColor = bgColorClasses[color] || bgColorClasses.default;
+  const progressColor = progressColorClasses[color] || progressColorClasses.default;
+  
+  // Render based on style
+  switch (style) {
+    case 'progress': {
+      const percentage = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
+      return (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              {icon && <span className="text-sm">{icon}</span>}
+              <span className="text-xs text-white/50">{attribute.name}</span>
+            </div>
+            <span className="text-xs font-medium text-white/80">
+              {value}{unit && <span className="text-white/40 ml-0.5">{unit}</span>}
+            </span>
+          </div>
+          <div className="w-full bg-white/10 rounded-full h-2">
+            <div className={`h-full rounded-full transition-all ${progressColor}`} style={{ width: `${percentage}%` }} />
+          </div>
+        </div>
+      );
+    }
+    
+    case 'gauge': {
+      const percentage = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
+      const circumference = 2 * Math.PI * 28;
+      const offset = circumference - (percentage / 100) * circumference;
+      return (
+        <div className="flex items-center gap-2">
+          <div className="relative w-10 h-10">
+            <svg className="w-10 h-10 transform -rotate-90">
+              <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.1)" strokeWidth="4" fill="none" />
+              <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="4" fill="none"
+                strokeDasharray={circumference} strokeDashoffset={offset}
+                className={textColor} style={{ transition: 'stroke-dashoffset 0.5s' }} />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-white">{value}</span>
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs text-white/50">{attribute.name}</span>
+            {unit && <span className="text-[10px] text-white/30">{unit}</span>}
+          </div>
+        </div>
+      );
+    }
+    
+    case 'badge':
+      return (
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-sm">{icon}</span>}
+          <span className="text-xs text-white/50">{attribute.name}:</span>
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${bgColor} ${textColor}`}>
+            {value}
+            {unit && <span className="ml-0.5 opacity-60">{unit}</span>}
+          </span>
+        </div>
+      );
+    
+    case 'pill':
+      return (
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${bgColor}`}>
+          {icon && <span className="text-sm">{icon}</span>}
+          <span className="text-xs text-white/60">{attribute.name}:</span>
+          <span className={`text-sm font-medium ${textColor}`}>
+            {value}
+            {unit && <span className="text-white/40 ml-0.5">{unit}</span>}
+          </span>
+        </div>
+      );
+    
+    case 'status': {
+      const statusColor = typeof value === 'boolean' 
+        ? (value ? 'bg-green-500' : 'bg-red-500')
+        : progressColor;
+      return (
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${statusColor} animate-pulse`} />
+          <span className="text-xs text-white/50">{attribute.name}:</span>
+          <span className={`text-sm font-medium ${textColor}`}>
+            {typeof value === 'boolean' ? (value ? 'Activo' : 'Inactivo') : String(value)}
+          </span>
+        </div>
+      );
+    }
+    
+    case 'dots': {
+      const numDots = typeof value === 'boolean' ? (value ? 5 : 0) : Math.min(5, Math.max(0, Number(value)));
+      return (
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-sm">{icon}</span>}
+          <span className="text-xs text-white/50">{attribute.name}:</span>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className={`w-2 h-2 rounded-full ${i <= numDots ? progressColor : 'bg-white/20'}`} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    case 'meter': {
+      const percentage = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
+      return (
+        <div className="flex items-end gap-2 h-8">
+          <div className="relative w-4 h-full bg-white/10 rounded-sm overflow-hidden">
+            <div className={`absolute bottom-0 w-full transition-all ${progressColor}`} style={{ height: `${percentage}%` }} />
+          </div>
+          <div className="flex flex-col justify-end">
+            <span className="text-[8px] text-white/50">{attribute.name}</span>
+            <span className={`text-[10px] font-bold ${textColor}`}>{value}</span>
+          </div>
+        </div>
+      );
+    }
+    
+    default:
+      return (
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-sm">{icon}</span>}
+          <span className="text-xs text-white/50">{attribute.name}:</span>
+          <span className={`text-sm font-medium px-2 py-0.5 rounded border ${bgColor} ${textColor}`}>
+            {value}
+            {unit && <span className="text-white/40 ml-0.5">{unit}</span>}
+          </span>
+        </div>
+      );
+  }
 }
 
 // ============================================

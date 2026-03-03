@@ -7,6 +7,11 @@
  * - {{char}} - Character's name
  * - {{userpersona}} - User's persona description
  * - {{#if condition}}...{{/if}} - Conditional blocks (basic support)
+ * 
+ * Supported example dialogue format:
+ * - <START> - Marks the beginning of an example dialogue block
+ * - {{user}}: - User's dialogue line
+ * - {{char}}: - Character's dialogue line
  */
 
 import type { CharacterCard, Persona } from '@/types';
@@ -98,6 +103,117 @@ function getVariableValue(varName: string, context: TemplateContext): string | u
     default:
       return undefined;
   }
+}
+
+/**
+ * Process example dialogue with SillyTavern-style formatting
+ * 
+ * Converts <START> blocks into formatted instruction/response pairs:
+ * 
+ * Input:
+ * <START>
+ * {{user}}: Hello, how are you?
+ * {{char}}: "I'm doing great, thank you for asking!"
+ * <START>
+ * 
+ * Output:
+ * ### Instruction:
+ * userName: Hello, how are you?
+ * 
+ * ### Response:
+ * charName: "I'm doing great, thank you for asking!"
+ * 
+ */
+export function processExampleDialogue(
+  mesExample: string,
+  userName: string,
+  charName: string
+): string {
+  if (!mesExample || !mesExample.trim()) {
+    return '';
+  }
+
+  // First, replace template variables in the entire text
+  let processed = mesExample;
+  processed = processed.replace(/\{\{user\}\}/gi, userName);
+  processed = processed.replace(/\{\{char\}\}/gi, charName);
+
+  // Split by <START> tags
+  const blocks = processed.split(/<START>/gi).filter(block => block.trim());
+  
+  if (blocks.length === 0) {
+    // No <START> tags found, return as-is (with variables replaced)
+    return processed.trim();
+  }
+
+  // Process each block
+  const formattedBlocks: string[] = [];
+  
+  for (const block of blocks) {
+    const trimmedBlock = block.trim();
+    if (!trimmedBlock) continue;
+    
+    // Parse the block into instruction (user lines) and response (char lines)
+    const lines = trimmedBlock.split('\n').filter(line => line.trim());
+    
+    if (lines.length === 0) continue;
+    
+    const userLines: string[] = [];
+    const charLines: string[] = [];
+    
+    // Regex to match "Name: content" pattern
+    const linePattern = new RegExp(`^(${escapeRegExp(userName)}|${escapeRegExp(charName)})\\s*:\\s*(.*)`, 'i');
+    
+    let lastSpeaker: 'user' | 'char' | null = null;
+    
+    for (const line of lines) {
+      const match = line.match(linePattern);
+      
+      if (match) {
+        const speaker = match[1].toLowerCase() === userName.toLowerCase() ? 'user' : 'char';
+        const content = match[2].trim();
+        
+        if (speaker === 'user') {
+          userLines.push(`${userName}: ${content}`);
+          lastSpeaker = 'user';
+        } else {
+          charLines.push(`${charName}: ${content}`);
+          lastSpeaker = 'char';
+        }
+      } else if (lastSpeaker) {
+        // Continuation of previous line
+        if (lastSpeaker === 'user') {
+          userLines[userLines.length - 1] += ' ' + line.trim();
+        } else {
+          charLines[charLines.length - 1] += ' ' + line.trim();
+        }
+      }
+    }
+    
+    // Format the block
+    if (userLines.length > 0 || charLines.length > 0) {
+      let formattedBlock = '';
+      
+      if (userLines.length > 0) {
+        formattedBlock += `### Instruction:\n${userLines.join('\n')}\n\n`;
+      }
+      
+      if (charLines.length > 0) {
+        formattedBlock += `### Response:\n${charLines.join('\n')}`;
+      }
+      
+      formattedBlocks.push(formattedBlock);
+    }
+  }
+  
+  return formattedBlocks.join('\n\n');
+}
+
+/**
+ * Escape special regex characters
+ */
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**

@@ -1,1 +1,35 @@
-[]
+[
+  {
+    "name": "Moon",
+    "description": "Stats",
+    "fields": [
+      {
+        "id": "9cbc7bdc-991d-410f-8271-1df603d9d66a",
+        "name": "Vida",
+        "key": "hp",
+        "type": "number",
+        "style": "default",
+        "color": "green",
+        "min": 10,
+        "max": 100,
+        "defaultValue": 0,
+        "unit": "pts",
+        "showLabel": true,
+        "showValue": true
+      }
+    ],
+    "position": "top-left",
+    "style": "neon",
+    "opacity": 0.7,
+    "compact": true,
+    "id": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da",
+    "createdAt": "2026-03-02T10:09:15.831Z",
+    "updatedAt": "2026-03-02T17:44:03.163Z",
+    "context": {
+      "enabled": true,
+      "content": "asd",
+      "position": 3,
+      "scanDepth": 1
+    }
+  }
+]

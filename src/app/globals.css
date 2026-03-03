@@ -294,3 +294,181 @@
     animation: none !important;
   }
 }
+
+/* ============================================
+   HUD Style Animations
+   ============================================ */
+
+/* Glass/Shimmer effect */
+@keyframes shimmer {
+  0%, 100% {
+    background-position: -200% 0;
+  }
+  50% {
+    background-position: 200% 0;
+  }
+}
+
+/* Neon pulse effect */
+@keyframes neonPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(6, 182, 212, 0.3),
+      inset 0 0 20px rgba(6, 182, 212, 0.1),
+      0 0 40px rgba(6, 182, 212, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(6, 182, 212, 0.5),
+      inset 0 0 30px rgba(6, 182, 212, 0.2),
+      0 0 60px rgba(6, 182, 212, 0.2);
+  }
+}
+
+/* Holographic scan line effect */
+@keyframes holoScan {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Holographic color shift */
+@keyframes holoShift {
+  0%, 100% {
+    opacity: 0.3;
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.6;
+    filter: hue-rotate(30deg);
+  }
+}
+
+/* Retro CRT flicker */
+@keyframes retroFlicker {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+  }
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.8;
+  }
+  94% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 0.9;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+/* Fantasy glow pulse */
+@keyframes fantasyGlow {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 20px rgba(217, 119, 6, 0.1),
+      0 0 15px rgba(217, 119, 6, 0.2);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 30px rgba(217, 119, 6, 0.15),
+      0 0 25px rgba(217, 119, 6, 0.3);
+  }
+}
+
+/* Progress bar animation */
+@keyframes progressPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Slide in from side based on position */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* HUD entrance animations */
+.hud-enter-left {
+  animation: slideInFromLeft 0.3s ease-out forwards;
+}
+
+.hud-enter-right {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+/* Reduced motion for HUD animations */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes shimmer {
+    0%, 100% {
+      background-position: 0 0;
+    }
+  }
+
+  @keyframes neonPulse {
+    0%, 100% {
+      box-shadow:
+        0 0 20px rgba(6, 182, 212, 0.3),
+        inset 0 0 20px rgba(6, 182, 212, 0.1);
+    }
+  }
+
+  @keyframes holoScan {
+    0%, 100% {
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes retroFlicker {
+    0%, 100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes fantasyGlow {
+    0%, 100% {
+      box-shadow:
+        inset 0 0 20px rgba(217, 119, 6, 0.1),
+        0 0 15px rgba(217, 119, 6, 0.2);
+    }
+  }
+}

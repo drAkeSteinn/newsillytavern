@@ -1,0 +1,14 @@
+{
+  "quests": [],
+  "questSettings": {
+    "enabled": true,
+    "autoDetect": true,
+    "realtimeEnabled": true,
+    "showNotifications": true,
+    "showCompletedInLog": true,
+    "maxActiveQuests": 10,
+    "promptInclude": true,
+    "promptTemplate": "**Quests Activos:**\n{{activeQuests}}\n\nInstrucciones: Usa la información de los quests activos para contextualizar tus respuestas. Progresar en los quests a través de la narrativa cuando sea apropiado."
+  },
+  "questNotifications": []
+}

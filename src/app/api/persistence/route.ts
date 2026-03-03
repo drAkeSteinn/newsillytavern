@@ -86,10 +86,16 @@ export async function PUT(request: NextRequest) {
     const {
       // Core data
       characters, sessions, groups, personas, settings, lorebooks,
+      // LLM & TTS
+      llmConfigs, ttsConfigs, promptTemplates,
       // Sound system
       soundTriggers, soundCollections,
       // Visual systems
-      backgroundPacks, spritePacks, hudTemplates,
+      backgrounds, backgroundPacks, spritePacks, sprites, hudTemplates,
+      // Advanced systems
+      atmosphere, memory, quests, dialogue, inventory,
+      // Active states
+      activeStates,
     } = body;
 
     const results: Record<string, boolean> = {};
@@ -114,6 +120,17 @@ export async function PUT(request: NextRequest) {
       results.lorebooks = writePersistentData('lorebooks', lorebooks);
     }
 
+    // LLM & TTS
+    if (llmConfigs !== undefined) {
+      results.llmConfigs = writePersistentData('llmConfigs', llmConfigs);
+    }
+    if (ttsConfigs !== undefined) {
+      results.ttsConfigs = writePersistentData('ttsConfigs', ttsConfigs);
+    }
+    if (promptTemplates !== undefined) {
+      results.promptTemplates = writePersistentData('promptTemplates', promptTemplates);
+    }
+
     // Sound system
     if (soundTriggers !== undefined) {
       results.soundTriggers = writePersistentData('soundTriggers', soundTriggers);
@@ -123,14 +140,42 @@ export async function PUT(request: NextRequest) {
     }
 
     // Visual systems
+    if (backgrounds !== undefined) {
+      results.backgrounds = writePersistentData('backgrounds', backgrounds);
+    }
     if (backgroundPacks !== undefined) {
       results.backgroundPacks = writePersistentData('backgroundPacks', backgroundPacks);
     }
     if (spritePacks !== undefined) {
       results.spritePacks = writePersistentData('spritePacks', spritePacks);
     }
+    if (sprites !== undefined) {
+      results.sprites = writePersistentData('sprites', sprites);
+    }
     if (hudTemplates !== undefined) {
       results.hudTemplates = writePersistentData('hudTemplates', hudTemplates);
+    }
+
+    // Advanced systems
+    if (atmosphere !== undefined) {
+      results.atmosphere = writePersistentData('atmosphere', atmosphere);
+    }
+    if (memory !== undefined) {
+      results.memory = writePersistentData('memory', memory);
+    }
+    if (quests !== undefined) {
+      results.quests = writePersistentData('quests', quests);
+    }
+    if (dialogue !== undefined) {
+      results.dialogue = writePersistentData('dialogue', dialogue);
+    }
+    if (inventory !== undefined) {
+      results.inventory = writePersistentData('inventory', inventory);
+    }
+
+    // Active states
+    if (activeStates !== undefined) {
+      results.activeStates = writePersistentData('activeStates', activeStates);
     }
 
     const allSuccess = Object.values(results).every(v => v);

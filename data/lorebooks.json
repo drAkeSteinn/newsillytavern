@@ -1,7 +1,7 @@
 [
   {
     "id": "970115d5-8ca4-45fe-996a-eb6d5daf93a2",
-    "name": "Lorebook",
+    "name": "Loreb",
     "description": "",
     "entries": [
       {
@@ -546,6 +546,6 @@
     "tags": [],
     "active": true,
     "createdAt": "2026-03-01T23:51:41.461Z",
-    "updatedAt": "2026-03-01T23:51:41.461Z"
+    "updatedAt": "2026-03-02T09:12:51.488Z"
   }
 ]

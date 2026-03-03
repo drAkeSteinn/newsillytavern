@@ -2,20 +2,21 @@
 // Prompt Builder - Unified prompt construction
 // ============================================
 
-import type { 
-  CharacterCard, 
-  ChatMessage, 
-  Persona, 
-  PromptSection, 
+import type {
+  CharacterCard,
+  ChatMessage,
+  Persona,
+  PromptSection,
   CharacterGroup,
   Lorebook,
   SummaryData,
   CharacterMemory,
   SessionStats,
+  HUDContextConfig,
 } from '@/types';
 import type { ChatApiMessage, CompletionPromptConfig, GroupPromptBuildResult } from './types';
-import { processCharacterTemplate } from '@/lib/prompt-template';
-import { 
+import { processCharacterTemplate, processExampleDialogue, replaceTemplateVariables } from '@/lib/prompt-template';
+import {
   processLorebooks,
   type LorebookInjectOptions,
   type LorebookInjectResult
@@ -23,8 +24,6 @@ import {
 import {
   resolveStats,
   resolveStatsInText,
-  buildStatsPromptSections,
-  hasStatsKeys,
   type StatsResolutionContext,
 } from '@/lib/stats';
 
@@ -47,7 +46,174 @@ export const SECTION_COLORS = {
   summary: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
   memory: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
   relationship: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
+  hud_context: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
 } as const;
+
+// ============================================
+// HUD Context Injection
+// ============================================
+
+/**
+ * Build a HUD context section for prompt injection
+ */
+export function buildHUDContextSection(
+  contextConfig: HUDContextConfig
+): PromptSection | null {
+  if (!contextConfig.enabled || !contextConfig.content.trim()) {
+    return null;
+  }
+
+  return {
+    type: 'lorebook', // Use lorebook type for styling
+    label: 'HUD Context',
+    content: contextConfig.content,
+    color: SECTION_COLORS.hud_context
+  };
+}
+
+/**
+ * Inject HUD context at the specified position
+ *
+ * Positions:
+ * 0 = After system prompt
+ * 1 = After user message
+ * 2 = Before user message
+ * 3 = After assistant message
+ * 4 = Before assistant message
+ * 5 = At top of chat (before all messages)
+ * 6 = At bottom of chat (after all messages)
+ */
+export function injectHUDContextIntoMessages(
+  messages: ChatApiMessage[],
+  contextSection: PromptSection,
+  position: number
+): ChatApiMessage[] {
+  if (!contextSection.content.trim()) {
+    return messages;
+  }
+
+  const contextContent = `[${contextSection.label}]\n${contextSection.content}`;
+  const result: ChatApiMessage[] = [...messages];
+
+  switch (position) {
+    case 0: // After system prompt
+      // Find the first system/assistant message (the system prompt)
+      const sysIdx = result.findIndex(m => m.role === 'assistant' || m.role === 'system');
+      if (sysIdx >= 0) {
+        result[sysIdx] = {
+          ...result[sysIdx],
+          content: result[sysIdx].content + '\n\n' + contextContent
+        };
+      }
+      break;
+
+    case 1: // After user message (before last user message)
+    case 2: // Before user message
+      // Find the last user message
+      const lastUserIdx = result.map((m, i) => m.role === 'user' ? i : -1).filter(i => i >= 0).pop();
+      if (lastUserIdx !== undefined && lastUserIdx >= 0) {
+        if (position === 1) { // After user message
+          result[lastUserIdx] = {
+            ...result[lastUserIdx],
+            content: result[lastUserIdx].content + '\n\n' + contextContent
+          };
+        } else { // Before user message
+          result[lastUserIdx] = {
+            ...result[lastUserIdx],
+            content: contextContent + '\n\n' + result[lastUserIdx].content
+          };
+        }
+      }
+      break;
+
+    case 3: // After assistant message
+    case 4: // Before assistant message
+      // Find the last assistant message
+      const lastAsstIdx = result.map((m, i) => m.role === 'assistant' ? i : -1).filter(i => i >= 0).pop();
+      if (lastAsstIdx !== undefined && lastAsstIdx >= 0) {
+        if (position === 3) { // After assistant message
+          result[lastAsstIdx] = {
+            ...result[lastAsstIdx],
+            content: result[lastAsstIdx].content + '\n\n' + contextContent
+          };
+        } else { // Before assistant message
+          result[lastAsstIdx] = {
+            ...result[lastAsstIdx],
+            content: contextContent + '\n\n' + result[lastAsstIdx].content
+          };
+        }
+      }
+      break;
+
+    case 5: // At top of chat (after system, before first message)
+      const firstNonSysIdx = result.findIndex(m => m.role !== 'system');
+      if (firstNonSysIdx > 0) {
+        result.splice(firstNonSysIdx, 0, {
+          role: 'system',
+          content: contextContent
+        });
+      } else {
+        result.push({
+          role: 'system',
+          content: contextContent
+        });
+      }
+      break;
+
+    case 6: // At bottom of chat (after all messages)
+    default:
+      result.push({
+        role: 'system',
+        content: contextContent
+      });
+      break;
+  }
+
+  return result;
+}
+
+/**
+ * Inject HUD context into prompt sections
+ * This is for the prompt viewer display
+ */
+export function injectHUDContextIntoSections(
+  sections: PromptSection[],
+  contextSection: PromptSection,
+  position: number
+): PromptSection[] {
+  if (!contextSection.content.trim()) {
+    return sections;
+  }
+
+  const result: PromptSection[] = [...sections];
+
+  switch (position) {
+    case 0: // After system prompt
+      const sysSectionIdx = result.findIndex(s => s.type === 'system');
+      if (sysSectionIdx >= 0) {
+        result.splice(sysSectionIdx + 1, 0, contextSection);
+      } else {
+        result.unshift(contextSection);
+      }
+      break;
+
+    case 5: // At top of chat
+      const chatIdx = result.findIndex(s => s.type === 'chat_history');
+      if (chatIdx >= 0) {
+        result.splice(chatIdx, 0, contextSection);
+      } else {
+        result.push(contextSection);
+      }
+      break;
+
+    case 6: // At bottom of chat
+    default:
+      result.push(contextSection);
+      break;
+  }
+
+  return result;
+}
 
 // ============================================
 // Extended Build Options
@@ -61,6 +227,7 @@ export interface PromptBuildOptions {
   postHistoryInstructions?: string;
   lorebookOptions?: LorebookInjectOptions;
   sessionStats?: SessionStats;
+  hudContext?: HUDContextConfig;
 }
 
 // ============================================
@@ -87,7 +254,11 @@ export function buildSystemPrompt(
   });
 
   // Main system instruction
-  const systemContent = `You are now in roleplay mode. You will act as ${character.name}.`;
+  // If character has a custom system prompt, use it instead of the default
+  const systemContent = character.systemPrompt?.trim() 
+    ? character.systemPrompt 
+    : `You are now in roleplay mode. You will act as ${character.name}.`;
+  
   sections.push({
     type: 'system',
     label: 'System Prompt',
@@ -136,11 +307,17 @@ export function buildSystemPrompt(
   }
 
   // Add example messages (important for few-shot learning)
+  // Format them with SillyTavern-style <START> blocks
   if (character.mesExample) {
+    const formattedExamples = processExampleDialogue(
+      character.mesExample, 
+      userName, 
+      character.name
+    );
     sections.push({
       type: 'example_dialogue',
       label: 'Example Dialogue',
-      content: character.mesExample,
+      content: formattedExamples,
       color: SECTION_COLORS.example_dialogue
     });
   }
@@ -155,39 +332,10 @@ export function buildSystemPrompt(
     });
   }
 
-  // Add custom system prompt from character card
-  if (character.systemPrompt) {
-    sections.push({
-      type: 'system',
-      label: 'Custom System Prompt',
-      content: character.systemPrompt,
-      color: SECTION_COLORS.system
-    });
-  }
-
   // Add lorebook section if provided
   if (lorebookSection) {
     sections.push(lorebookSection);
   }
-
-  // Add roleplay instructions
-  const instructionsContent = `Stay in character as ${character.name} at all times.
-Write detailed, engaging responses that reflect ${character.name}'s personality and emotions.
-Use proper formatting: actions in asterisks, dialogue in quotes, thoughts in parentheses.
-Never break character or acknowledge being an AI.
-Respond as ${character.name} would, maintaining consistency with the established personality.
-The user's name is ${userName}${persona?.description ? `, and their persona has been described above` : ''}`;
-
-  sections.push({
-    type: 'instructions',
-    label: 'Instructions',
-    content: instructionsContent,
-    color: SECTION_COLORS.instructions
-  });
-
-  // Add stats sections if configured
-  const statsSections = buildStatsPromptSections(resolvedStats, character.name);
-  sections.push(...statsSections);
 
   // Resolve stats keys in all sections content
   const processedSections = sections.map(s => ({
@@ -337,7 +485,6 @@ export function buildCompletionPrompt(config: CompletionPromptConfig): string {
  */
 export function buildGroupSystemPrompt(
   character: CharacterCard,
-  allCharacters: CharacterCard[],
   group: CharacterGroup,
   userName: string = 'User',
   persona?: Persona,
@@ -353,28 +500,43 @@ export function buildGroupSystemPrompt(
     sessionStats,
   });
 
-  // Group context
-  const groupContext = `You are in a group roleplay. You will act as ${character.name}.`;
+  // System Prompt Priority: Group > Character > Default
+  // If group has a system prompt, it replaces everything (character and default)
+  // If group doesn't have one, use character's system prompt
+  // If neither has one, use default
+  let systemContent: string;
+  let systemLabel: string;
+
+  // Build template context for variable resolution
+  const templateContext = {
+    user: userName,
+    char: character.name,
+    userpersona: persona?.description,
+    character,
+    persona
+  };
+
+  if (group.systemPrompt?.trim()) {
+    // Group system prompt takes highest priority - replaces everything
+    // Resolve template variables like {{user}}, {{char}}, etc.
+    systemContent = replaceTemplateVariables(group.systemPrompt, templateContext);
+    systemLabel = 'System Prompt (Group)';
+  } else if (character.systemPrompt?.trim()) {
+    // Character system prompt (already processed in processCharacterTemplate, but resolve again for safety)
+    systemContent = replaceTemplateVariables(character.systemPrompt, templateContext);
+    systemLabel = 'System Prompt';
+  } else {
+    // Default fallback
+    systemContent = `You are in a group roleplay. You will act as ${character.name}.`;
+    systemLabel = 'System Prompt';
+  }
+  
   sections.push({
     type: 'system',
-    label: 'Group Roleplay',
-    content: groupContext,
+    label: systemLabel,
+    content: systemContent,
     color: SECTION_COLORS.system
   });
-
-  // List all characters present
-  const otherCharacters = allCharacters.filter(c => c.id !== character.id);
-  if (otherCharacters.length > 0) {
-    const otherCharsContent = otherCharacters.map(c =>
-      `- ${c.name}: ${c.description?.slice(0, 200) || 'No description'}${(c.description?.length || 0) > 200 ? '...' : ''}`
-    ).join('\n');
-    sections.push({
-      type: 'character_description',
-      label: 'Other Characters Present',
-      content: otherCharsContent,
-      color: SECTION_COLORS.character_description
-    });
-  }
 
   // Add user's persona description if available
   if (persona && persona.description) {
@@ -405,23 +567,38 @@ export function buildGroupSystemPrompt(
     });
   }
 
-  // Add scenario from group or character
-  const scenario = group.description || character.scenario;
-  if (scenario) {
+  // Add scenario - Group description takes priority over character scenario
+  // If group has description, it replaces character's scenario for all members
+  // If group doesn't have description, use character's individual scenario
+  if (group.description?.trim()) {
+    // Resolve template variables in group description
+    const resolvedGroupDescription = replaceTemplateVariables(group.description, templateContext);
+    sections.push({
+      type: 'scenario',
+      label: 'Scenario (Group)',
+      content: resolvedGroupDescription,
+      color: SECTION_COLORS.scenario
+    });
+  } else if (character.scenario?.trim()) {
     sections.push({
       type: 'scenario',
       label: 'Scenario',
-      content: scenario,
+      content: character.scenario,
       color: SECTION_COLORS.scenario
     });
   }
 
-  // Add example messages
+  // Add example messages (formatted with SillyTavern-style <START> blocks)
   if (character.mesExample) {
+    const formattedExamples = processExampleDialogue(
+      character.mesExample, 
+      userName, 
+      character.name
+    );
     sections.push({
       type: 'example_dialogue',
       label: `Example Dialogue for ${character.name}`,
-      content: character.mesExample,
+      content: formattedExamples,
       color: SECTION_COLORS.example_dialogue
     });
   }
@@ -440,37 +617,6 @@ export function buildGroupSystemPrompt(
   if (lorebookSection) {
     sections.push(lorebookSection);
   }
-
-  // Add group system prompt if defined
-  if (group.systemPrompt) {
-    sections.push({
-      type: 'system',
-      label: 'Group Instructions',
-      content: group.systemPrompt,
-      color: SECTION_COLORS.system
-    });
-  }
-
-  // Add roleplay instructions
-  const instructionsContent = `- Stay in character as ${character.name} at all times
-- Write detailed, engaging responses that reflect ${character.name}'s personality and emotions
-- Use proper formatting: actions in asterisks, dialogue in quotes, thoughts in parentheses
-- Never break character or acknowledge being an AI
-- Be aware that other characters (${otherCharacters.map(c => c.name).join(', ')}) are also present and may respond
-- You can interact with, refer to, or address other characters naturally
-- The user's name is ${userName}
-- Keep your response focused - other characters will have their chance to respond`;
-
-  sections.push({
-    type: 'instructions',
-    label: 'Instructions',
-    content: instructionsContent,
-    color: SECTION_COLORS.instructions
-  });
-
-  // Add stats sections if configured
-  const statsSections = buildStatsPromptSections(resolvedStats, character.name);
-  sections.push(...statsSections);
 
   // Resolve stats keys in all sections content
   const processedSections = sections.map(s => ({

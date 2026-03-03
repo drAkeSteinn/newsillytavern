@@ -97,6 +97,8 @@ const translations: Record<Language, TranslationDictionary> = {
     'chatbox.opacity': 'Opacidad:',
     'chatbox.blurBackground': 'Fondo difuminado',
     'chatbox.actions': 'Acciones del chat',
+    'chatbox.sessionVariables': 'Variables de Sesión',
+    'chatbox.noVariables': 'No hay variables guardadas',
     
     // === Characters ===
     'character.new': 'Nuevo personaje',
@@ -369,6 +371,8 @@ const translations: Record<Language, TranslationDictionary> = {
     'chatbox.opacity': 'Opacity:',
     'chatbox.blurBackground': 'Blur Background',
     'chatbox.actions': 'Chat Actions',
+    'chatbox.sessionVariables': 'Session Variables',
+    'chatbox.noVariables': 'No saved variables',
     
     // === Characters ===
     'character.new': 'New Character',

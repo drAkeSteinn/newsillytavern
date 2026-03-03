@@ -77,6 +77,14 @@ import {
   type ItemHandlerState,
   type ItemTriggerContext,
 } from './handlers/item-handler';
+import {
+  createStatsHandlerState,
+  checkStatsTriggersInText,
+  executeStatsTrigger,
+  resetStatsHandlerState,
+  type StatsHandlerState,
+  type StatsTriggerContext,
+} from './handlers/stats-handler';
 import type { BackgroundOverlay, BackgroundTransitionType } from '@/types';
 
 // ============================================
@@ -91,6 +99,7 @@ export interface TriggerSystemConfig {
   hudEnabled?: boolean;
   questEnabled?: boolean;
   inventoryEnabled?: boolean;
+  statsEnabled?: boolean;
   debug?: boolean;
   maxSoundsPerMessage?: number;
 }
@@ -134,6 +143,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   const backgroundHandlerState = useMemo(() => createBackgroundHandlerState(), []);
   const questHandlerState = useMemo(() => createQuestHandlerState(), []);
   const itemHandlerState = useMemo(() => createItemHandlerState(), []);
+  const statsHandlerState = useMemo(() => createStatsHandlerState(), []);
   
   // Track last processed content per message
   const lastProcessedRef = useRef<Map<string, string>>(new Map());
@@ -162,8 +172,10 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       questHandlerState.triggeredPositions.clear();
       itemHandlerState.processedItems.clear();
       itemHandlerState.triggeredPositions.clear();
+      statsHandlerState.detectionStates.clear();
+      statsHandlerState.processedMessages.clear();
     };
-  }, [config.debug, config.tokenDetector, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState]);
+  }, [config.debug, config.tokenDetector, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState]);
   
   // Check for return to default background periodically
   useEffect(() => {
@@ -505,7 +517,34 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         }
       }
     }
-  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, getActiveHUDTemplate]);
+    
+    // Process Stats triggers (Character Attributes)
+    if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
+      const statsContext: StatsTriggerContext = {
+        ...context,
+        characterId: character.id,
+        statsConfig: character.statsConfig,
+        sessionStats: store.getActiveSession?.()?.sessionStats,
+      };
+      
+      const statsResult = checkStatsTriggersInText(
+        content,
+        statsContext,
+        statsHandlerState
+      );
+      
+      if (statsResult.matched && statsResult.trigger) {
+        const hits = executeStatsTrigger(statsResult.trigger, context, {
+          updateCharacterStat: store.updateCharacterStat.bind(store),
+          activeSessionId: store.activeSessionId,
+        });
+        
+        if (hits.length > 0) {
+          console.log(`[TriggerSystem] Stats updated: ${hits.map(h => `${h.attributeName}=${h.newValue}`).join(', ')}`);
+        }
+      }
+    }
+  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, getActiveHUDTemplate]);
   
   /**
    * Process full content at once (non-streaming)
@@ -543,13 +582,14 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     resetBackgroundHandlerState(backgroundHandlerState, messageKey);
     resetQuestHandlerState(questHandlerState, messageKey);
     resetItemHandlerState(itemHandlerState, messageKey);
+    resetStatsHandlerState(statsHandlerState, character?.id || '', messageKey);
     
     // Clear last processed
     lastProcessedRef.current.delete(messageKey);
     
     // Emit message end event
     bus.emit(createMessageEndEvent(messageKey, character, ''));
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState]);
   
   return {
     processStreamingContent,

@@ -39,12 +39,20 @@
   },
   "chatLayout": {
     "novelMode": true,
-    "chatWidth": 71.72051089406462,
-    "chatHeight": 35.55555555555556,
-    "chatX": 50.991735537190074,
-    "chatY": 82.22222222222223,
-    "chatOpacity": 0.95,
-    "blurBackground": true,
+    "chatWidth": 85.54470323065364,
+    "chatHeight": 36.66666666666667,
+    "chatX": 49.800450353966035,
+    "chatY": 81.66666666666666,
+    "chatOpacity": 0.96,
+    "blurBackground": false,
     "showCharacterSprite": true
+  },
+  "context": {
+    "maxMessages": 50,
+    "maxTokens": 4096,
+    "keepFirstN": 1,
+    "keepLastN": 20,
+    "enableSummaries": false,
+    "summaryThreshold": 40
   }
 }

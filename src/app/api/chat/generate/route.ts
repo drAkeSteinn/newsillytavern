@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import type { CharacterCard, Lorebook } from '@/types';
+import type { CharacterCard, Lorebook, SessionStats, HUDContextConfig } from '@/types';
 import {
   DEFAULT_CHARACTER,
   buildSystemPrompt,
@@ -18,7 +18,9 @@ import {
   callOllama,
   callTextGenerationWebUI,
   GenerateResponse,
-  buildLorebookSectionForPrompt
+  buildLorebookSectionForPrompt,
+  buildHUDContextSection,
+  injectHUDContextIntoMessages
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -48,11 +50,18 @@ export async function POST(request: NextRequest) {
       messages = [],
       llmConfig,
       userName = 'User',
-      persona
+      persona,
+      sessionStats
     } = validation.data;
 
     // Extract lorebooks from body (not validated by validation.ts)
     const lorebooks: Lorebook[] = body.lorebooks || [];
+
+    // Extract HUD context from body
+    const hudContext: HUDContextConfig | undefined = body.hudContext;
+
+    // Cast sessionStats to proper type
+    const typedSessionStats = sessionStats as SessionStats | undefined;
 
     if (!llmConfig) {
       return NextResponse.json(
@@ -90,7 +99,16 @@ export async function POST(request: NextRequest) {
     );
 
     // Build system prompt with persona and lorebook (using processed character)
-    const { prompt: systemPrompt } = buildSystemPrompt(processedCharacter, effectiveUserName, persona, lorebookSection);
+    const { prompt: systemPrompt } = buildSystemPrompt(
+      processedCharacter,
+      effectiveUserName,
+      persona,
+      lorebookSection,
+      typedSessionStats  // Pass session stats for attribute values
+    );
+
+    // Build HUD context section if enabled
+    const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
 
     // Prepare messages with new user message (use context-windowed messages)
     const allMessages = [...contextWindow.messages, createUserMessage(sanitizedMessage)];
@@ -101,13 +119,17 @@ export async function POST(request: NextRequest) {
     switch (llmConfig.provider) {
       case 'z-ai': {
         // Z.ai uses its own SDK
-        const chatMessages = buildChatMessages(
+        let chatMessages = buildChatMessages(
           systemPrompt,
           allMessages,
           processedCharacter,
           effectiveUserName,
           processedCharacter.postHistoryInstructions
         );
+        // Inject HUD context into chat messages if enabled
+        if (hudContextSection && hudContext) {
+          chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+        }
         response = await callZAI(chatMessages);
         break;
       }
@@ -119,7 +141,7 @@ export async function POST(request: NextRequest) {
         if (!llmConfig.endpoint) {
           throw new Error(`${llmConfig.provider} requires an endpoint URL. Please configure it in settings.`);
         }
-        const chatMessages = buildChatMessages(
+        let chatMessages = buildChatMessages(
           systemPrompt,
           allMessages,
           processedCharacter,
@@ -127,6 +149,10 @@ export async function POST(request: NextRequest) {
           processedCharacter.postHistoryInstructions,
           true // Use system role for OpenAI
         );
+        // Inject HUD context into chat messages if enabled
+        if (hudContextSection && hudContext) {
+          chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+        }
         response = await callOpenAICompatible(chatMessages, llmConfig, llmConfig.provider);
         break;
       }
@@ -135,7 +161,7 @@ export async function POST(request: NextRequest) {
         if (!llmConfig.apiKey) {
           throw new Error('Anthropic requires an API key. Please configure it in settings.');
         }
-        const chatMessages = buildChatMessages(
+        let chatMessages = buildChatMessages(
           systemPrompt,
           allMessages,
           processedCharacter,
@@ -143,6 +169,10 @@ export async function POST(request: NextRequest) {
           processedCharacter.postHistoryInstructions,
           true // Use system role for Anthropic
         );
+        // Inject HUD context into chat messages if enabled
+        if (hudContextSection && hudContext) {
+          chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
+        }
         response = await callAnthropic(chatMessages, llmConfig);
         break;
       }

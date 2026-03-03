@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp,
   Settings,
+  Play,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { QuestCard } from './quest-card';
@@ -348,8 +349,5 @@ export function QuestLogPanel({
     </div>
   );
 }
-
-// Need to import Play icon
-const Play = Target;
 
 export default QuestLogPanel;

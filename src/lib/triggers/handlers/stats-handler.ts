@@ -3,30 +3,27 @@
 // ============================================
 //
 // This handler detects stat changes in LLM responses
-// using keyword patterns defined in CharacterStatsConfig.attributes
+// using detection keys defined in CharacterStatsConfig.attributes
 //
-// For example:
-// - LLM response contains "Vida: 35"
-// - Handler detects pattern match
-// - Updates sessionStats for the responding character
+// Uses the same system as HUD fields:
+// - key: Primary detection key (always checked first)
+// - keys: Alternative detection keys (optional)
+// - caseSensitive: Whether to distinguish case
 
 import type { TriggerMatch } from '../types';
-import type { DetectedToken } from '../token-detector';
 import type { TriggerContext } from '../trigger-bus';
 import type {
   CharacterStatsConfig,
   SessionStats,
   StatsTriggerHit,
-  AttributeDefinition,
+  CharacterCard,
 } from '@/types';
 import {
   detectStatsUpdates,
   createStatsDetectionState,
-  checkStatsTriggers,
-  resetStatsHandlerState as resetDetectorState,
   type StatsDetectionState,
-  type StatsDetectionResult,
   type AttributeDetection,
+  type StatsDetectionResult,
 } from '@/lib/stats/stats-detector';
 
 // ============================================
@@ -50,18 +47,15 @@ export function createStatsHandlerState(): StatsHandlerState {
 // ============================================
 
 export interface StatsTriggerContext extends TriggerContext {
-  characterId: string;  // The character currently responding
+  characterId: string;
   statsConfig: CharacterStatsConfig | undefined;
   sessionStats: SessionStats | undefined;
 }
 
 export interface StatsHandlerResult {
   matched: boolean;
-  triggers: Array<{
-    trigger: TriggerMatch;
-    detections: AttributeDetection[];
-  }>;
-  allDetections: AttributeDetection[];
+  trigger: TriggerMatch | null;
+  detections: AttributeDetection[];
 }
 
 // ============================================
@@ -83,8 +77,8 @@ export function checkStatsTriggersInText(
 
   const result: StatsHandlerResult = {
     matched: false,
-    triggers: [],
-    allDetections: [],
+    trigger: null,
+    detections: [],
   };
 
   // Check if stats system is enabled
@@ -115,32 +109,27 @@ export function checkStatsTriggersInText(
     return result;
   }
 
-  // Convert detections to trigger matches
-  for (const detection of newDetections) {
-    result.triggers.push({
-      trigger: {
-        triggerId: `stats_${detection.attributeId}`,
-        triggerType: 'stats',
-        keyword: detection.attributeKey,
-        data: {
-          characterId,
-          attributeId: detection.attributeId,
-          attributeKey: detection.attributeKey,
-          attributeName: detection.attributeName,
-          oldValue: detection.oldValue,
-          newValue: detection.newValue,
-          matchedPattern: detection.matchedPattern,
-          matchedText: detection.matchedText,
-        },
-      },
-      detections: [detection],
-    });
-    result.allDetections.push(detection);
-  }
+  // Return first detection as trigger (like HUD handler)
+  const firstDetection = newDetections[0];
 
+  result.trigger = {
+    triggerId: `stats_${firstDetection.attributeId}`,
+    triggerType: 'stats',
+    keyword: firstDetection.attributeKey,
+    data: {
+      characterId,
+      attributeId: firstDetection.attributeId,
+      attributeKey: firstDetection.attributeKey,
+      attributeName: firstDetection.attributeName,
+      oldValue: firstDetection.oldValue,
+      newValue: firstDetection.newValue,
+      matchedPattern: firstDetection.matchedPattern,
+      matchedText: firstDetection.matchedText,
+      allDetections: newDetections, // Include all detections for batch processing
+    },
+  };
+  result.detections = newDetections;
   result.matched = true;
-
-  console.log(`[StatsHandler] Detected ${newDetections.length} stat changes for ${characterId}`);
 
   return result;
 }
@@ -162,9 +151,9 @@ export function executeStatsTrigger(
       value: number | string,
       reason?: 'llm_detection' | 'manual' | 'trigger'
     ) => void;
-    getSessionId: () => string | null;
+    activeSessionId: string | null;
   }
-): StatsTriggerHit | null {
+): StatsTriggerHit[] {
   const data = match.data as {
     characterId: string;
     attributeId: string;
@@ -174,61 +163,38 @@ export function executeStatsTrigger(
     newValue: number | string;
     matchedPattern: string;
     matchedText: string;
+    allDetections?: AttributeDetection[];
   };
-
-  // If store actions are provided, update the stat
-  if (storeActions) {
-    const sessionId = storeActions.getSessionId();
-    if (sessionId) {
-      storeActions.updateCharacterStat(
-        sessionId,
-        data.characterId,
-        data.attributeKey,
-        data.newValue,
-        'llm_detection'
-      );
-    }
-  }
-
-  // Return the trigger hit for UI updates
-  return {
-    characterId: data.characterId,
-    attributeId: data.attributeId,
-    attributeKey: data.attributeKey,
-    attributeName: data.attributeName,
-    oldValue: data.oldValue,
-    newValue: data.newValue,
-    matchedPattern: data.matchedPattern,
-    matchedText: data.matchedText,
-  };
-}
-
-/**
- * Execute all stats triggers from a result
- */
-export function executeAllStatsTriggers(
-  result: StatsHandlerResult,
-  context: TriggerContext,
-  storeActions?: {
-    updateCharacterStat: (
-      sessionId: string,
-      characterId: string,
-      attributeKey: string,
-      value: number | string,
-      reason?: 'llm_detection' | 'manual' | 'trigger'
-    ) => void;
-    getSessionId: () => string | null;
-  }
-): StatsTriggerHit[] {
-  if (!result.matched || result.triggers.length === 0) return [];
 
   const hits: StatsTriggerHit[] = [];
+  const sessionId = storeActions?.activeSessionId;
 
-  for (const { trigger } of result.triggers) {
-    const hit = executeStatsTrigger(trigger, context, storeActions);
-    if (hit) {
-      hits.push(hit);
-    }
+  if (!sessionId || !storeActions) {
+    return hits;
+  }
+
+  // Process all detections (batch update)
+  const detections = data.allDetections || [data];
+
+  for (const detection of detections) {
+    storeActions.updateCharacterStat(
+      sessionId,
+      detection.characterId || data.characterId,
+      detection.attributeKey,
+      detection.newValue,
+      'llm_detection'
+    );
+
+    hits.push({
+      characterId: detection.characterId || data.characterId,
+      attributeId: detection.attributeId,
+      attributeKey: detection.attributeKey,
+      attributeName: detection.attributeName,
+      oldValue: detection.oldValue,
+      newValue: detection.newValue,
+      matchedPattern: detection.matchedPattern,
+      matchedText: detection.matchedText,
+    });
   }
 
   return hits;
@@ -236,15 +202,26 @@ export function executeAllStatsTriggers(
 
 /**
  * Reset state for new message
+ * 
+ * If characterId is empty, resets ALL detection states (for safety).
+ * This ensures that stale state doesn't affect new messages.
  */
 export function resetStatsHandlerState(
   state: StatsHandlerState,
   characterId: string,
   messageKey: string
 ): void {
-  const detectionState = state.detectionStates.get(characterId);
-  if (detectionState) {
-    detectionState.reset();
+  if (!characterId) {
+    // No specific character - reset ALL states to be safe
+    for (const detectionState of state.detectionStates.values()) {
+      detectionState.reset();
+    }
+  } else {
+    // Reset specific character's state
+    const detectionState = state.detectionStates.get(characterId);
+    if (detectionState) {
+      detectionState.reset();
+    }
   }
   state.processedMessages.delete(messageKey);
 }
@@ -319,39 +296,24 @@ export function processGroupStats(
   return results;
 }
 
-// ============================================
-// Utility Functions
-// ============================================
-
 /**
- * Get all attribute patterns for a character
- * Useful for debugging or pattern testing
+ * Execute all stats triggers from a result
  */
-export function getAttributePatterns(
-  statsConfig: CharacterStatsConfig | undefined
-): Array<{ key: string; pattern: string }> {
-  if (!statsConfig?.attributes) return [];
-
-  return statsConfig.attributes
-    .filter(attr => attr.keywordPattern)
-    .map(attr => ({
-      key: attr.key,
-      pattern: attr.keywordPattern!,
-    }));
-}
-
-/**
- * Test a pattern against text
- * Returns matched groups if found
- */
-export function testPattern(
-  text: string,
-  pattern: string
-): RegExpMatchArray | null {
-  try {
-    const regex = new RegExp(pattern, 'gi');
-    return text.match(regex);
-  } catch {
-    return null;
+export function executeAllStatsTriggers(
+  result: StatsHandlerResult,
+  context: TriggerContext,
+  storeActions?: {
+    updateCharacterStat: (
+      sessionId: string,
+      characterId: string,
+      attributeKey: string,
+      value: number | string,
+      reason?: 'llm_detection' | 'manual' | 'trigger'
+    ) => void;
+    activeSessionId: string | null;
   }
+): StatsTriggerHit[] {
+  if (!result.matched || !result.trigger) return [];
+
+  return executeStatsTrigger(result.trigger, context, storeActions);
 }

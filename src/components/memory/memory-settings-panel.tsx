@@ -50,7 +50,10 @@ import { DEFAULT_SUMMARY_SETTINGS } from '@/types';
 export function MemorySettingsPanel() {
   const { summarySettings, setSummarySettings } = useTavernStore();
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
-  const [localPrompt, setLocalPrompt] = useState(summarySettings.promptTemplate);
+  
+  // Ensure promptTemplate exists with default fallback
+  const promptTemplate = summarySettings.promptTemplate ?? DEFAULT_SUMMARY_SETTINGS.promptTemplate ?? '';
+  const [localPrompt, setLocalPrompt] = useState(promptTemplate);
 
   // Update local prompt when settings change
   const handlePromptSave = useCallback(() => {
@@ -60,8 +63,9 @@ export function MemorySettingsPanel() {
 
   // Reset prompt to default
   const handleResetPrompt = useCallback(() => {
-    setLocalPrompt(DEFAULT_SUMMARY_SETTINGS.promptTemplate);
-    setSummarySettings({ promptTemplate: DEFAULT_SUMMARY_SETTINGS.promptTemplate });
+    const defaultPrompt = DEFAULT_SUMMARY_SETTINGS.promptTemplate ?? '';
+    setLocalPrompt(defaultPrompt);
+    setSummarySettings({ promptTemplate: defaultPrompt });
   }, [setSummarySettings]);
 
   return (
@@ -341,7 +345,7 @@ export function MemorySettingsPanel() {
                 <Button 
                   size="sm"
                   onClick={handlePromptSave}
-                  disabled={!summarySettings.enabled || localPrompt === summarySettings.promptTemplate}
+                  disabled={!summarySettings.enabled || localPrompt === promptTemplate}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Guardar Cambios
@@ -355,9 +359,9 @@ export function MemorySettingsPanel() {
             <div className="mt-3">
               <Label className="text-xs text-muted-foreground mb-2 block">Vista previa del prompt:</Label>
               <div className="p-3 rounded-lg bg-muted/50 text-xs font-mono max-h-[100px] overflow-y-auto text-muted-foreground">
-                {summarySettings.promptTemplate.length > 300 
-                  ? `${summarySettings.promptTemplate.slice(0, 300)}...`
-                  : summarySettings.promptTemplate
+                {promptTemplate.length > 300 
+                  ? `${promptTemplate.slice(0, 300)}...`
+                  : promptTemplate
                 }
               </div>
             </div>

@@ -162,16 +162,27 @@ function extractWordTokens(
 }
 
 /**
- * Extract HUD tokens from text [key=value|key2]
+ * Extract HUD tokens from text
+ * 
+ * Detects multiple formats:
+ * - [key=value] - in brackets with equals
+ * - [key: value] - in brackets with colon
+ * - key=value - without brackets (standalone)
+ * - key: value - without brackets with colon
+ * - KEY=VALUE, HP: 10, etc. - case variations
+ * 
+ * Also supports pipe-separated multiple values: [key=value|other]
  */
 function extractHudTokens(
   text: string,
   startWordPosition: number
 ): DetectedToken[] {
   const tokens: DetectedToken[] = [];
-  const re = /\[([^\]]{1,400})\]/g;
   
-  for (const match of text.matchAll(re)) {
+  // Pattern 1: Inside brackets [key=value] or [key: value]
+  const bracketRe = /\[([^\]]{1,400})\]/g;
+  
+  for (const match of text.matchAll(bracketRe)) {
     if (match[1]) {
       const inside = match[1].trim();
       const position = match.index ?? 0;
@@ -181,39 +192,10 @@ function extractHudTokens(
         const trimmed = part.trim();
         if (!trimmed) continue;
         
-        const eq = trimmed.indexOf('=');
-        
-        if (eq > 0 && eq < trimmed.length - 1) {
-          // key=value format
-          const key = trimmed.slice(0, eq).trim();
-          const value = trimmed.slice(eq + 1).trim();
-          
+        const hudToken = parseHudKeyValue(trimmed, position);
+        if (hudToken) {
           tokens.push({
-            token: normalizeToken(key),
-            original: key,
-            type: 'hud',
-            position,
-            wordPosition: startWordPosition + tokens.length,
-            metadata: { hudKey: key, hudValue: value },
-          });
-          
-          if (value) {
-            tokens.push({
-              token: normalizeToken(value),
-              original: value,
-              type: 'hud',
-              position,
-              wordPosition: startWordPosition + tokens.length,
-              metadata: { hudKey: key, hudValue: value },
-            });
-          }
-        } else {
-          // Simple token in brackets
-          tokens.push({
-            token: normalizeToken(trimmed),
-            original: trimmed,
-            type: 'hud',
-            position,
+            ...hudToken,
             wordPosition: startWordPosition + tokens.length,
           });
         }
@@ -221,7 +203,64 @@ function extractHudTokens(
     }
   }
   
+  // Pattern 2: Standalone key=value or key: value (outside brackets)
+  // Must be on its own line or surrounded by whitespace to avoid false positives
+  // Format: word=value or word: value (with optional spaces around separator)
+  const standaloneRe = /(?:^|\n|\s)([a-zA-Z][a-zA-Z0-9_]*)\s*[:=]\s*([^\s\n\[\]]{1,100})(?=\s|\n|$)/g;
+  
+  for (const match of text.matchAll(standaloneRe)) {
+    if (match[1] && match[2]) {
+      const key = match[1].trim();
+      const value = match[2].trim();
+      const position = match.index ?? 0;
+      
+      tokens.push({
+        token: normalizeToken(key),
+        original: key,
+        type: 'hud',
+        position,
+        wordPosition: startWordPosition + tokens.length,
+        metadata: { hudKey: key, hudValue: value },
+      });
+    }
+  }
+  
   return tokens;
+}
+
+/**
+ * Parse a HUD key=value or key: value string
+ */
+function parseHudKeyValue(
+  text: string,
+  position: number
+): DetectedToken | null {
+  // Try both = and : separators
+  // Pattern: key=value or key: value
+  const match = text.match(/^([a-zA-Z][a-zA-Z0-9_]*)\s*[:=]\s*(.+)$/);
+  
+  if (match && match[1] && match[2]) {
+    const key = match[1].trim();
+    const value = match[2].trim();
+    
+    return {
+      token: normalizeToken(key),
+      original: key,
+      type: 'hud',
+      position,
+      wordPosition: 0, // Will be set by caller
+      metadata: { hudKey: key, hudValue: value },
+    };
+  }
+  
+  // Simple token without value
+  return {
+    token: normalizeToken(text),
+    original: text,
+    type: 'hud',
+    position,
+    wordPosition: 0, // Will be set by caller
+  };
 }
 
 /**

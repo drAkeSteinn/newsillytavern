@@ -4,6 +4,9 @@
 
 import type { LLMConfig, GenerateResponse } from '../types';
 
+// Default timeout: 5 minutes for long group chats
+const DEFAULT_TIMEOUT = 300000;
+
 /**
  * Stream from Ollama API
  */
@@ -28,7 +31,7 @@ export async function* streamOllama(
         stop: config.parameters.stopStrings?.length ? config.parameters.stopStrings : undefined
       }
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT)
   });
 
   if (!response.ok) {
@@ -89,7 +92,7 @@ export async function callOllama(
         stop: config.parameters.stopStrings?.length ? config.parameters.stopStrings : undefined
       }
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT)
   });
 
   if (!response.ok) {

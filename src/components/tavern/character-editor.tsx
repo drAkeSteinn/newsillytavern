@@ -36,7 +36,8 @@ import {
   Crown,
   Star,
   Layers,
-  Activity
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import type { CharacterCard, SpriteLibraries } from '@/types';
 import { SpriteManager } from './sprite-manager';
@@ -46,6 +47,7 @@ import { SpritePackEditor } from './sprite-pack-editor';
 import { SpriteDebugPanel } from './sprite-debug-panel';
 import { PresetSelector, presetToData } from './preset-selector';
 import { HUDSelector } from './hud-selector';
+import { LorebookSelector } from './lorebook-selector';
 import { StatsEditor } from './stats-editor';
 import { getLogger } from '@/lib/logger';
 
@@ -300,6 +302,19 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                 value={character.hudTemplateId}
                 onChange={(hudTemplateId) => setCharacter(prev => ({ ...prev, hudTemplateId }))}
                 placeholder="Sin HUD asignado"
+              />
+            </div>
+
+            {/* Lorebook Selector */}
+            <div className="pt-2">
+              <div className="flex items-center gap-2 mb-1">
+                <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                <Label className="text-xs">Lorebooks</Label>
+              </div>
+              <LorebookSelector
+                value={character.lorebookIds}
+                onChange={(lorebookIds) => setCharacter(prev => ({ ...prev, lorebookIds }))}
+                placeholder="Sin lorebooks asignados"
               />
             </div>
           </div>

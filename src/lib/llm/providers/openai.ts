@@ -4,6 +4,9 @@
 
 import type { LLMConfig, ChatApiMessage, GenerateResponse } from '../types';
 
+// Default timeout: 5 minutes for long group chats
+const DEFAULT_TIMEOUT = 300000;
+
 /**
  * Stream from OpenAI-compatible API
  */
@@ -13,6 +16,9 @@ export async function* streamOpenAICompatible(
   provider: string = 'openai'
 ): AsyncGenerator<string> {
   const endpoint = config.endpoint.replace(/\/$/, '');
+  
+  // Use configurable timeout or default (5 minutes)
+  const timeoutMs = config.parameters.timeout || DEFAULT_TIMEOUT;
 
   const requestBody: Record<string, unknown> = {
     model: config.model || 'gpt-3.5-turbo',
@@ -38,7 +44,7 @@ export async function* streamOpenAICompatible(
       ...(config.apiKey && { 'Authorization': `Bearer ${config.apiKey}` })
     },
     body: JSON.stringify(requestBody),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) {
@@ -100,6 +106,9 @@ export async function callOpenAICompatible(
   provider: string = 'openai'
 ): Promise<GenerateResponse> {
   const endpoint = config.endpoint.replace(/\/$/, '');
+  
+  // Use default timeout (5 minutes)
+  const timeoutMs = DEFAULT_TIMEOUT;
 
   const requestBody: Record<string, unknown> = {
     model: config.model || 'gpt-3.5-turbo',
@@ -125,7 +134,7 @@ export async function callOpenAICompatible(
       ...(config.apiKey && { 'Authorization': `Bearer ${config.apiKey}` })
     },
     body: JSON.stringify(requestBody),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
 
   if (!response.ok) {
