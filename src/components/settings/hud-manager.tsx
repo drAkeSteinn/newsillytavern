@@ -874,12 +874,14 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
                       <SelectItem value="2">Antes del mensaje del usuario</SelectItem>
                       <SelectItem value="3">Después del mensaje del asistente</SelectItem>
                       <SelectItem value="4">Antes del mensaje del asistente</SelectItem>
-                      <SelectItem value="5">Al inicio del chat</SelectItem>
-                      <SelectItem value="6">Al final del chat</SelectItem>
+                      <SelectItem value="5">Al inicio del chat (antes del historial)</SelectItem>
+                      <SelectItem value="6">Al final del chat (después del historial)</SelectItem>
+                      <SelectItem value="7">Después del Lorebook (Author's Note)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-muted-foreground">
-                    Define dónde se inyectará el texto de contexto en el prompt enviado al LLM
+                    Define dónde se inyectará el texto de contexto en el prompt enviado al LLM.
+                    Las variables como {`{{user}}`}, {`{{char}}`} y {`{{resistencia}}`} se resolverán automáticamente.
                   </p>
                 </div>
 
@@ -900,7 +902,7 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
                     className="py-2"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    Cuántos mensajes hacia atrás considerar para el contexto
+                    Cuántos mensajes hacia atrás considerar para el contexto (próximamente: filtrado dinámico)
                   </p>
                 </div>
 

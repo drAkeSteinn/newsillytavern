@@ -99,6 +99,12 @@ const translations: Record<Language, TranslationDictionary> = {
     'chatbox.actions': 'Acciones del chat',
     'chatbox.sessionVariables': 'Variables de Sesión',
     'chatbox.noVariables': 'No hay variables guardadas',
+    'chatbox.quests': 'Misiones',
+    'chatbox.questsDisabled': 'Sistema de misiones deshabilitado',
+    'chatbox.noQuests': 'No hay misiones en esta sesión',
+    'chatbox.objectives': 'objetivos',
+    'chatbox.availableQuests': 'Misiones disponibles',
+    'chatbox.completedQuests': 'Misiones completadas',
     
     // === Characters ===
     'character.new': 'Nuevo personaje',
@@ -373,6 +379,12 @@ const translations: Record<Language, TranslationDictionary> = {
     'chatbox.actions': 'Chat Actions',
     'chatbox.sessionVariables': 'Session Variables',
     'chatbox.noVariables': 'No saved variables',
+    'chatbox.quests': 'Quests',
+    'chatbox.questsDisabled': 'Quest system is disabled',
+    'chatbox.noQuests': 'No quests in this session',
+    'chatbox.objectives': 'objectives',
+    'chatbox.availableQuests': 'Available Quests',
+    'chatbox.completedQuests': 'Completed Quests',
     
     // === Characters ===
     'character.new': 'New Character',

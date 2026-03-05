@@ -44,12 +44,14 @@ import {
   Brain,
   Settings,
   Layers,
-  BookOpen
+  BookOpen,
+  ScrollText
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { GroupMember, GroupActivationStrategy } from '@/types';
 import { HUDSelector } from './hud-selector';
 import { LorebookSelector } from './lorebook-selector';
+import { QuestSelector } from './quest-selector';
 
 interface GroupEditorProps {
   groupId: string | null;
@@ -124,7 +126,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
         mentionTriggers: existingGroup.mentionTriggers || [],
         conversationStyle: existingGroup.conversationStyle || 'sequential' as 'sequential' | 'parallel',
         hudTemplateId: existingGroup?.hudTemplateId || null,
-        lorebookIds: existingGroup?.lorebookIds || []
+        lorebookIds: existingGroup?.lorebookIds || [],
+        questTemplateIds: existingGroup?.questTemplateIds || []
       };
     }
     return {
@@ -137,7 +140,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       mentionTriggers: [],
       conversationStyle: 'sequential' as 'sequential' | 'parallel',
       hudTemplateId: null,
-      lorebookIds: []
+      lorebookIds: [],
+      questTemplateIds: []
     };
   }, [existingGroup]);
 
@@ -154,6 +158,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   const [conversationStyle, setConversationStyle] = useState<'sequential' | 'parallel'>(initialValues.conversationStyle);
   const [hudTemplateId, setHudTemplateId] = useState<string | null>(initialValues.hudTemplateId);
   const [lorebookIds, setLorebookIds] = useState<string[]>(initialValues.lorebookIds);
+  const [questTemplateIds, setQuestTemplateIds] = useState<string[]>(initialValues.questTemplateIds);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>('');
 
   // Get members - either from existing group or local state
@@ -232,7 +237,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       members,
       avatar: existingGroup?.avatar || '',
       hudTemplateId,
-      lorebookIds
+      lorebookIds,
+      questTemplateIds
     };
 
     if (isNewGroup) {
@@ -369,6 +375,19 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                     value={lorebookIds}
                     onChange={setLorebookIds}
                     placeholder="Sin lorebooks asignados"
+                  />
+                </div>
+
+                {/* Quest Templates Selector */}
+                <div className="pt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ScrollText className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Label className="text-xs">Misiones</Label>
+                  </div>
+                  <QuestSelector
+                    value={questTemplateIds}
+                    onChange={setQuestTemplateIds}
+                    placeholder="Sin misiones asignadas"
                   />
                 </div>
               </div>

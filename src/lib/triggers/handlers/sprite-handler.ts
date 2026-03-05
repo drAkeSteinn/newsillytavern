@@ -378,3 +378,11 @@ export function resetSpriteHandlerState(state: SpriteHandlerState, messageKey: s
   state.triggeredPositions.delete(messageKey);
   state.lastPackMatches.delete(messageKey);
 }
+
+/**
+ * Clear all sprite handler state
+ */
+export function clearSpriteHandlerState(state: SpriteHandlerState): void {
+  state.triggeredPositions.clear();
+  state.lastPackMatches.clear();
+}

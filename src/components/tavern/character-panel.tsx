@@ -26,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useState, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -37,7 +36,7 @@ import {
 import { CharacterEditor } from './character-editor';
 import { GroupEditor } from './group-editor';
 import { importCharacterCard, exportCharacterCardAsPng, exportCharacterCardAsJson } from '@/lib/character-card';
-import type { CharacterCard, ChatSession, CharacterGroup } from '@/types';
+import type { CharacterCard, CharacterGroup } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { getLogger } from '@/lib/logger';
 
@@ -88,12 +87,18 @@ export function CharacterPanel() {
   const handleSelectCharacter = (characterId: string) => {
     setActiveCharacter(characterId);
     setActiveGroup(null);
-    
-    // Find existing session or create new
-    const existingSession = sessions.find(s => s.characterId === characterId);
-    if (existingSession) {
-      setActiveSession(existingSession.id);
+
+    // Find existing INDIVIDUAL session (not group session) for this character
+    // A character can have: 1 individual session + multiple group sessions
+    // Priority: individual session (no groupId) > group session
+    const individualSession = sessions.find(s =>
+      s.characterId === characterId && !s.groupId
+    );
+
+    if (individualSession) {
+      setActiveSession(individualSession.id);
     } else {
+      // No individual session exists, create one
       createSession(characterId);
     }
   };
@@ -107,27 +112,16 @@ export function CharacterPanel() {
     if (existingSession) {
       setActiveSession(existingSession.id);
     } else {
-      // Create a new session for the group
+      // Create a new session for the group using the store's createSession
+      // Pass the first group member's characterId and the groupId
       const group = groups.find(g => g.id === groupId);
-      if (group) {
-        const id = uuidv4();
-        const newSession: ChatSession = {
-          id,
-          characterId: 'group',
-          groupId,
-          name: `Chat con ${group.name}`,
-          messages: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        // Add the session to the store
-        useTavernStore.setState((state) => ({
-          sessions: [...state.sessions, newSession],
-          activeSessionId: id,
-          activeGroupId: groupId,
-          activeCharacterId: null
-        }));
+      if (group && group.members && group.members.length > 0) {
+        // Use the first member's characterId to create the session
+        const firstMemberId = group.members[0].characterId;
+        createSession(firstMemberId, groupId);
+      } else {
+        // Fallback: create without character if group has no members
+        createSession('', groupId);
       }
     }
   };

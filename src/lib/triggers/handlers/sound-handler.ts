@@ -301,6 +301,16 @@ export function resetSoundHandlerState(state: SoundHandlerState, messageKey: str
 }
 
 /**
+ * Clear all sound handler state
+ */
+export function clearSoundHandlerState(state: SoundHandlerState): void {
+  state.soundCountPerMessage.clear();
+  state.triggeredPositions.clear();
+  clearAllSoundCooldowns();
+  clearAudioQueue();
+}
+
+/**
  * Reset cooldown for a context (call when changing characters/sessions)
  */
 export function resetSoundCooldowns(contextKey: string): void {

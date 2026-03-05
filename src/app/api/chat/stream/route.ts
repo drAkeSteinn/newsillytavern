@@ -1,22 +1,25 @@
 // ============================================
-// Chat Stream Route - Refactored with shared modules
+// Chat Stream Route - Simplified with unified key resolution
 // ============================================
+//
+// Key resolution happens in buildSystemPrompt():
+// - Template variables: {{user}}, {{char}}, {{userpersona}}
+// - Stats keys: {{resistencia}}, {{habilidades}}, etc.
+// - All sections are processed consistently
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, Quest, QuestSettings } from '@/types';
+import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance } from '@/types';
+import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import {
-  StreamRequest,
   DEFAULT_CHARACTER,
   createSSEJSON,
   createErrorResponse,
   createSSEStreamResponse,
   buildSystemPrompt,
   buildChatHistorySections,
-  buildPostHistorySection,
   buildChatMessages,
   buildCompletionPrompt,
   getEffectiveUserName,
-  processCharacter,
   createUserMessage,
   streamZAI,
   streamOpenAICompatible,
@@ -26,7 +29,10 @@ import {
   buildLorebookSectionForPrompt,
   buildHUDContextSection,
   injectHUDContextIntoMessages,
-  injectHUDContextIntoSections
+  injectHUDContextIntoSections,
+  resolveAllKeys,
+  buildKeyResolutionContext,
+  resolveStats,
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -65,9 +71,13 @@ export async function POST(request: NextRequest) {
     // Extract HUD context from body
     const hudContext: HUDContextConfig | undefined = body.hudContext;
 
-    // Extract Quest data for pre-LLM integration
-    const quests: Quest[] = body.quests || [];
-    const questSettings: QuestSettings | undefined = body.questSettings;
+    // Extract Quest data for pre-LLM integration (NEW FORMAT)
+    const questTemplates: QuestTemplate[] = body.questTemplates || [];
+    const sessionQuests: SessionQuestInstance[] = body.sessionQuests || [];
+    const questSettings: QuestSettings = {
+      ...DEFAULT_QUEST_SETTINGS,
+      ...(body.questSettings || {})
+    };
 
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
@@ -84,9 +94,6 @@ export async function POST(request: NextRequest) {
 
     // Get effective user name from persona or use provided userName
     const effectiveUserName = getEffectiveUserName(persona, userName);
-
-    // Process character template variables ({{user}}, {{char}}, etc.)
-    const processedCharacter = processCharacter(effectiveCharacter, effectiveUserName, persona);
 
     // Build context configuration from request or use defaults
     const contextConfig: Partial<ContextConfig> = body.contextConfig || {};
@@ -107,42 +114,69 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Build system prompt with persona and lorebook (using processed character)
+    // ========================================
+    // Build system prompt with unified key resolution
+    // ========================================
+    // This handles ALL key resolution internally:
+    // - Template variables: {{user}}, {{char}}, {{userpersona}}
+    // - Stats keys: {{resistencia}}, {{habilidades}}, etc.
+    // - All sections including post-history instructions
     const { prompt: systemPrompt, sections: systemSections } = buildSystemPrompt(
-      processedCharacter,
+      effectiveCharacter,
       effectiveUserName,
       persona,
       lorebookSection,
-      typedSessionStats  // Pass session stats for attribute values
+      typedSessionStats
     );
 
-    // Build HUD context section if enabled
-    const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
+    // Build key resolution context for HUD context and quest sections
+    const resolvedStats = resolveStats({
+      characterId: effectiveCharacter.id,
+      statsConfig: effectiveCharacter.statsConfig,
+      sessionStats: typedSessionStats,
+    });
+    const keyContext = buildKeyResolutionContext(
+      effectiveCharacter,
+      effectiveUserName,
+      persona,
+      resolvedStats
+    );
+
+    // Build HUD context section if enabled (now resolves keys!)
+    const hudContextSection = hudContext ? buildHUDContextSection(hudContext, keyContext) : null;
 
     // Build quest section if enabled (pre-LLM integration)
     let questSection: PromptSection | null = null;
-    if (questSettings?.enabled && questSettings?.promptInclude && quests.length > 0) {
-      const questPromptContent = buildQuestPromptSection(quests, questSettings.promptTemplate);
+    if (questSettings.enabled && questSettings.promptInclude && sessionQuests.length > 0 && questTemplates.length > 0) {
+      const questPromptContent = buildQuestPromptSection(
+        questTemplates,
+        sessionQuests,
+        questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate
+      );
       if (questPromptContent) {
+        const resolvedQuestContent = resolveAllKeys(questPromptContent, keyContext);
+
         questSection = {
-          type: 'lorebook',
+          type: 'quest',
           label: 'Active Quests',
-          content: questPromptContent,
+          content: resolvedQuestContent,
           color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
         };
       }
     }
 
-    // Build all prompt sections for storage
-    const chatHistorySections = buildChatHistorySections(contextWindow.messages, processedCharacter.name, effectiveUserName);
-    const postHistorySection = buildPostHistorySection(processedCharacter.postHistoryInstructions);
+    // Build chat history sections (for prompt viewer)
+    const chatHistorySections = buildChatHistorySections(
+      contextWindow.messages,
+      effectiveCharacter.name,
+      effectiveUserName
+    );
 
-    // Combine all sections in order
+    // Combine all sections in order for prompt viewer
     let allPromptSections: PromptSection[] = [
       ...systemSections,
       ...(questSection ? [questSection] : []),
-      ...chatHistorySections,
-      ...(postHistorySection ? [postHistorySection] : [])
+      ...chatHistorySections
     ];
 
     // Inject HUD context into sections if enabled
@@ -178,9 +212,9 @@ export async function POST(request: NextRequest) {
               let chatMessages = buildChatMessages(
                 finalSystemPrompt,
                 allMessages,
-                processedCharacter,
-                effectiveUserName,
-                processedCharacter.postHistoryInstructions
+                effectiveCharacter,
+                effectiveUserName
+                // Note: postHistoryInstructions is already included in systemPrompt
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -200,9 +234,9 @@ export async function POST(request: NextRequest) {
               let chatMessages = buildChatMessages(
                 finalSystemPrompt,
                 allMessages,
-                processedCharacter,
+                effectiveCharacter,
                 effectiveUserName,
-                processedCharacter.postHistoryInstructions,
+                undefined, // postHistoryInstructions already in systemPrompt
                 true // Use system role for OpenAI
               );
               // Inject HUD context into chat messages if enabled
@@ -220,9 +254,9 @@ export async function POST(request: NextRequest) {
               let chatMessages = buildChatMessages(
                 finalSystemPrompt,
                 allMessages,
-                processedCharacter,
+                effectiveCharacter,
                 effectiveUserName,
-                processedCharacter.postHistoryInstructions,
+                undefined, // postHistoryInstructions already in systemPrompt
                 true // Use system role for Anthropic
               );
               // Inject HUD context into chat messages if enabled
@@ -237,9 +271,9 @@ export async function POST(request: NextRequest) {
               const prompt = buildCompletionPrompt({
                 systemPrompt: finalSystemPrompt,
                 messages: allMessages,
-                character: processedCharacter,
-                userName: effectiveUserName,
-                postHistoryInstructions: processedCharacter.postHistoryInstructions
+                character: effectiveCharacter,
+                userName: effectiveUserName
+                // Note: postHistoryInstructions already in systemPrompt
               });
               generator = streamOllama(prompt, llmConfig);
               break;
@@ -251,9 +285,8 @@ export async function POST(request: NextRequest) {
               const prompt = buildCompletionPrompt({
                 systemPrompt: finalSystemPrompt,
                 messages: allMessages,
-                character: processedCharacter,
-                userName: effectiveUserName,
-                postHistoryInstructions: processedCharacter.postHistoryInstructions
+                character: effectiveCharacter,
+                userName: effectiveUserName
               });
               generator = streamTextGenerationWebUI(prompt, llmConfig);
               break;

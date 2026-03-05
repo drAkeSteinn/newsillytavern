@@ -437,12 +437,31 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   },
   
   startGenerationForCharacter: (characterId: string) => {
-    // Clear any pending return to idle for this character
-    clearReturnToIdleTimer(characterId);
-    
     set((state: any) => {
       const currentCharState = state.characterSpriteStates[characterId] || createDefaultCharacterState();
       
+      // Check if there's an active trigger sprite
+      // Trigger sprites have priority over thinking/talk states
+      const hasActiveTrigger = currentCharState.triggerSpriteUrl !== null;
+      
+      if (hasActiveTrigger) {
+        // Keep the trigger sprite - it has priority
+        // The return to idle timer (if any) will handle transitioning back
+        return {
+          characterSpriteStates: {
+            ...state.characterSpriteStates,
+            [characterId]: {
+              ...currentCharState,
+              // Keep triggerSpriteUrl and returnToIdle as they are
+              spriteState: 'thinking',
+              // Reset the flag for new generation (will be set to true if new trigger activates)
+              triggerActivatedDuringGeneration: false,
+            },
+          },
+        };
+      }
+      
+      // No active trigger - proceed with normal generation start
       return {
         characterSpriteStates: {
           ...state.characterSpriteStates,
@@ -471,22 +490,13 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
       const currentCharState = state.characterSpriteStates[characterId];
       if (!currentCharState) return state;
       
-      // If trigger was activated, keep the sprite (return to idle timer will handle it)
-      // If not, clear the trigger sprite
-      if (!currentCharState.triggerActivatedDuringGeneration) {
-        return {
-          characterSpriteStates: {
-            ...state.characterSpriteStates,
-            [characterId]: {
-              ...currentCharState,
-              triggerSpriteUrl: null,
-              triggerSpriteLabel: null,
-              spriteState: 'idle',
-            },
-          },
-        };
-      } else {
-        // Trigger was activated, keep the current sprite
+      // If there's an active trigger sprite (with or without return to idle),
+      // keep it - the return to idle timer will handle transitioning back if scheduled
+      const hasActiveTrigger = currentCharState.triggerSpriteUrl !== null;
+      
+      if (hasActiveTrigger) {
+        // Trigger sprite is active, keep it
+        // The return to idle timer (if any) will handle the transition
         return {
           characterSpriteStates: {
             ...state.characterSpriteStates,
@@ -497,6 +507,19 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
           },
         };
       }
+      
+      // No trigger active, clear everything
+      return {
+        characterSpriteStates: {
+          ...state.characterSpriteStates,
+          [characterId]: {
+            ...currentCharState,
+            triggerSpriteUrl: null,
+            triggerSpriteLabel: null,
+            spriteState: 'idle',
+          },
+        },
+      };
     });
   },
   

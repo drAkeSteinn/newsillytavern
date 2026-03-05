@@ -35,6 +35,7 @@ import {
   checkSoundTriggers,
   executeAllSoundTriggers,
   resetSoundHandlerState,
+  clearSoundHandlerState,
   type SoundHandlerState,
   type SoundTriggerContext,
 } from './handlers/sound-handler';
@@ -43,6 +44,7 @@ import {
   checkSpriteTriggers,
   executeSpriteTrigger,
   resetSpriteHandlerState,
+  clearSpriteHandlerState,
   type SpriteHandlerState,
   type SpriteTriggerContext,
 } from './handlers/sprite-handler';
@@ -51,6 +53,7 @@ import {
   checkHUDTriggers,
   executeHUDTrigger,
   resetHUDHandlerState,
+  clearHUDHandlerState,
   type HUDHandlerState,
   type HUDTriggerContext,
 } from './handlers/hud-handler';
@@ -60,6 +63,7 @@ import {
   checkReturnToDefault,
   executeBackgroundTrigger,
   resetBackgroundHandlerState,
+  clearBackgroundHandlerState,
   type BackgroundHandlerState,
   type BackgroundTriggerContext,
 } from './handlers/background-handler';
@@ -67,13 +71,20 @@ import {
   createQuestHandlerState,
   checkQuestTriggers,
   resetQuestHandlerState,
+  clearQuestHandlerState,
   type QuestHandlerState,
   type QuestTriggerContext,
 } from './handlers/quest-handler';
 import {
+  executeQuestCompletionRewards,
+  executeObjectiveRewards,
+  type RewardStoreActions,
+} from '@/lib/quest/quest-reward-executor';
+import {
   createItemHandlerState,
   checkItemTriggers,
   resetItemHandlerState,
+  clearItemHandlerState,
   type ItemHandlerState,
   type ItemTriggerContext,
 } from './handlers/item-handler';
@@ -82,6 +93,7 @@ import {
   checkStatsTriggersInText,
   executeStatsTrigger,
   resetStatsHandlerState,
+  clearStatsHandlerState,
   type StatsHandlerState,
   type StatsTriggerContext,
 } from './handlers/stats-handler';
@@ -124,6 +136,9 @@ export interface TriggerSystemResult {
   ) => void;
   
   resetForNewMessage: (messageKey: string, character: CharacterCard | null) => void;
+  
+  // Clear ALL state - call this when chat is reset
+  clearAllState: () => void;
   
   isEnabled: boolean;
 }
@@ -399,64 +414,259 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       }
     }
     
-    // Process Quest triggers
+    // Process Quest triggers (New Template/Instance System)
     if (config.questEnabled !== false && store.questSettings?.enabled) {
-      const questContext: QuestTriggerContext = {
-        ...context,
-        quests: store.quests,
-        questSettings: store.questSettings,
-        sessionId: store.activeSessionId || '',
-      };
+      const activeSession = store.getActiveSession?.();
+      const sessionId = store.activeSessionId || '';
       
-      const questResult = checkQuestTriggers(
-        newTokens,
-        content,
-        questContext,
-        questHandlerState
-      );
+      // Get templates and session quest instances
+      const templates = store.questTemplates || [];
+      const sessionQuests = activeSession?.sessionQuests || [];
+      const turnCount = activeSession?.turnCount || 0;
       
-      if (questResult.hits.length > 0) {
-        // Process quest trigger hits
-        for (const hit of questResult.hits) {
-          console.log(`[TriggerSystem] Quest trigger: ${hit.message}`);
-          
-          // Handle different quest actions
-          switch (hit.action) {
-            case 'start':
-              if (hit.questTitle) {
-                store.startQuest({
-                  sessionId: store.activeSessionId || '',
-                  title: hit.questTitle,
-                  description: hit.description || '',
-                  priority: 'side',
+      // Only process if we have quests in this session
+      if (templates.length > 0 || sessionQuests.length > 0) {
+        const questContext: QuestTriggerContext = {
+          ...context,
+          templates,
+          sessionQuests,
+          questSettings: store.questSettings,
+          sessionId,
+          turnCount,
+        };
+        
+        const questResult = checkQuestTriggers(
+          newTokens,
+          content,
+          questContext,
+          questHandlerState
+        );
+        
+        if (questResult.hits.length > 0) {
+          // Process quest trigger hits
+          for (const hit of questResult.hits) {
+            console.log(`[TriggerSystem] Quest trigger: ${hit.message}`);
+            
+            // Handle different quest actions
+            switch (hit.action) {
+              case 'activate':
+                // Activate a quest in the session
+                store.activateQuest(sessionId, hit.questId);
+                break;
+                
+              case 'progress':
+                // Progress an objective
+                if (hit.questId && hit.objectiveId) {
+                  // Check quest status BEFORE progressing (to detect auto-completion)
+                  const questBefore = activeSession?.sessionQuests?.find(
+                    (q: { templateId: string; status: string }) => q.templateId === hit.questId
+                  );
+                  const wasActive = questBefore?.status === 'active';
+                  
+                  store.progressQuestObjective(
+                    sessionId,
+                    hit.questId,
+                    hit.objectiveId,
+                    hit.progress || 1,
+                    character?.id
+                  );
+                  
+                  // Execute objective rewards if this progress completes the objective
+                  if (hit.completesObjective && hit.objectiveRewards && hit.objectiveRewards.length > 0) {
+                    console.log(`[TriggerSystem] Objective completed! Executing ${hit.objectiveRewards.length} rewards`);
+                    
+                    const objectiveRewardContext = {
+                      sessionId,
+                      characterId: character?.id || '',
+                      character,
+                      sessionStats: activeSession?.sessionStats,
+                      timestamp: Date.now(),
+                    };
+                    
+                    const rewardActions: RewardStoreActions = {
+                      updateCharacterStat: store.updateCharacterStat.bind(store),
+                      applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      playSound: store.playSound?.bind(store),
+                      setBackground: store.setBackground?.bind(store),
+                      setActiveOverlays: store.setActiveOverlays?.bind(store),
+                    };
+                    
+                    const objectiveRewardResult = executeObjectiveRewards(
+                      hit.objectiveRewards,
+                      objectiveRewardContext,
+                      rewardActions
+                    );
+                    
+                    console.log(
+                      `[TriggerSystem] Objective "${hit.objective?.description}" rewards: ${objectiveRewardResult.successCount} succeeded, ${objectiveRewardResult.failureCount} failed`
+                    );
+                    
+                    // Add notification for objective rewards
+                    if (objectiveRewardResult.successCount > 0 && store.questSettings.showNotifications) {
+                      const rewardMessages = objectiveRewardResult.results
+                        .filter(r => r.success)
+                        .map(r => r.message)
+                        .filter(Boolean);
+                      
+                      if (rewardMessages.length > 0) {
+                        store.addQuestNotification({
+                          questId: hit.questId,
+                          questName: hit.template?.name || 'Quest',
+                          type: 'objective_complete',
+                          message: `Objective "${hit.objective?.description}" completed! Rewards: ${rewardMessages.join(', ')}`,
+                          rewards: hit.objectiveRewards,
+                        });
+                      }
+                    }
+                  }
+                  
+                  // Check if quest was auto-completed (was active before, now completed)
+                  // Get the updated session to check quest status
+                  const updatedSession = store.getActiveSession?.();
+                  const questAfter = updatedSession?.sessionQuests?.find(
+                    (q: { templateId: string; status: string }) => q.templateId === hit.questId
+                  );
+                  const isNowCompleted = questAfter?.status === 'completed';
+                  
+                  if (wasActive && isNowCompleted && hit.template?.rewards && hit.template.rewards.length > 0) {
+                    console.log(`[TriggerSystem] Quest auto-completed! Executing ${hit.template.rewards.length} quest rewards`);
+                    
+                    const questRewardContext = {
+                      sessionId,
+                      characterId: character?.id || '',
+                      character,
+                      sessionStats: updatedSession?.sessionStats,
+                      timestamp: Date.now(),
+                    };
+                    
+                    const questRewardActions: RewardStoreActions = {
+                      updateCharacterStat: store.updateCharacterStat.bind(store),
+                      applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      playSound: store.playSound?.bind(store),
+                      setBackground: store.setBackground?.bind(store),
+                      setActiveOverlays: store.setActiveOverlays?.bind(store),
+                    };
+                    
+                    const questRewardResult = executeQuestCompletionRewards(
+                      hit.template,
+                      questRewardContext,
+                      questRewardActions
+                    );
+                    
+                    console.log(
+                      `[TriggerSystem] Quest "${hit.template.name}" auto-completion rewards: ${questRewardResult.successCount} succeeded, ${questRewardResult.failureCount} failed`
+                    );
+                    
+                    // Add quest completion notification with rewards
+                    if (store.questSettings.showNotifications) {
+                      const rewardMessages = questRewardResult.results
+                        .filter(r => r.success)
+                        .map(r => r.message)
+                        .filter(Boolean);
+                      
+                      store.addQuestNotification({
+                        questId: hit.questId,
+                        questName: hit.template.name,
+                        type: 'quest_complete',
+                        message: `¡Misión completada: ${hit.template.name}!${rewardMessages.length > 0 ? ` Recompensas: ${rewardMessages.join(', ')}` : ''}`,
+                        rewards: hit.template.rewards,
+                      });
+                    }
+                  }
+                }
+                break;
+                
+              case 'complete':
+                if (hit.questId) {
+                  // Complete the quest
+                  store.completeQuest(sessionId, hit.questId, character?.id);
+                  
+                  // Execute rewards if template has them
+                  if (hit.template?.rewards && hit.template.rewards.length > 0) {
+                    const rewardContext = {
+                      sessionId,
+                      characterId: character?.id || '',
+                      character,
+                      sessionStats: activeSession?.sessionStats,
+                      timestamp: Date.now(),
+                    };
+                    
+                    const rewardActions: RewardStoreActions = {
+                      updateCharacterStat: store.updateCharacterStat.bind(store),
+                      applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      playSound: store.playSound?.bind(store),
+                      setBackground: store.setBackground?.bind(store),
+                      setActiveOverlays: store.setActiveOverlays?.bind(store),
+                    };
+                    
+                    const rewardResult = executeQuestCompletionRewards(
+                      hit.template,
+                      rewardContext,
+                      rewardActions
+                    );
+                    
+                    console.log(
+                      `[TriggerSystem] Quest "${hit.template.name}" rewards: ${rewardResult.successCount} succeeded, ${rewardResult.failureCount} failed`
+                    );
+                    
+                    // Add reward info to notification
+                    if (rewardResult.successCount > 0 && store.questSettings.showNotifications) {
+                      const rewardMessages = rewardResult.results
+                        .filter(r => r.success)
+                        .map(r => r.message)
+                        .filter(Boolean);
+                      
+                      if (rewardMessages.length > 0) {
+                        store.addQuestNotification({
+                          questId: hit.questId,
+                          questName: hit.template.name,
+                          type: 'reward_claimed',
+                          message: `Rewards: ${rewardMessages.join(', ')}`,
+                          rewards: hit.template.rewards,
+                        });
+                      }
+                    }
+                  }
+                }
+                break;
+                
+              case 'fail':
+                if (hit.questId) {
+                  store.failQuest(sessionId, hit.questId);
+                }
+                break;
+            }
+            
+            // Add notification for quest events (except complete and progress with rewards which are handled separately)
+            // Only add notification if:
+            // - action is 'activate' or 'fail'
+            // - action is 'progress' but doesn't complete objective (no rewards)
+            if (store.questSettings.showNotifications) {
+              if (hit.action === 'activate') {
+                store.addQuestNotification({
+                  questId: hit.questId,
+                  questName: hit.template?.name || 'Quest',
+                  type: 'quest_activated',
+                  message: hit.message,
+                });
+              } else if (hit.action === 'fail') {
+                store.addQuestNotification({
+                  questId: hit.questId,
+                  questName: hit.template?.name || 'Quest',
+                  type: 'quest_failed',
+                  message: hit.message,
+                });
+              } else if (hit.action === 'progress' && !hit.completesObjective) {
+                // Only notify for progress that doesn't complete objective
+                // Progress that completes objective already notified with rewards above
+                store.addQuestNotification({
+                  questId: hit.questId,
+                  questName: hit.template?.name || 'Quest',
+                  type: 'objective_complete',
+                  message: hit.message,
                 });
               }
-              break;
-            case 'progress':
-              if (hit.questId && hit.objectiveId) {
-                store.progressObjective(hit.questId, hit.objectiveId, hit.progress || 1);
-              }
-              break;
-            case 'complete':
-              if (hit.questId) {
-                store.completeQuest(hit.questId);
-              }
-              break;
-            case 'fail':
-              if (hit.questId) {
-                store.failQuest(hit.questId);
-              }
-              break;
-          }
-          
-          // Add notification if enabled
-          if (store.questSettings.showNotifications) {
-            store.addQuestNotification({
-              questId: hit.questId,
-              questTitle: hit.quest?.title || 'Quest',
-              type: hit.action === 'complete' ? 'completed' : hit.action === 'fail' ? 'failed' : 'objective_complete',
-              message: hit.message,
-            });
+            }
           }
         }
       }
@@ -519,28 +729,37 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     }
     
     // Process Stats triggers (Character Attributes)
-    if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
-      const statsContext: StatsTriggerContext = {
-        ...context,
-        characterId: character.id,
-        statsConfig: character.statsConfig,
-        sessionStats: store.getActiveSession?.()?.sessionStats,
-      };
-      
-      const statsResult = checkStatsTriggersInText(
-        content,
-        statsContext,
-        statsHandlerState
-      );
-      
-      if (statsResult.matched && statsResult.trigger) {
-        const hits = executeStatsTrigger(statsResult.trigger, context, {
-          updateCharacterStat: store.updateCharacterStat.bind(store),
-          activeSessionId: store.activeSessionId,
-        });
-        
-        if (hits.length > 0) {
-          console.log(`[TriggerSystem] Stats updated: ${hits.map(h => `${h.attributeName}=${h.newValue}`).join(', ')}`);
+    // IMPORTANT: Only process stats for the SPEAKING character (the one in `character` parameter)
+    // This prevents conflicts when multiple characters have the same attribute key
+    if (config.statsEnabled !== false) {
+      const activeSession = store.getActiveSession?.();
+      const sessionId = store.activeSessionId || '';
+
+      // Only process stats for the speaking character
+      // In group chats, `character` is the current speaker, not all characters
+      if (character?.statsConfig?.enabled) {
+        const statsContext: StatsTriggerContext = {
+          ...context,
+          characterId: character.id,
+          statsConfig: character.statsConfig,
+          sessionStats: activeSession?.sessionStats,
+        };
+
+        const statsResult = checkStatsTriggersInText(
+          content,
+          statsContext,
+          statsHandlerState
+        );
+
+        if (statsResult.matched && statsResult.trigger) {
+          const hits = executeStatsTrigger(statsResult.trigger, context, {
+            updateCharacterStat: store.updateCharacterStat.bind(store),
+            activeSessionId: sessionId,
+          });
+
+          if (hits.length > 0) {
+            console.log(`[TriggerSystem] Stats updated for ${character.name} (${character.id}): ${hits.map(h => `${h.attributeName}=${h.newValue}`).join(', ')}`);
+          }
         }
       }
     }
@@ -575,12 +794,15 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     // Reset detector
     detector.reset(messageKey);
     
+    // Get sessionId for quest handler reset
+    const sessionId = store.activeSessionId || undefined;
+    
     // Reset handlers
     resetSoundHandlerState(soundHandlerState, messageKey);
     resetSpriteHandlerState(spriteHandlerState, messageKey);
     resetHUDHandlerState(hudHandlerState, messageKey);
     resetBackgroundHandlerState(backgroundHandlerState, messageKey);
-    resetQuestHandlerState(questHandlerState, messageKey);
+    resetQuestHandlerState(questHandlerState, messageKey, sessionId);
     resetItemHandlerState(itemHandlerState, messageKey);
     resetStatsHandlerState(statsHandlerState, character?.id || '', messageKey);
     
@@ -589,12 +811,33 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     
     // Emit message end event
     bus.emit(createMessageEndEvent(messageKey, character, ''));
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, store.activeSessionId]);
+  
+  /**
+   * Clear ALL trigger state - call this when chat is reset
+   * This clears all detection states so quests can be re-activated
+   */
+  const clearAllState = useCallback(() => {
+    // Clear all handler states
+    clearSoundHandlerState(soundHandlerState);
+    clearSpriteHandlerState(spriteHandlerState);
+    clearHUDHandlerState(hudHandlerState);
+    clearBackgroundHandlerState(backgroundHandlerState);
+    clearQuestHandlerState(questHandlerState);
+    clearItemHandlerState(itemHandlerState);
+    clearStatsHandlerState(statsHandlerState);
+    
+    // Clear processed tracking
+    lastProcessedRef.current.clear();
+    
+    console.log('[TriggerSystem] All state cleared');
   }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState]);
   
   return {
     processStreamingContent,
     processFullContent,
     resetForNewMessage,
+    clearAllState,
     isEnabled: true,
   };
 }

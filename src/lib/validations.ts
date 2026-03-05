@@ -19,6 +19,7 @@ export interface ValidatedStreamRequest {
   persona?: unknown;
   contextConfig?: unknown;
   sessionStats?: unknown;  // Session stats for attribute values
+  hudContext?: unknown;     // HUD context for prompt injection
 }
 
 export interface ValidatedGroupStreamRequest {
@@ -34,6 +35,7 @@ export interface ValidatedGroupStreamRequest {
   lastResponderId?: string;
   contextConfig?: unknown;
   sessionStats?: unknown;  // Session stats for attribute values
+  hudContext?: unknown;     // HUD context for prompt injection
 }
 
 export interface ValidatedGenerateRequest {
@@ -47,6 +49,7 @@ export interface ValidatedGenerateRequest {
   persona?: unknown;
   contextConfig?: unknown;
   sessionStats?: unknown;  // Session stats for attribute values
+  hudContext?: unknown;     // HUD context for prompt injection
 }
 
 // ============================================
@@ -116,6 +119,7 @@ export function validateStreamRequest(data: unknown): ValidationResult<Validated
     if (data.persona) result.persona = data.persona;
     if (data.contextConfig) result.contextConfig = data.contextConfig;
     if (data.sessionStats) result.sessionStats = data.sessionStats;
+    if (data.hudContext) result.hudContext = data.hudContext;
 
     return { success: true, data: result };
   } catch (error) {
@@ -186,6 +190,7 @@ export function validateGroupStreamRequest(data: unknown): ValidationResult<Vali
     if (isString(data.lastResponderId)) result.lastResponderId = data.lastResponderId;
     if (data.contextConfig) result.contextConfig = data.contextConfig;
     if (data.sessionStats) result.sessionStats = data.sessionStats;
+    if (data.hudContext) result.hudContext = data.hudContext;
 
     return { success: true, data: result };
   } catch (error) {

@@ -112,25 +112,27 @@ export function HUDDisplay({ className }: HUDDisplayProps) {
       .map((member) => {
         const char = characters.find((c) => c.id === member.characterId);
         if (!char) return null;
-        
+
         const attributes = char.statsConfig?.enabled
           ? char.statsConfig.attributes.filter((attr) => attr.showInHUD !== false)
           : [];
-        
+
         // Get values from sessionStats, or use defaults if not initialized
+        // IMPORTANT: Always use defaults as base, then override with stored values
+        // This ensures new attributes added after session creation are shown
         const storedValues = sessionStats?.characterStats?.[char.id]?.attributeValues;
         const values: Record<string, number | string> = {};
-        
-        if (storedValues) {
-          // Use stored values
-          Object.assign(values, storedValues);
-        } else {
-          // Use default values from attributes
-          for (const attr of attributes) {
-            values[attr.key] = attr.defaultValue;
-          }
+
+        // Start with default values for ALL attributes
+        for (const attr of attributes) {
+          values[attr.key] = attr.defaultValue;
         }
-        
+
+        // Override with stored values if available
+        if (storedValues) {
+          Object.assign(values, storedValues);
+        }
+
         return { character: char, attributes, values };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
@@ -140,21 +142,23 @@ export function HUDDisplay({ className }: HUDDisplayProps) {
     const attributes = activeCharacter.statsConfig?.enabled
       ? activeCharacter.statsConfig.attributes.filter((attr) => attr.showInHUD !== false)
       : [];
-    
+
     // Get values from sessionStats, or use defaults if not initialized
+    // IMPORTANT: Always use defaults as base, then override with stored values
+    // This ensures new attributes added after session creation are shown
     const storedValues = sessionStats?.characterStats?.[activeCharacter.id]?.attributeValues;
     const values: Record<string, number | string> = {};
-    
-    if (storedValues) {
-      // Use stored values
-      Object.assign(values, storedValues);
-    } else {
-      // Use default values from attributes
-      for (const attr of attributes) {
-        values[attr.key] = attr.defaultValue;
-      }
+
+    // Start with default values for ALL attributes
+    for (const attr of attributes) {
+      values[attr.key] = attr.defaultValue;
     }
-    
+
+    // Override with stored values if available
+    if (storedValues) {
+      Object.assign(values, storedValues);
+    }
+
     if (attributes.length > 0) {
       charactersWithAttributes = [{ character: activeCharacter, attributes, values }];
     }
@@ -267,8 +271,8 @@ function MultiCharacterAttributesHUD({ charactersWithAttributes, compact, isGrou
             </div>
           )}
 
-          {/* Attributes */}
-          <div className={cn('flex flex-col', compact ? 'gap-1' : 'gap-2')}>
+          {/* Attributes - Ensure all are visible */}
+          <div className={cn('flex flex-col', compact ? 'gap-1.5' : 'gap-2.5')}>
             {attributes.map((attr) => (
               <AttributeHUDField
                 key={attr.id}
@@ -779,21 +783,25 @@ function DefaultField({ field, value, color, compact, style }: FieldProps & { st
   return (
     <div className={cn('flex items-center gap-2', compact && 'gap-1')}>
       {field.icon && (
-        <span className="text-sm" title={field.name}>
+        <span className={cn('text-sm', compact && 'text-xs')} title={field.name}>
           {field.icon}
         </span>
       )}
-      {field.showLabel !== false && !compact && (
-        <span className="text-xs text-white/50 min-w-[60px]">
+      {/* Always show label in both modes for clarity */}
+      {field.showLabel !== false && (
+        <span className={cn(
+          'text-xs text-white/50',
+          compact ? 'text-[10px] min-w-[50px]' : 'min-w-[60px]'
+        )}>
           {field.name}:
         </span>
       )}
       <span
         className={cn(
-          'text-sm font-medium px-2 py-0.5 rounded border',
+          'font-medium rounded border',
+          compact ? 'text-xs px-1.5 py-0.5' : 'text-sm px-2 py-0.5',
           bgColor,
-          textColor,
-          compact && 'text-xs px-1.5'
+          textColor
         )}
       >
         {displayValue}
@@ -813,13 +821,21 @@ function ProgressField({ field, value, color, compact }: FieldProps) {
     <div className={cn('flex flex-col gap-1', compact && 'gap-0.5')}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {field.icon && <span className="text-sm">{field.icon}</span>}
+          {field.icon && <span className={cn('text-sm', compact && 'text-xs')}>{field.icon}</span>}
           {field.showLabel !== false && (
-            <span className="text-xs text-white/50">{field.name}</span>
+            <span className={cn(
+              'text-xs text-white/50',
+              compact && 'text-[10px]'
+            )}>
+              {field.name}
+            </span>
           )}
         </div>
         {field.showValue !== false && (
-          <span className="text-xs font-medium text-white/80">
+          <span className={cn(
+            'font-medium text-white/80',
+            compact ? 'text-[10px]' : 'text-xs'
+          )}>
             {value}
             {field.unit && <span className="text-white/40 ml-0.5">{field.unit}</span>}
           </span>
@@ -830,7 +846,7 @@ function ProgressField({ field, value, color, compact }: FieldProps) {
           'w-full bg-white/10 rounded-full overflow-hidden',
           compact ? 'h-1.5' : 'h-2'
         )}
-        style={{ minWidth: compact ? 60 : 100 }}
+        style={{ minWidth: compact ? 80 : 120 }}
       >
         <div
           className={cn(

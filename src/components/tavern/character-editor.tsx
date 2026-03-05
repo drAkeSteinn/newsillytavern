@@ -37,7 +37,8 @@ import {
   Star,
   Layers,
   Activity,
-  BookOpen
+  BookOpen,
+  ScrollText
 } from 'lucide-react';
 import type { CharacterCard, SpriteLibraries } from '@/types';
 import { SpriteManager } from './sprite-manager';
@@ -48,6 +49,7 @@ import { SpriteDebugPanel } from './sprite-debug-panel';
 import { PresetSelector, presetToData } from './preset-selector';
 import { HUDSelector } from './hud-selector';
 import { LorebookSelector } from './lorebook-selector';
+import { QuestSelector } from './quest-selector';
 import { StatsEditor } from './stats-editor';
 import { getLogger } from '@/lib/logger';
 
@@ -73,7 +75,9 @@ const defaultCharacter: Omit<CharacterCard, 'id' | 'createdAt' | 'updatedAt'> = 
   tags: [],
   avatar: '',
   sprites: [],
-  voice: null
+  voice: null,
+  lorebookIds: [],
+  questTemplateIds: [],
 };
 
 export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) {
@@ -315,6 +319,19 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                 value={character.lorebookIds}
                 onChange={(lorebookIds) => setCharacter(prev => ({ ...prev, lorebookIds }))}
                 placeholder="Sin lorebooks asignados"
+              />
+            </div>
+
+            {/* Quest Templates Selector */}
+            <div className="pt-2">
+              <div className="flex items-center gap-2 mb-1">
+                <ScrollText className="w-3.5 h-3.5 text-muted-foreground" />
+                <Label className="text-xs">Misiones</Label>
+              </div>
+              <QuestSelector
+                value={character.questTemplateIds}
+                onChange={(questTemplateIds) => setCharacter(prev => ({ ...prev, questTemplateIds }))}
+                placeholder="Sin misiones asignadas"
               />
             </div>
           </div>

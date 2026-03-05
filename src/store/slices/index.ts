@@ -50,3 +50,5 @@ export {
   filterIntentionsByRequirements,
   filterInvitationsByRequirements
 } from './statsSlice';
+export { createQuestTemplateSlice } from './questTemplateSlice';
+export type { QuestTemplateSlice } from './questTemplateSlice';

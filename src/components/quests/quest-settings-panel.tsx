@@ -35,12 +35,14 @@ import {
   Sparkles,
   Info,
   List,
-  Cog
+  Cog,
+  ScrollText
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import { QuestLogPanel } from './quest-log-panel';
+import { QuestTemplateManager } from '@/components/settings/quest-template-manager';
 
 export function QuestSettingsPanel() {
   const { questSettings, setQuestSettings, activeSessionId } = useTavernStore();
@@ -62,17 +64,26 @@ export function QuestSettingsPanel() {
   }, [setQuestSettings]);
 
   return (
-    <Tabs defaultValue="quests" className="h-full flex flex-col">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
+    <Tabs defaultValue="templates" className="h-full flex flex-col">
+      <TabsList className="grid w-full grid-cols-3 mb-4">
+        <TabsTrigger value="templates" className="gap-2">
+          <ScrollText className="w-4 h-4" />
+          Templates
+        </TabsTrigger>
         <TabsTrigger value="quests" className="gap-2">
           <List className="w-4 h-4" />
           Misiones
         </TabsTrigger>
         <TabsTrigger value="settings" className="gap-2">
           <Cog className="w-4 h-4" />
-          Configuración
+          Config
         </TabsTrigger>
       </TabsList>
+
+      {/* Templates Tab - Quest Template Manager */}
+      <TabsContent value="templates" className="flex-1 overflow-y-auto m-0">
+        <QuestTemplateManager />
+      </TabsContent>
 
       {/* Quest Management Tab */}
       <TabsContent value="quests" className="flex-1 overflow-hidden m-0">

@@ -2,7 +2,14 @@
 // Session Slice - Chat sessions and messages
 // ============================================
 
-import type { ChatSession, ChatMessage, SessionStats, CharacterSessionStats } from '@/types';
+import type { 
+  ChatSession, 
+  ChatMessage, 
+  SessionStats, 
+  CharacterSessionStats,
+  SessionQuestInstance,
+  QuestTemplate,
+} from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { processMessageTemplate } from '@/lib/prompt-template';
 
@@ -54,6 +61,46 @@ function initializeSessionStatsForCharacters(
   };
 }
 
+// ============================================
+// Quest Instance Helpers
+// ============================================
+
+/**
+ * Create quest instances from templates
+ * Creates 'available' status quests (not yet activated)
+ */
+function createQuestInstancesFromTemplates(
+  templates: QuestTemplate[]
+): SessionQuestInstance[] {
+  return templates.map(template => ({
+    templateId: template.id,
+    status: 'available' as const,
+    objectives: template.objectives.map(obj => ({
+      templateId: obj.id,
+      currentCount: 0,
+      isCompleted: false,
+    })),
+    progress: 0,
+    activatedAt: undefined,
+    completedAt: undefined,
+    activatedAtTurn: undefined,
+  }));
+}
+
+/**
+ * Calculate quest progress from objectives
+ */
+function calculateQuestProgress(objectives: Array<{ templateId: string; currentCount: number; isCompleted: boolean } & { isOptional?: boolean }>): number {
+  if (!objectives || objectives.length === 0) return 0;
+  
+  const requiredObjectives = objectives.filter(o => !o.isOptional);
+  
+  if (requiredObjectives.length === 0) return 100;
+  
+  const completedCount = requiredObjectives.filter(o => o.isCompleted).length;
+  return Math.round((completedCount / requiredObjectives.length) * 100);
+}
+
 export interface SessionSlice {
   // State
   sessions: ChatSession[];
@@ -77,6 +124,25 @@ export interface SessionSlice {
   addSwipeAlternative: (sessionId: string, messageId: string, content: string, metadata?: ChatMessage['metadata']) => void;
   setCurrentSwipe: (sessionId: string, messageId: string, swipeIndex: number) => void;
   getSwipeCount: (sessionId: string, messageId: string) => number;
+
+  // Turn Management
+  incrementTurnCount: (sessionId: string) => void;
+  getTurnCount: (sessionId: string) => number;
+  resetTurnCount: (sessionId: string) => void;
+
+  // Quest Instance Actions
+  initializeSessionQuests: (sessionId: string, questTemplateIds: string[]) => void;
+  activateQuest: (sessionId: string, questTemplateId: string) => void;
+  activateQuestFromTemplate: (sessionId: string, template: QuestTemplate) => void;  // NEW: Direct activation from template
+  completeQuest: (sessionId: string, questTemplateId: string, characterId?: string) => void;
+  failQuest: (sessionId: string, questTemplateId: string) => void;
+  progressQuestObjective: (sessionId: string, questTemplateId: string, objectiveId: string, amount?: number, characterId?: string) => void;
+  completeObjective: (sessionId: string, questTemplateId: string, objectiveId: string, characterId?: string) => void;
+  toggleObjectiveCompletion: (sessionId: string, questTemplateId: string, objectiveId: string) => void;  // Toggle objective completion
+  getSessionQuests: (sessionId: string) => SessionQuestInstance[];
+  getActiveQuests: (sessionId: string) => SessionQuestInstance[];
+  getAvailableQuests: (sessionId: string) => SessionQuestInstance[];
+  clearSessionQuests: (sessionId: string) => void;
 
   // Utilities
   getActiveSession: () => ChatSession | undefined;
@@ -105,6 +171,9 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
     // Initialize session stats
     let sessionStats: SessionStats | undefined;
     
+    // Initialize session quests
+    let sessionQuests: SessionQuestInstance[] = [];
+    
     if (groupId) {
       // Group chat: initialize stats for all group members
       const group = get().getGroupById?.(groupId);
@@ -113,10 +182,26 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
           .map((m: any) => get().getCharacterById(m.characterId))
           .filter((c: any) => c !== undefined);
         sessionStats = initializeSessionStatsForCharacters(groupCharacters);
+        
+        // Group chat: ONLY use group's quest templates (not individual character quests)
+        if (group.questTemplateIds && group.questTemplateIds.length > 0) {
+          const templates = get().getTemplatesByIds?.(group.questTemplateIds) || [];
+          if (templates.length > 0) {
+            sessionQuests = createQuestInstancesFromTemplates(templates);
+          }
+        }
       }
     } else if (character) {
       // Single character chat
       sessionStats = initializeSessionStatsForCharacters([character]);
+      
+      // Individual chat: use character's quest templates
+      if (character.questTemplateIds && character.questTemplateIds.length > 0) {
+        const templates = get().getTemplatesByIds?.(character.questTemplateIds) || [];
+        if (templates.length > 0) {
+          sessionQuests = createQuestInstancesFromTemplates(templates);
+        }
+      }
     }
     
     set((state: any) => ({
@@ -138,7 +223,9 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
         }] : [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        sessionStats  // Include initialized session stats
+        sessionStats,  // Include initialized session stats
+        sessionQuests, // Include initialized session quests
+        turnCount: 0   // Initialize turn counter
       }],
       activeSessionId: id,
       activeCharacterId: characterId,
@@ -238,6 +325,27 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
     // Reset session stats to default values
     const newSessionStats = initializeSessionStatsForCharacters(characters);
     
+    // Reset session quests to template defaults
+    let newSessionQuests: SessionQuestInstance[] = [];
+    
+    // Get quest template IDs from character or group
+    if (session.groupId) {
+      // Group chat: use group's quest templates
+      const group = get().getGroupById?.(session.groupId);
+      if (group?.questTemplateIds && group.questTemplateIds.length > 0) {
+        const templates = get().getTemplatesByIds?.(group.questTemplateIds) || [];
+        if (templates.length > 0) {
+          newSessionQuests = createQuestInstancesFromTemplates(templates);
+        }
+      }
+    } else if (character?.questTemplateIds && character.questTemplateIds.length > 0) {
+      // Individual chat: use character's quest templates
+      const templates = get().getTemplatesByIds?.(character.questTemplateIds) || [];
+      if (templates.length > 0) {
+        newSessionQuests = createQuestInstancesFromTemplates(templates);
+      }
+    }
+    
     // Reset messages to only the first message
     const initialContent = processedFirstMes || '';
     
@@ -257,6 +365,8 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
             swipes: [initialContent]
           }] : [],
           sessionStats: newSessionStats,
+          sessionQuests: newSessionQuests,  // Reset quests to template defaults
+          turnCount: 0,  // Reset turn counter
           updatedAt: new Date().toISOString()
         } : s
       ),
@@ -402,7 +512,476 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
     return message?.swipes?.length || 1;
   },
 
+  // ============================================
+  // Turn Management
+  // ============================================
+
+  incrementTurnCount: (sessionId) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) =>
+      s.id === sessionId
+        ? { ...s, turnCount: (s.turnCount || 0) + 1, updatedAt: new Date().toISOString() }
+        : s
+    ),
+  })),
+
+  getTurnCount: (sessionId) => {
+    const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+    return session?.turnCount || 0;
+  },
+
+  resetTurnCount: (sessionId) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) =>
+      s.id === sessionId
+        ? { ...s, turnCount: 0, updatedAt: new Date().toISOString() }
+        : s
+    ),
+  })),
+
+  // ============================================
+  // Quest Instance Actions
+  // ============================================
+
+  initializeSessionQuests: (sessionId, questTemplateIds) => {
+    // Get templates from quest template slice
+    const templates = get().getTemplatesByIds?.(questTemplateIds) || [];
+    
+    if (templates.length === 0) return;
+    
+    // Create instances from templates
+    const questInstances = createQuestInstancesFromTemplates(templates);
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) =>
+        s.id === sessionId
+          ? { ...s, sessionQuests: questInstances, updatedAt: new Date().toISOString() }
+          : s
+      ),
+    }));
+  },
+
+  activateQuest: (sessionId, questTemplateId) => {
+    // Get template to check prerequisites
+    const template = get().getTemplateById?.(questTemplateId);
+    
+    if (template?.prerequisites && template.prerequisites.length > 0) {
+      const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+      const completedQuestIds = (session?.sessionQuests || [])
+        .filter(q => q.status === 'completed')
+        .map(q => q.templateId);
+      
+      const hasAllPrereqs = template.prerequisites.every(prereqId => 
+        completedQuestIds.includes(prereqId)
+      );
+      
+      if (!hasAllPrereqs) {
+        console.warn(`[Quest] Cannot activate "${template.name}": missing prerequisites. Required: ${template.prerequisites.join(', ')}`);
+        return; // Don't activate - missing prerequisites
+      }
+    }
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) => {
+        if (s.id !== sessionId) return s;
+        
+        const turnCount = s.turnCount || 0;
+        
+        return {
+          ...s,
+          sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) =>
+            q.templateId === questTemplateId && q.status === 'available'
+              ? {
+                  ...q,
+                  status: 'active' as const,
+                  activatedAt: new Date().toISOString(),
+                  activatedAtTurn: turnCount,
+                }
+              : q
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    
+    // Add notification for quest activation
+    if (template) {
+      get().addQuestNotification?.({
+        questId: questTemplateId,
+        questTitle: template.name,
+        type: 'quest_activated',
+        message: `¡Nueva misión activada: ${template.name}!`,
+      });
+    }
+  },
+
+  completeQuest: (sessionId, questTemplateId, characterId) => {
+    // Get the template to check for chain
+    const template = get().getTemplateById?.(questTemplateId);
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) => {
+        if (s.id !== sessionId) return s;
+        
+        return {
+          ...s,
+          sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) =>
+            q.templateId === questTemplateId
+              ? {
+                  ...q,
+                  status: 'completed' as const,
+                  completedAt: new Date().toISOString(),
+                  completedBy: characterId,
+                  progress: 100,
+                }
+              : q
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    
+    // Handle quest chain - activate next quest if autoStart is enabled
+    if (template?.chain && template.chain.type !== 'none' && template.chain.autoStart) {
+      const nextQuestId = template.chain.type === 'specific' 
+        ? template.chain.nextQuestId 
+        : template.chain.type === 'random' && template.chain.randomPool?.length
+          ? template.chain.randomPool[Math.floor(Math.random() * template.chain.randomPool.length)]
+          : null;
+      
+      if (nextQuestId) {
+        // Check if next quest exists in session quests
+        const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+        const nextQuestInstance = session?.sessionQuests?.find(q => q.templateId === nextQuestId);
+        
+        if (nextQuestInstance) {
+          // Activate existing quest instance
+          console.log(`[Quest Chain] Auto-starting next quest: ${nextQuestId}`);
+          get().activateQuest(sessionId, nextQuestId);
+        } else {
+          // Create and activate new quest instance from template
+          const nextTemplate = get().getTemplateById?.(nextQuestId);
+          if (nextTemplate) {
+            console.log(`[Quest Chain] Creating and activating new quest: ${nextQuestId}`);
+            get().activateQuestFromTemplate?.(sessionId, nextTemplate);
+          }
+        }
+      }
+    }
+    
+    // Add completion notification
+    if (template) {
+      get().addQuestNotification?.({
+        questId: questTemplateId,
+        questTitle: template.name,
+        type: 'quest_complete',
+        message: `¡Misión completada: ${template.name}!`,
+        rewards: template.rewards,
+      });
+    }
+  },
+
+  failQuest: (sessionId, questTemplateId) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) => {
+      if (s.id !== sessionId) return s;
+      
+      return {
+        ...s,
+        sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) =>
+          q.templateId === questTemplateId
+            ? { ...q, status: 'failed' as const, updatedAt: new Date().toISOString() }
+            : q
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    }),
+  })),
+
+  progressQuestObjective: (sessionId, questTemplateId, objectiveId, amount = 1, characterId?: string) => {
+    // Get the template to find target count
+    const template = get().getTemplateById?.(questTemplateId);
+    const targetObjective = template?.objectives.find(o => o.id === objectiveId);
+    const targetCount = targetObjective?.targetCount || 1;
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) => {
+        if (s.id !== sessionId) return s;
+        
+        return {
+          ...s,
+          sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) => {
+            if (q.templateId !== questTemplateId) return q;
+            
+            const updatedObjectives = q.objectives.map((o) => {
+              if (o.templateId !== objectiveId) return o;
+              
+              const newCount = Math.min((o.currentCount || 0) + amount, targetCount);
+              const isNowCompleted = newCount >= targetCount;
+              
+              return {
+                ...o,
+                currentCount: newCount,
+                isCompleted: isNowCompleted,
+              };
+            });
+            
+            const newProgress = calculateQuestProgress(updatedObjectives);
+            
+            // Only check non-optional objectives for auto-completion
+            const requiredObjectives = updatedObjectives.filter(o => {
+              const objTemplate = template?.objectives.find(ot => ot.id === o.templateId);
+              return !objTemplate?.isOptional;
+            });
+            const allRequiredCompleted = requiredObjectives.length === 0 || 
+              requiredObjectives.every(o => o.isCompleted);
+            
+            return {
+              ...q,
+              objectives: updatedObjectives,
+              progress: newProgress,
+              // Auto-complete quest if all REQUIRED objectives are done
+              ...(allRequiredCompleted && {
+                status: 'completed' as const,
+                completedAt: new Date().toISOString(),
+                completedBy: characterId,
+              }),
+            };
+          }),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    
+    // Add notification if objective completed
+    const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+    const quest = session?.sessionQuests?.find((q: SessionQuestInstance) => q.templateId === questTemplateId);
+    const objective = quest?.objectives.find(o => o.templateId === objectiveId);
+    
+    if (objective?.isCompleted && template) {
+      get().addQuestNotification?.({
+        questId: questTemplateId,
+        questTitle: template.name,
+        type: 'objective_complete',
+        message: `Objetivo completado: ${targetObjective?.description}`,
+      });
+    }
+  },
+
+  getSessionQuests: (sessionId) => {
+    const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+    return session?.sessionQuests || [];
+  },
+
+  completeObjective: (sessionId, questTemplateId, objectiveId, characterId) => {
+    const template = get().getTemplateById?.(questTemplateId);
+    const targetObjective = template?.objectives.find(o => o.id === objectiveId);
+    const targetCount = targetObjective?.targetCount || 1;
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) => {
+        if (s.id !== sessionId) return s;
+        
+        return {
+          ...s,
+          sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) => {
+            if (q.templateId !== questTemplateId) return q;
+            
+            const updatedObjectives = q.objectives.map((o) => {
+              if (o.templateId !== objectiveId) return o;
+              
+              return {
+                ...o,
+                currentCount: targetCount,
+                isCompleted: true,
+              };
+            });
+            
+            const newProgress = calculateQuestProgress(updatedObjectives);
+            
+            // Only check non-optional objectives for auto-completion
+            const requiredObjectives = updatedObjectives.filter(o => {
+              const objTemplate = template?.objectives.find(ot => ot.id === o.templateId);
+              return !objTemplate?.isOptional;
+            });
+            const allRequiredCompleted = requiredObjectives.length === 0 || 
+              requiredObjectives.every(o => o.isCompleted);
+            
+            return {
+              ...q,
+              objectives: updatedObjectives,
+              progress: newProgress,
+              // Auto-complete quest if all REQUIRED objectives are done
+              ...(allRequiredCompleted && {
+                status: 'completed' as const,
+                completedAt: new Date().toISOString(),
+                completedBy: characterId,
+              }),
+            };
+          }),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    
+    // Add notification
+    if (template && targetObjective) {
+      get().addQuestNotification?.({
+        questId: questTemplateId,
+        questTitle: template.name,
+        type: 'objective_complete',
+        message: `Objetivo completado: ${targetObjective.description}`,
+      });
+    }
+  },
+
+  // Toggle objective completion (complete/uncomplete)
+  toggleObjectiveCompletion: (sessionId, questTemplateId, objectiveId) => {
+    const template = get().getTemplateById?.(questTemplateId);
+    const targetObjective = template?.objectives.find(o => o.id === objectiveId);
+    const targetCount = targetObjective?.targetCount || 1;
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) => {
+        if (s.id !== sessionId) return s;
+        
+        return {
+          ...s,
+          sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) => {
+            if (q.templateId !== questTemplateId) return q;
+            
+            // Find current objective state
+            const currentObjective = q.objectives.find(o => o.templateId === objectiveId);
+            if (!currentObjective) return q;
+            
+            // Toggle the completion status
+            const newCompletedState = !currentObjective.isCompleted;
+            
+            const updatedObjectives = q.objectives.map((o) => {
+              if (o.templateId !== objectiveId) return o;
+              
+              return {
+                ...o,
+                currentCount: newCompletedState ? targetCount : 0,
+                isCompleted: newCompletedState,
+              };
+            });
+            
+            const newProgress = calculateQuestProgress(updatedObjectives);
+            const allCompleted = updatedObjectives.every(o => o.isCompleted);
+            
+            return {
+              ...q,
+              objectives: updatedObjectives,
+              progress: newProgress,
+              // Auto-complete quest if all objectives are done AND quest was active
+              ...(allCompleted && q.status === 'active' && {
+                status: 'completed' as const,
+                completedAt: new Date().toISOString(),
+              }),
+              // If uncompleting an objective and quest was completed, set back to active
+              ...(!newCompletedState && q.status === 'completed' && {
+                status: 'active' as const,
+                completedAt: undefined,
+              }),
+            };
+          }),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+  },
+
+  getActiveQuests: (sessionId) => {
+    const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+    return (session?.sessionQuests || []).filter((q: SessionQuestInstance) => q.status === 'active');
+  },
+
+  getAvailableQuests: (sessionId) => {
+    const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+    return (session?.sessionQuests || []).filter((q: SessionQuestInstance) => q.status === 'available');
+  },
+
+  clearSessionQuests: (sessionId) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) =>
+      s.id === sessionId
+        ? { ...s, sessionQuests: [], updatedAt: new Date().toISOString() }
+        : s
+    ),
+  })),
+
+  // NEW: Activate quest directly from template (creates instance if needed)
+  activateQuestFromTemplate: (sessionId, template) => {
+    const session = get().sessions.find((s: ChatSession) => s.id === sessionId);
+    if (!session) return;
+
+    const turnCount = session.turnCount || 0;
+    const existingQuest = (session.sessionQuests || []).find(
+      (q: SessionQuestInstance) => q.templateId === template.id
+    );
+
+    if (existingQuest) {
+      // Quest already exists, just activate it if available
+      if (existingQuest.status === 'available') {
+        set((state: any) => ({
+          sessions: state.sessions.map((s: ChatSession) =>
+            s.id === sessionId
+              ? {
+                  ...s,
+                  sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) =>
+                    q.templateId === template.id
+                      ? {
+                          ...q,
+                          status: 'active' as const,
+                          activatedAt: new Date().toISOString(),
+                          activatedAtTurn: turnCount,
+                        }
+                      : q
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : s
+          ),
+        }));
+      }
+    } else {
+      // Create new instance and activate it
+      const newQuest: SessionQuestInstance = {
+        templateId: template.id,
+        status: 'active',
+        objectives: template.objectives.map(obj => ({
+          templateId: obj.id,
+          currentCount: 0,
+          isCompleted: false,
+        })),
+        progress: 0,
+        activatedAt: new Date().toISOString(),
+        activatedAtTurn: turnCount,
+      };
+
+      set((state: any) => ({
+        sessions: state.sessions.map((s: ChatSession) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                sessionQuests: [...(s.sessionQuests || []), newQuest],
+                updatedAt: new Date().toISOString(),
+              }
+            : s
+        ),
+      }));
+    }
+
+    // Add notification using quest slice
+    get().addQuestNotification?.({
+      questId: template.id,
+      questTitle: template.name,
+      type: 'started',
+      message: `Nueva misión iniciada: ${template.name}`,
+    });
+  },
+
+  // ============================================
   // Utilities
+  // ============================================
+
   getActiveSession: () => {
     const state = get();
     return state.sessions.find((s: ChatSession) => s.id === state.activeSessionId);

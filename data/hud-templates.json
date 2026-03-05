@@ -19,16 +19,16 @@
       }
     ],
     "position": "top-left",
-    "style": "neon",
+    "style": "minimal",
     "opacity": 0.7,
-    "compact": true,
+    "compact": false,
     "id": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da",
     "createdAt": "2026-03-02T10:09:15.831Z",
-    "updatedAt": "2026-03-02T17:44:03.163Z",
+    "updatedAt": "2026-03-03T09:59:49.289Z",
     "context": {
       "enabled": true,
-      "content": "asd",
-      "position": 3,
+      "content": "HUD values:\n{{resistencia}} {{user}} {{char}}",
+      "position": 5,
       "scanDepth": 1
     }
   }

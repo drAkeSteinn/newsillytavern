@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "name": "glohg",
+    "active": true,
+    "keywords": [
+      "glohg"
+    ],
+    "keywordsEnabled": {
+      "glohg": true
+    },
+    "collection": "glohg",
+    "playMode": "random",
+    "volume": 0.8,
+    "cooldown": 0,
+    "delay": 0,
+    "id": "f0fe8a3f-4153-4320-8ded-6b65b438e00f",
+    "currentIndex": 0,
+    "createdAt": "2026-03-03T09:40:38.829Z",
+    "updatedAt": "2026-03-03T09:40:51.441Z"
+  }
+]

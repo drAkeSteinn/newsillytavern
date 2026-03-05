@@ -223,7 +223,7 @@ export interface CharacterCard {
   tags: string[];
   avatar: string;
   sprites: CharacterSprite[];
-  spriteConfig?: SpriteConfig;  // Sprite configuration for the character
+  spriteConfig?: SpriteConfig;  // Sprite configuration for this character
   spriteTriggers?: CharacterSpriteTrigger[];  // Simple character-specific sprite triggers
   spritePacks?: SpritePack[];   // Advanced sprite packs (DOP Tirano style)
   spriteLibraries?: SpriteLibraries;  // Reusable action/pose/clothes definitions
@@ -231,6 +231,7 @@ export interface CharacterCard {
   voice: VoiceSettings | null;
   hudTemplateId?: string | null;  // HUD template to use for this character
   lorebookIds?: string[];         // Lorebooks to use for this character
+  questTemplateIds?: string[];       // Quest templates to use for this character
   statsConfig?: CharacterStatsConfig;  // Stats system configuration (attributes, skills, etc.)
   createdAt: string;
   updatedAt: string;
@@ -329,7 +330,7 @@ export interface MessageMetadata {
 
 // Prompt section for displaying in prompt viewer
 export interface PromptSection {
-  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'post_history' | 'chat_history' | 'instructions';
+  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'post_history' | 'chat_history' | 'instructions' | 'quest';
   label: string;
   content: string;
   color: string;  // Tailwind color class for the section header
@@ -346,6 +347,8 @@ export interface ChatSession {
   background?: string;
   scenario?: string;
   sessionStats?: SessionStats;  // Stats values for this session (per character)
+  sessionQuests?: SessionQuestInstance[];  // NEW: Active quests in this session
+  turnCount?: number;             // NEW: Turn counter
 }
 
 // ============ Group Types ============
@@ -379,6 +382,7 @@ export interface CharacterGroup {
   conversationStyle: 'sequential' | 'parallel';  // How responses are generated
   hudTemplateId?: string | null;  // HUD template to use for this group
   lorebookIds?: string[];         // Lorebooks to use for this group
+  questTemplateIds?: string[];       // Quest templates to use for this group
   createdAt: string;
   updatedAt: string;
 }
@@ -1170,110 +1174,291 @@ export interface ChatSessionMemory {
   lastSummaryAt?: string;
 }
 
-// ============ Quest System Types ============
+// ============ Quest System Types (Renovado) ============
+//
+// El sistema de misiones ahora usa:
+// - QuestTemplate: Plantillas guardadas en JSON separados
+// - SessionQuestInstance: Instancias en la sesión JSON
+// - QuestReward: Triggers unificados (attribute, sprite, sound, background)
 
-// Quest status
-export type QuestStatus = 'active' | 'completed' | 'failed' | 'paused';
+// ============================================
+// QUEST STATUS
+// ============================================
 
-// Quest priority
+export type QuestStatus = 
+  | 'locked'      // No disponible (prerrequisitos no cumplidos)
+  | 'available'   // Disponible para activar
+  | 'active'      // En progreso
+  | 'completed'   // Completado
+  | 'failed';     // Fallido
+
 export type QuestPriority = 'main' | 'side' | 'hidden';
 
-// Quest objective type
 export type QuestObjectiveType = 'collect' | 'reach' | 'defeat' | 'talk' | 'discover' | 'custom';
 
-// Single quest objective
-export interface QuestObjective {
+// ============================================
+// QUEST VALUE DETECTION SYSTEM
+// ============================================
+
+/**
+ * Tipos de valor a detectar después de una key
+ * - presence: Solo detecta si la key existe (comportamiento actual)
+ * - number: Lee un valor numérico después de la key y compara
+ * - text: Lee un valor de texto después de la key y compara
+ */
+export type QuestValueType = 'presence' | 'number' | 'text';
+
+/**
+ * Operadores para comparación de números
+ */
+export type QuestNumberOperator = '>' | '<' | '>=' | '<=' | '==' | '!=';
+
+/**
+ * Operadores para comparación de texto
+ */
+export type QuestTextOperator = 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'notEquals';
+
+/**
+ * Condición de valor para objetivos y completado
+ * Permite detectar valores después de una key y compararlos
+ */
+export interface QuestValueCondition {
+  // Tipo de valor a detectar
+  valueType: QuestValueType;
+  
+  // Valor objetivo a comparar
+  // Para number: el número objetivo
+  // Para text: el texto objetivo
+  // Para presence: se ignora
+  targetValue?: number | string;
+  
+  // Operador de comparación
+  // Para number: operadores numéricos
+  // Para text: operadores de texto
+  // Para presence: se ignora
+  operator?: QuestNumberOperator | QuestTextOperator;
+}
+
+// ============================================
+// QUEST OBJECTIVE TEMPLATE
+// ============================================
+
+export interface QuestObjectiveTemplate {
   id: string;
-  description: string;          // "Recoger 3 piedras mágicas"
-  type: QuestObjectiveType;
-  target?: string;              // Target entity (item name, location, enemy type, character)
-  currentCount: number;         // Current progress
-  targetCount: number;          // Goal count
-  isCompleted: boolean;
-  isOptional: boolean;
-  metadata?: Record<string, unknown>;
-}
-
-// Quest reward definition
-export interface QuestReward {
-  type: 'item' | 'experience' | 'relationship' | 'unlock' | 'custom';
-  name: string;
-  description?: string;
-  quantity?: number;
-  metadata?: Record<string, unknown>;
-}
-
-// Quest trigger configuration
-export interface QuestTrigger {
-  // Activation triggers
-  startKeywords: string[];      // Keywords that can START this quest
-  startPattern?: RegExp | string; // Custom regex pattern for activation
-  
-  // Completion triggers
-  completionKeywords: string[]; // Keywords that can COMPLETE objectives
-  completionPattern?: RegExp | string;
-  
-  // Auto-detection
-  autoStart: boolean;           // Auto-start when keywords detected
-  autoComplete: boolean;        // Auto-complete objectives when detected
-  trackProgress: boolean;       // Track progress automatically
-}
-
-// Quest definition
-export interface Quest {
-  id: string;
-  sessionId: string;            // Which session this quest belongs to
-  characterId?: string;         // Related character (optional)
-  
-  // Basic info
-  title: string;
   description: string;
-  status: QuestStatus;
-  priority: QuestPriority;
+  type: QuestObjectiveType;
   
-  // Objectives
-  objectives: QuestObjective[];
+  // Keys para detectar completado (sistema unificado como HUD)
+  completion: {
+    key: string;              // Key principal: "resistencia", "HP", etc.
+    keys?: string[];          // Keys alternativas: ["Resistance", "hp"]
+    caseSensitive: boolean;
+    
+    // Condición de valor (opcional)
+    // Si se especifica, detecta el valor DESPUÉS de la key
+    // Formatos detectados: "key: valor", "key=valor", "key valor"
+    valueCondition?: QuestValueCondition;
+  };
   
-  // Rewards
+  // Objetivo (legacy - para conteo simple)
+  target?: string;            // Qué buscar/contar
+  targetCount: number;        // Cuántos necesita (default: 1)
+  isOptional: boolean;        // Si es opcional, no impide completar la misión
+  
+  // Recompensas al completar este objetivo (se ejecutan para el personaje que responde)
+  rewards?: QuestReward[];
+  
+  // Metadata opcional
+  metadata?: Record<string, unknown>;
+}
+
+// ============================================
+// QUEST REWARD - Sistema Unificado de Triggers
+// ============================================
+
+export type QuestRewardType = 'attribute' | 'sprite' | 'sound' | 'background' | 'item' | 'custom';
+
+export interface QuestRewardCondition {
+  type: 'attribute';
+  key: string;                // "HP", "nivel", etc.
+  operator: '<' | '>' | '<=' | '>=' | '==' | '!=';
+  value: number | string;
+}
+
+export interface QuestReward {
+  id: string;
+  
+  // Tipo de trigger
+  type: QuestRewardType;
+  
+  // Key del trigger (depende del tipo)
+  // - attribute: key del atributo a modificar (ej: "resistencia", "HP", "oro")
+  // - sprite: keyword del trigger (ej: "feliz", "victory") - busca en spritePacks del personaje
+  // - sound: nombre de la colección de sonidos
+  // - background: URL o label del fondo
+  key: string;
+  
+  // Valor/acción
+  // - attribute: valor numérico o string a aplicar
+  // - sprite: URL del sprite (opcional, si no se especifica usa el del trigger)
+  // - sound: nombre del archivo de sonido
+  // - background: URL del fondo
+  value: string | number;
+  
+  // Para attributes: tipo de operación
+  action?: 'set' | 'add' | 'subtract' | 'multiply' | 'divide' | 'percent';
+  
+  // Para sprites: tiempo antes de volver a idle (ms, 0 = no volver)
+  returnToIdleMs?: number;
+  
+  // Condiciones opcionales para ejecutar el reward
+  condition?: QuestRewardCondition;
+}
+
+// ============================================
+// QUEST CHAIN CONFIGURATION
+// ============================================
+
+export type QuestChainType = 'none' | 'specific' | 'random';
+
+export interface QuestChainConfig {
+  type: QuestChainType;
+  
+  // Si es 'specific': ID del siguiente quest
+  nextQuestId?: string;
+  
+  // Si es 'random': pool de IDs a elegir aleatoriamente
+  randomPool?: string[];
+  
+  // Iniciar automáticamente al completar
+  autoStart: boolean;
+}
+
+// ============================================
+// QUEST ACTIVATION CONFIG
+// ============================================
+
+export type QuestActivationMethod = 'keyword' | 'turn' | 'manual' | 'chain';
+
+export interface QuestActivationConfig {
+  // Keys para detectar activación (sistema unificado como HUD)
+  key: string;                    // "mision:rescate"
+  keys?: string[];                // ["mission:rescue", "quest:rescate"]
+  caseSensitive: boolean;
+  
+  // Método de activación
+  method: QuestActivationMethod;
+  
+  // Para method: 'turn' - cada cuántos turnos
+  turnInterval?: number;
+}
+
+// ============================================
+// QUEST COMPLETION CONFIG
+// ============================================
+
+export interface QuestCompletionConfig {
+  key: string;                    // "resistencia", "nivel", etc.
+  keys?: string[];                // ["Resistance", "level"]
+  caseSensitive: boolean;
+  
+  // Condición de valor (opcional)
+  // Si se especifica, detecta el valor DESPUÉS de la key
+  // Formatos detectados: "key: valor", "key=valor", "key valor"
+  valueCondition?: QuestValueCondition;
+}
+
+// ============================================
+// QUEST TEMPLATE (Archivo JSON individual)
+// Guardado en: /data/quests/[quest-id].json
+// ============================================
+
+export interface QuestTemplate {
+  id: string;
+  name: string;
+  description: string;
+  
+  // Configuración de activación
+  activation: QuestActivationConfig;
+  
+  // Objetivos
+  objectives: QuestObjectiveTemplate[];
+  
+  // Configuración de completado
+  completion: QuestCompletionConfig;
+  
+  // Cadena de quests (qué sigue después)
+  chain?: QuestChainConfig;
+  
+  // Recompensas (triggers unificados)
   rewards: QuestReward[];
   
-  // Trigger configuration
-  triggers: QuestTrigger;
+  // Metadatos
+  priority: QuestPriority;
+  icon?: string;                  // Emoji o nombre de icono
+  color?: string;                 // Color Tailwind para prioridad
   
-  // Timing
-  startedAt?: string;
-  completedAt?: string;
+  // Comportamiento
+  isRepeatable: boolean;
+  isHidden: boolean;              // No mostrar hasta activarse
+  
+  // Prerrequisitos (IDs de otros templates)
+  prerequisites?: string[];
+  
+  // Timestamps
+  createdAt: string;
   updatedAt: string;
-  
-  // Progress
-  progress: number;             // 0-100 percentage
-  currentObjectiveId?: string;  // Current active objective
-  
-  // Display
-  icon?: string;                // Emoji or icon name
-  color?: string;               // Tailwind color for priority
-  notes?: string;               // User notes
-  
-  // Metadata
-  isHidden: boolean;            // Hidden quest (not shown in log until discovered)
-  isRepeatable: boolean;        // Can be repeated
-  prerequisites?: string[];     // Quest IDs that must be completed first
-  metadata?: Record<string, unknown>;
 }
 
-// Quest settings
+// ============================================
+// SESSION QUEST INSTANCE (En sesión JSON)
+// ============================================
+
+export interface SessionQuestObjective {
+  templateId: string;             // Referencia al objetivo del template
+  currentCount: number;
+  isCompleted: boolean;
+}
+
+export interface SessionQuestInstance {
+  // Referencia al template
+  templateId: string;
+  
+  // Estado actual
+  status: QuestStatus;
+  
+  // Objetivos con progreso
+  objectives: SessionQuestObjective[];
+  
+  // Timestamps
+  activatedAt?: string;           // Cuándo se activó
+  completedAt?: string;           // Cuándo se completó
+  
+  // Turno de activación (para quests por turnos)
+  activatedAtTurn?: number;
+  
+  // Progreso general (0-100)
+  progress: number;
+  
+  // Personaje que completó (para grupos)
+  completedBy?: string;
+}
+
+// ============================================
+// QUEST SETTINGS
+// ============================================
+
 export interface QuestSettings {
   enabled: boolean;
-  autoDetect: boolean;          // Auto-detect quest triggers in messages
-  realtimeEnabled: boolean;     // Detect during streaming
-  showNotifications: boolean;   // Show quest update notifications
-  showCompletedInLog: boolean;  // Keep completed quests in log
-  maxActiveQuests: number;      // Maximum active quests at once
-  promptInclude: boolean;       // Include active quests in prompt
-  promptTemplate: string;       // Template for quest prompt section
+  autoDetect: boolean;            // Auto-detect quest triggers in messages
+  realtimeEnabled: boolean;       // Detect during streaming
+  showNotifications: boolean;     // Show quest update notifications
+  showCompletedInLog: boolean;    // Keep completed quests in log
+  maxActiveQuests: number;        // Maximum active quests at once
+  promptInclude: boolean;         // Include active quests in prompt
+  promptTemplate: string;         // Template for quest prompt section
 }
 
-// Default quest settings
 export const DEFAULT_QUEST_SETTINGS: QuestSettings = {
   enabled: true,
   autoDetect: true,
@@ -1282,33 +1467,59 @@ export const DEFAULT_QUEST_SETTINGS: QuestSettings = {
   showCompletedInLog: true,
   maxActiveQuests: 10,
   promptInclude: true,
-  promptTemplate: `**Quests Activos:**
+  promptTemplate: `**Misiones Activas:**
 {{activeQuests}}
 
-Instrucciones: Usa la información de los quests activos para contextualizar tus respuestas. Progresar en los quests a través de la narrativa cuando sea apropiado.`,
+Instrucciones: Usa la información de las misiones activas para contextualizar tus respuestas. Progresa en las misiones a través de la narrativa cuando sea apropiado.`,
 };
 
-// Quest trigger hit result
+// ============================================
+// QUEST TRIGGER HIT (Post-LLM Detection)
+// ============================================
+
 export interface QuestTriggerHit {
-  questId: string;
-  quest?: Quest;
+  questId: string;                // Template ID
+  template?: QuestTemplate;
   objectiveId?: string;
-  objective?: QuestObjective;
-  action: 'start' | 'progress' | 'complete' | 'fail';
+  objective?: QuestObjectiveTemplate;
+  action: 'activate' | 'progress' | 'complete' | 'fail';
   progress?: number;
   message: string;
+  rewards?: QuestReward[];        // Quest completion rewards (when action='complete')
+  objectiveRewards?: QuestReward[]; // Objective completion rewards (when progress completes objective)
+  completesObjective?: boolean;   // True if this progress will complete the objective
 }
 
-// Quest notification
+// ============================================
+// QUEST NOTIFICATION
+// ============================================
+
+export type QuestNotificationType = 
+  | 'quest_activated' 
+  | 'objective_complete' 
+  | 'quest_complete' 
+  | 'quest_failed'
+  | 'reward_claimed';
+
 export interface QuestNotification {
   id: string;
   questId: string;
-  questTitle: string;
-  type: 'started' | 'updated' | 'completed' | 'failed' | 'objective_complete';
+  questName: string;
+  type: QuestNotificationType;
   message: string;
+  rewards?: QuestReward[];
   timestamp: string;
   read: boolean;
 }
+
+// ============================================
+// LEGACY TYPES (Para compatibilidad)
+// ============================================
+
+// Mantener compatibilidad con código existente
+export type Quest = QuestTemplate;
+export type QuestObjective = QuestObjectiveTemplate;
+export type QuestTrigger = QuestActivationConfig;
 
 // ============ Dialogue System Types ============
 

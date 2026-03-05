@@ -212,6 +212,22 @@ export function usePersistenceSync() {
         }
       }
 
+      // Load quest templates from separate API (they are stored in individual JSON files)
+      // This must be done AFTER the main persistence data is loaded so that
+      // character.questTemplateIds and group.questTemplateIds are available
+      try {
+        const templatesResponse = await fetch('/api/quest-templates');
+        if (templatesResponse.ok) {
+          const templatesData = await templatesResponse.json();
+          if (templatesData.templates && Array.isArray(templatesData.templates)) {
+            useTavernStore.setState({ questTemplates: templatesData.templates });
+            console.log('[Persistence] Loaded', templatesData.templates.length, 'quest templates');
+          }
+        }
+      } catch (templateError) {
+        console.error('[Persistence] Error loading quest templates:', templateError);
+      }
+
       return true;
     } catch (error) {
       console.error('Error loading persistent data:', error);

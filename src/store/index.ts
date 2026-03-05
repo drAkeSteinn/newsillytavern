@@ -26,6 +26,7 @@ import {
   createDialogueSlice,
   createInventorySlice,
   createStatsSlice,
+  createQuestTemplateSlice,
 } from './slices';
 
 // Import slice types
@@ -48,6 +49,7 @@ import type {
   DialogueSlice,
   InventorySlice,
   StatsSlice,
+  QuestTemplateSlice,
 } from './slices';
 
 // Import defaults for merge function
@@ -72,7 +74,8 @@ export type TavernState = CharacterSlice &
   QuestSlice &
   DialogueSlice &
   InventorySlice &
-  StatsSlice;
+  StatsSlice &
+  QuestTemplateSlice;
 
 // Create the combined store
 export const useTavernStore = create<TavernState>()(
@@ -97,6 +100,7 @@ export const useTavernStore = create<TavernState>()(
       ...createDialogueSlice(set, get),
       ...createInventorySlice(set, get),
       ...createStatsSlice(set, get),
+      ...createQuestTemplateSlice(set, get),
     }),
     {
       name: 'tavernflow-storage', // Same name for backward compatibility
@@ -279,4 +283,4 @@ export const useTavernStore = create<TavernState>()(
 );
 
 // Export types
-export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice, StatsSlice };
+export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice, StatsSlice, QuestTemplateSlice };

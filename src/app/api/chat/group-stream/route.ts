@@ -1,9 +1,15 @@
 // ============================================
-// Group Stream Route - Refactored with shared modules
+// Group Stream Route - Simplified with unified key resolution
 // ============================================
+//
+// Key resolution happens in buildGroupSystemPrompt():
+// - Template variables: {{user}}, {{char}}, {{userpersona}}
+// - Stats keys: {{resistencia}}, {{habilidades}}, etc.
+// - All sections are processed consistently
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, Quest, QuestSettings } from '@/types';
+import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance } from '@/types';
+import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import {
   createSSEJSON,
   createErrorResponse,
@@ -20,7 +26,11 @@ import {
   streamTextGenerationWebUI,
   buildLorebookSectionForPrompt,
   buildHUDContextSection,
-  injectHUDContextIntoMessages
+  injectHUDContextIntoMessages,
+  injectHUDContextIntoSections,
+  resolveAllKeys,
+  buildKeyResolutionContext,
+  resolveStats,
 } from '@/lib/llm';
 import {
   validateRequest,
@@ -155,13 +165,13 @@ function getResponders(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Validate request (automatically detects group request)
     const validation = validateRequest(null, body);
     if (!validation.success) {
       return createErrorResponse(validation.error, 400);
     }
-    
+
     const {
       message,
       group,
@@ -178,20 +188,24 @@ export async function POST(request: NextRequest) {
     // Extract lorebooks from body (not validated by validation.ts)
     const lorebooks: Lorebook[] = body.lorebooks || [];
 
-    // Extract Quest data for pre-LLM integration
-    const quests: Quest[] = body.quests || [];
-    const questSettings: QuestSettings | undefined = body.questSettings;
+    // Extract Quest data for pre-LLM integration (NEW FORMAT)
+    const questTemplates: QuestTemplate[] = body.questTemplates || [];
+    const sessionQuests: SessionQuestInstance[] = body.sessionQuests || [];
+    const questSettings: QuestSettings = {
+      ...DEFAULT_QUEST_SETTINGS,
+      ...(body.questSettings || {})
+    };
 
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
-    
+
+    // Cast hudContext to proper type
+    const typedHUDContext = hudContext as HUDContextConfig | undefined;
+
     // Extract per-character lorebook map for when group has no lorebooks
-    // characterLorebooksMap: { [characterId]: lorebookId[] }
     const characterLorebooksMap: Record<string, string[]> = body.characterLorebooksMap || {};
-    
+
     // Determine if we should use per-character lorebooks
-    // If group has lorebooks → use group lorebooks for all
-    // If group has NO lorebooks → use per-character lorebooks
     const useGroupLorebooks = lorebooks.length > 0;
 
     if (!llmConfig) {
@@ -218,7 +232,6 @@ export async function POST(request: NextRequest) {
     const contextWindow = selectContextMessages(messages, llmConfig, contextConfig);
 
     // Build group-level lorebook section if group has lorebooks
-    // This will be used for all characters if group has lorebooks
     let groupLorebookSection: PromptSection | null = null;
     if (useGroupLorebooks && lorebooks.length > 0) {
       const result = buildLorebookSectionForPrompt(
@@ -232,21 +245,18 @@ export async function POST(request: NextRequest) {
       groupLorebookSection = result.section;
     }
 
-    // Build HUD context section if enabled
-    const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
+    // Note: HUD context section is built inside the character loop
+    // so it can resolve keys for each specific character
 
     // Build quest section if enabled (pre-LLM integration)
-    let questSection: PromptSection | null = null;
-    if (questSettings?.enabled && questSettings?.promptInclude && quests.length > 0) {
-      const questPromptContent = buildQuestPromptSection(quests, questSettings.promptTemplate);
-      if (questPromptContent) {
-        questSection = {
-          type: 'lorebook',
-          label: 'Active Quests',
-          content: questPromptContent,
-          color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-        };
-      }
+    // Note: Content will be resolved per-character in the loop
+    let questSectionContent: string | null = null;
+    if (questSettings.enabled && questSettings.promptInclude && sessionQuests.length > 0 && questTemplates.length > 0) {
+      questSectionContent = buildQuestPromptSection(
+        questTemplates,
+        sessionQuests,
+        questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate
+      );
     }
 
     // Create a TransformStream for SSE
@@ -270,16 +280,15 @@ export async function POST(request: NextRequest) {
 
             // Determine lorebook section for this character
             let lorebookSectionForCharacter: PromptSection | null = groupLorebookSection;
-            
+
             // If group has no lorebooks, use character's own lorebooks
             if (!useGroupLorebooks) {
               const characterLorebookIds = characterLorebooksMap[responder.id] || [];
               if (characterLorebookIds.length > 0) {
-                // Filter to get only this character's lorebooks
-                const characterLorebooksFiltered = lorebooks.filter(lb => 
+                const characterLorebooksFiltered = lorebooks.filter(lb =>
                   characterLorebookIds.includes(lb.id) && lb.active
                 );
-                
+
                 if (characterLorebooksFiltered.length > 0) {
                   const result = buildLorebookSectionForPrompt(
                     messages,
@@ -292,25 +301,59 @@ export async function POST(request: NextRequest) {
                   lorebookSectionForCharacter = result.section;
                 }
               } else {
-                // Character has no lorebooks
                 lorebookSectionForCharacter = null;
               }
             }
 
-            // Build system prompt for this character
+            // ========================================
+            // Build system prompt with unified key resolution
+            // ========================================
+            // This handles ALL key resolution internally:
+            // - Template variables: {{user}}, {{char}}, {{userpersona}}
+            // - Stats keys: {{resistencia}}, {{habilidades}}, etc.
+            // - All sections including post-history instructions
             const { prompt: systemPrompt, sections: promptSections } = buildGroupSystemPrompt(
               responder,
               group,
               effectiveUserName,
               persona,
               lorebookSectionForCharacter,
-              typedSessionStats  // Pass session stats for attribute values
+              typedSessionStats
+              // Note: postHistoryInstructions is included internally
             );
+
+            // Build key resolution context for this character
+            const resolvedStats = resolveStats({
+              characterId: responder.id,
+              statsConfig: responder.statsConfig,
+              sessionStats: typedSessionStats,
+            });
+            const keyContext = buildKeyResolutionContext(
+              responder,
+              effectiveUserName,
+              persona,
+              resolvedStats
+            );
+
+            // Build HUD context section for this character (resolves keys!)
+            const hudContextSection = typedHUDContext ? buildHUDContextSection(typedHUDContext, keyContext) : null;
+
+            // Resolve keys in quest section if present
+            let resolvedQuestSection: PromptSection | null = null;
+            if (questSectionContent) {
+              const resolvedQuestContent = resolveAllKeys(questSectionContent, keyContext);
+              resolvedQuestSection = {
+                type: 'lorebook',
+                label: 'Active Quests',
+                content: resolvedQuestContent,
+                color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+              };
+            }
 
             // Add quest section to the system prompt if present
             let finalSystemPrompt = systemPrompt;
-            if (questSection) {
-              finalSystemPrompt += `\n\n[${questSection.label}]\n${questSection.content}`;
+            if (resolvedQuestSection) {
+              finalSystemPrompt += `\n\n[${resolvedQuestSection.label}]\n${resolvedQuestSection.content}`;
             }
 
             // Build chat messages with previous responses from this turn
@@ -319,9 +362,19 @@ export async function POST(request: NextRequest) {
               content: r.content
             }));
 
+            // Check if the last message is already the user's current message
+            const lastMessage = contextWindow.messages[contextWindow.messages.length - 1];
+            const isLastMessageCurrentUser = lastMessage?.role === 'user' &&
+              lastMessage?.content === sanitizedMessage;
+
+            // Only add user message if it's not already the last message
+            const messagesForPrompt = isLastMessageCurrentUser
+              ? contextWindow.messages
+              : [...contextWindow.messages, createUserMessage(sanitizedMessage)];
+
             const { chatMessages, chatHistorySection } = buildGroupChatMessages(
               finalSystemPrompt,
-              [...contextWindow.messages, createUserMessage(sanitizedMessage)],
+              messagesForPrompt,
               responder,
               characters,
               effectiveUserName,
@@ -329,9 +382,14 @@ export async function POST(request: NextRequest) {
             );
 
             // Combine prompt sections with chat history for the viewer
-            const allPromptSections: PromptSection[] = chatHistorySection
-              ? [...promptSections, ...(questSection ? [questSection] : []), chatHistorySection]
-              : [...promptSections, ...(questSection ? [questSection] : [])];
+            let allPromptSections: PromptSection[] = chatHistorySection
+              ? [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection]
+              : [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : [])];
+
+            // Inject HUD context into sections if enabled
+            if (hudContextSection && typedHUDContext) {
+              allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, typedHUDContext.position);
+            }
 
             // Generate response
             let fullContent = '';
@@ -341,8 +399,8 @@ export async function POST(request: NextRequest) {
               let generator: AsyncGenerator<string>;
 
               // Inject HUD context into chat messages if enabled
-              const finalChatMessages = hudContextSection && hudContext
-                ? injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position)
+              const finalChatMessages = hudContextSection && typedHUDContext
+                ? injectHUDContextIntoMessages(chatMessages, hudContextSection, typedHUDContext.position)
                 : chatMessages;
 
               switch (llmConfig.provider) {
@@ -383,7 +441,7 @@ export async function POST(request: NextRequest) {
                   // Build completion prompt for Ollama
                   const prompt = buildGroupCompletionPrompt(
                     finalSystemPrompt,
-                    [...contextWindow.messages, createUserMessage(sanitizedMessage)],
+                    messagesForPrompt,
                     responder,
                     effectiveUserName,
                     previousResponses
@@ -398,7 +456,7 @@ export async function POST(request: NextRequest) {
                   // Build completion prompt for Text Generation WebUI
                   const prompt = buildGroupCompletionPrompt(
                     finalSystemPrompt,
-                    [...contextWindow.messages, createUserMessage(sanitizedMessage)],
+                    messagesForPrompt,
                     responder,
                     effectiveUserName,
                     previousResponses

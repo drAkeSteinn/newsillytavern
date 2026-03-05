@@ -1,16 +1,27 @@
 // ============================================
 // Quest Handler - Handles Quest Triggers
 // ============================================
+//
+// Updated to work with the new Quest Template/Instance system
+// Uses quest-detector.ts for key-based detection
 
 import type { DetectedToken } from '../token-detector';
 import type { TriggerContext } from '../trigger-bus';
-import type { 
-  Quest, 
-  QuestSettings, 
-  QuestTriggerHit, 
-  QuestObjective,
-  QuestStatus
+import type {
+  QuestTemplate,
+  SessionQuestInstance,
+  QuestSettings,
+  QuestTriggerHit,
+  QuestObjectiveTemplate,
+  QuestReward,
 } from '@/types';
+import {
+  checkQuestTriggersInText,
+  createQuestDetectionState,
+  resetQuestDetectorState,
+  type QuestDetectionResult,
+  type QuestDetectionState,
+} from '@/lib/quest/quest-detector';
 import { getCooldownManager } from '../cooldown-manager';
 
 // ============================================
@@ -21,6 +32,7 @@ export interface QuestHandlerState {
   processedQuests: Map<string, Set<string>>; // messageKey -> questIds processed
   questProgressTracked: Map<string, Set<string>>; // questId -> objectiveIds tracked
   triggeredPositions: Map<string, Set<number>>; // messageKey -> wordPositions already triggered
+  detectionStates: Map<string, QuestDetectionState>; // sessionId -> detection state
 }
 
 export function createQuestHandlerState(): QuestHandlerState {
@@ -28,6 +40,7 @@ export function createQuestHandlerState(): QuestHandlerState {
     processedQuests: new Map(),
     questProgressTracked: new Map(),
     triggeredPositions: new Map(),
+    detectionStates: new Map(),
   };
 }
 
@@ -36,24 +49,25 @@ export function createQuestHandlerState(): QuestHandlerState {
 // ============================================
 
 export interface QuestTriggerContext extends TriggerContext {
-  quests: Quest[];
+  templates: QuestTemplate[];
+  sessionQuests: SessionQuestInstance[];
   questSettings: QuestSettings;
   sessionId: string;
+  turnCount: number;
 }
 
 export interface QuestHandlerResult {
+  matched: boolean;
   hits: QuestTriggerHit[];
-  startedQuests: Quest[];
-  progressedQuests: Quest[];
-  completedQuests: Quest[];
+  detections: QuestDetectionResult | null;
 }
 
 // ============================================
-// Quest Tag Parser
+// Quest Tag Parser (Legacy Support)
 // ============================================
 
 interface ParsedQuestTag {
-  action: 'start' | 'progress' | 'complete' | 'fail';
+  action: 'activate' | 'progress' | 'complete' | 'fail';
   questId?: string;
   questTitle?: string;
   objectiveId?: string;
@@ -61,12 +75,12 @@ interface ParsedQuestTag {
   description?: string;
 }
 
-const QUEST_TAG_PATTERN = /<quest(?::(start|progress|complete|fail))?(?:\s+([^>]*))?\/?>/gi;
+const QUEST_TAG_PATTERN = /<quest(?::(activate|progress|complete|fail))?(?:\s+([^>]*))?\/?>/gi;
 const QUEST_ATTR_PATTERN = /(\w+)="([^"]*)"/g;
 
 /**
- * Parse quest tags from message content
- * Format: <quest:start title="Mission Name" description="..."/>
+ * Parse quest tags from message content (legacy format)
+ * Format: <quest:activate title="Mission Name" description="..."/>
  *         <quest:progress id="quest-123" objective="obj-1" amount="1"/>
  *         <quest:complete id="quest-123"/>
  */
@@ -75,7 +89,7 @@ export function parseQuestTags(content: string): ParsedQuestTag[] {
   
   let match;
   while ((match = QUEST_TAG_PATTERN.exec(content)) !== null) {
-    const action = (match[1] as ParsedQuestTag['action']) || 'start';
+    const action = (match[1] as ParsedQuestTag['action']) || 'activate';
     const attrs = match[2] || '';
     
     const tag: ParsedQuestTag = { action };
@@ -116,8 +130,11 @@ export function parseQuestTags(content: string): ParsedQuestTag[] {
 // ============================================
 
 /**
- * Check quest triggers - Detects quest start, progress, and completion
- * Uses wordPosition for token validation to prevent duplicate triggers
+ * Check quest triggers - Main entry point
+ * 
+ * Uses both:
+ * 1. Key-based detection (new system via quest-detector)
+ * 2. Tag parsing (legacy support)
  */
 export function checkQuestTriggers(
   tokens: DetectedToken[],
@@ -125,281 +142,194 @@ export function checkQuestTriggers(
   context: QuestTriggerContext,
   state: QuestHandlerState
 ): QuestHandlerResult {
-  const { quests, questSettings, sessionId } = context;
-  
-  const result: QuestHandlerResult = {
-    hits: [],
-    startedQuests: [],
-    progressedQuests: [],
-    completedQuests: [],
-  };
+  const { templates, sessionQuests, questSettings, sessionId, turnCount } = context;
   
   if (!questSettings.enabled) {
-    return result;
+    return {
+      matched: false,
+      hits: [],
+      detections: null,
+    };
   }
   
-  const cooldownManager = getCooldownManager();
-  const processedForMessage = state.processedQuests.get(context.messageKey) ?? new Set<string>();
-  const triggeredPositions = state.triggeredPositions.get(context.messageKey) ?? new Set<number>();
+  const hits: QuestTriggerHit[] = [];
+  let detections: QuestDetectionResult | null = null;
   
-  // 1. Parse explicit quest tags from content (these don't need wordPosition validation)
+  // 1. Parse explicit quest tags from content (legacy format)
   const parsedTags = parseQuestTags(content);
   
   for (const tag of parsedTags) {
-    const hit = processParsedTag(tag, quests, sessionId);
+    const hit = processParsedTag(tag, templates, sessionQuests);
     if (hit) {
-      result.hits.push(hit);
+      hits.push(hit);
     }
   }
   
-  // 2. Check keyword-based triggers (auto-detection) using token validation
-  if (questSettings.autoDetect) {
-    const activeQuests = quests.filter(q => 
-      q.sessionId === sessionId && q.status === 'active'
-    );
+  // 2. Use key-based detection (new system)
+  // Debug logging
+  console.log('[QuestHandler] Checking quest triggers:', {
+    autoDetect: questSettings.autoDetect,
+    templatesCount: templates.length,
+    sessionQuestsCount: sessionQuests.length,
+    sessionId,
+    contentPreview: content.substring(0, 100) + '...',
+  });
+  
+  if (questSettings.autoDetect && templates.length > 0 && sessionQuests.length > 0) {
+    // Log available quests
+    const availableQuests = sessionQuests.filter(q => q.status === 'available');
+    console.log('[QuestHandler] Available quests (status=available):', availableQuests.map(q => ({
+      templateId: q.templateId,
+      status: q.status,
+    })));
     
-    // Process tokens for keyword-based detection
-    for (const token of tokens) {
-      // Skip if this position already triggered something
-      if (triggeredPositions.has(token.wordPosition)) {
-        continue;
-      }
-      
-      for (const quest of activeQuests) {
-        // Skip if already processed for this message
-        if (processedForMessage.has(quest.id)) continue;
-        
-        // Check for progress/completion keywords using tokens
-        const progressHit = checkQuestProgressWithToken(quest, token, content);
-        if (progressHit) {
-          result.hits.push(progressHit);
-          result.progressedQuests.push(quest);
-          
-          // Check if quest is now complete
-          if (progressHit.action === 'complete') {
-            result.completedQuests.push(quest);
-          }
-          
-          // Mark this position as triggered
-          triggeredPositions.add(token.wordPosition);
-          processedForMessage.add(quest.id);
-          break; // Move to next token
-        }
-      }
+    // Log templates with keyword activation
+    const keywordTemplates = templates.filter(t => t.activation.method === 'keyword');
+    console.log('[QuestHandler] Templates with keyword activation:', keywordTemplates.map(t => ({
+      id: t.id,
+      name: t.name,
+      activationKey: t.activation.key,
+      activationKeys: t.activation.keys,
+      caseSensitive: t.activation.caseSensitive,
+    })));
+    
+    // Get or create detection state for this session
+    let detectionState = state.detectionStates.get(sessionId);
+    if (!detectionState) {
+      detectionState = createQuestDetectionState();
+      state.detectionStates.set(sessionId, detectionState);
     }
     
-    // Check for quest start keywords in inactive quests
-    const inactiveQuests = quests.filter(q => 
-      q.sessionId === sessionId && q.status === 'paused'
-    );
+    // Create handler state for detection
+    const detectorHandlerState = { detectionStates: state.detectionStates };
     
-    for (const token of tokens) {
-      if (triggeredPositions.has(token.wordPosition)) {
-        continue;
-      }
-      
-      for (const quest of inactiveQuests) {
-        if (quest.triggers.startKeywords.length === 0) continue;
-        
-        // Check if token matches any start keyword
-        const hasKeyword = quest.triggers.startKeywords.some(kw => {
-          const normalizedKw = kw.toLowerCase().trim();
-          const normalizedToken = token.token.toLowerCase();
-          return normalizedToken.includes(normalizedKw) || normalizedKw.includes(normalizedToken);
-        });
-        
-        if (hasKeyword) {
-          result.hits.push({
-            questId: quest.id,
-            quest,
-            action: 'start',
-            message: `Quest "${quest.title}" resumed`,
-          });
-          triggeredPositions.add(token.wordPosition);
-          break;
-        }
-      }
+    // Run detection
+    const detectContext = {
+      sessionId,
+      fullText: content,
+      isStreaming: context.isStreaming,
+      messageKey: context.messageKey,
+      timestamp: context.timestamp,
+      templates,
+      sessionQuests,
+      turnCount,
+    };
+    
+    const detectResult = checkQuestTriggersInText(detectContext, detectorHandlerState);
+    
+    console.log('[QuestHandler] Detection result:', {
+      matched: detectResult.matched,
+      hitsCount: detectResult.hits.length,
+      activations: detectResult.detections?.activations?.length || 0,
+    });
+    
+    if (detectResult.matched) {
+      detections = detectResult.detections;
+      hits.push(...detectResult.hits);
+    }
+  } else {
+    // Log why we're not checking
+    if (!questSettings.autoDetect) {
+      console.log('[QuestHandler] Auto-detect disabled in quest settings');
+    }
+    if (templates.length === 0) {
+      console.log('[QuestHandler] No templates loaded in store');
+    }
+    if (sessionQuests.length === 0) {
+      console.log('[QuestHandler] No session quests in active session');
     }
   }
   
   // Update state
+  const processedForMessage = state.processedQuests.get(context.messageKey) ?? new Set<string>();
+  for (const hit of hits) {
+    processedForMessage.add(hit.questId);
+  }
   state.processedQuests.set(context.messageKey, processedForMessage);
-  state.triggeredPositions.set(context.messageKey, triggeredPositions);
   
-  return result;
+  return {
+    matched: hits.length > 0,
+    hits,
+    detections,
+  };
 }
 
 /**
- * Process a parsed quest tag
+ * Process a parsed quest tag (legacy format)
  */
 function processParsedTag(
   tag: ParsedQuestTag,
-  quests: Quest[],
-  sessionId: string
+  templates: QuestTemplate[],
+  sessionQuests: SessionQuestInstance[]
 ): QuestTriggerHit | null {
   switch (tag.action) {
-    case 'start':
+    case 'activate':
+      // For activation, try to find template by ID or create from title
+      let template = templates.find(t => t.id === tag.questId);
+      
+      if (!template && tag.questTitle) {
+        // Try to find by name
+        template = templates.find(t => t.name.toLowerCase() === tag.questTitle?.toLowerCase());
+      }
+      
       return {
         questId: tag.questId || `quest-${Date.now()}`,
-        action: 'start',
-        message: `Quest started: ${tag.questTitle || tag.description || 'New Quest'}`,
+        template,
+        action: 'activate',
+        message: `Quest activated: ${tag.questTitle || tag.description || 'New Quest'}`,
       };
       
     case 'progress':
-      const quest = quests.find(q => q.id === tag.questId);
-      if (!quest) return null;
+      const progressTemplate = templates.find(t => t.id === tag.questId);
+      if (!progressTemplate) return null;
       
-      const objective = quest.objectives.find(o => o.id === tag.objectiveId);
+      const objective = progressTemplate.objectives.find(o => o.id === tag.objectiveId);
       if (!objective) return null;
       
+      // Find session quest to check if this progress completes the objective
+      const sessionQuest = sessionQuests.find(q => q.templateId === progressTemplate.id);
+      const sessionObj = sessionQuest?.objectives.find(o => o.templateId === objective.id);
+      const currentCount = sessionObj?.currentCount || 0;
+      const targetCount = objective.targetCount || 1;
+      const progressAmount = tag.progress || 1;
+      const newCount = Math.min(currentCount + progressAmount, targetCount);
+      const willComplete = !sessionObj?.isCompleted && newCount >= targetCount;
+      
       return {
-        questId: quest.id,
-        quest,
+        questId: progressTemplate.id,
+        template: progressTemplate,
         objectiveId: objective.id,
         objective,
         action: 'progress',
-        progress: tag.progress || 1,
+        progress: progressAmount,
         message: `Objective "${objective.description}" progressed`,
+        // Include objective rewards if this progress will complete the objective
+        objectiveRewards: willComplete && objective.rewards ? objective.rewards : undefined,
+        completesObjective: willComplete,
       };
       
     case 'complete':
-      const completeQuest = quests.find(q => q.id === tag.questId);
+      const completeTemplate = templates.find(t => t.id === tag.questId);
       return {
         questId: tag.questId || '',
-        quest: completeQuest,
+        template: completeTemplate,
         action: 'complete',
-        message: `Quest completed: ${completeQuest?.title || tag.questId}`,
+        message: `Quest completed: ${completeTemplate?.name || tag.questId}`,
+        rewards: completeTemplate?.rewards,
       };
       
     case 'fail':
-      const failQuest = quests.find(q => q.id === tag.questId);
+      const failTemplate = templates.find(t => t.id === tag.questId);
       return {
         questId: tag.questId || '',
-        quest: failQuest,
+        template: failTemplate,
         action: 'fail',
-        message: `Quest failed: ${failQuest?.title || tag.questId}`,
+        message: `Quest failed: ${failTemplate?.name || tag.questId}`,
       };
       
     default:
       return null;
   }
-}
-
-/**
- * Check quest progress based on a single token
- * Uses token-level validation for more precise matching
- */
-function checkQuestProgressWithToken(
-  quest: Quest,
-  token: DetectedToken,
-  content: string
-): QuestTriggerHit | null {
-  if (!quest.triggers.autoComplete && !quest.triggers.trackProgress) {
-    return null;
-  }
-  
-  const normalizedToken = token.token.toLowerCase();
-  const lowerContent = content.toLowerCase();
-  
-  // Check each incomplete objective
-  for (const objective of quest.objectives) {
-    if (objective.isCompleted) continue;
-    
-    // Check completion keywords against token
-    const hasCompletionKeyword = quest.triggers.completionKeywords.some(kw => {
-      const normalizedKw = kw.toLowerCase().trim();
-      return normalizedToken.includes(normalizedKw) || normalizedKw.includes(normalizedToken);
-    });
-    
-    if (hasCompletionKeyword && quest.triggers.autoComplete) {
-      return {
-        questId: quest.id,
-        quest,
-        objectiveId: objective.id,
-        objective,
-        action: 'complete',
-        message: `Objective completed: ${objective.description}`,
-      };
-    }
-    
-    // Check for progress keywords (if tracking)
-    if (quest.triggers.trackProgress && objective.target) {
-      const targetLower = objective.target.toLowerCase();
-      const matchesTarget = normalizedToken.includes(targetLower) || 
-                           targetLower.includes(normalizedToken) ||
-                           lowerContent.includes(targetLower);
-      
-      if (matchesTarget) {
-        return {
-          questId: quest.id,
-          quest,
-          objectiveId: objective.id,
-          objective,
-          action: 'progress',
-          progress: 1,
-          message: `Progress made on: ${objective.description}`,
-        };
-      }
-    }
-  }
-  
-  return null;
-}
-
-/**
- * Check quest progress based on keywords (legacy, uses full content)
- */
-function checkQuestProgress(
-  quest: Quest,
-  tokens: DetectedToken[],
-  content: string
-): QuestTriggerHit | null {
-  if (!quest.triggers.autoComplete && !quest.triggers.trackProgress) {
-    return null;
-  }
-  
-  const lowerContent = content.toLowerCase();
-  
-  // Check each incomplete objective
-  for (const objective of quest.objectives) {
-    if (objective.isCompleted) continue;
-    
-    // Check completion keywords
-    const hasCompletion = quest.triggers.completionKeywords.some(kw =>
-      lowerContent.includes(kw.toLowerCase())
-    );
-    
-    if (hasCompletion && quest.triggers.autoComplete) {
-      return {
-        questId: quest.id,
-        quest,
-        objectiveId: objective.id,
-        objective,
-        action: 'complete',
-        message: `Objective completed: ${objective.description}`,
-      };
-    }
-    
-    // Check for progress keywords (if tracking)
-    if (quest.triggers.trackProgress && objective.target) {
-      const targetLower = objective.target.toLowerCase();
-      const hasTarget = lowerContent.includes(targetLower);
-      
-      if (hasTarget) {
-        return {
-          questId: quest.id,
-          quest,
-          objectiveId: objective.id,
-          objective,
-          action: 'progress',
-          progress: 1,
-          message: `Progress made on: ${objective.description}`,
-        };
-      }
-    }
-  }
-  
-  return null;
 }
 
 // ============================================
@@ -410,33 +340,88 @@ function checkQuestProgress(
  * Build quest section for prompt
  */
 export function buildQuestPromptSection(
-  quests: Quest[],
-  template: string
+  templates: QuestTemplate[],
+  sessionQuests: SessionQuestInstance[],
+  templateStr: string
 ): string {
-  const activeQuests = quests.filter(q => q.status === 'active');
+  // Get active quests
+  const activeQuests = sessionQuests.filter(q => q.status === 'active');
   
   if (activeQuests.length === 0) {
     return '';
   }
   
   const questList = activeQuests.map(q => {
-    const objectives = q.objectives
-      .filter(o => !o.isCompleted)
-      .map(o => {
-        const progress = o.targetCount > 1 
-          ? ` (${o.currentCount}/${o.targetCount})` 
+    const questTemplate = templates.find(t => t.id === q.templateId);
+    if (!questTemplate) return '';
+    
+    // Build objectives list
+    const objectives = questTemplate.objectives
+      .map(obj => {
+        const sessionObj = q.objectives.find(o => o.templateId === obj.id);
+        const isCompleted = sessionObj?.isCompleted || false;
+        const currentCount = sessionObj?.currentCount || 0;
+        
+        const progress = obj.targetCount > 1 
+          ? ` (${currentCount}/${obj.targetCount})` 
           : '';
-        return `  - ${o.description}${progress}`;
+        
+        const status = isCompleted ? '✓' : '○';
+        return `  - ${status} ${obj.description}${progress}`;
       })
+      .filter(o => o)
       .join('\n');
     
-    return `**${q.title}** (${q.priority})
-${q.description}
+    return `**${questTemplate.name}** (${questTemplate.priority})
+${questTemplate.description}
 Objectives:
 ${objectives}`;
-  }).join('\n\n');
+  }).filter(q => q).join('\n\n');
   
-  return template.replace('{{activeQuests}}', questList);
+  if (!questList) return '';
+  
+  return templateStr.replace('{{activeQuests}}', questList);
+}
+
+/**
+ * Build quest progress block for AI to use
+ * This tells the AI what keys it can use to progress quests
+ */
+export function buildQuestKeysPrompt(
+  templates: QuestTemplate[],
+  sessionQuests: SessionQuestInstance[]
+): string {
+  const activeQuests = sessionQuests.filter(q => q.status === 'active');
+  
+  if (activeQuests.length === 0) {
+    return '';
+  }
+  
+  const lines: string[] = ['You can progress quests by including these keys in your response:'];
+  
+  for (const q of activeQuests) {
+    const template = templates.find(t => t.id === q.templateId);
+    if (!template) continue;
+    
+    // Incomplete objectives
+    for (const obj of template.objectives) {
+      const sessionObj = q.objectives.find(o => o.templateId === obj.id);
+      if (sessionObj?.isCompleted) continue;
+      
+      const keys = [obj.completion.key, ...(obj.completion.keys || [])];
+      if (keys.length > 0) {
+        lines.push(`- ${keys[0]}: ${obj.description} (${template.name})`);
+      }
+    }
+    
+    // Quest completion key
+    const completionKeys = [template.completion.key, ...(template.completion.keys || [])];
+    if (completionKeys.length > 0) {
+      lines.push(`- ${completionKeys[0]}: Complete quest "${template.name}"`);
+    }
+  }
+  
+  return lines.join('\n');
 }
 
 // ============================================
@@ -444,45 +429,36 @@ ${objectives}`;
 // ============================================
 
 /**
- * Create a new quest from detected content
+ * Reset state for new message
+ * IMPORTANT: Must also reset the QuestDetectionState for the session so that
+ * each message can detect quest keys independently
  */
-export function createQuestFromDetection(
-  sessionId: string,
-  title: string,
-  description: string,
-  objectives: QuestObjective[] = [],
-  priority: 'main' | 'side' | 'hidden' = 'side'
-): Quest {
-  return {
-    id: `quest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    sessionId,
-    title,
-    description,
-    status: 'active',
-    priority,
-    objectives,
-    rewards: [],
-    triggers: {
-      startKeywords: [],
-      completionKeywords: [],
-      autoStart: false,
-      autoComplete: true,
-      trackProgress: true,
-    },
-    startedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    progress: 0,
-    isHidden: false,
-    isRepeatable: false,
-  };
+export function resetQuestHandlerState(state: QuestHandlerState, messageKey: string, sessionId?: string): void {
+  state.processedQuests.delete(messageKey);
+  state.triggeredPositions.delete(messageKey);
+  
+  // Reset the QuestDetectionState for the session so processedLength = 0
+  // This allows each new message to be processed from the beginning
+  if (sessionId) {
+    const detectionState = state.detectionStates.get(sessionId);
+    if (detectionState) {
+      detectionState.reset();
+      console.log(`[QuestHandler] Reset detection state for session ${sessionId}`);
+    }
+  }
 }
 
 /**
- * Reset state for new message
+ * Reset detection state for a session
  */
-export function resetQuestHandlerState(state: QuestHandlerState, messageKey: string): void {
-  state.processedQuests.delete(messageKey);
-  state.triggeredPositions.delete(messageKey);
+export function resetQuestDetectionForSession(
+  state: QuestHandlerState,
+  sessionId: string
+): void {
+  const detectionState = state.detectionStates.get(sessionId);
+  if (detectionState) {
+    detectionState.reset();
+  }
 }
 
 /**
@@ -492,6 +468,7 @@ export function clearQuestHandlerState(state: QuestHandlerState): void {
   state.processedQuests.clear();
   state.questProgressTracked.clear();
   state.triggeredPositions.clear();
+  state.detectionStates.clear();
 }
 
 // ============================================

@@ -477,6 +477,16 @@ export function resetBackgroundHandlerState(state: BackgroundHandlerState, messa
 }
 
 /**
+ * Clear all background handler state
+ */
+export function clearBackgroundHandlerState(state: BackgroundHandlerState): void {
+  state.triggeredPositions.clear();
+  state.lastTriggeredBackground.clear();
+  state.lastTriggerTime.clear();
+  state.currentActivePack.clear();
+}
+
+/**
  * Reset cooldown for a context
  */
 export function resetBackgroundCooldowns(contextKey: string): void {

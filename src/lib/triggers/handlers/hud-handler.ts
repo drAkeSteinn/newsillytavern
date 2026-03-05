@@ -204,6 +204,13 @@ export function resetHUDHandlerState(state: HUDHandlerState, messageKey: string)
   state.updatedFields.delete(messageKey);
 }
 
+/**
+ * Clear all HUD handler state
+ */
+export function clearHUDHandlerState(state: HUDHandlerState): void {
+  state.updatedFields.clear();
+}
+
 // ============================================
 // Helper Functions
 // ============================================

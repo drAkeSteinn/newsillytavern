@@ -10,6 +10,8 @@ import { useTriggerSystem } from '@/lib/triggers';
 import { useBackgroundTriggers } from '@/hooks/use-background-triggers';
 import { GroupSprites } from './group-sprites';
 import { HUDDisplay } from './hud-display';
+import { QuestHUD } from './quest-hud';
+import { QuestNotifications } from './quest-notifications';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard } from '@/types';
 import { t } from '@/lib/i18n';
@@ -41,6 +43,10 @@ export function ChatPanel() {
   // Lorebooks for prompt injection
   const lorebooks = useTavernStore((state) => state.lorebooks);
   const globalActiveLorebookIds = useTavernStore((state) => state.activeLorebookIds);
+  
+  // Quests for prompt injection
+  const questTemplates = useTavernStore((state) => state.questTemplates);
+  const questSettings = useTavernStore((state) => state.questSettings);
   
   const setGenerating = useTavernStore((state) => state.setGenerating);
   const addMessage = useTavernStore((state) => state.addMessage);
@@ -127,6 +133,7 @@ export function ChatPanel() {
   const {
     processStreamingContent: processTriggers,
     resetForNewMessage: resetTriggers,
+    clearAllState: clearAllTriggerState,
   } = useTriggerSystem({
     soundEnabled: settings.sound?.enabled ?? true,
     spriteEnabled: settings.chatLayout.showCharacterSprite,
@@ -270,6 +277,9 @@ export function ChatPanel() {
             // Pass per-character lorebooks when group has no lorebooks
             characterLorebooksMap: characterLorebooksMap,
             sessionStats,  // Pass session stats for attribute values
+            sessionQuests: currentSession?.sessionQuests,  // Pass session quests
+            questTemplates,  // Pass quest templates
+            questSettings,  // Pass quest settings
             hudContext: activeHUDContext  // Pass HUD context for prompt injection
           })
         });
@@ -399,6 +409,9 @@ export function ChatPanel() {
             contextConfig,
             lorebooks: activeLorebooks,
             sessionStats,  // Pass session stats for attribute values
+            sessionQuests: currentSession?.sessionQuests,  // Pass session quests
+            questTemplates,  // Pass quest templates
+            questSettings,  // Pass quest settings
             hudContext: activeHUDContext  // Pass HUD context for prompt injection
           })
         });
@@ -501,6 +514,9 @@ export function ChatPanel() {
             contextConfig,
             lorebooks: activeLorebooks,
             sessionStats,  // Pass session stats for attribute values
+            sessionQuests: currentSession?.sessionQuests,  // Pass session quests
+            questTemplates,  // Pass quest templates
+            questSettings,  // Pass quest settings
             hudContext: activeHUDContext  // Pass HUD context for prompt injection
           })
         });
@@ -609,6 +625,9 @@ export function ChatPanel() {
           contextConfig,
           lorebooks: activeLorebooks,
           sessionStats,  // Pass session stats for attribute values
+          sessionQuests: currentSession?.sessionQuests,  // Pass session quests
+          questTemplates,  // Pass quest templates
+          questSettings,  // Pass quest settings
           hudContext: activeHUDContext  // Pass HUD context for prompt injection
         })
       });
@@ -756,45 +775,29 @@ export function ChatPanel() {
     }
   }, [isGenerating, activeCharacter, characters, setGenerating, resetTriggers, resetBgDetection, scanForBackgroundTriggers, processTriggers]);
 
+  // Get clearChat from store for proper reset
+  const clearChat = useTavernStore((state) => state.clearChat);
+  const resetSessionStats = useTavernStore((state) => state.resetSessionStats);
+
   const handleResetChat = () => {
     if (!activeSessionId) return;
     
-    // Group mode reset
-    if (isGroupMode && activeGroup) {
-      if (confirm(t('chat.resetConfirm'))) {
-        updateSession(activeSessionId, { 
-          messages: [],
-          updatedAt: new Date().toISOString()
-        });
-      }
-      return;
-    }
-    
-    // Single character mode reset
-    if (!activeCharacter) return;
-    
-    if (confirm(t('chat.resetFirstConfirm'))) {
-      const firstMessage = {
-        id: generateId(),
-        characterId: activeCharacter.id,
-        role: 'assistant' as const,
-        content: activeCharacter.firstMes || `*${activeCharacter.name} looks at you expectantly, waiting for you to speak.*`,
-        timestamp: new Date().toISOString(),
-        isDeleted: false,
-        swipeId: generateId(),
-        swipeIndex: 0
-      };
-      
-      updateSession(activeSessionId, { 
-        messages: [firstMessage],
-        updatedAt: new Date().toISOString()
-      });
+    // Use the store's clearChat which properly resets:
+    // 1. Messages to first message
+    // 2. Session stats to default values
+    // 3. Session quests to template defaults (with updated templates)
+    // 4. Turn count to 0
+    if (confirm(t('chat.resetConfirm'))) {
+      clearChat(activeSessionId);
+      // Clear ALL trigger detection state so quests can be re-activated
+      clearAllTriggerState();
     }
   };
 
   const handleClearChat = () => {
     if (!activeSessionId) return;
     
+    // Clear only messages, keep stats and quests
     if (confirm(t('chat.clearConfirm'))) {
       updateSession(activeSessionId, { 
         messages: [],
@@ -868,6 +871,11 @@ export function ChatPanel() {
         <HUDDisplay />
       )}
 
+      {/* Quest HUD - Shows active quests */}
+      {questSettings.enabled && (
+        <QuestHUD position="bottom-right" />
+      )}
+
       {/* Floating Chat Box */}
       <NovelChatBox 
         onSendMessage={(msg) => handleSend(msg)}
@@ -886,6 +894,9 @@ export function ChatPanel() {
         characters={characters}
         activePersona={activePersona}
       />
+
+      {/* Quest Notifications */}
+      <QuestNotifications />
     </div>
   );
 }

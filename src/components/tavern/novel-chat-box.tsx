@@ -26,6 +26,10 @@ import {
   ChevronRight,
   Sparkles,
   Database,
+  ScrollText,
+  Check,
+  Circle,
+  Target,
 } from 'lucide-react';
 import {
   Popover,
@@ -76,6 +80,7 @@ export function NovelChatBox({
   const [isResizing, setIsResizing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showVariables, setShowVariables] = useState(false);
+  const [showQuests, setShowQuests] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,6 +99,8 @@ export function NovelChatBox({
     swipeMessage,
     getSwipeCount,
     characters: allCharacters,
+    questTemplates,
+    questSettings,
   } = useTavernStore();
 
   const activeSession = getActiveSession();
@@ -102,6 +109,9 @@ export function NovelChatBox({
 
   // Get session stats for the variables panel
   const sessionStats = activeSession?.sessionStats;
+  
+  // Get session quests for the quests panel
+  const sessionQuests = activeSession?.sessionQuests || [];
 
   // Determine display name for header
   const headerName = isGroupMode 
@@ -425,6 +435,139 @@ export function NovelChatBox({
             </PopoverContent>
           </Popover>
 
+          {/* Quests Popover */}
+          <Popover open={showQuests} onOpenChange={setShowQuests}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 relative">
+                <ScrollText className="w-4 h-4" />
+                {sessionQuests.filter(q => q.status === 'active').length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full flex items-center justify-center text-[8px] font-bold text-white">
+                    {sessionQuests.filter(q => q.status === 'active').length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 max-h-96 overflow-y-auto" align="end">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <ScrollText className="w-4 h-4 text-amber-500" />
+                  {t('chatbox.quests')}
+                </h4>
+                
+                {!questSettings.enabled ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    <ScrollText className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    {t('chatbox.questsDisabled')}
+                  </div>
+                ) : sessionQuests.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    <ScrollText className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    {t('chatbox.noQuests')}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Active Quests */}
+                    {sessionQuests.filter(q => q.status === 'active').map(quest => {
+                      const template = questTemplates.find(t => t.id === quest.templateId);
+                      if (!template) return null;
+                      
+                      const completedObjectives = quest.objectives.filter(o => o.isCompleted).length;
+                      const totalObjectives = quest.objectives.length;
+                      
+                      return (
+                        <div
+                          key={quest.templateId}
+                          className="p-2 rounded-lg border bg-amber-500/10 border-amber-500/30"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{template.icon || '📜'}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-medium truncate">{template.name}</span>
+                                {template.priority === 'main' && (
+                                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[8px] px-1">
+                                    Main
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 h-1 bg-black/20 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-amber-500 rounded-full"
+                                    style={{ width: `${quest.progress}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {Math.round(quest.progress)}%
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                                <Target className="w-3 h-3" />
+                                <span>{completedObjectives}/{totalObjectives} {t('chatbox.objectives')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Available Quests */}
+                    {sessionQuests.filter(q => q.status === 'available').length > 0 && (
+                      <>
+                        <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t">
+                          {t('chatbox.availableQuests')}
+                        </div>
+                        {sessionQuests.filter(q => q.status === 'available').map(quest => {
+                          const template = questTemplates.find(t => t.id === quest.templateId);
+                          if (!template) return null;
+                          
+                          return (
+                            <div
+                              key={quest.templateId}
+                              className="p-2 rounded-lg border bg-muted/50 border-border/50 opacity-70"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{template.icon || '📜'}</span>
+                                <span className="text-xs truncate">{template.name}</span>
+                                <Circle className="w-3 h-3 text-muted-foreground ml-auto" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                    
+                    {/* Completed Quests */}
+                    {sessionQuests.filter(q => q.status === 'completed').length > 0 && (
+                      <>
+                        <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t">
+                          {t('chatbox.completedQuests')}
+                        </div>
+                        {sessionQuests.filter(q => q.status === 'completed').slice(0, 3).map(quest => {
+                          const template = questTemplates.find(t => t.id === quest.templateId);
+                          if (!template) return null;
+                          
+                          return (
+                            <div
+                              key={quest.templateId}
+                              className="p-2 rounded-lg border bg-green-500/10 border-green-500/30"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{template.icon || '📜'}</span>
+                                <span className="text-xs truncate line-through opacity-70">{template.name}</span>
+                                <Check className="w-3 h-3 text-green-500 ml-auto" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Settings Popover */}
           <Popover open={showSettings} onOpenChange={setShowSettings}>
             <PopoverTrigger asChild>
@@ -563,9 +706,16 @@ export function NovelChatBox({
                   displayName = activePersona?.name || t('message.you');
                   displayAvatar = activePersona?.avatar || undefined;
                 } else if (isGroupMode) {
-                  messageCharacter = characters.find(c => c.id === message.characterId);
+                  // Use allCharacters from store if characters prop is empty
+                  const characterList = characters.length > 0 ? characters : allCharacters;
+                  messageCharacter = characterList.find(c => c.id === message.characterId);
                   displayName = messageCharacter?.name;
                   displayAvatar = messageCharacter?.avatar;
+                  
+                  // Debug: log if character not found
+                  if (!messageCharacter && message.characterId) {
+                    console.warn('[NovelChatBox] Character not found:', message.characterId, 'Available:', characterList.map(c => c.id));
+                  }
                 } else {
                   messageCharacter = activeCharacter || undefined;
                   displayName = activeCharacter?.name;

@@ -1,0 +1,1517 @@
+'use client';
+
+/**
+ * QuestTemplateManager Component
+ * 
+ * Settings tab for managing Quest templates.
+ * Allows creating, editing, duplicating, and deleting quest templates.
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { useTavernStore } from '@/store';
+import type { 
+  QuestTemplate, 
+  QuestObjectiveTemplate, 
+  QuestReward,
+  QuestPriority,
+  QuestObjectiveType,
+  QuestRewardType,
+  QuestActivationMethod,
+  QuestValueCondition,
+  QuestValueType,
+  QuestNumberOperator,
+  QuestTextOperator,
+} from '@/types';
+import { cn, generateId } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import {
+  Plus,
+  Pencil,
+  Copy,
+  Trash2,
+  ScrollText,
+  Target,
+  Gift,
+  Sparkles,
+  ChevronUp,
+  ChevronDown,
+  X,
+  GripVertical,
+  Zap,
+  Clock,
+  Link2,
+  Hash,
+  List,
+  ToggleLeft,
+  ToggleRight,
+  Check,
+  AlertCircle,
+  Info,
+  Settings2,
+  Eye,
+  EyeOff,
+  Timer,
+} from 'lucide-react';
+
+// ============================================
+// Main Component
+// ============================================
+
+export function QuestTemplateManager() {
+  const [editingTemplate, setEditingTemplate] = useState<QuestTemplate | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const questTemplates = useTavernStore((state) => state.questTemplates);
+  const loadTemplates = useTavernStore((state) => state.loadTemplates);
+  const saveTemplate = useTavernStore((state) => state.saveTemplate);
+  const deleteTemplate = useTavernStore((state) => state.deleteTemplate);
+  const duplicateTemplate = useTavernStore((state) => state.duplicateTemplate);
+
+  // Load templates on mount
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        await loadTemplates();
+      } catch (error) {
+        console.error('Error loading templates:', error);
+      }
+      setIsLoading(false);
+    };
+    load();
+  }, [loadTemplates]);
+
+  const handleCreate = () => {
+    setIsCreating(true);
+    setEditingTemplate(null);
+  };
+  
+  const handleEdit = (template: QuestTemplate) => {
+    setIsCreating(false);
+    setEditingTemplate(template);
+  };
+  
+  const handleDuplicate = async (template: QuestTemplate) => {
+    const newId = `${template.id}-copy-${Date.now().toString(36)}`;
+    try {
+      duplicateTemplate(template.id, newId);
+    } catch (error) {
+      console.error('Error duplicating template:', error);
+    }
+  };
+  
+  const handleDelete = async (template: QuestTemplate) => {
+    if (confirm(`¿Eliminar el template "${template.name}"?`)) {
+      try {
+        await deleteTemplate(template.id);
+      } catch (error) {
+        console.error('Error deleting template:', error);
+      }
+    }
+  };
+  
+  const handleSave = async (template: QuestTemplate) => {
+    try {
+      await saveTemplate(template);
+      setEditingTemplate(null);
+      setIsCreating(false);
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('Error al guardar el template');
+    }
+  };
+
+  const handleClose = () => {
+    setEditingTemplate(null);
+    setIsCreating(false);
+  };
+
+  // Priority colors
+  const priorityColors: Record<QuestPriority, string> = {
+    main: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30',
+    side: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30',
+    hidden: 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30',
+  };
+
+  const priorityLabels: Record<QuestPriority, string> = {
+    main: 'Principal',
+    side: 'Secundaria',
+    hidden: 'Oculta',
+  };
+  
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
+              <ScrollText className="w-5 h-5 text-amber-500" />
+            </div>
+            Quest Templates
+          </h2>
+          <p className="text-muted-foreground text-sm ml-12">
+            Crea plantillas de misiones para usar en las sesiones de rol
+          </p>
+        </div>
+        <Button 
+          onClick={handleCreate}
+          className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:shadow-amber-500/40"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Crear Template
+        </Button>
+      </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+            <p className="text-muted-foreground text-sm mt-4">Cargando templates...</p>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Template List */}
+      {!isLoading && questTemplates.length === 0 ? (
+        <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 mb-4">
+              <ScrollText className="w-12 h-12 text-amber-400" />
+            </div>
+            <p className="text-muted-foreground text-center mb-2 font-medium">
+              No hay templates de quest creados
+            </p>
+            <p className="text-muted-foreground/60 text-sm text-center max-w-xs mb-6">
+              Los templates definen misiones que pueden activarse automáticamente durante el rol
+            </p>
+            <Button variant="outline" className="gap-2" onClick={handleCreate}>
+              <Sparkles className="w-4 h-4" />
+              Crear primer template
+            </Button>
+          </CardContent>
+        </Card>
+      ) : !isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {questTemplates.map((template) => (
+            <Card 
+              key={template.id} 
+              className={cn(
+                "group relative overflow-hidden transition-all duration-300",
+                "hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1",
+                "border border-border/60 bg-gradient-to-br from-card to-muted/30 hover:border-amber-500/30"
+              )}
+            >
+              {/* Background decoration */}
+              <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/5 to-orange-500/5 group-hover:scale-150 transition-transform duration-500" />
+              
+              <CardHeader className="pb-3 relative">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{template.icon || '📜'}</span>
+                      <CardTitle className="text-lg truncate">{template.name}</CardTitle>
+                    </div>
+                    {template.description && (
+                      <CardDescription className="mt-1.5 line-clamp-2">
+                        {template.description}
+                      </CardDescription>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4 relative">
+                {/* Priority & Stats */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge className={priorityColors[template.priority]}>
+                    {priorityLabels[template.priority]}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs bg-muted/50">
+                    <Target className="w-3 h-3 mr-1" />
+                    {template.objectives.length} objetivos
+                  </Badge>
+                  <Badge variant="outline" className="text-xs bg-muted/50">
+                    <Gift className="w-3 h-3 mr-1" />
+                    {template.rewards.length} recompensas
+                  </Badge>
+                </div>
+
+                {/* Activation Info */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {template.activation.method === 'keyword' && (
+                    <>
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Key: <code className="bg-muted px-1 rounded">{template.activation.key}</code></span>
+                    </>
+                  )}
+                  {template.activation.method === 'turn' && (
+                    <>
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Cada {template.activation.turnInterval} turnos</span>
+                    </>
+                  )}
+                  {template.activation.method === 'manual' && (
+                    <>
+                      <ToggleRight className="w-3.5 h-3.5" />
+                      <span>Activación manual</span>
+                    </>
+                  )}
+                  {template.activation.method === 'chain' && (
+                    <>
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span>En cadena</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Behavior badges */}
+                <div className="flex items-center gap-2">
+                  {template.isRepeatable && (
+                    <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600 dark:text-green-400">
+                      Repetible
+                    </Badge>
+                  )}
+                  {template.isHidden && (
+                    <Badge variant="secondary" className="text-xs bg-slate-500/10 text-slate-600 dark:text-slate-400">
+                      <EyeOff className="w-3 h-3 mr-1" />
+                      Oculta
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2 border-t border-border/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 hover:bg-amber-500/10 hover:text-amber-600 hover:border-amber-500/30 transition-colors"
+                    onClick={() => handleEdit(template)}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 hover:bg-slate-500/10 hover:text-slate-600 hover:border-slate-500/30 transition-colors"
+                    onClick={() => handleDuplicate(template)}
+                  >
+                    <Copy className="w-3.5 h-3.5 mr-1.5" />
+                    Duplicar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30 transition-colors"
+                    onClick={() => handleDelete(template)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      
+      {/* Editor Dialog */}
+      {(editingTemplate || isCreating) && (
+        <QuestTemplateEditorDialog
+          template={editingTemplate}
+          isNew={isCreating}
+          onSave={handleSave}
+          onClose={handleClose}
+          existingIds={questTemplates.map(t => t.id)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Quest Template Editor Dialog
+// ============================================
+
+interface QuestTemplateEditorDialogProps {
+  template: QuestTemplate | null;
+  isNew: boolean;
+  onSave: (template: QuestTemplate) => void;
+  onClose: () => void;
+  existingIds: string[];
+}
+
+function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingIds }: QuestTemplateEditorDialogProps) {
+  // Basic info
+  const [id, setId] = useState(template?.id || '');
+  const [name, setName] = useState(template?.name || '');
+  const [description, setDescription] = useState(template?.description || '');
+  const [priority, setPriority] = useState<QuestPriority>(template?.priority || 'side');
+  const [icon, setIcon] = useState(template?.icon || '📜');
+  const [isRepeatable, setIsRepeatable] = useState(template?.isRepeatable ?? false);
+  const [isHidden, setIsHidden] = useState(template?.isHidden ?? false);
+  const [prerequisites, setPrerequisites] = useState<string[]>(template?.prerequisites || []);
+  
+  // Activation
+  const [activationKey, setActivationKey] = useState(template?.activation?.key || '');
+  const [activationKeys, setActivationKeys] = useState<string[]>(template?.activation?.keys || []);
+  const [activationCaseSensitive, setActivationCaseSensitive] = useState(template?.activation?.caseSensitive ?? false);
+  const [activationMethod, setActivationMethod] = useState<QuestActivationMethod>(template?.activation?.method || 'keyword');
+  const [turnInterval, setTurnInterval] = useState(template?.activation?.turnInterval || 5);
+  
+  // Completion
+  const [completionKey, setCompletionKey] = useState(template?.completion?.key || '');
+  const [completionKeys, setCompletionKeys] = useState<string[]>(template?.completion?.keys || []);
+  const [completionCaseSensitive, setCompletionCaseSensitive] = useState(template?.completion?.caseSensitive ?? false);
+  const [completionValueCondition, setCompletionValueCondition] = useState<QuestValueCondition | undefined>(template?.completion?.valueCondition);
+  
+  // Objectives & Rewards
+  const [objectives, setObjectives] = useState<QuestObjectiveTemplate[]>(template?.objectives || []);
+  const [rewards, setRewards] = useState<QuestReward[]>(template?.rewards || []);
+  
+  // Chain config
+  const [chainType, setChainType] = useState<'none' | 'specific' | 'random'>(template?.chain?.type || 'none');
+  const [chainNextQuestId, setChainNextQuestId] = useState(template?.chain?.nextQuestId || '');
+  const [chainAutoStart, setChainAutoStart] = useState(template?.chain?.autoStart ?? false);
+  const [chainRandomPool, setChainRandomPool] = useState<string[]>(template?.chain?.randomPool || []);
+
+  // Validation
+  const [errors, setErrors] = useState<string[]>([]);
+
+  // Active tab for the editor
+  const [activeSection, setActiveSection] = useState<'basic' | 'activation' | 'objectives' | 'completion' | 'rewards'>('basic');
+
+  const validate = (): boolean => {
+    const newErrors: string[] = [];
+    
+    if (!id.trim()) newErrors.push('ID es requerido');
+    if (!name.trim()) newErrors.push('Nombre es requerido');
+    if (!activationKey.trim()) newErrors.push('Key de activación es requerida');
+    if (!completionKey.trim()) newErrors.push('Key de completado es requerida');
+    
+    if (isNew && existingIds.includes(id)) {
+      newErrors.push('Ya existe un template con este ID');
+    }
+    
+    // Validate objectives
+    objectives.forEach((obj, i) => {
+      if (!obj.id) newErrors.push(`Objetivo ${i + 1}: ID requerido`);
+      if (!obj.completion?.key) newErrors.push(`Objetivo ${i + 1}: Key de completado requerida`);
+    });
+    
+    // Validate rewards
+    rewards.forEach((reward, i) => {
+      if (!reward.id) newErrors.push(`Recompensa ${i + 1}: ID requerido`);
+      if (!reward.key) newErrors.push(`Recompensa ${i + 1}: Key requerida`);
+    });
+    
+    setErrors(newErrors);
+    return newErrors.length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validate()) return;
+    
+    const now = new Date().toISOString();
+    
+    const newTemplate: QuestTemplate = {
+      id,
+      name,
+      description,
+      priority,
+      icon,
+      isRepeatable,
+      isHidden,
+      prerequisites,
+      
+      activation: {
+        key: activationKey,
+        keys: activationKeys,
+        caseSensitive: activationCaseSensitive,
+        method: activationMethod,
+        turnInterval: activationMethod === 'turn' ? turnInterval : undefined,
+      },
+      
+      objectives,
+      
+      completion: {
+        key: completionKey,
+        keys: completionKeys,
+        caseSensitive: completionCaseSensitive,
+        valueCondition: completionValueCondition,
+      },
+      
+      chain: chainType !== 'none' ? {
+        type: chainType,
+        nextQuestId: chainType === 'specific' ? chainNextQuestId : undefined,
+        autoStart: chainAutoStart,
+        randomPool: chainType === 'random' ? chainRandomPool : undefined,
+      } : undefined,
+      
+      rewards,
+      
+      createdAt: template?.createdAt || now,
+      updatedAt: now,
+    };
+    
+    onSave(newTemplate);
+  };
+
+  // Objective management
+  const addObjective = () => {
+    const newObjective: QuestObjectiveTemplate = {
+      id: `obj-${Date.now().toString(36)}`,
+      description: '',
+      type: 'custom',
+      completion: {
+        key: '',
+        keys: [],
+        caseSensitive: false,
+      },
+      targetCount: 1,
+      isOptional: false,
+    };
+    setObjectives([...objectives, newObjective]);
+  };
+
+  const updateObjective = (index: number, updates: Partial<QuestObjectiveTemplate>) => {
+    setObjectives(objectives.map((obj, i) => i === index ? { ...obj, ...updates } : obj));
+  };
+
+  const removeObjective = (index: number) => {
+    setObjectives(objectives.filter((_, i) => i !== index));
+  };
+
+  const moveObjective = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= objectives.length) return;
+    const newObjectives = [...objectives];
+    [newObjectives[index], newObjectives[newIndex]] = [newObjectives[newIndex], newObjectives[index]];
+    setObjectives(newObjectives);
+  };
+
+  // Reward management
+  const addReward = () => {
+    const newReward: QuestReward = {
+      id: `reward-${Date.now().toString(36)}`,
+      type: 'attribute',
+      key: '',
+      value: 0,
+      action: 'add',
+    };
+    setRewards([...rewards, newReward]);
+  };
+
+  const updateReward = (index: number, updates: Partial<QuestReward>) => {
+    setRewards(rewards.map((reward, i) => i === index ? { ...reward, ...updates } : reward));
+  };
+
+  const removeReward = (index: number) => {
+    setRewards(rewards.filter((_, i) => i !== index));
+  };
+
+  // Section navigation buttons
+  const sections = [
+    { id: 'basic', label: 'Info Básica', icon: <Settings2 className="w-4 h-4" /> },
+    { id: 'activation', label: 'Activación', icon: <Zap className="w-4 h-4" /> },
+    { id: 'objectives', label: 'Objetivos', icon: <Target className="w-4 h-4" /> },
+    { id: 'completion', label: 'Completado', icon: <Check className="w-4 h-4" /> },
+    { id: 'rewards', label: 'Recompensas', icon: <Gift className="w-4 h-4" /> },
+  ] as const;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
+              {isNew ? <Plus className="w-5 h-5 text-amber-500" /> : <Pencil className="w-5 h-5 text-amber-500" />}
+            </div>
+            {isNew ? 'Crear Nuevo Template' : 'Editar Template'}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Section Tabs */}
+        <div className="flex gap-1 py-2 overflow-x-auto">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
+                activeSection === section.id
+                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              {section.icon}
+              {section.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Error Messages */}
+        {errors.length > 0 && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <div className="text-sm text-red-600 dark:text-red-400">
+              <ul className="list-disc list-inside">
+                {errors.map((error, i) => (
+                  <li key={i}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto py-4">
+          {/* Basic Info Section */}
+          {activeSection === 'basic' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="template-id" className="text-xs text-muted-foreground">ID del Template</Label>
+                  <Input
+                    id="template-id"
+                    value={id}
+                    onChange={(e) => setId(e.target.value.replace(/\s+/g, '-').toLowerCase())}
+                    placeholder="ejemplo-mision"
+                    disabled={!isNew}
+                    className="bg-background font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Identificador único, sin espacios</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="template-name" className="text-xs text-muted-foreground">Nombre</Label>
+                  <Input
+                    id="template-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Misión de Ejemplo"
+                    className="bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="template-desc" className="text-xs text-muted-foreground">Descripción</Label>
+                <Textarea
+                  id="template-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe la misión..."
+                  className="bg-background min-h-[80px]"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Prioridad</Label>
+                  <Select value={priority} onValueChange={(v) => setPriority(v as QuestPriority)}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="main">Principal</SelectItem>
+                      <SelectItem value="side">Secundaria</SelectItem>
+                      <SelectItem value="hidden">Oculta</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="template-icon" className="text-xs text-muted-foreground">Icono (emoji)</Label>
+                  <Input
+                    id="template-icon"
+                    value={icon}
+                    onChange={(e) => setIcon(e.target.value)}
+                    placeholder="📜"
+                    className="bg-background text-center text-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Comportamiento</Label>
+                  <div className="flex flex-col gap-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={isRepeatable}
+                        onCheckedChange={setIsRepeatable}
+                      />
+                      <span className="text-sm">Repetible</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={isHidden}
+                        onCheckedChange={setIsHidden}
+                      />
+                      <span className="text-sm">Oculta</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="prerequisites" className="text-xs text-muted-foreground">
+                  Prerrequisitos (IDs de misiones requeridas, separadas por coma)
+                </Label>
+                <Input
+                  id="prerequisites"
+                  value={prerequisites.join(', ')}
+                  onChange={(e) => setPrerequisites(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="mision-anterior, otra-mision"
+                  className="bg-background font-mono"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Esta misión no estará disponible hasta que se completen las misiones listadas
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Activation Section */}
+          {activeSection === 'activation' && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    La key de activación detecta cuándo la misión debe comenzar. El LLM puede generar esta key en su respuesta.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="activation-key" className="text-xs text-muted-foreground">Key Principal de Activación</Label>
+                <Input
+                  id="activation-key"
+                  value={activationKey}
+                  onChange={(e) => setActivationKey(e.target.value)}
+                  placeholder="mision:rescate"
+                  className="bg-background font-mono"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="activation-keys" className="text-xs text-muted-foreground">Keys Alternativas (separadas por coma)</Label>
+                <Input
+                  id="activation-keys"
+                  value={activationKeys.join(', ')}
+                  onChange={(e) => setActivationKeys(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="mission:rescue, quest:rescate"
+                  className="bg-background font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Método de Activación</Label>
+                  <Select value={activationMethod} onValueChange={(v) => setActivationMethod(v as QuestActivationMethod)}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="keyword">Por Keyword</SelectItem>
+                      <SelectItem value="turn">Por Turnos</SelectItem>
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="chain">En Cadena</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {activationMethod === 'turn' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="turn-interval" className="text-xs text-muted-foreground">Cada cuántos turnos</Label>
+                    <Input
+                      id="turn-interval"
+                      type="number"
+                      min={1}
+                      value={turnInterval}
+                      onChange={(e) => setTurnInterval(Number(e.target.value))}
+                      className="bg-background"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={activationCaseSensitive}
+                  onCheckedChange={setActivationCaseSensitive}
+                />
+                <span className="text-sm">Distinguir mayúsculas/minúsculas</span>
+              </div>
+            </div>
+          )}
+
+          {/* Objectives Section */}
+          {activeSection === 'objectives' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Objetivos de la Misión</h3>
+                <Button variant="outline" size="sm" onClick={addObjective}>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Agregar Objetivo
+                </Button>
+              </div>
+
+              {objectives.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/20">
+                  <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground text-sm">No hay objetivos definidos</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {objectives.map((obj, index) => (
+                    <Card key={obj.id} className="border-border/60">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex flex-col gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => moveObjective(index, 'up')}
+                              disabled={index === 0}
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => moveObjective(index, 'down')}
+                              disabled={index === objectives.length - 1}
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                          
+                          <div className="flex-1 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">ID</Label>
+                                <Input
+                                  value={obj.id}
+                                  onChange={(e) => updateObjective(index, { id: e.target.value })}
+                                  className="bg-background font-mono text-xs h-8"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                                <Select value={obj.type} onValueChange={(v) => updateObjective(index, { type: v as QuestObjectiveType })}>
+                                  <SelectTrigger className="bg-background h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="collect">Coleccionar</SelectItem>
+                                    <SelectItem value="reach">Alcanzar</SelectItem>
+                                    <SelectItem value="defeat">Derrotar</SelectItem>
+                                    <SelectItem value="talk">Hablar</SelectItem>
+                                    <SelectItem value="discover">Descubrir</SelectItem>
+                                    <SelectItem value="custom">Personalizado</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">Descripción</Label>
+                              <Input
+                                value={obj.description}
+                                onChange={(e) => updateObjective(index, { description: e.target.value })}
+                                placeholder="Descripción del objetivo..."
+                                className="bg-background h-8"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Key de Completado</Label>
+                                <Input
+                                  value={obj.completion.key}
+                                  onChange={(e) => updateObjective(index, { 
+                                    completion: { ...obj.completion, key: e.target.value } 
+                                  })}
+                                  placeholder="resistencia"
+                                  className="bg-background font-mono text-xs h-8"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Keys Alternativas</Label>
+                                <Input
+                                  value={(obj.completion.keys || []).join(', ')}
+                                  onChange={(e) => updateObjective(index, { 
+                                    completion: { ...obj.completion, keys: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } 
+                                  })}
+                                  placeholder="resistance, Resistance"
+                                  className="bg-background font-mono text-xs h-8"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={obj.targetCount}
+                                  onChange={(e) => updateObjective(index, { targetCount: Number(e.target.value) })}
+                                  className="bg-background h-8"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={obj.completion.caseSensitive}
+                                  onCheckedChange={(v) => updateObjective(index, { 
+                                    completion: { ...obj.completion, caseSensitive: v } 
+                                  })}
+                                />
+                                <span className="text-xs text-muted-foreground">Case Sensitive</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={obj.isOptional}
+                                  onCheckedChange={(v) => updateObjective(index, { isOptional: v })}
+                                />
+                                <span className="text-xs text-muted-foreground">Opcional</span>
+                              </div>
+                            </div>
+
+                            {/* Value Condition Section */}
+                            <div className="space-y-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[10px] text-muted-foreground">Condición de Valor</Label>
+                                <Switch
+                                  checked={!!obj.completion.valueCondition}
+                                  onCheckedChange={(v) => updateObjective(index, { 
+                                    completion: { 
+                                      ...obj.completion, 
+                                      valueCondition: v ? { valueType: 'presence' } : undefined 
+                                    } 
+                                  })}
+                                />
+                              </div>
+                              
+                              {obj.completion.valueCondition && (
+                                <div className="grid grid-cols-3 gap-2 p-2 rounded bg-muted/30">
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] text-muted-foreground">Tipo de Valor</Label>
+                                    <Select 
+                                      value={obj.completion.valueCondition.valueType} 
+                                      onValueChange={(v) => updateObjective(index, { 
+                                        completion: { 
+                                          ...obj.completion, 
+                                          valueCondition: { 
+                                            ...obj.completion.valueCondition, 
+                                            valueType: v as QuestValueType 
+                                          } 
+                                        } 
+                                      })}
+                                    >
+                                      <SelectTrigger className="bg-background h-7 text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="presence">Presencia</SelectItem>
+                                        <SelectItem value="number">Número</SelectItem>
+                                        <SelectItem value="text">Texto</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  {obj.completion.valueCondition.valueType !== 'presence' && (
+                                    <>
+                                      <div className="space-y-1">
+                                        <Label className="text-[9px] text-muted-foreground">Operador</Label>
+                                        <Select 
+                                          value={obj.completion.valueCondition.operator || (obj.completion.valueCondition.valueType === 'number' ? '==' : 'equals')} 
+                                          onValueChange={(v) => updateObjective(index, { 
+                                            completion: { 
+                                              ...obj.completion, 
+                                              valueCondition: { 
+                                                ...obj.completion.valueCondition, 
+                                                operator: v as any 
+                                              } 
+                                            } 
+                                          })}
+                                        >
+                                          <SelectTrigger className="bg-background h-7 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {obj.completion.valueCondition.valueType === 'number' ? (
+                                              <>
+                                                <SelectItem value=">">&gt; Mayor que</SelectItem>
+                                                <SelectItem value="<">&lt; Menor que</SelectItem>
+                                                <SelectItem value=">=">≥ Mayor o igual</SelectItem>
+                                                <SelectItem value="<=">≤ Menor o igual</SelectItem>
+                                                <SelectItem value="==">= Igual</SelectItem>
+                                                <SelectItem value="!=">≠ Diferente</SelectItem>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <SelectItem value="equals">Igual a</SelectItem>
+                                                <SelectItem value="contains">Contiene</SelectItem>
+                                                <SelectItem value="startsWith">Empieza con</SelectItem>
+                                                <SelectItem value="endsWith">Termina con</SelectItem>
+                                                <SelectItem value="notEquals">Diferente de</SelectItem>
+                                              </>
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[9px] text-muted-foreground">Valor Objetivo</Label>
+                                        <Input
+                                          value={String(obj.completion.valueCondition.targetValue || '')}
+                                          onChange={(e) => updateObjective(index, { 
+                                            completion: { 
+                                              ...obj.completion, 
+                                              valueCondition: { 
+                                                ...obj.completion.valueCondition, 
+                                                targetValue: obj.completion.valueCondition?.valueType === 'number' 
+                                                  ? Number(e.target.value) 
+                                                  : e.target.value 
+                                              } 
+                                            } 
+                                          })}
+                                          placeholder={obj.completion.valueCondition.valueType === 'number' ? '50' : 'texto'}
+                                          className="bg-background h-7 text-xs"
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {obj.completion.valueCondition.valueType === 'presence' && (
+                                    <div className="col-span-2 flex items-center text-xs text-muted-foreground">
+                                      <Info className="w-3 h-3 mr-1" />
+                                      Detecta si la key existe en el texto
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Objective Rewards Section */}
+                            <div className="space-y-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                  <Gift className="w-3 h-3" />
+                                  Recompensas del Objetivo
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs"
+                                  onClick={() => {
+                                    const newReward: QuestReward = {
+                                      id: `obj-reward-${Date.now().toString(36)}`,
+                                      type: 'attribute',
+                                      key: '',
+                                      value: 0,
+                                      action: 'add',
+                                    };
+                                    updateObjective(index, { 
+                                      rewards: [...(obj.rewards || []), newReward] 
+                                    });
+                                  }}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Agregar
+                                </Button>
+                              </div>
+                              
+                              {(obj.rewards || []).length > 0 && (
+                                <div className="space-y-2">
+                                  {(obj.rewards || []).map((reward, rewardIdx) => (
+                                    <div key={reward.id} className="grid grid-cols-4 gap-2 p-2 rounded bg-muted/20">
+                                      <div className="space-y-0.5">
+                                        <Label className="text-[9px] text-muted-foreground">Tipo</Label>
+                                        <Select 
+                                          value={reward.type} 
+                                          onValueChange={(v) => {
+                                            const updatedRewards = [...(obj.rewards || [])];
+                                            updatedRewards[rewardIdx] = { ...reward, type: v as QuestRewardType };
+                                            updateObjective(index, { rewards: updatedRewards });
+                                          }}
+                                        >
+                                          <SelectTrigger className="bg-background h-6 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="attribute">Atributo</SelectItem>
+                                            <SelectItem value="sprite">Sprite</SelectItem>
+                                            <SelectItem value="sound">Sonido</SelectItem>
+                                            <SelectItem value="background">Fondo</SelectItem>
+                                            <SelectItem value="item">Item</SelectItem>
+                                            <SelectItem value="custom">Custom</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-0.5">
+                                        <Label className="text-[9px] text-muted-foreground">Key</Label>
+                                        <Input
+                                          value={reward.key}
+                                          onChange={(e) => {
+                                            const updatedRewards = [...(obj.rewards || [])];
+                                            updatedRewards[rewardIdx] = { ...reward, key: e.target.value };
+                                            updateObjective(index, { rewards: updatedRewards });
+                                          }}
+                                          placeholder="HP, oro..."
+                                          className="bg-background h-6 text-xs"
+                                        />
+                                      </div>
+                                      <div className="space-y-0.5">
+                                        <Label className="text-[9px] text-muted-foreground">Valor</Label>
+                                        <Input
+                                          value={String(reward.value)}
+                                          onChange={(e) => {
+                                            const updatedRewards = [...(obj.rewards || [])];
+                                            updatedRewards[rewardIdx] = { 
+                                              ...reward, 
+                                              value: reward.type === 'attribute' ? Number(e.target.value) : e.target.value 
+                                            };
+                                            updateObjective(index, { rewards: updatedRewards });
+                                          }}
+                                          className="bg-background h-6 text-xs"
+                                        />
+                                      </div>
+                                      <div className="flex items-end gap-1">
+                                        {reward.type === 'attribute' && (
+                                          <Select 
+                                            value={reward.action || 'add'} 
+                                            onValueChange={(v) => {
+                                              const updatedRewards = [...(obj.rewards || [])];
+                                              updatedRewards[rewardIdx] = { ...reward, action: v as any };
+                                              updateObjective(index, { rewards: updatedRewards });
+                                            }}
+                                          >
+                                            <SelectTrigger className="bg-background h-6 text-xs w-16">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="add">+</SelectItem>
+                                              <SelectItem value="subtract">-</SelectItem>
+                                              <SelectItem value="set">=</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10"
+                                          onClick={() => {
+                                            const updatedRewards = (obj.rewards || []).filter((_, i) => i !== rewardIdx);
+                                            updateObjective(index, { rewards: updatedRewards });
+                                          }}
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {(obj.rewards || []).length === 0 && (
+                                <p className="text-[10px] text-muted-foreground italic">
+                                  Sin recompensas. Se ejecutarán al completar este objetivo.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
+                            onClick={() => removeObjective(index)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Completion Section */}
+          {activeSection === 'completion' && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    La key de completado detecta cuándo la misión termina exitosamente. Se ejecutan las recompensas automáticamente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="completion-key" className="text-xs text-muted-foreground">Key Principal de Completado</Label>
+                <Input
+                  id="completion-key"
+                  value={completionKey}
+                  onChange={(e) => setCompletionKey(e.target.value)}
+                  placeholder="mision:completada"
+                  className="bg-background font-mono"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="completion-keys" className="text-xs text-muted-foreground">Keys Alternativas (separadas por coma)</Label>
+                <Input
+                  id="completion-keys"
+                  value={completionKeys.join(', ')}
+                  onChange={(e) => setCompletionKeys(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="mission:complete, quest:done"
+                  className="bg-background font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={completionCaseSensitive}
+                  onCheckedChange={setCompletionCaseSensitive}
+                />
+                <span className="text-sm">Distinguir mayúsculas/minúsculas</span>
+              </div>
+
+              {/* Value Condition for Completion */}
+              <div className="space-y-3 p-4 rounded-lg border border-border/50 bg-muted/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Condición de Valor</Label>
+                    <p className="text-xs text-muted-foreground">Detectar y comparar valores después de la key</p>
+                  </div>
+                  <Switch
+                    checked={!!completionValueCondition}
+                    onCheckedChange={(v) => setCompletionValueCondition(v ? { valueType: 'presence' } : undefined)}
+                  />
+                </div>
+                
+                {completionValueCondition && (
+                  <div className="grid grid-cols-3 gap-3 mt-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Tipo de Valor</Label>
+                      <Select 
+                        value={completionValueCondition.valueType} 
+                        onValueChange={(v) => setCompletionValueCondition({ 
+                          ...completionValueCondition, 
+                          valueType: v as QuestValueType 
+                        })}
+                      >
+                        <SelectTrigger className="bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="presence">Presencia</SelectItem>
+                          <SelectItem value="number">Número</SelectItem>
+                          <SelectItem value="text">Texto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {completionValueCondition.valueType !== 'presence' && (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Operador</Label>
+                          <Select 
+                            value={completionValueCondition.operator || (completionValueCondition.valueType === 'number' ? '==' : 'equals')} 
+                            onValueChange={(v) => setCompletionValueCondition({ 
+                              ...completionValueCondition, 
+                              operator: v as any 
+                            })}
+                          >
+                            <SelectTrigger className="bg-background">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {completionValueCondition.valueType === 'number' ? (
+                                <>
+                                  <SelectItem value=">">&gt; Mayor que</SelectItem>
+                                  <SelectItem value="<">&lt; Menor que</SelectItem>
+                                  <SelectItem value=">=">≥ Mayor o igual</SelectItem>
+                                  <SelectItem value="<=">≤ Menor o igual</SelectItem>
+                                  <SelectItem value="==">= Igual</SelectItem>
+                                  <SelectItem value="!=">≠ Diferente</SelectItem>
+                                </>
+                              ) : (
+                                <>
+                                  <SelectItem value="equals">Igual a</SelectItem>
+                                  <SelectItem value="contains">Contiene</SelectItem>
+                                  <SelectItem value="startsWith">Empieza con</SelectItem>
+                                  <SelectItem value="endsWith">Termina con</SelectItem>
+                                  <SelectItem value="notEquals">Diferente de</SelectItem>
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Valor Objetivo</Label>
+                          <Input
+                            value={String(completionValueCondition.targetValue || '')}
+                            onChange={(e) => setCompletionValueCondition({ 
+                              ...completionValueCondition, 
+                              targetValue: completionValueCondition.valueType === 'number' 
+                                ? Number(e.target.value) 
+                                : e.target.value 
+                            })}
+                            placeholder={completionValueCondition.valueType === 'number' ? '50' : 'texto'}
+                            className="bg-background"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {completionValueCondition.valueType === 'presence' && (
+                      <div className="col-span-2 flex items-center text-sm text-muted-foreground">
+                        <Info className="w-4 h-4 mr-2" />
+                        Detecta si la key existe en el texto (comportamiento por defecto)
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Configuración de Cadena</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Tipo de Cadena</Label>
+                    <Select value={chainType} onValueChange={(v) => setChainType(v as 'none' | 'specific' | 'random')}>
+                      <SelectTrigger className="bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin cadena</SelectItem>
+                        <SelectItem value="specific">Siguiente específico</SelectItem>
+                        <SelectItem value="random">Pool aleatorio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {chainType === 'specific' && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">ID de la Siguiente Misión</Label>
+                      <Input
+                        value={chainNextQuestId}
+                        onChange={(e) => setChainNextQuestId(e.target.value)}
+                        placeholder="siguiente-mision"
+                        className="bg-background font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {chainType === 'random' && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Pool de Misiones (IDs separados por coma)</Label>
+                    <Input
+                      value={chainRandomPool.join(', ')}
+                      onChange={(e) => setChainRandomPool(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      placeholder="mision-1, mision-2, mision-3"
+                      className="bg-background font-mono"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={chainAutoStart}
+                    onCheckedChange={setChainAutoStart}
+                  />
+                  <span className="text-sm">Iniciar automáticamente la siguiente misión</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rewards Section */}
+          {activeSection === 'rewards' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Recompensas al Completar</h3>
+                <Button variant="outline" size="sm" onClick={addReward}>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Agregar Recompensa
+                </Button>
+              </div>
+
+              {rewards.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/20">
+                  <Gift className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground text-sm">No hay recompensas definidas</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {rewards.map((reward, index) => (
+                    <Card key={reward.id} className="border-border/60">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 space-y-3">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">ID</Label>
+                                <Input
+                                  value={reward.id}
+                                  onChange={(e) => updateReward(index, { id: e.target.value })}
+                                  className="bg-background font-mono text-xs h-8"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                                <Select value={reward.type} onValueChange={(v) => updateReward(index, { type: v as QuestRewardType })}>
+                                  <SelectTrigger className="bg-background h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="attribute">Atributo</SelectItem>
+                                    <SelectItem value="sprite">Sprite</SelectItem>
+                                    <SelectItem value="sound">Sonido</SelectItem>
+                                    <SelectItem value="background">Fondo</SelectItem>
+                                    <SelectItem value="item">Item</SelectItem>
+                                    <SelectItem value="custom">Custom</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Key</Label>
+                                <Input
+                                  value={reward.key}
+                                  onChange={(e) => updateReward(index, { key: e.target.value })}
+                                  placeholder="HP, exp, oro..."
+                                  className="bg-background font-mono text-xs h-8"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Valor</Label>
+                                <Input
+                                  value={String(reward.value)}
+                                  onChange={(e) => updateReward(index, { 
+                                    value: isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value) 
+                                  })}
+                                  className="bg-background h-8"
+                                />
+                              </div>
+                              {reward.type === 'attribute' && (
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">Acción</Label>
+                                  <Select 
+                                    value={reward.action || 'set'} 
+                                    onValueChange={(v) => updateReward(index, { action: v as 'set' | 'add' | 'subtract' | 'multiply' | 'divide' | 'percent' })}
+                                  >
+                                    <SelectTrigger className="bg-background h-8">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="set">= Establecer</SelectItem>
+                                      <SelectItem value="add">+ Sumar</SelectItem>
+                                      <SelectItem value="subtract">- Restar</SelectItem>
+                                      <SelectItem value="multiply">× Multiplicar</SelectItem>
+                                      <SelectItem value="divide">÷ Dividir</SelectItem>
+                                      <SelectItem value="percent">% Porcentaje</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                              {reward.type === 'sprite' && (
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">Volver a Idle (ms)</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={reward.returnToIdleMs || 0}
+                                    onChange={(e) => updateReward(index, { returnToIdleMs: Number(e.target.value) })}
+                                    placeholder="0 = no volver"
+                                    className="bg-background h-8"
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Help text for sprite rewards */}
+                            {reward.type === 'sprite' && (
+                              <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                                <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                                <div>
+                                  <p><strong>Key:</strong> Keyword del trigger (ej: "feliz", "victory")</p>
+                                  <p><strong>Valor:</strong> URL del sprite o vacío para usar el del trigger</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
+                            onClick={() => removeReward(index)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="pt-4 border-t border-border/50">
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSave}
+            className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+          >
+            <Check className="w-4 h-4 mr-2" />
+            Guardar Template
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
