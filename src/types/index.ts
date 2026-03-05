@@ -1273,10 +1273,26 @@ export interface QuestObjectiveTemplate {
 }
 
 // ============================================
-// QUEST REWARD - Sistema Unificado de Triggers
+// QUEST REWARD - Sistema Simplificado (2 tipos)
 // ============================================
+//
+// El sistema de recompensas ahora usa solo 2 tipos:
+// - attribute: Modifica atributos del personaje en sessionStats
+// - trigger: Activa triggers existentes (sprite, sound, background)
+//
+// Los triggers se ejecutan a través del UnifiedTriggerExecutor,
+// que simula que el TokenDetector encontró la key.
 
-export type QuestRewardType = 'attribute' | 'sprite' | 'sound' | 'background' | 'item' | 'custom';
+export type QuestRewardType = 'attribute' | 'trigger';
+
+// Target mode para grupos
+export type TriggerTargetMode = 'self' | 'all' | 'target';
+
+// Categorías de triggers disponibles
+export type TriggerCategory = 'sprite' | 'sound' | 'background';
+
+// Acciones para atributos
+export type AttributeAction = 'set' | 'add' | 'subtract' | 'multiply' | 'divide' | 'percent';
 
 export interface QuestRewardCondition {
   type: 'attribute';
@@ -1285,34 +1301,55 @@ export interface QuestRewardCondition {
   value: number | string;
 }
 
-export interface QuestReward {
-  id: string;
-  
-  // Tipo de trigger
-  type: QuestRewardType;
-  
-  // Key del trigger (depende del tipo)
-  // - attribute: key del atributo a modificar (ej: "resistencia", "HP", "oro")
-  // - sprite: keyword del trigger (ej: "feliz", "victory") - busca en spritePacks del personaje
-  // - sound: nombre de la colección de sonidos
-  // - background: URL o label del fondo
-  key: string;
-  
-  // Valor/acción
-  // - attribute: valor numérico o string a aplicar
-  // - sprite: URL del sprite (opcional, si no se especifica usa el del trigger)
-  // - sound: nombre del archivo de sonido
-  // - background: URL del fondo
-  value: string | number;
-  
-  // Para attributes: tipo de operación
-  action?: 'set' | 'add' | 'subtract' | 'multiply' | 'divide' | 'percent';
+// Configuración de atributo para recompensa
+export interface QuestRewardAttribute {
+  key: string;                // "resistencia", "HP", "oro", "experiencia"
+  value: number | string;     // Valor a aplicar
+  action: AttributeAction;    // Tipo de operación
+}
+
+// Configuración de trigger para recompensa
+export interface QuestRewardTrigger {
+  category: TriggerCategory;  // 'sprite' | 'sound' | 'background'
+  key: string;                // Keyword del trigger: "feliz", "victory", "forest"
+  targetMode: TriggerTargetMode; // 'self' | 'all' | 'target' - quién recibe el trigger
   
   // Para sprites: tiempo antes de volver a idle (ms, 0 = no volver)
   returnToIdleMs?: number;
   
+  // Para sonidos: volumen (0-1)
+  volume?: number;
+  
+  // Para backgrounds: transición
+  transitionDuration?: number;
+}
+
+export interface QuestReward {
+  id: string;
+  
+  // Tipo de recompensa: attribute o trigger
+  type: QuestRewardType;
+  
+  // Para type: 'attribute' - modificación de atributos
+  attribute?: QuestRewardAttribute;
+  
+  // Para type: 'trigger' - activación de triggers
+  trigger?: QuestRewardTrigger;
+  
   // Condiciones opcionales para ejecutar el reward
   condition?: QuestRewardCondition;
+  
+  // ===== LEGACY: Compatibilidad con formato anterior =====
+  // Estos campos se mantienen para migración gradual
+  // Serán eliminados en futuras versiones
+  /** @deprecated Usar attribute.key */
+  key?: string;
+  /** @deprecated Usar attribute.value */
+  value?: string | number;
+  /** @deprecated Usar attribute.action */
+  action?: AttributeAction;
+  /** @deprecated Usar trigger.returnToIdleMs */
+  returnToIdleMs?: number;
 }
 
 // ============================================

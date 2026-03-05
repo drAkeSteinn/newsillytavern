@@ -6,52 +6,33 @@
     "name": "Chat with Dra. Moon",
     "messages": [
       {
-        "id": "4a7d6860-2a99-449d-b7d6-acf2c452c9df",
+        "id": "e20e137c-3942-4823-ae1d-e8d28127e9bd",
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "assistant",
-        "content": "La Dra. Sarah Moon se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58.\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" Sprite:win",
-        "timestamp": "2026-03-04T12:35:24.743Z",
+        "content": "La Dra. Sarah Moon se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58.\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\"",
+        "timestamp": "2026-03-05T08:54:30.389Z",
         "isDeleted": false,
-        "swipeId": "9a779815-a056-4385-86d0-ec4a9e53e160",
+        "swipeId": "094992a0-58e1-4517-953d-b3c9d3422176",
         "swipeIndex": 0,
         "swipes": [
-          "La Dra. Sarah Moon se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58.\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" Sprite:win"
+          "La Dra. Sarah Moon se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58.\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\""
         ]
       }
     ],
     "createdAt": "2026-03-04T11:26:36.328Z",
-    "updatedAt": "2026-03-04T12:36:11.919Z",
+    "updatedAt": "2026-03-05T08:54:30.389Z",
     "sessionStats": {
       "characterStats": {
         "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
           "attributeValues": {
-            "resistencia": 60,
+            "resistencia": 0,
             "estamina": 0
           },
           "lastUpdated": {
-            "resistencia": 1772627759863,
-            "estamina": 1772627724742
+            "resistencia": 1772700870389,
+            "estamina": 1772700870389
           },
-          "changeLog": [
-            {
-              "attributeId": "attr-1772406748598",
-              "attributeKey": "resistencia",
-              "attributeName": "Resistencia",
-              "oldValue": 0,
-              "newValue": 10,
-              "reason": "trigger",
-              "timestamp": 1772627759827
-            },
-            {
-              "attributeId": "attr-1772406748598",
-              "attributeKey": "resistencia",
-              "attributeName": "Resistencia",
-              "oldValue": 10,
-              "newValue": 60,
-              "reason": "trigger",
-              "timestamp": 1772627759863
-            }
-          ]
+          "changeLog": []
         },
         "611876f7-399e-49a3-a32f-aa847e8f28da": {
           "attributeValues": {
@@ -59,36 +40,32 @@
             "resistencia": 10
           },
           "lastUpdated": {
-            "holi": 1772627724742,
-            "resistencia": 1772627724742
+            "holi": 1772700870389,
+            "resistencia": 1772700870389
           },
           "changeLog": []
         }
       },
       "initialized": true,
-      "lastModified": 1772627759863
+      "lastModified": 1772700870389
     },
     "sessionQuests": [
       {
         "templateId": "asd",
-        "status": "completed",
+        "status": "available",
         "objectives": [
           {
             "templateId": "obj-mmafuc58",
-            "currentCount": 1,
-            "isCompleted": true
+            "currentCount": 0,
+            "isCompleted": false
           },
           {
             "templateId": "obj-mmbwe737",
-            "currentCount": 1,
-            "isCompleted": true
+            "currentCount": 0,
+            "isCompleted": false
           }
         ],
-        "progress": 100,
-        "activatedAt": "2026-03-04T12:35:35.838Z",
-        "completedAt": "2026-03-04T12:35:59.795Z",
-        "activatedAtTurn": 0,
-        "completedBy": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a"
+        "progress": 0
       }
     ],
     "turnCount": 0

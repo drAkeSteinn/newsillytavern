@@ -1,9 +1,9 @@
 [
   {
-    "id": "default",
-    "name": "Z.ai Chat",
+    "name": "33",
     "provider": "z-ai",
     "endpoint": "",
+    "apiKey": "",
     "model": "",
     "parameters": {
       "temperature": 0.7,
@@ -17,6 +17,7 @@
       "stopStrings": [],
       "stream": true
     },
-    "isActive": true
+    "isActive": true,
+    "id": "960e8af8-9196-4108-8eb7-221fb69010a8"
   }
 ]

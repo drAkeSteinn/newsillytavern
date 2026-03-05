@@ -99,6 +99,11 @@ export type {
   QuestReward,
   QuestRewardType,
   QuestRewardCondition,
+  QuestRewardAttribute,
+  QuestRewardTrigger,
+  TriggerTargetMode,
+  TriggerCategory,
+  AttributeAction,
   QuestStatus,
   QuestPriority,
   QuestObjectiveType,
@@ -110,3 +115,29 @@ export type {
   QuestNotification,
   DEFAULT_QUEST_SETTINGS,
 } from '@/types';
+
+// Re-export reward utilities
+export {
+  // Factory functions
+  createAttributeReward,
+  createTriggerReward,
+  
+  // Migration functions
+  migrateRewardToNewFormat,
+  migrateRewardsToNewFormat,
+  
+  // Validation functions
+  validateReward,
+  validateRewards,
+  
+  // Utility functions
+  getActionSymbol,
+  getCategoryIcon,
+  getTargetModeLabel,
+  describeReward,
+  describeRewards,
+  
+  // Normalization functions
+  normalizeReward,
+  normalizeRewards,
+} from './quest-reward-utils';
