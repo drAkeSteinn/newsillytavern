@@ -1,18 +1,15 @@
 // ============================================
-// Quest Reward Executor - Silent Reward Execution
+// Quest Reward Executor - Unified Reward Execution
 // ============================================
 //
-// This module handles the execution of quest rewards.
-// Rewards are executed SILENTLY - they update session state
-// without showing messages in the chat.
+// Este módulo ejecuta recompensas de quests usando el sistema unificado:
+// - attribute: Modifica stats del personaje (HP, MP, gold, etc.)
+// - trigger: Activa triggers existentes (sprite, sound, background)
 //
-// Reward Types:
-// - attribute: Update character stats (HP, MP, gold, etc.)
-// - sprite: Trigger sprite change
-// - sound: Play a sound effect
-// - background: Change the background
+// Las recompensas se ejecutan SILENTLY - actualizan estado sin mensajes en chat.
 //
-// Each reward can have an optional condition that must be met.
+// Para triggers, delega a unified-trigger-executor.ts que reutiliza
+// toda la infraestructura de TokenDetector/TriggerBus.
 
 import type {
   QuestReward,
@@ -20,7 +17,20 @@ import type {
   QuestTemplate,
   SessionStats,
   CharacterCard,
+  AttributeAction,
 } from '@/types';
+import {
+  normalizeReward,
+  validateReward,
+} from './quest-reward-utils';
+import {
+  executeTriggerReward,
+  type TriggerExecutionContext,
+  type TriggerExecutionResult,
+  type TriggerStoreActions,
+  type TriggerCategory,
+  type TriggerTargetMode,
+} from '@/lib/triggers/unified-trigger-executor';
 
 // ============================================
 // Types
@@ -31,17 +41,20 @@ export interface RewardExecutionContext {
   characterId: string;
   character?: CharacterCard | null;
   sessionStats?: SessionStats;
+  allCharacters?: CharacterCard[];  // Para group chats
   timestamp: number;
 }
 
 export interface RewardExecutionResult {
   rewardId: string;
-  type: QuestReward['type'];
-  key: string;
-  value: string | number;
+  type: 'attribute' | 'trigger';
   success: boolean;
+  key: string;
+  value?: string | number;
   message?: string;
   error?: string;
+  // Para triggers, información adicional
+  triggerResults?: TriggerExecutionResult[];
 }
 
 export interface RewardBatchResult {
@@ -49,9 +62,7 @@ export interface RewardBatchResult {
   successCount: number;
   failureCount: number;
   attributeUpdates: Map<string, number | string>; // key -> new value
-  spriteTrigger?: string;
-  soundTrigger?: string;
-  backgroundTrigger?: string;
+  triggerResults: TriggerExecutionResult[];
 }
 
 // ============================================
@@ -60,7 +71,7 @@ export interface RewardBatchResult {
 
 /**
  * Interface for store actions needed to execute rewards
- * This allows decoupling from the actual store implementation
+ * Combines attribute actions and trigger actions
  */
 export interface RewardStoreActions {
   // Attribute updates
@@ -72,17 +83,25 @@ export interface RewardStoreActions {
     reason?: 'llm_detection' | 'manual' | 'trigger' | 'initialization'
   ) => void;
   
-  // Sprite triggers
-  applyTriggerForCharacter?: (
+  // Trigger actions (delegated to unified-trigger-executor)
+  applyTriggerForCharacter: (
     characterId: string,
     spriteUrl: string,
     returnToIdleMs?: number
   ) => void;
+  scheduleReturnToIdleForCharacter: (
+    characterId: string,
+    triggerSpriteUrl: string,
+    idleSpriteUrl: string,
+    idleLabel: string | null,
+    returnToIdleMs: number
+  ) => void;
+  isSpriteLocked?: () => boolean;
   
-  // Sound triggers
+  // Sound
   playSound?: (collection: string, filename: string, volume?: number) => void;
   
-  // Background triggers
+  // Background
   setBackground?: (url: string) => void;
   setActiveOverlays?: (overlays: Array<{ url: string; position: string; opacity: number }>) => void;
 }
@@ -153,7 +172,7 @@ export function evaluateRewardCondition(
 export function calculateNewAttributeValue(
   currentValue: number | string | undefined,
   rewardValue: number | string,
-  action: QuestReward['action'] = 'set'
+  action: AttributeAction = 'set'
 ): number | string {
   if (action === 'set') {
     return rewardValue;
@@ -185,6 +204,7 @@ export function calculateNewAttributeValue(
 
 /**
  * Execute an attribute reward
+ * Supports both new format (reward.attribute) and legacy format (reward.key/value/action)
  */
 export function executeAttributeReward(
   reward: QuestReward,
@@ -194,17 +214,31 @@ export function executeAttributeReward(
   const { sessionId, characterId, sessionStats } = context;
   
   try {
+    // Normalize to get attribute config (handles both new and legacy format)
+    const normalized = normalizeReward(reward);
+    const attr = normalized.attribute;
+    
+    if (!attr) {
+      return {
+        rewardId: reward.id,
+        type: 'attribute',
+        key: reward.key || 'unknown',
+        success: false,
+        error: 'Invalid attribute reward structure',
+      };
+    }
+    
     // Get current value
-    const currentValue = sessionStats?.characterStats?.[characterId]?.attributeValues?.[reward.key];
+    const currentValue = sessionStats?.characterStats?.[characterId]?.attributeValues?.[attr.key];
     
     // Calculate new value
-    const newValue = calculateNewAttributeValue(currentValue, reward.value, reward.action);
+    const newValue = calculateNewAttributeValue(currentValue, attr.value, attr.action);
     
     // Execute update with 'trigger' reason since this is from a quest reward
     storeActions.updateCharacterStat(
       sessionId,
       characterId,
-      reward.key,
+      attr.key,
       newValue,
       'trigger'
     );
@@ -212,17 +246,16 @@ export function executeAttributeReward(
     return {
       rewardId: reward.id,
       type: 'attribute',
-      key: reward.key,
+      key: attr.key,
       value: newValue,
       success: true,
-      message: `${reward.key}: ${currentValue ?? 0} → ${newValue}`,
+      message: `${attr.key}: ${currentValue ?? 0} → ${newValue}`,
     };
   } catch (error) {
     return {
       rewardId: reward.id,
       type: 'attribute',
-      key: reward.key,
-      value: reward.value,
+      key: reward.key || 'unknown',
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
@@ -230,299 +263,114 @@ export function executeAttributeReward(
 }
 
 // ============================================
-// Sprite Reward Execution
+// Trigger Reward Execution
 // ============================================
 
 /**
- * Execute a sprite reward
+ * Execute a trigger reward by delegating to unified-trigger-executor
  * 
- * For sprites, the reward.key is the trigger keyword (e.g., "feliz", "victory")
- * The reward.value is the sprite URL (optional - if not provided, searches in character's spritePacks)
- * 
- * This function:
- * 1. If value is a URL, uses it directly
- * 2. If value is empty, searches for a matching sprite in character's spritePacks
+ * This creates a synthetic token detection and executes the trigger
+ * using the existing infrastructure (SpriteHandler, SoundHandler, BackgroundHandler)
  */
-export function executeSpriteReward(
+export function executeTriggerRewardFromQuest(
   reward: QuestReward,
   context: RewardExecutionContext,
   storeActions: RewardStoreActions
 ): RewardExecutionResult {
-  const { characterId, character } = context;
+  const { characterId, character, allCharacters, sessionId } = context;
   
   try {
-    if (!storeActions.applyTriggerForCharacter) {
+    // Normalize to get trigger config
+    const normalized = normalizeReward(reward);
+    const trig = normalized.trigger;
+    
+    if (!trig) {
       return {
         rewardId: reward.id,
-        type: 'sprite',
-        key: reward.key,
-        value: reward.value,
+        type: 'trigger',
+        key: reward.key || 'unknown',
         success: false,
-        error: 'Sprite actions not available',
+        error: 'Invalid trigger reward structure',
       };
     }
     
-    let spriteUrl: string | undefined;
-    
-    // Check if value is a URL
-    const valueStr = String(reward.value || '');
-    const isUrl = valueStr.startsWith('http') || valueStr.startsWith('/') || valueStr.startsWith('data:');
-    
-    if (isUrl) {
-      // Use the URL directly
-      spriteUrl = valueStr;
-    } else if (valueStr) {
-      // Value is a label/reference, try to find in character's sprites
-      // First check spritePacks
-      if (character?.spritePacks) {
-        for (const pack of character.spritePacks) {
-          if (!pack.active) continue;
-          
-          // Check if the key matches any pack keyword
-          const keywords = pack.keywords || [];
-          if (keywords.includes(reward.key) || keywords.includes(valueStr)) {
-            // Found matching pack, get a sprite from items
-            if (pack.items && pack.items.length > 0) {
-              // Pick a random or first item
-              const item = pack.playMode === 'random' 
-                ? pack.items[Math.floor(Math.random() * pack.items.length)]
-                : pack.items[pack.currentIndex || 0];
-              
-              if (item?.spriteUrl) {
-                spriteUrl = item.spriteUrl;
-                break;
-              }
-            }
-          }
-        }
-      }
-      
-      // Check spriteTriggers if not found in packs
-      if (!spriteUrl && character?.spriteTriggers) {
-        const matchingTrigger = character.spriteTriggers.find(
-          t => t.keywords.includes(reward.key) || t.keywords.includes(valueStr)
-        );
-        
-        if (matchingTrigger?.spriteUrl) {
-          spriteUrl = matchingTrigger.spriteUrl;
-        }
-      }
-    } else {
-      // No value provided, search by key in spritePacks
-      if (character?.spritePacks) {
-        for (const pack of character.spritePacks) {
-          if (!pack.active) continue;
-          
-          const keywords = pack.keywords || [];
-          if (keywords.includes(reward.key)) {
-            if (pack.items && pack.items.length > 0) {
-              const item = pack.items[pack.currentIndex || 0];
-              if (item?.spriteUrl) {
-                spriteUrl = item.spriteUrl;
-                break;
-              }
-            }
-          }
-        }
-      }
-      
-      // Check spriteTriggers
-      if (!spriteUrl && character?.spriteTriggers) {
-        const matchingTrigger = character.spriteTriggers.find(
-          t => t.keywords.includes(reward.key)
-        );
-        
-        if (matchingTrigger?.spriteUrl) {
-          spriteUrl = matchingTrigger.spriteUrl;
-        }
-      }
-    }
-    
-    // If still no sprite found, use a fallback or fail
-    if (!spriteUrl) {
-      console.log(`[QuestReward] No sprite found for key "${reward.key}" in character "${character?.name}"`);
+    if (!character) {
       return {
         rewardId: reward.id,
-        type: 'sprite',
-        key: reward.key,
-        value: reward.value,
+        type: 'trigger',
+        key: trig.key,
         success: false,
-        error: `No sprite found for trigger "${reward.key}"`,
+        error: 'Character not available for trigger execution',
       };
     }
     
-    // Execute sprite change with optional return to idle
-    const returnToIdleMs = reward.returnToIdleMs ?? 0;
-    storeActions.applyTriggerForCharacter(characterId, spriteUrl, returnToIdleMs);
+    // Build trigger context
+    const triggerContext: TriggerExecutionContext = {
+      sessionId,
+      characterId,
+      character,
+      allCharacters,
+      source: 'quest_completion',
+      timestamp: Date.now(),
+      storeActions: {
+        applyTriggerForCharacter: storeActions.applyTriggerForCharacter,
+        scheduleReturnToIdleForCharacter: storeActions.scheduleReturnToIdleForCharacter,
+        isSpriteLocked: storeActions.isSpriteLocked,
+        playSound: storeActions.playSound,
+        setBackground: storeActions.setBackground,
+        setActiveOverlays: storeActions.setActiveOverlays,
+      },
+    };
+    
+    // Execute trigger via unified executor
+    const results = executeTriggerReward(
+      trig.category as TriggerCategory,
+      trig.key,
+      triggerContext,
+      trig.targetMode as TriggerTargetMode,
+      {
+        returnToIdleMs: trig.returnToIdleMs,
+        volume: trig.volume,
+        transitionDuration: trig.transitionDuration,
+      }
+    );
+    
+    // Check if all trigger executions succeeded
+    const allSucceeded = results.every(r => r.success);
+    const anySucceeded = results.some(r => r.success);
+    
+    // Build summary message
+    const successMessages = results
+      .filter(r => r.success)
+      .map(r => r.message)
+      .filter(Boolean);
+    const errorMessages = results
+      .filter(r => !r.success)
+      .map(r => r.error)
+      .filter(Boolean);
     
     return {
       rewardId: reward.id,
-      type: 'sprite',
-      key: reward.key,
-      value: spriteUrl,
-      success: true,
-      message: `Sprite changed to: ${spriteUrl}${returnToIdleMs ? ` (returns in ${returnToIdleMs}ms)` : ''}`,
+      type: 'trigger',
+      key: trig.key,
+      success: allSucceeded,
+      message: allSucceeded 
+        ? successMessages.join('; ')
+        : anySucceeded 
+          ? `Partial success: ${successMessages.length}/${results.length}`
+          : undefined,
+      error: errorMessages.length > 0 ? errorMessages.join('; ') : undefined,
+      triggerResults: results,
     };
   } catch (error) {
     return {
       rewardId: reward.id,
-      type: 'sprite',
-      key: reward.key,
-      value: reward.value,
+      type: 'trigger',
+      key: reward.key || 'unknown',
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
-}
-
-// ============================================
-// Sound Reward Execution
-// ============================================
-
-/**
- * Execute a sound reward
- */
-export function executeSoundReward(
-  reward: QuestReward,
-  context: RewardExecutionContext,
-  storeActions: RewardStoreActions
-): RewardExecutionResult {
-  try {
-    if (!storeActions.playSound) {
-      return {
-        rewardId: reward.id,
-        type: 'sound',
-        key: reward.key,
-        value: reward.value,
-        success: false,
-        error: 'Sound actions not available',
-      };
-    }
-    
-    // The key for sound rewards is the collection name
-    // The value is the filename
-    const collection = reward.key;
-    const filename = String(reward.value);
-    
-    // Execute sound play
-    storeActions.playSound(collection, filename, 0.8);
-    
-    return {
-      rewardId: reward.id,
-      type: 'sound',
-      key: reward.key,
-      value: reward.value,
-      success: true,
-      message: `Sound played: ${collection}/${filename}`,
-    };
-  } catch (error) {
-    return {
-      rewardId: reward.id,
-      type: 'sound',
-      key: reward.key,
-      value: reward.value,
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-// ============================================
-// Background Reward Execution
-// ============================================
-
-/**
- * Execute a background reward
- */
-export function executeBackgroundReward(
-  reward: QuestReward,
-  context: RewardExecutionContext,
-  storeActions: RewardStoreActions
-): RewardExecutionResult {
-  try {
-    if (!storeActions.setBackground) {
-      return {
-        rewardId: reward.id,
-        type: 'background',
-        key: reward.key,
-        value: reward.value,
-        success: false,
-        error: 'Background actions not available',
-      };
-    }
-    
-    // The value for background rewards is the background URL
-    const backgroundUrl = String(reward.value);
-    
-    // Execute background change
-    storeActions.setBackground(backgroundUrl);
-    
-    return {
-      rewardId: reward.id,
-      type: 'background',
-      key: reward.key,
-      value: backgroundUrl,
-      success: true,
-      message: `Background changed to: ${backgroundUrl}`,
-    };
-  } catch (error) {
-    return {
-      rewardId: reward.id,
-      type: 'background',
-      key: reward.key,
-      value: reward.value,
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-// ============================================
-// Item Reward Execution (Future)
-// ============================================
-
-/**
- * Execute an item reward
- * This is a placeholder for future inventory integration
- */
-export function executeItemReward(
-  reward: QuestReward,
-  context: RewardExecutionContext,
-  storeActions: RewardStoreActions
-): RewardExecutionResult {
-  return {
-    rewardId: reward.id,
-    type: 'item',
-    key: reward.key,
-    value: reward.value,
-    success: false,
-    error: 'Item rewards not yet implemented',
-  };
-}
-
-// ============================================
-// Custom Reward Execution
-// ============================================
-
-/**
- * Execute a custom reward
- * This allows for extensibility via custom handlers
- */
-export function executeCustomReward(
-  reward: QuestReward,
-  context: RewardExecutionContext,
-  storeActions: RewardStoreActions
-): RewardExecutionResult {
-  // Custom rewards can be handled by external systems
-  // The key and value are passed through as-is
-  return {
-    rewardId: reward.id,
-    type: 'custom',
-    key: reward.key,
-    value: reward.value,
-    success: true,
-    message: `Custom reward: ${reward.key} = ${reward.value}`,
-  };
 }
 
 // ============================================
@@ -531,6 +379,9 @@ export function executeCustomReward(
 
 /**
  * Execute a single reward
+ * 
+ * Handles both new unified types (attribute, trigger) and legacy types
+ * (sprite, sound, background) which are normalized to trigger type.
  */
 export function executeReward(
   reward: QuestReward,
@@ -542,35 +393,42 @@ export function executeReward(
     return {
       rewardId: reward.id,
       type: reward.type,
-      key: reward.key,
-      value: reward.value,
+      key: reward.key || '',
       success: false,
       message: 'Condition not met',
     };
   }
   
-  // Execute based on type
-  switch (reward.type) {
+  // Normalize reward to handle legacy formats
+  const normalized = normalizeReward(reward);
+  
+  // Validate
+  const validation = validateReward(normalized);
+  if (!validation.valid) {
+    return {
+      rewardId: reward.id,
+      type: normalized.type,
+      key: normalized.key || '',
+      success: false,
+      error: `Invalid reward: ${validation.errors.join(', ')}`,
+    };
+  }
+  
+  // Execute based on unified type
+  switch (normalized.type) {
     case 'attribute':
-      return executeAttributeReward(reward, context, storeActions);
-    case 'sprite':
-      return executeSpriteReward(reward, context, storeActions);
-    case 'sound':
-      return executeSoundReward(reward, context, storeActions);
-    case 'background':
-      return executeBackgroundReward(reward, context, storeActions);
-    case 'item':
-      return executeItemReward(reward, context, storeActions);
-    case 'custom':
-      return executeCustomReward(reward, context, storeActions);
+      return executeAttributeReward(normalized, context, storeActions);
+      
+    case 'trigger':
+      return executeTriggerRewardFromQuest(normalized, context, storeActions);
+      
     default:
       return {
         rewardId: reward.id,
-        type: reward.type,
-        key: reward.key,
-        value: reward.value,
+        type: normalized.type,
+        key: normalized.key || '',
         success: false,
-        error: `Unknown reward type: ${reward.type}`,
+        error: `Unknown reward type: ${normalized.type}`,
       };
   }
 }
@@ -589,10 +447,7 @@ export function executeAllRewards(
 ): RewardBatchResult {
   const results: RewardExecutionResult[] = [];
   const attributeUpdates = new Map<string, number | string>();
-  
-  let spriteTrigger: string | undefined;
-  let soundTrigger: string | undefined;
-  let backgroundTrigger: string | undefined;
+  const triggerResults: TriggerExecutionResult[] = [];
   
   let successCount = 0;
   let failureCount = 0;
@@ -604,20 +459,14 @@ export function executeAllRewards(
     if (result.success) {
       successCount++;
       
-      // Track specific triggers for UI feedback
-      switch (reward.type) {
-        case 'attribute':
-          attributeUpdates.set(reward.key, result.value as number | string);
-          break;
-        case 'sprite':
-          spriteTrigger = String(reward.value);
-          break;
-        case 'sound':
-          soundTrigger = `${reward.key}:${reward.value}`;
-          break;
-        case 'background':
-          backgroundTrigger = String(reward.value);
-          break;
+      // Track attribute updates
+      if (result.type === 'attribute' && result.value !== undefined) {
+        attributeUpdates.set(result.key, result.value as number | string);
+      }
+      
+      // Collect trigger results
+      if (result.triggerResults) {
+        triggerResults.push(...result.triggerResults);
       }
     } else {
       failureCount++;
@@ -629,9 +478,7 @@ export function executeAllRewards(
     successCount,
     failureCount,
     attributeUpdates,
-    spriteTrigger,
-    soundTrigger,
-    backgroundTrigger,
+    triggerResults,
   };
 }
 
@@ -650,8 +497,11 @@ export function executeQuestCompletionRewards(
       successCount: 0,
       failureCount: 0,
       attributeUpdates: new Map(),
+      triggerResults: [],
     };
   }
+  
+  console.log(`[QuestReward] Executing ${template.rewards.length} quest completion rewards for character ${context.characterId}`);
   
   return executeAllRewards(template.rewards, context, storeActions);
 }
@@ -675,6 +525,7 @@ export function executeObjectiveRewards(
       successCount: 0,
       failureCount: 0,
       attributeUpdates: new Map(),
+      triggerResults: [],
     };
   }
   
@@ -691,33 +542,41 @@ export function executeObjectiveRewards(
  * Generate a human-readable description of a reward
  */
 export function describeReward(reward: QuestReward): string {
-  const actionStr = reward.action ? ` (${reward.action})` : '';
+  const normalized = normalizeReward(reward);
   
-  switch (reward.type) {
-    case 'attribute':
-      const actionDesc: Record<string, string> = {
-        'set': '=',
-        'add': '+',
-        'subtract': '-',
-        'multiply': '×',
-        'divide': '÷',
-        'percent': '%+',
-      };
-      const symbol = reward.action ? actionDesc[reward.action] || '=' : '=';
-      return `${reward.key} ${symbol} ${reward.value}`;
-    case 'sprite':
-      return `Sprite: ${reward.value}`;
-    case 'sound':
-      return `Sound: ${reward.key}/${reward.value}`;
-    case 'background':
-      return `Background: ${reward.value}`;
-    case 'item':
-      return `Item: ${reward.key} × ${reward.value}`;
-    case 'custom':
-      return `Custom: ${reward.key} = ${reward.value}`;
-    default:
-      return `${reward.type}: ${reward.key} = ${reward.value}`;
+  if (normalized.type === 'attribute' && normalized.attribute) {
+    const attr = normalized.attribute;
+    const actionSymbols: Record<AttributeAction, string> = {
+      'set': '=',
+      'add': '+',
+      'subtract': '-',
+      'multiply': '×',
+      'divide': '÷',
+      'percent': '%+',
+    };
+    const symbol = actionSymbols[attr.action as AttributeAction] || '=';
+    return `${attr.key} ${symbol} ${attr.value}`;
   }
+  
+  if (normalized.type === 'trigger' && normalized.trigger) {
+    const trig = normalized.trigger;
+    const categoryIcons: Record<string, string> = {
+      sprite: '🖼️',
+      sound: '🔊',
+      background: '🌄',
+    };
+    const icon = categoryIcons[trig.category] || '⚡';
+    const targetLabels: Record<string, string> = {
+      self: '',
+      all: ' (todos)',
+      target: ' (objetivo)',
+    };
+    const targetLabel = targetLabels[trig.targetMode] || '';
+    return `${icon} ${trig.key}${targetLabel}`;
+  }
+  
+  // Fallback for unknown format
+  return `${normalized.type}: ${normalized.key || '?'}`;
 }
 
 /**

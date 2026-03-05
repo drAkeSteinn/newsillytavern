@@ -40,9 +40,12 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Hash,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Quest, QuestObjective, QuestStatus, QuestPriority } from '@/types';
+import { describeReward, normalizeReward } from '@/lib/quest/quest-reward-utils';
 
 // ============================================
 // Quest Instance Editor Props
@@ -316,19 +319,31 @@ export function QuestInstanceEditor({
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {quest.rewards.map((reward, index) => (
-                      <Badge key={index} variant="secondary" className="gap-1">
-                        {reward.type === 'item' && '📦'}
-                        {reward.type === 'experience' && '⭐'}
-                        {reward.type === 'relationship' && '❤️'}
-                        {reward.type === 'unlock' && '🔓'}
-                        {reward.type === 'attribute' && '📊'}
-                        {reward.type === 'custom' && '🎁'}
-                        {reward.name || reward.key}
-                        {reward.value && reward.value > 1 && ` x${reward.value}`}
-                      </Badge>
-                    ))}
+                    {quest.rewards.map((reward, index) => {
+                      const normalized = normalizeReward(reward);
+                      const isAttribute = normalized.type === 'attribute';
+                      const isTrigger = normalized.type === 'trigger';
+                      
+                      return (
+                        <Badge 
+                          key={reward.id || index} 
+                          variant="secondary" 
+                          className={cn(
+                            "gap-1.5 py-1 px-2",
+                            isAttribute && "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                            isTrigger && "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                          )}
+                        >
+                          {isAttribute && <Hash className="w-3 h-3" />}
+                          {isTrigger && <Zap className="w-3 h-3" />}
+                          <span>{describeReward(normalized)}</span>
+                        </Badge>
+                      );
+                    })}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Las recompensas se aplicarán automáticamente al completar la misión.
+                  </p>
                 </CardContent>
               </Card>
             )}

@@ -479,6 +479,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       sessionId,
                       characterId: character?.id || '',
                       character,
+                      allCharacters: characters, // Para targetMode en group chats
                       sessionStats: activeSession?.sessionStats,
                       timestamp: Date.now(),
                     };
@@ -486,6 +487,8 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                     const rewardActions: RewardStoreActions = {
                       updateCharacterStat: store.updateCharacterStat.bind(store),
                       applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+                      isSpriteLocked: store.isSpriteLocked?.bind(store),
                       playSound: store.playSound?.bind(store),
                       setBackground: store.setBackground?.bind(store),
                       setActiveOverlays: store.setActiveOverlays?.bind(store),
@@ -535,6 +538,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       sessionId,
                       characterId: character?.id || '',
                       character,
+                      allCharacters: characters, // Para targetMode en group chats
                       sessionStats: updatedSession?.sessionStats,
                       timestamp: Date.now(),
                     };
@@ -542,6 +546,8 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                     const questRewardActions: RewardStoreActions = {
                       updateCharacterStat: store.updateCharacterStat.bind(store),
                       applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+                      isSpriteLocked: store.isSpriteLocked?.bind(store),
                       playSound: store.playSound?.bind(store),
                       setBackground: store.setBackground?.bind(store),
                       setActiveOverlays: store.setActiveOverlays?.bind(store),
@@ -587,6 +593,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       sessionId,
                       characterId: character?.id || '',
                       character,
+                      allCharacters: characters, // Para targetMode en group chats
                       sessionStats: activeSession?.sessionStats,
                       timestamp: Date.now(),
                     };
@@ -594,6 +601,8 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                     const rewardActions: RewardStoreActions = {
                       updateCharacterStat: store.updateCharacterStat.bind(store),
                       applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+                      isSpriteLocked: store.isSpriteLocked?.bind(store),
                       playSound: store.playSound?.bind(store),
                       setBackground: store.setBackground?.bind(store),
                       setActiveOverlays: store.setActiveOverlays?.bind(store),

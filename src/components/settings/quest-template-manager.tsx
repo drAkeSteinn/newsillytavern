@@ -21,8 +21,18 @@ import type {
   QuestValueType,
   QuestNumberOperator,
   QuestTextOperator,
+  AttributeAction,
+  TriggerCategory,
+  TriggerTargetMode,
 } from '@/types';
 import { cn, generateId } from '@/lib/utils';
+import {
+  createAttributeReward,
+  createTriggerReward,
+  describeReward,
+  getActionSymbol,
+  normalizeReward,
+} from '@/lib/quest/quest-reward-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,6 +82,12 @@ import {
   Eye,
   EyeOff,
   Timer,
+  Image as ImageIcon,
+  Volume2,
+  Wallpaper,
+  Users,
+  User,
+  Crosshair,
 } from 'lucide-react';
 
 // ============================================
@@ -515,18 +531,58 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
 
   // Reward management
   const addReward = () => {
-    const newReward: QuestReward = {
-      id: `reward-${Date.now().toString(36)}`,
-      type: 'attribute',
-      key: '',
-      value: 0,
-      action: 'add',
-    };
+    const newReward = createAttributeReward('', 0, 'add');
     setRewards([...rewards, newReward]);
   };
 
   const updateReward = (index: number, updates: Partial<QuestReward>) => {
-    setRewards(rewards.map((reward, i) => i === index ? { ...reward, ...updates } : reward));
+    setRewards(rewards.map((reward, i) => {
+      if (i !== index) return reward;
+      
+      // Si se cambia el tipo, necesitamos crear la estructura correcta
+      if (updates.type && updates.type !== reward.type) {
+        if (updates.type === 'attribute') {
+          return createAttributeReward(
+            reward.attribute?.key || reward.key || '',
+            reward.attribute?.value ?? reward.value ?? 0,
+            reward.attribute?.action || reward.action || 'add'
+          );
+        }
+        if (updates.type === 'trigger') {
+          return createTriggerReward(
+            'sprite',
+            reward.trigger?.key || reward.key || '',
+            reward.trigger?.targetMode || 'self'
+          );
+        }
+      }
+      
+      // Normal update
+      const updated = { ...reward, ...updates };
+      
+      // Si es tipo attribute, actualizar el objeto attribute
+      if (updated.type === 'attribute') {
+        updated.attribute = {
+          key: updates.attribute?.key ?? reward.attribute?.key ?? reward.key ?? '',
+          value: updates.attribute?.value ?? reward.attribute?.value ?? reward.value ?? 0,
+          action: updates.attribute?.action ?? reward.attribute?.action ?? reward.action ?? 'add',
+        };
+      }
+      
+      // Si es tipo trigger, actualizar el objeto trigger
+      if (updated.type === 'trigger') {
+        updated.trigger = {
+          category: updates.trigger?.category ?? reward.trigger?.category ?? 'sprite',
+          key: updates.trigger?.key ?? reward.trigger?.key ?? reward.key ?? '',
+          targetMode: updates.trigger?.targetMode ?? reward.trigger?.targetMode ?? 'self',
+          returnToIdleMs: updates.trigger?.returnToIdleMs ?? reward.trigger?.returnToIdleMs,
+          volume: updates.trigger?.volume ?? reward.trigger?.volume,
+          transitionDuration: updates.trigger?.transitionDuration ?? reward.trigger?.transitionDuration,
+        };
+      }
+      
+      return updated;
+    }));
   };
 
   const removeReward = (index: number) => {
@@ -1033,13 +1089,7 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                                   size="sm"
                                   className="h-6 text-xs"
                                   onClick={() => {
-                                    const newReward: QuestReward = {
-                                      id: `obj-reward-${Date.now().toString(36)}`,
-                                      type: 'attribute',
-                                      key: '',
-                                      value: 0,
-                                      action: 'add',
-                                    };
+                                    const newReward = createAttributeReward('', 0, 'add', { id: `obj-reward-${Date.now().toString(36)}` });
                                     updateObjective(index, { 
                                       rewards: [...(obj.rewards || []), newReward] 
                                     });
@@ -1052,93 +1102,179 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                               
                               {(obj.rewards || []).length > 0 && (
                                 <div className="space-y-2">
-                                  {(obj.rewards || []).map((reward, rewardIdx) => (
-                                    <div key={reward.id} className="grid grid-cols-4 gap-2 p-2 rounded bg-muted/20">
-                                      <div className="space-y-0.5">
-                                        <Label className="text-[9px] text-muted-foreground">Tipo</Label>
-                                        <Select 
-                                          value={reward.type} 
-                                          onValueChange={(v) => {
-                                            const updatedRewards = [...(obj.rewards || [])];
-                                            updatedRewards[rewardIdx] = { ...reward, type: v as QuestRewardType };
-                                            updateObjective(index, { rewards: updatedRewards });
-                                          }}
-                                        >
-                                          <SelectTrigger className="bg-background h-6 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="attribute">Atributo</SelectItem>
-                                            <SelectItem value="sprite">Sprite</SelectItem>
-                                            <SelectItem value="sound">Sonido</SelectItem>
-                                            <SelectItem value="background">Fondo</SelectItem>
-                                            <SelectItem value="item">Item</SelectItem>
-                                            <SelectItem value="custom">Custom</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                      <div className="space-y-0.5">
-                                        <Label className="text-[9px] text-muted-foreground">Key</Label>
-                                        <Input
-                                          value={reward.key}
-                                          onChange={(e) => {
-                                            const updatedRewards = [...(obj.rewards || [])];
-                                            updatedRewards[rewardIdx] = { ...reward, key: e.target.value };
-                                            updateObjective(index, { rewards: updatedRewards });
-                                          }}
-                                          placeholder="HP, oro..."
-                                          className="bg-background h-6 text-xs"
-                                        />
-                                      </div>
-                                      <div className="space-y-0.5">
-                                        <Label className="text-[9px] text-muted-foreground">Valor</Label>
-                                        <Input
-                                          value={String(reward.value)}
-                                          onChange={(e) => {
-                                            const updatedRewards = [...(obj.rewards || [])];
-                                            updatedRewards[rewardIdx] = { 
-                                              ...reward, 
-                                              value: reward.type === 'attribute' ? Number(e.target.value) : e.target.value 
-                                            };
-                                            updateObjective(index, { rewards: updatedRewards });
-                                          }}
-                                          className="bg-background h-6 text-xs"
-                                        />
-                                      </div>
-                                      <div className="flex items-end gap-1">
-                                        {reward.type === 'attribute' && (
+                                  {(obj.rewards || []).map((reward, rewardIdx) => {
+                                    const normalized = normalizeReward(reward);
+                                    const isAttr = normalized.type === 'attribute';
+                                    const isTrig = normalized.type === 'trigger';
+                                    
+                                    return (
+                                      <div key={reward.id} className="p-2 rounded bg-muted/20 space-y-2">
+                                        {/* Tipo y preview */}
+                                        <div className="flex items-center gap-2">
                                           <Select 
-                                            value={reward.action || 'add'} 
+                                            value={normalized.type} 
                                             onValueChange={(v) => {
+                                              let newReward: QuestReward;
+                                              if (v === 'attribute') {
+                                                newReward = createAttributeReward(
+                                                  normalized.attribute?.key || normalized.key || '',
+                                                  normalized.attribute?.value ?? normalized.value ?? 0,
+                                                  normalized.attribute?.action || 'add',
+                                                  { id: reward.id }
+                                                );
+                                              } else {
+                                                newReward = createTriggerReward(
+                                                  normalized.trigger?.category || 'sprite',
+                                                  normalized.trigger?.key || normalized.key || '',
+                                                  normalized.trigger?.targetMode || 'self',
+                                                  { id: reward.id }
+                                                );
+                                              }
                                               const updatedRewards = [...(obj.rewards || [])];
-                                              updatedRewards[rewardIdx] = { ...reward, action: v as any };
+                                              updatedRewards[rewardIdx] = newReward;
                                               updateObjective(index, { rewards: updatedRewards });
                                             }}
                                           >
-                                            <SelectTrigger className="bg-background h-6 text-xs w-16">
+                                            <SelectTrigger className="bg-background h-6 text-xs w-24">
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              <SelectItem value="add">+</SelectItem>
-                                              <SelectItem value="subtract">-</SelectItem>
-                                              <SelectItem value="set">=</SelectItem>
+                                              <SelectItem value="attribute">📊 Atributo</SelectItem>
+                                              <SelectItem value="trigger">⚡ Trigger</SelectItem>
                                             </SelectContent>
                                           </Select>
+                                          <Badge variant="outline" className="text-[10px]">
+                                            {describeReward(normalized)}
+                                          </Badge>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
+                                            onClick={() => {
+                                              const updatedRewards = (obj.rewards || []).filter((_, i) => i !== rewardIdx);
+                                              updateObjective(index, { rewards: updatedRewards });
+                                            }}
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                        
+                                        {/* Config según tipo */}
+                                        {isAttr && normalized.attribute && (
+                                          <div className="grid grid-cols-3 gap-2">
+                                            <Input
+                                              value={normalized.attribute.key}
+                                              onChange={(e) => {
+                                                const updatedRewards = [...(obj.rewards || [])];
+                                                updatedRewards[rewardIdx] = {
+                                                  ...reward,
+                                                  attribute: { ...normalized.attribute!, key: e.target.value }
+                                                };
+                                                updateObjective(index, { rewards: updatedRewards });
+                                              }}
+                                              placeholder="Key"
+                                              className="bg-background h-6 text-xs"
+                                            />
+                                            <Input
+                                              type="number"
+                                              value={normalized.attribute.value}
+                                              onChange={(e) => {
+                                                const updatedRewards = [...(obj.rewards || [])];
+                                                updatedRewards[rewardIdx] = {
+                                                  ...reward,
+                                                  attribute: { ...normalized.attribute!, value: Number(e.target.value) }
+                                                };
+                                                updateObjective(index, { rewards: updatedRewards });
+                                              }}
+                                              placeholder="Valor"
+                                              className="bg-background h-6 text-xs"
+                                            />
+                                            <Select 
+                                              value={normalized.attribute.action} 
+                                              onValueChange={(v) => {
+                                                const updatedRewards = [...(obj.rewards || [])];
+                                                updatedRewards[rewardIdx] = {
+                                                  ...reward,
+                                                  attribute: { ...normalized.attribute!, action: v as AttributeAction }
+                                                };
+                                                updateObjective(index, { rewards: updatedRewards });
+                                              }}
+                                            >
+                                              <SelectTrigger className="bg-background h-6 text-xs">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="add">+</SelectItem>
+                                                <SelectItem value="subtract">-</SelectItem>
+                                                <SelectItem value="set">=</SelectItem>
+                                                <SelectItem value="multiply">×</SelectItem>
+                                                <SelectItem value="divide">÷</SelectItem>
+                                                <SelectItem value="percent">%</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
                                         )}
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10"
-                                          onClick={() => {
-                                            const updatedRewards = (obj.rewards || []).filter((_, i) => i !== rewardIdx);
-                                            updateObjective(index, { rewards: updatedRewards });
-                                          }}
-                                        >
-                                          <X className="w-3 h-3" />
-                                        </Button>
+                                        
+                                        {isTrig && normalized.trigger && (
+                                          <div className="grid grid-cols-3 gap-2">
+                                            <Select 
+                                              value={normalized.trigger.category} 
+                                              onValueChange={(v) => {
+                                                const updatedRewards = [...(obj.rewards || [])];
+                                                updatedRewards[rewardIdx] = {
+                                                  ...reward,
+                                                  trigger: { ...normalized.trigger!, category: v as TriggerCategory }
+                                                };
+                                                updateObjective(index, { rewards: updatedRewards });
+                                              }}
+                                            >
+                                              <SelectTrigger className="bg-background h-6 text-xs">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                                                <SelectItem value="sound">🔊 Sonido</SelectItem>
+                                                <SelectItem value="background">🌄 Fondo</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                            <Input
+                                              value={normalized.trigger.key}
+                                              onChange={(e) => {
+                                                const updatedRewards = [...(obj.rewards || [])];
+                                                updatedRewards[rewardIdx] = {
+                                                  ...reward,
+                                                  trigger: { ...normalized.trigger!, key: e.target.value }
+                                                };
+                                                updateObjective(index, { rewards: updatedRewards });
+                                              }}
+                                              placeholder="Key"
+                                              className="bg-background h-6 text-xs"
+                                            />
+                                            <Select 
+                                              value={normalized.trigger.targetMode} 
+                                              onValueChange={(v) => {
+                                                const updatedRewards = [...(obj.rewards || [])];
+                                                updatedRewards[rewardIdx] = {
+                                                  ...reward,
+                                                  trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
+                                                };
+                                                updateObjective(index, { rewards: updatedRewards });
+                                              }}
+                                            >
+                                              <SelectTrigger className="bg-background h-6 text-xs">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="self">👤 Self</SelectItem>
+                                                <SelectItem value="all">👥 Todos</SelectItem>
+                                                <SelectItem value="target">🎯 Target</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        )}
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                               
@@ -1381,118 +1517,286 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {rewards.map((reward, index) => (
-                    <Card key={reward.id} className="border-border/60">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1 space-y-3">
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">ID</Label>
-                                <Input
-                                  value={reward.id}
-                                  onChange={(e) => updateReward(index, { id: e.target.value })}
-                                  className="bg-background font-mono text-xs h-8"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Tipo</Label>
-                                <Select value={reward.type} onValueChange={(v) => updateReward(index, { type: v as QuestRewardType })}>
-                                  <SelectTrigger className="bg-background h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="attribute">Atributo</SelectItem>
-                                    <SelectItem value="sprite">Sprite</SelectItem>
-                                    <SelectItem value="sound">Sonido</SelectItem>
-                                    <SelectItem value="background">Fondo</SelectItem>
-                                    <SelectItem value="item">Item</SelectItem>
-                                    <SelectItem value="custom">Custom</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Key</Label>
-                                <Input
-                                  value={reward.key}
-                                  onChange={(e) => updateReward(index, { key: e.target.value })}
-                                  placeholder="HP, exp, oro..."
-                                  className="bg-background font-mono text-xs h-8"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Valor</Label>
-                                <Input
-                                  value={String(reward.value)}
-                                  onChange={(e) => updateReward(index, { 
-                                    value: isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value) 
-                                  })}
-                                  className="bg-background h-8"
-                                />
-                              </div>
-                              {reward.type === 'attribute' && (
-                                <div className="space-y-1">
-                                  <Label className="text-[10px] text-muted-foreground">Acción</Label>
+                  {rewards.map((reward, index) => {
+                    // Normalizar para obtener valores actuales
+                    const normalized = normalizeReward(reward);
+                    const isAttribute = normalized.type === 'attribute';
+                    const isTrigger = normalized.type === 'trigger';
+                    
+                    return (
+                      <Card key={reward.id} className="border-border/60">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 space-y-3">
+                              {/* Type selector and preview */}
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <Label className="text-[10px] text-muted-foreground mb-1 block">Tipo de Recompensa</Label>
                                   <Select 
-                                    value={reward.action || 'set'} 
-                                    onValueChange={(v) => updateReward(index, { action: v as 'set' | 'add' | 'subtract' | 'multiply' | 'divide' | 'percent' })}
+                                    value={normalized.type} 
+                                    onValueChange={(v) => updateReward(index, { type: v as QuestRewardType })}
                                   >
-                                    <SelectTrigger className="bg-background h-8">
+                                    <SelectTrigger className="bg-background h-9">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="set">= Establecer</SelectItem>
-                                      <SelectItem value="add">+ Sumar</SelectItem>
-                                      <SelectItem value="subtract">- Restar</SelectItem>
-                                      <SelectItem value="multiply">× Multiplicar</SelectItem>
-                                      <SelectItem value="divide">÷ Dividir</SelectItem>
-                                      <SelectItem value="percent">% Porcentaje</SelectItem>
+                                      <SelectItem value="attribute">
+                                        <div className="flex items-center gap-2">
+                                          <Hash className="w-4 h-4" />
+                                          Atributo
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="trigger">
+                                        <div className="flex items-center gap-2">
+                                          <Zap className="w-4 h-4" />
+                                          Trigger
+                                        </div>
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              )}
-                              {reward.type === 'sprite' && (
-                                <div className="space-y-1">
-                                  <Label className="text-[10px] text-muted-foreground">Volver a Idle (ms)</Label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    value={reward.returnToIdleMs || 0}
-                                    onChange={(e) => updateReward(index, { returnToIdleMs: Number(e.target.value) })}
-                                    placeholder="0 = no volver"
-                                    className="bg-background h-8"
-                                  />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Help text for sprite rewards */}
-                            {reward.type === 'sprite' && (
-                              <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                <Info className="w-3 h-3 mt-0.5 shrink-0" />
-                                <div>
-                                  <p><strong>Key:</strong> Keyword del trigger (ej: "feliz", "victory")</p>
-                                  <p><strong>Valor:</strong> URL del sprite o vacío para usar el del trigger</p>
+                                
+                                {/* Preview badge */}
+                                <div className="pt-5">
+                                  <Badge variant="outline" className="text-xs">
+                                    {describeReward(normalized)}
+                                  </Badge>
                                 </div>
                               </div>
-                            )}
-                          </div>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
-                            onClick={() => removeReward(index)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                              {/* ATTRIBUTE CONFIG */}
+                              {isAttribute && normalized.attribute && (
+                                <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-muted/30">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] text-muted-foreground">Key del Atributo</Label>
+                                    <Input
+                                      value={normalized.attribute.key}
+                                      onChange={(e) => updateReward(index, { 
+                                        attribute: { ...normalized.attribute!, key: e.target.value } 
+                                      })}
+                                      placeholder="HP, oro, exp..."
+                                      className="bg-background font-mono text-xs h-8"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] text-muted-foreground">Valor</Label>
+                                    <Input
+                                      type="number"
+                                      value={normalized.attribute.value}
+                                      onChange={(e) => updateReward(index, { 
+                                        attribute: { ...normalized.attribute!, value: Number(e.target.value) } 
+                                      })}
+                                      className="bg-background h-8"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] text-muted-foreground">Acción</Label>
+                                    <Select 
+                                      value={normalized.attribute.action} 
+                                      onValueChange={(v) => updateReward(index, { 
+                                        attribute: { ...normalized.attribute!, action: v as AttributeAction } 
+                                      })}
+                                    >
+                                      <SelectTrigger className="bg-background h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="set">= Establecer</SelectItem>
+                                        <SelectItem value="add">+ Sumar</SelectItem>
+                                        <SelectItem value="subtract">- Restar</SelectItem>
+                                        <SelectItem value="multiply">× Multiplicar</SelectItem>
+                                        <SelectItem value="divide">÷ Dividir</SelectItem>
+                                        <SelectItem value="percent">% Porcentaje</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* TRIGGER CONFIG */}
+                              {isTrigger && normalized.trigger && (
+                                <div className="space-y-3 p-3 rounded-lg bg-muted/30">
+                                  <div className="grid grid-cols-3 gap-3">
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px] text-muted-foreground">Categoría</Label>
+                                      <Select 
+                                        value={normalized.trigger.category} 
+                                        onValueChange={(v) => updateReward(index, { 
+                                          trigger: { ...normalized.trigger!, category: v as TriggerCategory } 
+                                        })}
+                                      >
+                                        <SelectTrigger className="bg-background h-8">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="sprite">
+                                            <div className="flex items-center gap-2">
+                                              <ImageIcon className="w-3.5 h-3.5" />
+                                              Sprite
+                                            </div>
+                                          </SelectItem>
+                                          <SelectItem value="sound">
+                                            <div className="flex items-center gap-2">
+                                              <Volume2 className="w-3.5 h-3.5" />
+                                              Sonido
+                                            </div>
+                                          </SelectItem>
+                                          <SelectItem value="background">
+                                            <div className="flex items-center gap-2">
+                                              <Wallpaper className="w-3.5 h-3.5" />
+                                              Fondo
+                                            </div>
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px] text-muted-foreground">Key del Trigger</Label>
+                                      <Input
+                                        value={normalized.trigger.key}
+                                        onChange={(e) => updateReward(index, { 
+                                          trigger: { ...normalized.trigger!, key: e.target.value } 
+                                        })}
+                                        placeholder="feliz, victory, forest..."
+                                        className="bg-background font-mono text-xs h-8"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px] text-muted-foreground">Objetivo</Label>
+                                      <Select 
+                                        value={normalized.trigger.targetMode} 
+                                        onValueChange={(v) => updateReward(index, { 
+                                          trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode } 
+                                        })}
+                                      >
+                                        <SelectTrigger className="bg-background h-8">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="self">
+                                            <div className="flex items-center gap-2">
+                                              <User className="w-3.5 h-3.5" />
+                                              Mismo personaje
+                                            </div>
+                                          </SelectItem>
+                                          <SelectItem value="all">
+                                            <div className="flex items-center gap-2">
+                                              <Users className="w-3.5 h-3.5" />
+                                              Todos
+                                            </div>
+                                          </SelectItem>
+                                          <SelectItem value="target">
+                                            <div className="flex items-center gap-2">
+                                              <Crosshair className="w-3.5 h-3.5" />
+                                              Objetivo específico
+                                            </div>
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+
+                                  {/* Category-specific options */}
+                                  {normalized.trigger.category === 'sprite' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] text-muted-foreground">Volver a Idle (ms)</Label>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          value={normalized.trigger.returnToIdleMs || 0}
+                                          onChange={(e) => updateReward(index, { 
+                                            trigger: { ...normalized.trigger!, returnToIdleMs: Number(e.target.value) } 
+                                          })}
+                                          placeholder="0 = no volver"
+                                          className="bg-background h-8"
+                                        />
+                                      </div>
+                                      <div className="flex items-end pb-1">
+                                        <p className="text-[10px] text-muted-foreground">
+                                          0 = mantener sprite indefinidamente
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {normalized.trigger.category === 'sound' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] text-muted-foreground">Volumen (0-1)</Label>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          max={1}
+                                          step={0.1}
+                                          value={normalized.trigger.volume ?? 0.8}
+                                          onChange={(e) => updateReward(index, { 
+                                            trigger: { ...normalized.trigger!, volume: Number(e.target.value) } 
+                                          })}
+                                          className="bg-background h-8"
+                                        />
+                                      </div>
+                                      <div className="flex items-end pb-1">
+                                        <p className="text-[10px] text-muted-foreground">
+                                          Formato key: "coleccion/archivo"
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {normalized.trigger.category === 'background' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] text-muted-foreground">Duración Transición (ms)</Label>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          value={normalized.trigger.transitionDuration ?? 500}
+                                          onChange={(e) => updateReward(index, { 
+                                            trigger: { ...normalized.trigger!, transitionDuration: Number(e.target.value) } 
+                                          })}
+                                          className="bg-background h-8"
+                                        />
+                                      </div>
+                                      <div className="flex items-end pb-1">
+                                        <p className="text-[10px] text-muted-foreground">
+                                          Key puede ser URL o nombre
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* ID field (collapsed by default) */}
+                              <details className="group">
+                                <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+                                  <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
+                                  ID: {reward.id}
+                                </summary>
+                                <div className="mt-2">
+                                  <Input
+                                    value={reward.id}
+                                    onChange={(e) => updateReward(index, { id: e.target.value })}
+                                    className="bg-background font-mono text-xs h-7"
+                                  />
+                                </div>
+                              </details>
+                            </div>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
+                              onClick={() => removeReward(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>
