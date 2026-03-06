@@ -155,6 +155,10 @@ function normalizeKey(key: string): string {
 
 /**
  * Check if text contains any of the detection keys
+ * 
+ * Uses word boundaries for single-word keys to prevent false positives:
+ * - "risa" won't match "marisa" (word boundary required)
+ * - Multi-word keys use phrase matching
  */
 function findKeyMatch(
   text: string,
@@ -164,13 +168,23 @@ function findKeyMatch(
   for (const key of keys) {
     // Create pattern to find the key
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(escapedKey, caseSensitive ? 'g' : 'gi');
+    
+    // For single-word keys, use word boundaries to prevent partial matches
+    // For multi-word keys, use phrase matching
+    const keyWords = key.trim().split(/\s+/);
+    const patternStr = keyWords.length === 1 
+      ? `(^|[^\\w])${escapedKey}([^\\w]|$)`  // Word boundary for single words
+      : escapedKey;  // Phrase matching for multi-word keys
+    
+    const pattern = new RegExp(patternStr, caseSensitive ? 'g' : 'gi');
     
     let match;
     while ((match = pattern.exec(text)) !== null) {
+      // For word boundary matches, return the actual key, not the boundary chars
+      const matchedText = match[0].replace(/^[^\w]+|[^\w]+$/g, '') || match[0];
       return {
         matchedKey: key,
-        matchedText: match[0],
+        matchedText,
         position: match.index,
       };
     }

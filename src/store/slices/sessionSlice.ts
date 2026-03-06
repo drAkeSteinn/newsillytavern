@@ -118,6 +118,7 @@ export interface SessionSlice {
   addMessage: (sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   updateMessage: (sessionId: string, messageId: string, content: string) => void;
   deleteMessage: (sessionId: string, messageId: string) => void;
+  deleteMessagesUpTo: (sessionId: string, keepLastN: number) => void;  // Delete old messages, keep last N
   
   // Swipe Actions
   swipeMessage: (sessionId: string, messageId: string, direction: 'left' | 'right') => number;
@@ -129,6 +130,10 @@ export interface SessionSlice {
   incrementTurnCount: (sessionId: string) => void;
   getTurnCount: (sessionId: string) => number;
   resetTurnCount: (sessionId: string) => void;
+  
+  // Summary Actions
+  setSessionSummary: (sessionId: string, summary: import('@/types').SessionSummary) => void;
+  clearSessionSummary: (sessionId: string) => void;
 
   // Quest Instance Actions
   initializeSessionQuests: (sessionId: string, questTemplateIds: string[]) => void;
@@ -428,6 +433,39 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
     )
   })),
 
+  // Delete old messages, keeping the last N messages (for memory/summary system)
+  deleteMessagesUpTo: (sessionId, keepLastN) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) => {
+      if (s.id !== sessionId) return s;
+      
+      const visibleMessages = s.messages.filter((m: ChatMessage) => !m.isDeleted);
+      const messagesToDelete = visibleMessages.length - keepLastN;
+      
+      if (messagesToDelete <= 0) return s; // Nothing to delete
+      
+      // Mark old messages as deleted (keep the first message and last N messages)
+      const firstMessageId = s.messages[0]?.id;
+      let deletedCount = 0;
+      
+      return {
+        ...s,
+        messages: s.messages.map((m: ChatMessage) => {
+          // Never delete the first message (greeting)
+          if (m.id === firstMessageId) return m;
+          // Already deleted
+          if (m.isDeleted) return m;
+          // Check if we should delete this message
+          if (deletedCount < messagesToDelete) {
+            deletedCount++;
+            return { ...m, isDeleted: true };
+          }
+          return m;
+        }),
+        updatedAt: new Date().toISOString()
+      };
+    })
+  })),
+
   // Swipe Actions
   swipeMessage: (sessionId, messageId, direction) => {
     let newIndex = 0;
@@ -533,6 +571,26 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
     sessions: state.sessions.map((s: ChatSession) =>
       s.id === sessionId
         ? { ...s, turnCount: 0, updatedAt: new Date().toISOString() }
+        : s
+    ),
+  })),
+
+  // ============================================
+  // Summary Actions
+  // ============================================
+  
+  setSessionSummary: (sessionId, summary) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) =>
+      s.id === sessionId
+        ? { ...s, summary, updatedAt: new Date().toISOString() }
+        : s
+    ),
+  })),
+
+  clearSessionSummary: (sessionId) => set((state: any) => ({
+    sessions: state.sessions.map((s: ChatSession) =>
+      s.id === sessionId
+        ? { ...s, summary: undefined, updatedAt: new Date().toISOString() }
         : s
     ),
   })),

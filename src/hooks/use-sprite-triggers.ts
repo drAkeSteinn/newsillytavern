@@ -525,9 +525,35 @@ export function matchSpritePacks(
 // ============================================
 
 /**
+ * Get all keys from a trigger (main key + alternatives + legacy keywords)
+ * Supports both new key/keys system and legacy keywords field
+ */
+export function getAllTriggerKeys(trigger: CharacterSpriteTrigger): string[] {
+  const allKeys: string[] = [];
+  
+  // New system: main key
+  if (trigger.key) {
+    allKeys.push(trigger.key);
+  }
+  
+  // New system: alternative keys
+  if (trigger.keys && trigger.keys.length > 0) {
+    allKeys.push(...trigger.keys);
+  }
+  
+  // Legacy: keywords (only if no new keys defined)
+  if (allKeys.length === 0 && trigger.keywords && trigger.keywords.length > 0) {
+    allKeys.push(...trigger.keywords);
+  }
+  
+  return allKeys;
+}
+
+/**
  * Match simple character sprite triggers (CharacterSpriteTrigger)
  * 
- * Logic: ANY keyword matches
+ * Logic: ANY key matches (main key OR any alternative key)
+ * Supports both new key/keys system and legacy keywords field
  */
 export function matchSimpleSpriteTriggers(
   text: string,
@@ -547,15 +573,20 @@ export function matchSimpleSpriteTriggers(
 
   let best: CharacterSpriteTrigger | null = null;
   let bestIdx = Infinity;
+  let bestPriority = -1;
 
   for (const trigger of activeTriggers) {
     const caseSensitive = trigger.caseSensitive;
     const requirePipes = trigger.requirePipes;
+    const triggerPriority = trigger.priority || 1;
 
     const tokenSetAny = buildTokenSet({ pipeTokens, wordTokens }, caseSensitive);
     const tokenSetPipes = buildTokenSet({ pipeTokens }, caseSensitive);
 
-    for (const kw of trigger.keywords) {
+    // Get all keys (new system + legacy)
+    const allKeys = getAllTriggerKeys(trigger);
+    
+    for (const kw of allKeys) {
       const needle = caseSensitive ? kw : kw.toLowerCase();
       const ok = requirePipes
         ? tokenSetPipes.has(needle)
@@ -564,9 +595,15 @@ export function matchSimpleSpriteTriggers(
       if (!ok) continue;
 
       const idx = findFirstIndex(text, kw, caseSensitive);
-      if (idx !== -1 && idx < bestIdx) {
-        bestIdx = idx;
-        best = trigger;
+      
+      // Higher priority wins, or earlier match if same priority
+      if (idx !== -1) {
+        if (triggerPriority > bestPriority || 
+            (triggerPriority === bestPriority && idx < bestIdx)) {
+          bestIdx = idx;
+          bestPriority = triggerPriority;
+          best = trigger;
+        }
       }
     }
   }
@@ -718,43 +755,51 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       store.applyTriggerForCharacter(characterId, hit);
 
       // Schedule return to idle if configured
+      // Use 'clear' mode to let the normal logic determine what sprite to show
+      // based on current state (talk/thinking/idle)
       if (hit.returnToIdleMs && hit.returnToIdleMs > 0) {
-        let returnToUrl: string | null = null;
-        let returnToLabel: string | null = null;
+        let returnToMode: 'idle' | 'talk' | 'thinking' | 'clear' = 'clear';
+        let returnSpriteUrl: string | null = null;
+        let returnSpriteLabel: string | null = null;
 
         if (hit.returnToMode === 'custom_sprite' && hit.returnToSpriteUrl) {
-          // Return to custom sprite
-          returnToUrl = hit.returnToSpriteUrl;
-          returnToLabel = 'custom_return';
+          // Return to custom sprite - use 'idle' mode with specific sprite
+          returnToMode = 'idle';
+          returnSpriteUrl = hit.returnToSpriteUrl;
+          returnSpriteLabel = 'custom_return';
         } else {
-          // Return to idle collection - get the sprite from the idle collection
+          // Default: use 'clear' mode to let normal logic determine what to show
+          // This ensures that if the character is in talk/thinking mode, the correct sprite shows
+          returnToMode = 'clear';
+          
+          // Still get the idle sprite URL for reference (used by some UI elements)
           const idleCollection = character?.spriteConfig?.stateCollections?.['idle'];
           if (idleCollection && idleCollection.entries.length > 0) {
             const result = getSpriteFromCollection(idleCollection, false);
-            returnToUrl = result.url;
-            returnToLabel = result.label;
+            returnSpriteUrl = result.url;
+            returnSpriteLabel = result.label;
           }
           // Fall back to legacy idle sprite
-          if (!returnToUrl && character?.spriteConfig?.sprites?.['idle']) {
-            returnToUrl = character.spriteConfig.sprites['idle'];
-            returnToLabel = 'idle';
+          if (!returnSpriteUrl && character?.spriteConfig?.sprites?.['idle']) {
+            returnSpriteUrl = character.spriteConfig.sprites['idle'];
+            returnSpriteLabel = 'idle';
           }
           // Fall back to avatar
-          if (!returnToUrl && character?.avatar) {
-            returnToUrl = character.avatar;
-            returnToLabel = 'avatar';
+          if (!returnSpriteUrl && character?.avatar) {
+            returnSpriteUrl = character.avatar;
+            returnSpriteLabel = 'avatar';
           }
         }
         
-        if (returnToUrl) {
-          store.scheduleReturnToIdleForCharacter(
-            characterId,
-            hit.spriteUrl,
-            returnToUrl,
-            returnToLabel,
-            hit.returnToIdleMs
-          );
-        }
+        // Schedule the return - using 'clear' mode by default
+        store.scheduleReturnToIdleForCharacter(
+          characterId,
+          hit.spriteUrl,
+          returnToMode,
+          returnSpriteUrl || '',
+          returnSpriteLabel,
+          hit.returnToIdleMs
+        );
       }
       
       return hit;

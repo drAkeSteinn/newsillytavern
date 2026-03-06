@@ -1,27 +1,123 @@
 // ============================================
 // Z.ai Provider - Streaming and generation
 // ============================================
+//
+// This provider reads the .z-ai-config file and uses the token for authentication.
+// The config file is located at:
+// 1. process.cwd()/.z-ai-config
+// 2. ~/.z-ai-config
+// 3. /etc/.z-ai-config
 
-import ZAI from 'z-ai-web-dev-sdk';
 import type { ChatApiMessage, GenerateResponse } from '../types';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+
+// Config interface matching the SDK
+interface ZAIConfig {
+  baseUrl: string;
+  apiKey: string;
+  chatId?: string;
+  userId?: string;
+  token?: string;  // JWT token for X-Token header
+}
+
+// Cache for config
+let cachedConfig: ZAIConfig | null = null;
 
 /**
- * Stream from Z.ai SDK
+ * Load Z.ai configuration from file
+ */
+async function loadConfig(): Promise<ZAIConfig> {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  const homeDir = os.homedir();
+  const configPaths = [
+    path.join(process.cwd(), '.z-ai-config'),
+    path.join(homeDir, '.z-ai-config'),
+    '/etc/.z-ai-config'
+  ];
+
+  for (const filePath of configPaths) {
+    try {
+      const configStr = await fs.readFile(filePath, 'utf-8');
+      const config = JSON.parse(configStr);
+      if (config.baseUrl && config.apiKey) {
+        cachedConfig = config;
+        console.log('[Z.ai Provider] Config loaded from:', filePath);
+        return config;
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`[Z.ai Provider] Error reading config at ${filePath}:`, error);
+      }
+    }
+  }
+
+  throw new Error('Z.ai configuration file not found. Please create .z-ai-config in your project, home directory, or /etc.');
+}
+
+/**
+ * Stream from Z.ai API with proper authentication
  */
 export async function* streamZAI(
   messages: ChatApiMessage[]
 ): AsyncGenerator<string> {
   try {
-    const zai = await ZAI.create();
+    const config = await loadConfig();
+    const { baseUrl, apiKey, chatId, userId, token } = config;
 
-    const response = await zai.chat.completions.create({
-      messages: messages as Array<{ role: 'assistant' | 'user'; content: string }>,
-      thinking: { type: 'disabled' },
-      stream: true
+    const url = `${baseUrl}/chat/completions`;
+
+    // Build headers with X-Token if available
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'X-Z-AI-From': 'Z',
+    };
+
+    // Add X-Token header (JWT token from config)
+    if (token) {
+      headers['X-Token'] = token;
+    }
+
+    if (chatId) {
+      headers['X-Chat-Id'] = chatId;
+    }
+
+    if (userId) {
+      headers['X-User-Id'] = userId;
+    }
+
+    console.log('[Z.ai Provider] Streaming request to:', url);
+    console.log('[Z.ai Provider] Headers:', Object.keys(headers).join(', '));
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        messages: messages.map(m => ({
+          role: m.role,
+          content: m.content
+        })),
+        thinking: { type: 'disabled' },
+        stream: true
+      })
     });
 
-    // The SDK returns a ReadableStream, not an async iterable
-    const reader = (response as ReadableStream).getReader();
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Z.ai API error ${response.status}: ${errorBody}`);
+    }
+
+    // The API returns a ReadableStream for streaming responses
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body from Z.ai');
+    }
+
     const decoder = new TextDecoder();
     let buffer = '';
 
@@ -61,28 +157,68 @@ export async function* streamZAI(
       reader.releaseLock();
     }
   } catch (error) {
+    console.error('[Z.ai Provider] Stream error:', error);
     throw new Error(`Z.ai Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
- * Call Z.ai using the SDK (non-streaming)
+ * Call Z.ai API (non-streaming)
  */
 export async function callZAI(
   messages: ChatApiMessage[]
 ): Promise<GenerateResponse> {
   try {
-    const zai = await ZAI.create();
+    const config = await loadConfig();
+    const { baseUrl, apiKey, chatId, userId, token } = config;
 
-    const completion = await zai.chat.completions.create({
-      messages: messages as Array<{ role: 'assistant' | 'user'; content: string }>,
-      thinking: { type: 'disabled' }
+    const url = `${baseUrl}/chat/completions`;
+
+    // Build headers with X-Token if available
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'X-Z-AI-From': 'Z',
+    };
+
+    // Add X-Token header (JWT token from config)
+    if (token) {
+      headers['X-Token'] = token;
+    }
+
+    if (chatId) {
+      headers['X-Chat-Id'] = chatId;
+    }
+
+    if (userId) {
+      headers['X-User-Id'] = userId;
+    }
+
+    console.log('[Z.ai Provider] Non-streaming request to:', url);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        messages: messages.map(m => ({
+          role: m.role,
+          content: m.content
+        })),
+        thinking: { type: 'disabled' },
+        stream: false
+      })
     });
 
-    const response = completion.choices[0]?.message?.content || '';
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Z.ai API error ${response.status}: ${errorBody}`);
+    }
+
+    const completion = await response.json();
+    const content = completion.choices[0]?.message?.content || '';
 
     return {
-      message: response,
+      message: content,
       usage: {
         promptTokens: completion.usage?.prompt_tokens || 0,
         completionTokens: completion.usage?.completion_tokens || 0,
@@ -91,6 +227,14 @@ export async function callZAI(
       model: completion.model || 'z-ai'
     };
   } catch (error) {
+    console.error('[Z.ai Provider] Call error:', error);
     throw new Error(`Z.ai Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+/**
+ * Clear cached config (useful for testing)
+ */
+export function clearConfigCache(): void {
+  cachedConfig = null;
 }

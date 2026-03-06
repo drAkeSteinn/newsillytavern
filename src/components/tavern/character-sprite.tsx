@@ -142,6 +142,32 @@ export function CharacterSprite({
   // ============================================
   // UNIFIED SYSTEM: Get sprite state from store
   // ============================================
+  // 
+  // ⚠️ SPRITE PRIORITY SYSTEM - DO NOT MODIFY ⚠️
+  // 
+  // The sprite system follows a STRICT priority order:
+  // 
+  // 1. TRIGGER SPRITE (HIGHEST PRIORITY)
+  //    - Activated by sprite triggers from AI response
+  //    - Once active, CANNOT be overridden by talk/thinking/idle
+  //    - Only changes when:
+  //      a) Timer expires (returnToIdleMs > 0)
+  //      b) Another trigger replaces it
+  //      c) User manually clears it
+  //
+  // 2. STATE COLLECTION SPRITES
+  //    - Talk sprite (streaming with content)
+  //    - Thinking sprite (generating without content)
+  //    - Only shown when NO trigger sprite is active
+  //
+  // 3. LEGACY SPRITES (fallback)
+  //    - From character.spriteConfig.sprites[state]
+  //
+  // 4. AVATAR (lowest priority)
+  //    - Character avatar as final fallback
+  //
+  // See: /docs/SPRITE_PRIORITY_SYSTEM.md
+  //
   // Use proper Zustand selectors to ensure reactivity
   const characterSpriteStates = useTavernStore((state) => state.characterSpriteStates);
   const isLocked = useTavernStore((state) => state.spriteLock.active);

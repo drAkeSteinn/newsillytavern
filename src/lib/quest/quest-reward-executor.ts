@@ -92,8 +92,9 @@ export interface RewardStoreActions {
   scheduleReturnToIdleForCharacter: (
     characterId: string,
     triggerSpriteUrl: string,
-    idleSpriteUrl: string,
-    idleLabel: string | null,
+    returnToMode: 'idle' | 'talk' | 'thinking' | 'clear',
+    returnSpriteUrl: string,
+    returnSpriteLabel: string | null,
     returnToIdleMs: number
   ) => void;
   isSpriteLocked?: () => boolean;

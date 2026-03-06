@@ -52,6 +52,35 @@ export interface SpriteHandlerResult {
 }
 
 // ============================================
+// Key Extraction Helper
+// ============================================
+
+/**
+ * Get all keys from a trigger (main key + alternatives + legacy keywords)
+ * Supports both new key/keys system and legacy keywords field
+ */
+function getAllTriggerKeys(trigger: CharacterSpriteTrigger): string[] {
+  const allKeys: string[] = [];
+  
+  // New system: main key
+  if (trigger.key) {
+    allKeys.push(trigger.key);
+  }
+  
+  // New system: alternative keys
+  if (trigger.keys && trigger.keys.length > 0) {
+    allKeys.push(...trigger.keys);
+  }
+  
+  // Legacy: keywords (only if no new keys defined)
+  if (allKeys.length === 0 && trigger.keywords && trigger.keywords.length > 0) {
+    allKeys.push(...trigger.keywords);
+  }
+  
+  return allKeys;
+}
+
+// ============================================
 // Sprite Handler Functions
 // ============================================
 
@@ -177,7 +206,13 @@ function checkSpritePacks(
 }
 
 /**
- * Check simple sprite triggers (ANY keyword)
+ * Check simple sprite triggers (ANY key)
+ * 
+ * PRIORITY SYSTEM:
+ * - Triggers are sorted by priority (descending)
+ * - Higher priority triggers match first
+ * - requirePipes: If true, keyword must be in |pipes| format
+ * - Supports new key/keys system AND legacy keywords field
  */
 function checkSimpleTriggers(
   tokens: DetectedToken[],
@@ -185,31 +220,49 @@ function checkSimpleTriggers(
   triggeredPositions: Set<number>,
   context: SpriteTriggerContext
 ): SpriteHandlerResult | null {
-  const activeTriggers = triggers.filter(t => t.active);
+  // Filter active triggers and sort by priority (highest first)
+  const activeTriggers = triggers
+    .filter(t => t.active)
+    .sort((a, b) => (b.priority ?? 1) - (a.priority ?? 1));
   
-  for (const token of tokens) {
-    if (token.wordPosition !== undefined && triggeredPositions.has(token.wordPosition)) continue;
+  // Separate tokens by type
+  const pipeTokens = tokens.filter(t => t.type === 'pipe');
+  const allTokens = tokens;
+  
+  for (const trigger of activeTriggers) {
+    // Determine which tokens to check based on requirePipes
+    const tokensToCheck = trigger.requirePipes ? pipeTokens : allTokens;
     
-    for (const trigger of activeTriggers) {
-      const matchingKeyword = trigger.keywords.find(kw =>
-        tokenMatchesKeyword(token, kw, trigger.caseSensitive ?? false)
+    // Get all keys (new key/keys system + legacy keywords)
+    const allKeys = getAllTriggerKeys(trigger);
+    
+    for (const token of tokensToCheck) {
+      if (token.wordPosition !== undefined && triggeredPositions.has(token.wordPosition)) continue;
+      
+      const matchingKey = allKeys.find(key =>
+        tokenMatchesKeyword(token, key, trigger.caseSensitive ?? false)
       );
       
-      if (!matchingKeyword) continue;
+      if (!matchingKey) continue;
+      
+      // Verify sprite URL exists
+      const spriteUrl = trigger.spriteUrl;
+      if (!spriteUrl) continue;
       
       return {
         matched: true,
         trigger: {
           triggerId: trigger.id,
           triggerType: 'sprite',
-          keyword: matchingKeyword,
+          keyword: matchingKey,
           data: {
-            spriteUrl: trigger.spriteUrl,
+            spriteUrl,
             spriteLabel: trigger.spriteState,
             returnToIdleMs: trigger.returnToIdleMs ?? 0,
             characterId: context.character?.id,
             returnToMode: trigger.returnToMode,
             returnToSpriteUrl: trigger.returnToSpriteUrl,
+            priority: trigger.priority ?? 1,
           },
         },
         tokens: [token],
@@ -308,6 +361,14 @@ function getSpriteUrl(
 
 /**
  * Check if token matches keyword
+ * 
+ * Matching rules:
+ * - Single-word keyword: Requires EXACT match (no partial matches)
+ * - Multi-word keyword: Checks if all words appear in token or if keyword appears as substring
+ * 
+ * This prevents false positives like:
+ * - "marisa" triggering "risa" (no longer matches)
+ * - "alegría" triggering "ale" (no longer matches)
  */
 function tokenMatchesKeyword(token: DetectedToken, keyword: string, caseSensitive: boolean): boolean {
   const kw = caseSensitive ? keyword : keyword.toLowerCase();
@@ -315,7 +376,20 @@ function tokenMatchesKeyword(token: DetectedToken, keyword: string, caseSensitiv
   
   if (!kw || !tk) return false;
   
-  return tk.includes(kw) || kw.includes(tk);
+  // For single-word keywords, require EXACT match
+  // This prevents false positives like "marisa" matching "risa"
+  const keywordWords = kw.split(/\s+/);
+  if (keywordWords.length === 1) {
+    return tk === kw;
+  }
+  
+  // For multi-word keywords, check if all words appear in token
+  // or if the full phrase appears as substring
+  const allWordsMatch = keywordWords.every(word => tk.includes(word));
+  if (allWordsMatch) return true;
+  
+  // Also check if the full keyword phrase appears in token
+  return tk.includes(kw);
 }
 
 /**
@@ -333,8 +407,9 @@ export function executeSpriteTrigger(
     scheduleReturnToIdleForCharacter: (
       characterId: string,
       triggerSpriteUrl: string,
-      idleSpriteUrl: string,
-      idleLabel: string | null,
+      returnToMode: 'idle' | 'talk' | 'thinking' | 'clear',
+      returnSpriteUrl: string,
+      returnSpriteLabel: string | null,
       returnToIdleMs: number
     ) => void;
   },
@@ -357,12 +432,14 @@ export function executeSpriteTrigger(
   });
   
   // Schedule return to idle if configured
+  // Use 'clear' mode to let normal logic determine what sprite to show
   if (returnToIdleMs > 0) {
     const idleUrl = getIdleSpriteUrl();
     if (idleUrl) {
       storeActions.scheduleReturnToIdleForCharacter(
         characterId,
         spriteUrl,
+        'clear',  // Let normal logic determine what to show (talk/thinking/idle)
         idleUrl,
         spriteLabel,
         returnToIdleMs

@@ -14,5 +14,12 @@
     "preserveEmotionalMoments": true
   },
   "characterMemories": [],
-  "sessionTracking": {}
+  "sessionTracking": {
+    "38ed7a4a-0805-47bb-93d3-dd0fb985d853": {
+      "sessionId": "38ed7a4a-0805-47bb-93d3-dd0fb985d853",
+      "messagesSinceLastSummary": 1,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
+    }
+  }
 }

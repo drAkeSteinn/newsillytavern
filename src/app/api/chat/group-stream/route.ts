@@ -8,7 +8,7 @@
 // - All sections are processed consistently
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance } from '@/types';
+import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance, SessionSummary } from '@/types';
 import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import {
   createSSEJSON,
@@ -17,6 +17,7 @@ import {
   cleanResponseContent,
   buildGroupSystemPrompt,
   buildGroupChatMessages,
+  buildPostHistorySection,
   getEffectiveUserName,
   createUserMessage,
   streamZAI,
@@ -196,6 +197,9 @@ export async function POST(request: NextRequest) {
       ...(body.questSettings || {})
     };
 
+    // Extract summaries for memory/context compression
+    const summary: SessionSummary | undefined = body.summary;
+
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
 
@@ -367,10 +371,40 @@ export async function POST(request: NextRequest) {
             const isLastMessageCurrentUser = lastMessage?.role === 'user' &&
               lastMessage?.content === sanitizedMessage;
 
-            // Only add user message if it's not already the last message
-            const messagesForPrompt = isLastMessageCurrentUser
+            // Create summary message if summary exists (inject at start of chat history)
+            const summaryMessage = summary ? {
+              id: 'summary-' + Date.now(),
+              role: 'assistant' as const,
+              content: `[Previous Conversation Summary]\n${summary.content}`,
+              characterId: responder.id,
+              isDeleted: false,
+              timestamp: summary.createdAt,
+              swipeId: 'summary',
+              swipeIndex: 0
+            } : null;
+
+            // Build messages: summary (if exists) + context window messages + user message
+            let baseMessages = isLastMessageCurrentUser
               ? contextWindow.messages
               : [...contextWindow.messages, createUserMessage(sanitizedMessage)];
+            
+            // Inject summary at the START of chat history
+            const messagesForPrompt = summaryMessage 
+              ? [summaryMessage, ...baseMessages] 
+              : baseMessages;
+
+            // Resolve keys in post-history instructions BEFORE passing to buildGroupChatMessages
+            // This ensures {{user}}, {{char}}, {{stats}}, etc. are replaced
+            const rawPostHistoryInstructions = responder.postHistoryInstructions?.trim();
+            const resolvedPostHistoryInstructions = rawPostHistoryInstructions
+              ? resolveAllKeys(rawPostHistoryInstructions, keyContext)
+              : undefined;
+
+            // Build post-history section for prompt viewer (pass raw instructions, function will resolve keys)
+            const postHistorySection = buildPostHistorySection(
+              responder.postHistoryInstructions,
+              keyContext
+            );
 
             const { chatMessages, chatHistorySection } = buildGroupChatMessages(
               finalSystemPrompt,
@@ -378,13 +412,15 @@ export async function POST(request: NextRequest) {
               responder,
               characters,
               effectiveUserName,
-              previousResponses
+              previousResponses,
+              resolvedPostHistoryInstructions  // Post-history instructions AFTER chat (with keys resolved)
             );
 
             // Combine prompt sections with chat history for the viewer
+            // Order: System sections -> Quest -> Chat History -> Post-History Instructions
             let allPromptSections: PromptSection[] = chatHistorySection
-              ? [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection]
-              : [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : [])];
+              ? [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
+              : [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(postHistorySection ? [postHistorySection] : [])];
 
             // Inject HUD context into sections if enabled
             if (hudContextSection && typedHUDContext) {

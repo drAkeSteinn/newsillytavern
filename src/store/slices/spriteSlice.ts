@@ -2,6 +2,34 @@
 // Sprite Slice - Unified Sprite State Management
 // Supports both single character and group chat
 // ============================================
+//
+// ⚠️ SPRITE PRIORITY SYSTEM - CRITICAL - DO NOT MODIFY ⚠️
+//
+// This module implements the sprite priority system. The rules are:
+//
+// 1. TRIGGER SPRITE HAS ABSOLUTE PRIORITY
+//    - Once set, triggerSpriteUrl MUST NOT be cleared by:
+//      * startGenerationForCharacter()
+//      * endGenerationForCharacter()
+//      * State changes (talk/thinking/idle)
+//    - Only cleared by:
+//      * Timer expiration (returnToIdleMs > 0)
+//      * New trigger replacing it
+//      * User manual action
+//
+// 2. TIMER BEHAVIOR
+//    - returnToIdleMs = 0: Trigger persists indefinitely
+//    - returnToIdleMs > 0: Trigger clears after X ms
+//
+// 3. RETURN MODE
+//    - 'clear': Clear trigger, show state-based sprite (talk/thinking/idle)
+//    - 'idle': Clear trigger, show idle sprite
+//    - 'talk': Clear trigger, show talk sprite
+//    - 'thinking': Clear trigger, show thinking sprite
+//
+// See: /docs/SPRITE_PRIORITY_SYSTEM.md for full documentation
+//
+// ============================================
 
 import type { 
   SpriteState, 
@@ -18,7 +46,7 @@ import { v4 as uuidv4 } from 'uuid';
 // ============================================
 
 export interface CharacterSpriteState {
-  // Current sprite from trigger (highest priority)
+  // Current sprite from trigger (HIGHEST PRIORITY - DO NOT OVERRIDE)
   triggerSpriteUrl: string | null;
   triggerSpriteLabel: string | null;
   
@@ -28,8 +56,9 @@ export interface CharacterSpriteState {
     scheduledAt: number;
     returnAt: number;
     triggerSpriteUrl: string;  // URL of trigger sprite (to verify)
-    idleSpriteUrl: string;     // URL to return to
-    idleSpriteLabel: string | null;
+    returnToMode: 'idle' | 'talk' | 'thinking' | 'clear';  // What state to return to
+    returnSpriteUrl: string;     // URL to return to (if mode is idle/talk/thinking)
+    returnSpriteLabel: string | null;
   };
   
   // Track if trigger was activated during current generation
@@ -48,8 +77,9 @@ export const createDefaultCharacterState = (): CharacterSpriteState => ({
     scheduledAt: 0,
     returnAt: 0,
     triggerSpriteUrl: '',
-    idleSpriteUrl: '',
-    idleSpriteLabel: null,
+    returnToMode: 'clear',
+    returnSpriteUrl: '',
+    returnSpriteLabel: null,
   },
   triggerActivatedDuringGeneration: false,
   spriteState: 'idle',
@@ -94,8 +124,9 @@ export interface SpriteSlice {
   scheduleReturnToIdleForCharacter: (
     characterId: string,
     triggerUrl: string,
-    idleUrl: string,
-    idleLabel: string | null,
+    returnToMode: 'idle' | 'talk' | 'thinking' | 'clear',
+    returnSpriteUrl: string,
+    returnSpriteLabel: string | null,
     delayMs: number
   ) => void;
   
@@ -217,8 +248,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
     scheduledAt: 0,
     returnAt: 0,
     triggerSpriteUrl: '',
-    idleSpriteUrl: '',
-    idleSpriteLabel: null,
+    returnToMode: 'clear',
+    returnSpriteUrl: '',
+    returnSpriteLabel: null,
   },
 
   spriteLock: {
@@ -278,8 +310,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
               scheduledAt: 0,
               returnAt: 0,
               triggerSpriteUrl: '',
-              idleSpriteUrl: '',
-              idleSpriteLabel: null,
+              returnToMode: 'clear',
+              returnSpriteUrl: '',
+              returnSpriteLabel: null,
             },
           },
         },
@@ -292,8 +325,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   scheduleReturnToIdleForCharacter: (
     characterId: string,
     triggerUrl: string,
-    idleUrl: string,
-    idleLabel: string | null,
+    returnToMode: 'idle' | 'talk' | 'thinking' | 'clear',
+    returnSpriteUrl: string,
+    returnSpriteLabel: string | null,
     delayMs: number
   ) => {
     // Clear any existing timer for this character
@@ -309,25 +343,31 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
       // Only execute if the trigger sprite is still the one we scheduled for
       if (charState?.returnToIdle.active && 
           charState.triggerSpriteUrl === charState.returnToIdle.triggerSpriteUrl) {
-        // Execute return to idle
+        
+        // Execute return based on mode
         set((state: any) => {
           const currentCharState = state.characterSpriteStates[characterId];
           if (!currentCharState) return state;
+          
+          // If mode is 'clear', just clear the trigger sprite and let normal logic determine what to show
+          // Otherwise, set the trigger sprite to the return sprite
+          const shouldClearTrigger = returnToMode === 'clear';
           
           return {
             characterSpriteStates: {
               ...state.characterSpriteStates,
               [characterId]: {
                 ...currentCharState,
-                triggerSpriteUrl: currentCharState.returnToIdle.idleSpriteUrl,
-                triggerSpriteLabel: currentCharState.returnToIdle.idleSpriteLabel,
+                triggerSpriteUrl: shouldClearTrigger ? null : currentCharState.returnToIdle.returnSpriteUrl,
+                triggerSpriteLabel: shouldClearTrigger ? null : currentCharState.returnToIdle.returnSpriteLabel,
                 returnToIdle: {
                   active: false,
                   scheduledAt: 0,
                   returnAt: 0,
                   triggerSpriteUrl: '',
-                  idleSpriteUrl: '',
-                  idleSpriteLabel: null,
+                  returnToMode: 'clear',
+                  returnSpriteUrl: '',
+                  returnSpriteLabel: null,
                 },
               },
             },
@@ -359,8 +399,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
               scheduledAt: now,
               returnAt: now + delayMs,
               triggerSpriteUrl: triggerUrl,
-              idleSpriteUrl: idleUrl,
-              idleSpriteLabel: idleLabel,
+              returnToMode,
+              returnSpriteUrl,
+              returnSpriteLabel,
             },
           },
         },
@@ -385,8 +426,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
               scheduledAt: 0,
               returnAt: 0,
               triggerSpriteUrl: '',
-              idleSpriteUrl: '',
-              idleSpriteLabel: null,
+              returnToMode: 'clear',
+              returnSpriteUrl: '',
+              returnSpriteLabel: null,
             },
           },
         },
@@ -401,20 +443,24 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
       const currentCharState = state.characterSpriteStates[characterId];
       if (!currentCharState || !currentCharState.returnToIdle.active) return state;
       
+      // If mode is 'clear', just clear the trigger sprite and let normal logic determine what to show
+      const shouldClearTrigger = currentCharState.returnToIdle.returnToMode === 'clear';
+      
       return {
         characterSpriteStates: {
           ...state.characterSpriteStates,
           [characterId]: {
             ...currentCharState,
-            triggerSpriteUrl: currentCharState.returnToIdle.idleSpriteUrl,
-            triggerSpriteLabel: currentCharState.returnToIdle.idleSpriteLabel,
+            triggerSpriteUrl: shouldClearTrigger ? null : currentCharState.returnToIdle.returnSpriteUrl,
+            triggerSpriteLabel: shouldClearTrigger ? null : currentCharState.returnToIdle.returnSpriteLabel,
             returnToIdle: {
               active: false,
               scheduledAt: 0,
               returnAt: 0,
               triggerSpriteUrl: '',
-              idleSpriteUrl: '',
-              idleSpriteLabel: null,
+              returnToMode: 'clear',
+              returnSpriteUrl: '',
+              returnSpriteLabel: null,
             },
           },
         },
@@ -476,8 +522,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
               scheduledAt: 0,
               returnAt: 0,
               triggerSpriteUrl: '',
-              idleSpriteUrl: '',
-              idleSpriteLabel: null,
+              returnToMode: 'clear',
+              returnSpriteUrl: '',
+              returnSpriteLabel: null,
             },
           },
         },
@@ -661,7 +708,7 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
     const state = get();
     const activeCharId = Object.keys(state.characterSpriteStates)[0];
     if (activeCharId) {
-      get().scheduleReturnToIdleForCharacter(activeCharId, currentUrl, idleUrl, idleLabel, delayMs);
+      get().scheduleReturnToIdleForCharacter(activeCharId, currentUrl, 'clear', idleUrl, idleLabel, delayMs);
     }
   },
   

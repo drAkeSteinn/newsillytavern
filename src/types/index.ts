@@ -113,7 +113,11 @@ export interface CharacterSpriteTrigger {
   id: string;
   title: string;
   active: boolean;
-  keywords: string[];
+  // Key detection (HUD-style: main key + alternatives)
+  key: string;               // Primary key (e.g., "spritewin", "sprite:win")
+  keys?: string[];           // Alternative keys (ANY of these triggers the sprite)
+  // Legacy support
+  keywords?: string[];       // DEPRECATED: Use key/keys instead
   requirePipes: boolean;
   caseSensitive: boolean;
   spriteUrl: string;         // Sprite to show when triggered
@@ -349,6 +353,19 @@ export interface ChatSession {
   sessionStats?: SessionStats;  // Stats values for this session (per character)
   sessionQuests?: SessionQuestInstance[];  // NEW: Active quests in this session
   turnCount?: number;             // NEW: Turn counter
+  summary?: SessionSummary;       // Last conversation summary (overwritten on each new summary)
+}
+
+// Session summary - stored directly in the session JSON
+export interface SessionSummary {
+  content: string;           // The summary text
+  messageRange: {
+    start: number;           // Index of first message summarized
+    end: number;             // Index of last message summarized
+  };
+  tokens: number;            // Approximate token count
+  createdAt: string;
+  model?: string;            // Model used for generation
 }
 
 // ============ Group Types ============

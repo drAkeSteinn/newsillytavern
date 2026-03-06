@@ -35,7 +35,9 @@
     "enabled": true,
     "globalCooldown": 250,
     "realtimeEnabled": true,
-    "transitionDuration": 500
+    "transitionDuration": 500,
+    "returnToDefaultEnabled": false,
+    "defaultBackgroundUrl": "/backgrounds/Biblioteca/ComfyUI_temp_rikdt_00271_.png"
   },
   "chatLayout": {
     "novelMode": true,

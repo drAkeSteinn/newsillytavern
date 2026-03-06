@@ -436,15 +436,8 @@ export function buildSystemPrompt(
     sections.push(lorebookSection);
   }
 
-  // Add post-history instructions if provided
-  if (character.postHistoryInstructions?.trim()) {
-    sections.push({
-      type: 'post_history',
-      label: 'Post-History Instructions',
-      content: character.postHistoryInstructions,
-      color: SECTION_COLORS.post_history
-    });
-  }
+  // Note: postHistoryInstructions should NOT be in system prompt
+  // It must be injected AFTER the chat history in buildChatMessages
 
   // ========================================
   // UNIFIED KEY RESOLUTION - Apply to ALL sections
@@ -474,6 +467,34 @@ export function buildLorebookSectionForPrompt(
   return {
     section: result.lorebookSection,
     result
+  };
+}
+
+/**
+ * Build post-history instructions section
+ * This section is injected AFTER the chat history
+ * 
+ * @param instructions - Raw instructions text (may contain {{keys}})
+ * @param keyContext - Key resolution context (optional, for resolving keys)
+ */
+export function buildPostHistorySection(
+  instructions: string | undefined,
+  keyContext?: KeyResolutionContext
+): PromptSection | null {
+  if (!instructions?.trim()) {
+    return null;
+  }
+
+  // Resolve all keys if keyContext is provided
+  const resolvedContent = keyContext 
+    ? resolveAllKeys(instructions, keyContext)
+    : instructions;
+
+  return {
+    type: 'post_history',
+    label: 'Post-History Instructions',
+    content: resolvedContent,
+    color: SECTION_COLORS.post_history
   };
 }
 
@@ -508,6 +529,11 @@ export function buildChatHistorySections(
 
 /**
  * Build messages array for chat models
+ * 
+ * Order (SillyTavern style):
+ * 1. System message (system prompt)
+ * 2. Chat history
+ * 3. Post-History Instructions (injected AFTER chat, as system message)
  */
 export function buildChatMessages(
   systemPrompt: string,
@@ -519,19 +545,13 @@ export function buildChatMessages(
 ): ChatApiMessage[] {
   const chatMessages: ChatApiMessage[] = [];
 
-  // System message
-  let fullSystemPrompt = systemPrompt;
-  if (postHistoryInstructions) {
-    fullSystemPrompt += `\n\n${postHistoryInstructions}`;
-  }
-
-  // Some providers prefer 'system' role, others use 'assistant' for system
+  // 1. System message (just the system prompt, NOT post-history instructions)
   chatMessages.push({
     role: useSystemRole ? 'system' : 'assistant',
-    content: fullSystemPrompt
+    content: systemPrompt
   });
 
-  // Chat history
+  // 2. Chat history
   const visibleMessages = messages.filter(m => !m.isDeleted);
 
   for (const msg of visibleMessages) {
@@ -540,6 +560,15 @@ export function buildChatMessages(
     } else if (msg.role === 'assistant') {
       chatMessages.push({ role: 'assistant', content: msg.content });
     }
+  }
+
+  // 3. Post-History Instructions - injected AFTER chat history
+  // This is the correct SillyTavern behavior
+  if (postHistoryInstructions?.trim()) {
+    chatMessages.push({
+      role: 'system',
+      content: postHistoryInstructions
+    });
   }
 
   return chatMessages;
@@ -705,17 +734,8 @@ export function buildGroupSystemPrompt(
     sections.push(lorebookSection);
   }
 
-  // Add post-history instructions
-  // Priority: parameter > character's postHistoryInstructions
-  const postHistory = postHistoryInstructions?.trim() || character.postHistoryInstructions?.trim();
-  if (postHistory) {
-    sections.push({
-      type: 'post_history',
-      label: 'Post-History Instructions',
-      content: postHistory,
-      color: SECTION_COLORS.post_history
-    });
-  }
+  // Note: postHistoryInstructions should NOT be in system prompt
+  // It must be injected AFTER the chat history in buildGroupChatMessages
 
   // ========================================
   // UNIFIED KEY RESOLUTION - Apply to ALL sections
@@ -731,10 +751,11 @@ export function buildGroupSystemPrompt(
 /**
  * Build messages array for group chat
  *
- * Chat History format for group chats:
- * - Shows all messages in chronological order
- * - Includes previous responses from current turn BEFORE this character responds
- * - Each message shows the speaker's name (user or character name)
+ * Order (SillyTavern style):
+ * 1. System message (system prompt)
+ * 2. Chat history (all visible messages)
+ * 3. Previous responses from this turn
+ * 4. Post-History Instructions (injected AFTER chat, as system message)
  */
 export function buildGroupChatMessages(
   systemPrompt: string,
@@ -742,11 +763,12 @@ export function buildGroupChatMessages(
   character: CharacterCard,
   allCharacters: CharacterCard[],
   userName: string = 'User',
-  previousResponses?: Array<{ characterName: string; content: string }>
+  previousResponses?: Array<{ characterName: string; content: string }>,
+  postHistoryInstructions?: string
 ): GroupPromptBuildResult {
   const chatMessages: ChatApiMessage[] = [];
 
-  // System message (just the character/group prompt, no chat history here)
+  // 1. System message (just the character/group prompt, no chat history here)
   chatMessages.push({ role: 'assistant', content: systemPrompt });
 
   // Filter visible messages
@@ -755,7 +777,7 @@ export function buildGroupChatMessages(
   // Build chat history content for prompt viewer
   const historyLines: string[] = [];
 
-  // Add all historical messages
+  // 2. Add all historical messages
   for (const msg of visibleMessages) {
     const speaker = msg.role === 'user' ? userName :
       (allCharacters.find(c => c.id === msg.characterId)?.name || 'Character');
@@ -769,12 +791,21 @@ export function buildGroupChatMessages(
     }
   }
 
-  // Add previous responses from this turn AFTER the user's message
+  // 3. Add previous responses from this turn AFTER the user's message
   if (previousResponses && previousResponses.length > 0) {
     for (const resp of previousResponses) {
       historyLines.push(`${resp.characterName}: ${resp.content}`);
       chatMessages.push({ role: 'assistant', content: resp.content });
     }
+  }
+
+  // 4. Post-History Instructions - injected AFTER chat history
+  // This is the correct SillyTavern behavior
+  if (postHistoryInstructions?.trim()) {
+    chatMessages.push({
+      role: 'system',
+      content: postHistoryInstructions
+    });
   }
 
   // Build chat history section for prompt viewer

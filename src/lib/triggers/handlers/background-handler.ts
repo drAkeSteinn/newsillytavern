@@ -82,6 +82,33 @@ export interface BackgroundHandlerResult {
 // ============================================
 
 /**
+ * Check if a key matches a token
+ * 
+ * Matching rules:
+ * - Single-word key: Requires EXACT match (no partial matches)
+ * - Multi-word key: Checks if the phrase appears in text
+ * 
+ * This prevents false positives like:
+ * - "marisa" triggering "risa" (no longer matches)
+ * - "alegría" triggering "ale" (no longer matches)
+ */
+function keyMatchesToken(key: string, tokenText: string): boolean {
+  const normalizedKey = key.toLowerCase();
+  const normalizedToken = tokenText.toLowerCase();
+  
+  if (!normalizedKey || !normalizedToken) return false;
+  
+  // For single-word keys, require EXACT match
+  const keyWords = normalizedKey.split(/\s+/);
+  if (keyWords.length === 1) {
+    return normalizedToken === normalizedKey;
+  }
+  
+  // For multi-word keys, check if the phrase appears in token
+  return normalizedToken.includes(normalizedKey);
+}
+
+/**
  * Check if keys match according to the specified mode
  */
 function checkMatchMode(
@@ -92,23 +119,23 @@ function checkMatchMode(
   mode: BackgroundMatchMode
 ): { triggerMatched: boolean; contextMatched: boolean } {
   const triggerMatched = triggerKeys.length === 0 || triggerKeys.some(key =>
-    tokenTexts.some(t => t.includes(key.toLowerCase())) ||
-    allText.includes(key.toLowerCase())
+    tokenTexts.some(t => keyMatchesToken(key, t)) ||
+    keyMatchesToken(key, allText)
   );
   
   const allTriggerMatched = triggerKeys.length === 0 || triggerKeys.every(key =>
-    tokenTexts.some(t => t.includes(key.toLowerCase())) ||
-    allText.includes(key.toLowerCase())
+    tokenTexts.some(t => keyMatchesToken(key, t)) ||
+    keyMatchesToken(key, allText)
   );
   
   const contextMatched = contextKeys.length === 0 || contextKeys.some(key =>
-    tokenTexts.some(t => t.includes(key.toLowerCase())) ||
-    allText.includes(key.toLowerCase())
+    tokenTexts.some(t => keyMatchesToken(key, t)) ||
+    keyMatchesToken(key, allText)
   );
   
   const allContextMatched = contextKeys.length === 0 || contextKeys.every(key =>
-    tokenTexts.some(t => t.includes(key.toLowerCase())) ||
-    allText.includes(key.toLowerCase())
+    tokenTexts.some(t => keyMatchesToken(key, t)) ||
+    keyMatchesToken(key, allText)
   );
   
   switch (mode) {
@@ -150,16 +177,16 @@ function findMatchingVariant(
   );
   
   for (const variant of sortedVariants) {
-    // Check if any trigger key matches
+    // Check if any trigger key matches (using exact matching for single words)
     const triggerMatched = variant.triggerKeys.length === 0 || variant.triggerKeys.some(key =>
-      tokenTexts.some(t => t.includes(key.toLowerCase())) ||
-      allText.includes(key.toLowerCase())
+      tokenTexts.some(t => keyMatchesToken(key, t)) ||
+      keyMatchesToken(key, allText)
     );
     
     // Check if any context key matches (optional)
     const contextMatched = variant.contextKeys.length === 0 || variant.contextKeys.some(key =>
-      tokenTexts.some(t => t.includes(key.toLowerCase())) ||
-      allText.includes(key.toLowerCase())
+      tokenTexts.some(t => keyMatchesToken(key, t)) ||
+      keyMatchesToken(key, allText)
     );
     
     if (triggerMatched && contextMatched) {

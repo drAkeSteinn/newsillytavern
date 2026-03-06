@@ -8,7 +8,7 @@
 // - All sections are processed consistently
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance } from '@/types';
+import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance, SessionSummary } from '@/types';
 import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import {
   DEFAULT_CHARACTER,
@@ -17,6 +17,7 @@ import {
   createSSEStreamResponse,
   buildSystemPrompt,
   buildChatHistorySections,
+  buildPostHistorySection,
   buildChatMessages,
   buildCompletionPrompt,
   getEffectiveUserName,
@@ -78,6 +79,9 @@ export async function POST(request: NextRequest) {
       ...DEFAULT_QUEST_SETTINGS,
       ...(body.questSettings || {})
     };
+
+    // Extract summary for memory/context compression (single summary from session)
+    const summary: SessionSummary | undefined = body.summary;
 
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
@@ -172,11 +176,44 @@ export async function POST(request: NextRequest) {
       effectiveUserName
     );
 
+    // Build post-history instructions section (for prompt viewer)
+    // Pass keyContext to resolve all {{keys}} like {{user}}, {{char}}, {{stats}}, etc.
+    const postHistorySection = buildPostHistorySection(
+      effectiveCharacter.postHistoryInstructions,
+      keyContext
+    );
+
+    // Build summary section if summary exists (memory/context compression)
+    let summarySection: PromptSection | null = null;
+    let summaryMessage: ChatMessage | null = null;
+    if (summary) {
+      summarySection = {
+        type: 'system',
+        label: 'Conversation Summary',
+        content: `[Previous Conversation Summary]\n${summary.content}`,
+        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+      };
+      // Create a synthetic message for chat history injection
+      summaryMessage = {
+        id: 'summary-' + Date.now(),
+        role: 'assistant',
+        content: `[Previous Conversation Summary]\n${summary.content}`,
+        characterId: effectiveCharacter.id,
+        isDeleted: false,
+        timestamp: summary.createdAt,
+        swipeId: 'summary',
+        swipeIndex: 0
+      };
+    }
+
     // Combine all sections in order for prompt viewer
+    // Order: System -> Summary -> Quest -> Chat History -> Post-History Instructions
     let allPromptSections: PromptSection[] = [
       ...systemSections,
+      ...(summarySection ? [summarySection] : []),
       ...(questSection ? [questSection] : []),
-      ...chatHistorySections
+      ...chatHistorySections,
+      ...(postHistorySection ? [postHistorySection] : [])
     ];
 
     // Inject HUD context into sections if enabled
@@ -184,14 +221,18 @@ export async function POST(request: NextRequest) {
       allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
     }
 
-    // Build the final system prompt (include quest section if present)
+    // Build the final system prompt (only include quest section, summary goes to chat history)
     let finalSystemPrompt = systemPrompt;
     if (questSection) {
       finalSystemPrompt += `\n\n[${questSection.label}]\n${questSection.content}`;
     }
 
     // Prepare messages with new user message (use context-windowed messages)
-    const allMessages = [...contextWindow.messages, createUserMessage(sanitizedMessage)];
+    // Inject summary at the START of chat history if it exists
+    let allMessages = summaryMessage 
+      ? [summaryMessage, ...contextWindow.messages] 
+      : [...contextWindow.messages];
+    allMessages = [...allMessages, createUserMessage(sanitizedMessage)];
 
     // Create a TransformStream for SSE
     const stream = new ReadableStream({
@@ -205,6 +246,13 @@ export async function POST(request: NextRequest) {
 
           let generator: AsyncGenerator<string>;
 
+          // Get post-history instructions from character and RESOLVE ALL KEYS
+          // This ensures {{user}}, {{char}}, {{stats}}, etc. are replaced
+          const rawPostHistoryInstructions = effectiveCharacter.postHistoryInstructions?.trim();
+          const postHistoryInstructions = rawPostHistoryInstructions 
+            ? resolveAllKeys(rawPostHistoryInstructions, keyContext)
+            : undefined;
+
           // Route to appropriate provider
           switch (llmConfig.provider) {
             case 'z-ai': {
@@ -213,8 +261,8 @@ export async function POST(request: NextRequest) {
                 finalSystemPrompt,
                 allMessages,
                 effectiveCharacter,
-                effectiveUserName
-                // Note: postHistoryInstructions is already included in systemPrompt
+                effectiveUserName,
+                postHistoryInstructions  // Injected AFTER chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -236,7 +284,7 @@ export async function POST(request: NextRequest) {
                 allMessages,
                 effectiveCharacter,
                 effectiveUserName,
-                undefined, // postHistoryInstructions already in systemPrompt
+                postHistoryInstructions,  // Injected AFTER chat history
                 true // Use system role for OpenAI
               );
               // Inject HUD context into chat messages if enabled
@@ -256,7 +304,7 @@ export async function POST(request: NextRequest) {
                 allMessages,
                 effectiveCharacter,
                 effectiveUserName,
-                undefined, // postHistoryInstructions already in systemPrompt
+                postHistoryInstructions,  // Injected AFTER chat history
                 true // Use system role for Anthropic
               );
               // Inject HUD context into chat messages if enabled
@@ -272,8 +320,8 @@ export async function POST(request: NextRequest) {
                 systemPrompt: finalSystemPrompt,
                 messages: allMessages,
                 character: effectiveCharacter,
-                userName: effectiveUserName
-                // Note: postHistoryInstructions already in systemPrompt
+                userName: effectiveUserName,
+                postHistoryInstructions  // Injected AFTER chat history
               });
               generator = streamOllama(prompt, llmConfig);
               break;
@@ -286,7 +334,8 @@ export async function POST(request: NextRequest) {
                 systemPrompt: finalSystemPrompt,
                 messages: allMessages,
                 character: effectiveCharacter,
-                userName: effectiveUserName
+                userName: effectiveUserName,
+                postHistoryInstructions  // Injected AFTER chat history
               });
               generator = streamTextGenerationWebUI(prompt, llmConfig);
               break;

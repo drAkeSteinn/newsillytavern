@@ -359,6 +359,14 @@ function getSoundFile(trigger: SoundTrigger, collections: SoundCollection[]): st
 
 /**
  * Check if token matches keyword
+ * 
+ * Matching rules:
+ * - Single-word keyword: Requires EXACT match (no partial matches)
+ * - Multi-word keyword: Checks if all words appear in token or if keyword appears as substring
+ * 
+ * This prevents false positives like:
+ * - "marisa" triggering "risa" (no longer matches)
+ * - "alegría" triggering "ale" (no longer matches)
  */
 function checkTokenMatch(token: DetectedToken, keyword: string): boolean {
   const normalizedKeyword = keyword.toLowerCase().trim();
@@ -366,6 +374,18 @@ function checkTokenMatch(token: DetectedToken, keyword: string): boolean {
   
   if (!normalizedKeyword || !normalizedToken) return false;
   
-  return normalizedToken.includes(normalizedKeyword) || 
-         normalizedKeyword.includes(normalizedToken);
+  // For single-word keywords, require EXACT match
+  // This prevents false positives like "marisa" matching "risa"
+  const keywordWords = normalizedKeyword.split(/\s+/);
+  if (keywordWords.length === 1) {
+    return normalizedToken === normalizedKeyword;
+  }
+  
+  // For multi-word keywords, check if all words appear in token
+  // or if the full phrase appears as substring
+  const allWordsMatch = keywordWords.every(word => normalizedToken.includes(word));
+  if (allWordsMatch) return true;
+  
+  // Also check if the full keyword phrase appears in token
+  return normalizedToken.includes(normalizedKeyword);
 }

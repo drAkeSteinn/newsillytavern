@@ -338,6 +338,18 @@ function processParsedTag(
 
 /**
  * Build quest section for prompt
+ * 
+ * Format:
+ * - Misión: nombre
+ *   Descripción: descripción
+ *   OBJETIVOS PENDIENTES:
+ *   - Objetivo 1
+ *   - Objetivo 2
+ *   OBJETIVOS OPCIONALES:
+ *   - objetivo opcional 1
+ * 
+ * - Only shows incomplete objectives
+ * - Optional objectives section only appears if there are pending optional objectives
  */
 export function buildQuestPromptSection(
   templates: QuestTemplate[],
@@ -355,27 +367,50 @@ export function buildQuestPromptSection(
     const questTemplate = templates.find(t => t.id === q.templateId);
     if (!questTemplate) return '';
     
-    // Build objectives list
-    const objectives = questTemplate.objectives
-      .map(obj => {
-        const sessionObj = q.objectives.find(o => o.templateId === obj.id);
-        const isCompleted = sessionObj?.isCompleted || false;
-        const currentCount = sessionObj?.currentCount || 0;
-        
-        const progress = obj.targetCount > 1 
-          ? ` (${currentCount}/${obj.targetCount})` 
-          : '';
-        
-        const status = isCompleted ? '✓' : '○';
-        return `  - ${status} ${obj.description}${progress}`;
-      })
-      .filter(o => o)
-      .join('\n');
+    // Separate objectives: pending (not completed) vs optional
+    const pendingObjectives: string[] = [];
+    const optionalObjectives: string[] = [];
     
-    return `**${questTemplate.name}** (${questTemplate.priority})
-${questTemplate.description}
-Objectives:
-${objectives}`;
+    for (const obj of questTemplate.objectives) {
+      const sessionObj = q.objectives.find(o => o.templateId === obj.id);
+      const isCompleted = sessionObj?.isCompleted || false;
+      
+      // Skip completed objectives - they should not appear
+      if (isCompleted) continue;
+      
+      const currentCount = sessionObj?.currentCount || 0;
+      const progress = obj.targetCount > 1 
+        ? ` (${currentCount}/${obj.targetCount})` 
+        : '';
+      
+      const objectiveLine = `- ${obj.description}${progress}`;
+      
+      if (obj.isOptional) {
+        optionalObjectives.push(objectiveLine);
+      } else {
+        pendingObjectives.push(objectiveLine);
+      }
+    }
+    
+    // Build the quest block
+    let questBlock = `- Misión: ${questTemplate.name}
+  Descripción: ${questTemplate.description}`;
+    
+    // Add pending objectives section (always show if there are any)
+    if (pendingObjectives.length > 0) {
+      questBlock += `
+  OBJETIVOS PENDIENTES:
+  ${pendingObjectives.join('\n  ')}`;
+    }
+    
+    // Add optional objectives section only if there are pending optional objectives
+    if (optionalObjectives.length > 0) {
+      questBlock += `
+  OBJETIVOS OPCIONALES:
+  ${optionalObjectives.join('\n  ')}`;
+    }
+    
+    return questBlock;
   }).filter(q => q).join('\n\n');
   
   if (!questList) return '';

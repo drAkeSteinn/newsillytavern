@@ -13,7 +13,7 @@ import { HUDDisplay } from './hud-display';
 import { QuestHUD } from './quest-hud';
 import { QuestNotifications } from './quest-notifications';
 import { Sparkles } from 'lucide-react';
-import type { CharacterCard } from '@/types';
+import type { CharacterCard, SummaryData, ChatMessage } from '@/types';
 import { t } from '@/lib/i18n';
 import { chatLogger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
@@ -57,6 +57,15 @@ export function ChatPanel() {
   // UNIFIED SPRITE SYSTEM: Use per-character sprite state management
   const startSpriteGenerationForCharacter = useTavernStore((state) => state.startGenerationForCharacter);
   const endSpriteGenerationForCharacter = useTavernStore((state) => state.endGenerationForCharacter);
+  
+  // Memory & Summary System - Track messages and generate summaries
+  const summarySettings = useTavernStore((state) => state.summarySettings);
+  const incrementMessageCount = useTavernStore((state) => state.incrementMessageCount);
+  const shouldGenerateSummary = useTavernStore((state) => state.shouldGenerateSummary);
+  const setSessionSummary = useTavernStore((state) => state.setSessionSummary);
+  const resetMessageCount = useTavernStore((state) => state.resetMessageCount);
+  const initSessionTracking = useTavernStore((state) => state.initSessionTracking);
+  const deleteMessagesUpTo = useTavernStore((state) => state.deleteMessagesUpTo);
 
   // Ref to track ongoing generation and prevent race conditions
   const generationIdRef = useRef<string | null>(null);
@@ -179,6 +188,125 @@ export function ChatPanel() {
       generationIdRef.current = null;
     }
   }, [isGenerating]);
+
+  // ============================================
+  // MEMORY & SUMMARY INTEGRATION
+  // Generates summaries when threshold is reached
+  // ============================================
+  
+  // Initialize session tracking when session changes
+  useEffect(() => {
+    if (activeSessionId && summarySettings.enabled) {
+      initSessionTracking(activeSessionId, isGroupMode);
+    }
+  }, [activeSessionId, summarySettings.enabled, isGroupMode, initSessionTracking]);
+
+  // Function to generate summary when threshold is reached
+  const generateSummaryIfNeeded = useCallback(async () => {
+    if (!activeSessionId || !summarySettings.enabled || !summarySettings.autoSummarize) {
+      return;
+    }
+
+    // Check if we should generate a summary
+    if (!shouldGenerateSummary(activeSessionId)) {
+      return;
+    }
+
+    try {
+      chatLogger.info('[Memory] Generating summary for session', { sessionId: activeSessionId });
+
+      // Get the current session's messages
+      const currentSession = useTavernStore.getState().sessions.find(s => s.id === activeSessionId);
+      const messages = currentSession?.messages || [];
+      const visibleMessages = messages.filter(m => !m.isDeleted);
+
+      // Get the messages to summarize (all except recent ones to keep)
+      const messagesToSummarize = visibleMessages.slice(0, -summarySettings.keepRecentMessages);
+      
+      if (messagesToSummarize.length === 0) {
+        return;
+      }
+
+      // Get the current summary from the session for incremental update
+      const previousSummary = currentSession?.summary?.content;
+
+      // Get LLM config for summary generation
+      const { llmConfigs } = useTavernStore.getState();
+      const activeLLMConfig = llmConfigs.find(c => c.isActive);
+      
+      if (!activeLLMConfig) {
+        chatLogger.warn('[Memory] No active LLM config for summary generation');
+        return;
+      }
+
+      // Get character name(s) for summary
+      const characterName = isGroupMode 
+        ? activeGroup?.name || 'Group'
+        : activeCharacter?.name || 'Character';
+
+      // Call summary API
+      const response = await fetch('/api/chat/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messagesToSummarize,
+          characterName,
+          userName: activePersona?.name || 'User',
+          settings: summarySettings,
+          previousSummary,
+          apiConfig: {
+            provider: activeLLMConfig.provider,
+            endpoint: activeLLMConfig.endpoint || '',
+            apiKey: activeLLMConfig.apiKey,
+            model: summarySettings.model || activeLLMConfig.model,
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Summary generation failed');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.summary) {
+        // Save summary directly to session (overwrites previous)
+        setSessionSummary(activeSessionId, {
+          content: data.summary.content,
+          messageRange: data.summary.messageRange,
+          tokens: data.summary.tokens,
+          createdAt: data.summary.createdAt,
+          model: data.summary.model,
+        });
+        
+        // Delete old messages that were summarized (keep recent ones + first message)
+        deleteMessagesUpTo(activeSessionId, summarySettings.keepRecentMessages);
+        
+        // Reset message count after successful summary
+        resetMessageCount(activeSessionId);
+        
+        chatLogger.info('[Memory] Summary generated successfully', { 
+          sessionId: activeSessionId,
+          tokens: data.summary.tokens,
+          messagesDeleted: messagesToSummarize.length
+        });
+      }
+    } catch (error) {
+      chatLogger.error('[Memory] Summary generation error', { error });
+    }
+  }, [
+    activeSessionId, 
+    summarySettings, 
+    shouldGenerateSummary, 
+    activeSession,
+    setSessionSummary, 
+    resetMessageCount,
+    deleteMessagesUpTo,
+    isGroupMode,
+    activeGroup,
+    activeCharacter,
+    activePersona
+  ]);
 
   const handleSend = useCallback(async (userMessage: string) => {
     // Double-check using both state and ref to prevent race conditions
@@ -412,7 +540,8 @@ export function ChatPanel() {
             sessionQuests: currentSession?.sessionQuests,  // Pass session quests
             questTemplates,  // Pass quest templates
             questSettings,  // Pass quest settings
-            hudContext: activeHUDContext  // Pass HUD context for prompt injection
+            hudContext: activeHUDContext,  // Pass HUD context for prompt injection
+            summary: activeSession?.summary  // Pass session summary (single, not array)
           })
         });
 
@@ -565,6 +694,21 @@ export function ChatPanel() {
         // If trigger was activated, keeps trigger sprite; otherwise returns to idle
         if (activeCharacter) {
           endSpriteGenerationForCharacter(activeCharacter.id);
+        }
+        
+        // ============================================
+        // MEMORY & SUMMARY INTEGRATION
+        // Increment message count and check for summary generation
+        // ============================================
+        if (activeSessionId) {
+          // Increment message count (one for user, one for assistant = 2 messages per exchange)
+          incrementMessageCount(activeSessionId, isGroupMode);
+          
+          // Check if we need to generate a summary
+          // Run asynchronously to not block the UI
+          generateSummaryIfNeeded().catch(err => {
+            chatLogger.error('[Memory] Background summary generation failed', { err });
+          });
         }
       }
     }

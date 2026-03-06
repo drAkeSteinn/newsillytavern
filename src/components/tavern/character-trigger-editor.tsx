@@ -31,11 +31,13 @@ import {
   Edit,
   Zap,
   Image as ImageIcon,
-  X,
   Loader2,
   Timer,
   RefreshCw,
   ArrowRight,
+  Key,
+  Settings2,
+  Info,
 } from 'lucide-react';
 import type { CharacterCard, SpriteState, CharacterSpriteTrigger, SpriteIndexEntry, ReturnToMode } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -70,15 +72,59 @@ const RETURN_TO_MODES: { value: ReturnToMode; label: string; description: string
   },
 ];
 
+/**
+ * Get all keys from a trigger (main key + alternatives + legacy keywords)
+ */
+function getAllTriggerKeys(trigger: CharacterSpriteTrigger): string[] {
+  const allKeys: string[] = [];
+  
+  // Main key
+  if (trigger.key) {
+    allKeys.push(trigger.key);
+  }
+  
+  // Alternative keys
+  if (trigger.keys && trigger.keys.length > 0) {
+    allKeys.push(...trigger.keys);
+  }
+  
+  // Legacy keywords support
+  if (trigger.keywords && trigger.keywords.length > 0) {
+    allKeys.push(...trigger.keywords);
+  }
+  
+  return allKeys;
+}
+
+/**
+ * Parse keys from comma-separated string
+ */
+function parseKeysString(keysStr: string): string[] {
+  return keysStr
+    .split(',')
+    .map(k => k.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Convert keys array to comma-separated string
+ */
+function keysToString(keys: string[] | undefined): string {
+  return (keys || []).join(', ');
+}
+
 export function CharacterTriggerEditor({ character, onChange }: CharacterTriggerEditorProps) {
   // Get triggers from character data
   const triggers: CharacterSpriteTrigger[] = character.spriteTriggers || [];
   
   const [editingTrigger, setEditingTrigger] = useState<CharacterSpriteTrigger | null>(null);
   const [showEditor, setShowEditor] = useState(false);
-  const [newKeyword, setNewKeyword] = useState('');
   const [availableSprites, setAvailableSprites] = useState<SpriteIndexEntry[]>([]);
   const [loadingSprites, setLoadingSprites] = useState(false);
+  
+  // Key fields state
+  const [mainKey, setMainKey] = useState('');
+  const [alternativeKeys, setAlternativeKeys] = useState('');
 
   // Load available sprites from character's collection
   useEffect(() => {
@@ -119,7 +165,8 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
       id: uuidv4(),
       title: 'Nuevo Trigger',
       active: true,
-      keywords: [],
+      key: '',
+      keys: [],
       requirePipes: true,
       caseSensitive: false,
       spriteUrl: '',
@@ -130,11 +177,26 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
       cooldownMs: 1000,
       priority: 1,
     };
+    setMainKey('');
+    setAlternativeKeys('');
     setEditingTrigger(newTrigger);
     setShowEditor(true);
   };
 
   const handleEditTrigger = (trigger: CharacterSpriteTrigger) => {
+    // Initialize key fields from trigger
+    setMainKey(trigger.key || '');
+    
+    // Get alternative keys (excluding main key from legacy keywords)
+    const altKeys = trigger.keys || [];
+    // If legacy keywords exist but keys doesn't, use keywords minus main key
+    if (!trigger.keys && trigger.keywords && trigger.keywords.length > 0) {
+      const legacyAltKeys = trigger.keywords.filter(k => k !== trigger.key);
+      setAlternativeKeys(legacyAltKeys.join(', '));
+    } else {
+      setAlternativeKeys(keysToString(altKeys));
+    }
+    
     setEditingTrigger({ ...trigger });
     setShowEditor(true);
   };
@@ -146,40 +208,28 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
   const handleSaveTrigger = () => {
     if (!editingTrigger) return;
     
-    const existingIndex = triggers.findIndex(t => t.id === editingTrigger.id);
+    // Build the trigger with keys
+    const updatedTrigger: CharacterSpriteTrigger = {
+      ...editingTrigger,
+      key: mainKey.trim(),
+      keys: parseKeysString(alternativeKeys),
+      // Clear legacy keywords if we have new key system
+      keywords: undefined,
+    };
+    
+    const existingIndex = triggers.findIndex(t => t.id === updatedTrigger.id);
     if (existingIndex >= 0) {
       // Update existing
       const newTriggers = [...triggers];
-      newTriggers[existingIndex] = editingTrigger;
+      newTriggers[existingIndex] = updatedTrigger;
       updateTriggers(newTriggers);
     } else {
       // Add new
-      updateTriggers([...triggers, editingTrigger]);
+      updateTriggers([...triggers, updatedTrigger]);
     }
     
     setEditingTrigger(null);
     setShowEditor(false);
-  };
-
-  const handleAddKeyword = () => {
-    if (!editingTrigger || !newKeyword.trim()) return;
-    
-    const keyword = newKeyword.trim().toLowerCase();
-    if (!editingTrigger.keywords.includes(keyword)) {
-      setEditingTrigger({
-        ...editingTrigger,
-        keywords: [...editingTrigger.keywords, keyword],
-      });
-    }
-    setNewKeyword('');
-  };
-
-  const handleRemoveKeyword = (keyword: string) => {
-    if (!editingTrigger) return;
-    setEditingTrigger({
-      ...editingTrigger,
-      keywords: editingTrigger.keywords.filter(k => k !== keyword),
-    });
   };
 
   // Get sprite preview URL from trigger
@@ -237,7 +287,7 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
         <div>
           <h3 className="text-sm font-medium">Triggers Simples</h3>
           <p className="text-xs text-muted-foreground">
-            Sistema básico: cuando se detecta <strong>cualquier keyword</strong>, muestra el sprite asignado.
+            Sistema básico: cuando se detecta <strong>cualquier key</strong>, muestra el sprite asignado.
           </p>
         </div>
         <Button size="sm" onClick={handleAddTrigger}>
@@ -254,12 +304,12 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="p-2 bg-background rounded border">
-            <div className="font-mono text-xs">|happy|</div>
+            <div className="font-mono text-xs">|spritewin|</div>
             <div className="text-muted-foreground text-[10px] mt-1">Detectado en chat</div>
           </div>
           <div className="flex items-center justify-center text-muted-foreground">→</div>
           <div className="p-2 bg-background rounded border">
-            <div className="font-mono text-xs">happy.png</div>
+            <div className="font-mono text-xs">win.png</div>
             <div className="text-muted-foreground text-[10px] mt-1">Sprite mostrado</div>
           </div>
         </div>
@@ -278,99 +328,102 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
       ) : (
         <ScrollArea className="h-[300px]">
           <div className="space-y-2 pr-2">
-            {triggers.map((trigger) => (
-              <div
-                key={trigger.id}
-                className={cn(
-                  "flex items-center gap-3 p-3 border rounded-lg",
-                  !trigger.active && "opacity-50"
-                )}
-              >
-                {/* Sprite Preview */}
-                <div className="w-12 h-12 rounded border overflow-hidden bg-muted/50 flex items-center justify-center flex-shrink-0">
-                  {getSpritePreviewUrl(trigger) ? (
-                    <SpritePreview
-                      src={getSpritePreviewUrl(trigger)!}
-                      alt={trigger.title}
-                      className="w-full h-full"
-                      objectFit="contain"
-                    />
-                  ) : (
-                    <ImageIcon className="w-5 h-5 text-muted-foreground" />
+            {triggers.map((trigger) => {
+              const allKeys = getAllTriggerKeys(trigger);
+              return (
+                <div
+                  key={trigger.id}
+                  className={cn(
+                    "flex items-center gap-3 p-3 border rounded-lg",
+                    !trigger.active && "opacity-50"
                   )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">{trigger.title}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {getSpriteLabel(trigger)}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {trigger.keywords.slice(0, 4).map((kw) => (
-                      <Badge key={kw} variant="secondary" className="text-xs">
-                        {trigger.requirePipes ? `|${kw}|` : kw}
-                      </Badge>
-                    ))}
-                    {trigger.keywords.length > 4 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{trigger.keywords.length - 4}
-                      </Badge>
+                >
+                  {/* Sprite Preview */}
+                  <div className="w-12 h-12 rounded border overflow-hidden bg-muted/50 flex items-center justify-center flex-shrink-0">
+                    {getSpritePreviewUrl(trigger) ? (
+                      <SpritePreview
+                        src={getSpritePreviewUrl(trigger)!}
+                        alt={trigger.title}
+                        className="w-full h-full"
+                        objectFit="contain"
+                      />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-muted-foreground" />
                     )}
                   </div>
-                  {/* Return info */}
-                  {trigger.returnToIdleMs > 0 && (
-                    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-                      <Timer className="w-3 h-3" />
-                      <span>
-                        Retorna en {formatTime(trigger.returnToIdleMs)} → 
-                        {trigger.returnToMode === 'custom_sprite' ? ' Sprite personalizado' : ' Colección Idle'}
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1">
-                  <Switch
-                    checked={trigger.active}
-                    onCheckedChange={(active) => {
-                      const newTriggers = triggers.map(t =>
-                        t.id === trigger.id ? { ...t, active } : t
-                      );
-                      updateTriggers(newTriggers);
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => handleEditTrigger(trigger)}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => handleDeleteTrigger(trigger.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">{trigger.title}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {getSpriteLabel(trigger)}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {allKeys.slice(0, 4).map((k) => (
+                        <Badge key={k} variant="secondary" className="text-xs font-mono">
+                          {trigger.requirePipes ? `|${k}|` : k}
+                        </Badge>
+                      ))}
+                      {allKeys.length > 4 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{allKeys.length - 4}
+                        </Badge>
+                      )}
+                    </div>
+                    {/* Return info */}
+                    {trigger.returnToIdleMs > 0 && (
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                        <Timer className="w-3 h-3" />
+                        <span>
+                          Retorna en {formatTime(trigger.returnToIdleMs)} → 
+                          {trigger.returnToMode === 'custom_sprite' ? ' Sprite personalizado' : ' Colección Idle'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1">
+                    <Switch
+                      checked={trigger.active}
+                      onCheckedChange={(active) => {
+                        const newTriggers = triggers.map(t =>
+                          t.id === trigger.id ? { ...t, active } : t
+                        );
+                        updateTriggers(newTriggers);
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleEditTrigger(trigger)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => handleDeleteTrigger(trigger.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       )}
 
       {/* Info Box */}
       <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg space-y-1">
-        <p>💡 <strong>Pipes:</strong> Usa |keyword| para detectar solo cuando está entre pipes.</p>
+        <p>💡 <strong>Keys:</strong> Key principal + alternativas separadas por coma.</p>
+        <p>💡 <strong>Pipes:</strong> Usa |key| para detectar solo cuando está entre pipes.</p>
         <p>💡 <strong>Prioridad:</strong> Los triggers con mayor prioridad tienen preferencia.</p>
-        <p>💡 <strong>Return to Idle:</strong> Tiempo antes de retornar. Por defecto usa la Colección Idle.</p>
       </div>
 
       {/* Edit Dialog */}
@@ -397,59 +450,97 @@ export function CharacterTriggerEditor({ character, onChange }: CharacterTrigger
                 />
               </div>
 
-              {/* Keywords */}
-              <div>
-                <Label className="text-xs">Palabras Clave</Label>
-                <div className="flex gap-1.5 mt-1">
-                  <Input
-                    value={newKeyword}
-                    onChange={(e) => setNewKeyword(e.target.value)}
-                    placeholder="Agregar palabra..."
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddKeyword()}
-                    className="h-8 flex-1"
-                  />
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleAddKeyword}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                {editingTrigger.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {editingTrigger.keywords.map((kw) => (
-                      <Badge key={kw} variant="secondary" className="gap-1 text-xs">
-                        {kw}
-                        <X
-                          className="w-3 h-3 cursor-pointer"
-                          onClick={() => handleRemoveKeyword(kw)}
-                        />
-                      </Badge>
-                    ))}
+              {/* Key Detection Section - HUD Style */}
+              <div className="space-y-3 p-4 rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-muted/10">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-cyan-500/10">
+                    <Key className="w-4 h-4 text-cyan-500" />
                   </div>
-                )}
-              </div>
-
-              {/* Options Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Requiere |pipes|</Label>
+                  Detección de Keys
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20">
+                    Cómo se activa
+                  </Badge>
+                </div>
+                
+                {/* Primary Key */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Key principal</Label>
+                  <Input
+                    value={mainKey}
+                    onChange={(e) => setMainKey(e.target.value)}
+                    placeholder="spritewin, sprite:win, happy..."
+                    className="bg-background font-mono text-sm"
+                  />
+                </div>
+                
+                {/* Alternative Keys */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                    Keys alternativas (separadas por coma)
+                    <span className="ml-1 text-muted-foreground cursor-help inline-flex items-center justify-center" title="Permite detectar variaciones de la key">
+                      <Info className="w-3.5 h-3.5" />
+                    </span>
+                  </Label>
+                  <Input
+                    value={alternativeKeys}
+                    onChange={(e) => setAlternativeKeys(e.target.value)}
+                    placeholder="win, victory, triumph"
+                    className="bg-background font-mono text-sm"
+                  />
+                  {alternativeKeys && (
+                    <div className="flex flex-wrap gap-1">
+                      {parseKeysString(alternativeKeys).map((k, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs font-mono bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                          {k}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Case Sensitivity */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs font-medium">Distinguir mayúsculas/minúsculas</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Si está desactivado, "Win" y "win" serán equivalentes
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingTrigger.caseSensitive}
+                    onCheckedChange={(caseSensitive) => setEditingTrigger({ ...editingTrigger, caseSensitive })}
+                  />
+                </div>
+                
+                {/* Require Pipes */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/40">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs font-medium">Requiere |pipes|</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Si está activo, solo detecta keys entre | pipes |
+                    </p>
+                  </div>
                   <Switch
                     checked={editingTrigger.requirePipes}
                     onCheckedChange={(requirePipes) => setEditingTrigger({ ...editingTrigger, requirePipes })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Cooldown</Label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      value={editingTrigger.cooldownMs}
-                      onChange={(e) => setEditingTrigger({
-                        ...editingTrigger,
-                        cooldownMs: Math.max(0, parseInt(e.target.value) || 0),
-                      })}
-                      className="h-7 w-16 text-xs"
-                    />
-                    <span className="text-xs text-muted-foreground">ms</span>
-                  </div>
+              </div>
+
+              {/* Cooldown */}
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Cooldown</Label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    value={editingTrigger.cooldownMs}
+                    onChange={(e) => setEditingTrigger({
+                      ...editingTrigger,
+                      cooldownMs: Math.max(0, parseInt(e.target.value) || 0),
+                    })}
+                    className="h-7 w-16 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">ms</span>
                 </div>
               </div>
 
