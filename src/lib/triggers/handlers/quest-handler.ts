@@ -389,13 +389,15 @@ export function filterObjectivesForCharacter(
  * Build quest section for prompt
  * 
  * Format:
+ * MISIONES ACTIVAS
  * - Misión: nombre
  *   Descripción: descripción
- *   OBJETIVOS PENDIENTES:
- *   - Objetivo 1
- *   - Objetivo 2
- *   OBJETIVOS OPCIONALES:
- *   - objetivo opcional 1
+ *   OBJETIVOS PRINCIPALES (pendientes):
+ *   - key: objective_key
+ *     texto: descripción del objetivo
+ *   OBJETIVOS OPCIONALES (pendientes):
+ *   - key: optional_key
+ *     texto: descripción del objetivo
  * 
  * - Only shows incomplete objectives
  * - Optional objectives section only appears if there are pending optional objectives
@@ -434,8 +436,9 @@ export function buildQuestPromptSection(
     if (visibleObjectives.length === 0) return '';
     
     // Separate objectives: pending (not completed) vs optional
-    const pendingObjectives: string[] = [];
-    const optionalObjectives: string[] = [];
+    // Store as objects with key and text
+    const pendingObjectives: { key: string; text: string }[] = [];
+    const optionalObjectives: { key: string; text: string }[] = [];
     
     for (const obj of visibleObjectives) {
       const sessionObj = q.objectives.find(o => o.templateId === obj.id);
@@ -449,12 +452,14 @@ export function buildQuestPromptSection(
         ? ` (${currentCount}/${obj.targetCount})` 
         : '';
       
-      const objectiveLine = `- ${obj.description}${progress}`;
+      // Get the completion key for this objective
+      const objectiveKey = obj.completion.key;
+      const objectiveText = `${obj.description}${progress}`;
       
       if (obj.isOptional) {
-        optionalObjectives.push(objectiveLine);
+        optionalObjectives.push({ key: objectiveKey, text: objectiveText });
       } else {
-        pendingObjectives.push(objectiveLine);
+        pendingObjectives.push({ key: objectiveKey, text: objectiveText });
       }
     }
     
@@ -467,16 +472,22 @@ export function buildQuestPromptSection(
     
     // Add pending objectives section (always show if there are any)
     if (pendingObjectives.length > 0) {
+      const objectiveLines = pendingObjectives.map(obj => 
+        `  - key: ${obj.key}\n    texto: ${obj.text}`
+      ).join('\n');
       questBlock += `
-  OBJETIVOS PENDIENTES:
-  ${pendingObjectives.join('\n  ')}`;
+  OBJETIVOS PRINCIPALES (pendientes):
+${objectiveLines}`;
     }
     
     // Add optional objectives section only if there are pending optional objectives
     if (optionalObjectives.length > 0) {
+      const objectiveLines = optionalObjectives.map(obj => 
+        `  - key: ${obj.key}\n    texto: ${obj.text}`
+      ).join('\n');
       questBlock += `
-  OBJETIVOS OPCIONALES:
-  ${optionalObjectives.join('\n  ')}`;
+  OBJETIVOS OPCIONALES (pendientes):
+${objectiveLines}`;
     }
     
     return questBlock;
@@ -484,7 +495,11 @@ export function buildQuestPromptSection(
   
   if (!questList) return '';
   
-  return templateStr.replace('{{activeQuests}}', questList);
+  // Add header and replace placeholder
+  const fullQuestSection = `MISIONES ACTIVAS
+${questList}`;
+  
+  return templateStr.replace('{{activeQuests}}', fullQuestSection);
 }
 
 /**

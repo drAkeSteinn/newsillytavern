@@ -30,6 +30,7 @@ import {
   type TriggerStoreActions,
   type TriggerCategory,
   type TriggerTargetMode,
+  type SpriteTriggerHit,
 } from '@/lib/triggers/unified-trigger-executor';
 
 // ============================================
@@ -43,6 +44,15 @@ export interface RewardExecutionContext {
   sessionStats?: SessionStats;
   allCharacters?: CharacterCard[];  // Para group chats
   timestamp: number;
+  
+  // Resources for trigger lookup
+  soundCollections?: Array<{ name: string; path: string; files: string[] }>;
+  soundTriggers?: Array<{ id: string; name: string; keywords: string[]; collection: string; active: boolean; playMode?: string }>;
+  backgroundPacks?: Array<{ id: string; name: string; active: boolean; priority: number; items: Array<{ backgroundUrl: string; backgroundName: string; triggerKeys: string[]; enabled: boolean; overlays?: unknown[] }>; defaultOverlays?: unknown[]; defaultBackground?: string }>;
+  
+  // Settings
+  soundSettings?: { enabled: boolean; globalVolume: number };
+  backgroundSettings?: { transitionDuration: number; defaultTransitionType: string };
 }
 
 export interface RewardExecutionResult {
@@ -86,8 +96,7 @@ export interface RewardStoreActions {
   // Trigger actions (delegated to unified-trigger-executor)
   applyTriggerForCharacter: (
     characterId: string,
-    spriteUrl: string,
-    returnToIdleMs?: number
+    hit: SpriteTriggerHit
   ) => void;
   scheduleReturnToIdleForCharacter: (
     characterId: string,
@@ -321,6 +330,13 @@ export function executeTriggerRewardFromQuest(
         setBackground: storeActions.setBackground,
         setActiveOverlays: storeActions.setActiveOverlays,
       },
+      // Pass resources for lookup
+      soundCollections: context.soundCollections as any,
+      soundTriggers: context.soundTriggers as any,
+      backgroundPacks: context.backgroundPacks as any,
+      // Pass settings
+      soundSettings: context.soundSettings as any,
+      backgroundSettings: context.backgroundSettings as any,
     };
     
     // Execute trigger via unified executor

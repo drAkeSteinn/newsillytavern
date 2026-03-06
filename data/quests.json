@@ -8,9 +8,495 @@
     "showCompletedInLog": true,
     "maxActiveQuests": 10,
     "promptInclude": true,
-    "promptTemplate": "MISIONES ACTIVAS\n{{activeQuests}}\n\nPROTOCOLO DE MISIONES (para tu respuesta)\n- Siempre muestra el HUD al inicio:\n  [Personaje: Juan | Objetivo: <KEY o NINGUNO>]\n- Objetivo solo puede ser NINGUNO o una key exacta listada arriba.\n- Usa NINGUNO si solo hablas del tema, preguntas o aún no lo cumples.\n- Usa la KEY solo cuando tu respuesta confirme que el objetivo fue cumplido (confirmación clara).\n- Si completas un objetivo opcional, también puedes usar su KEY, pero tu diálogo debe reflejar que es algo extra/voluntario.\n- Máximo 1 objetivo por respuesta (una sola KEY).\n- No inventes objetivos ni keys que no estén listadas."
+    "promptTemplate": "{{activeQuests}}\n\nPROTOCOLO DE MISIONES (para tu respuesta)\n- Siempre muestra el HUD al inicio:\n  [Personaje: Juan | Objetivo: <KEY o NINGUNO>]\n- Objetivo solo puede ser NINGUNO o una key exacta listada arriba.\n- Usa NINGUNO si solo hablas del tema, preguntas o aún no lo cumples.\n- Usa la KEY solo cuando tu respuesta confirme que el objetivo fue cumplido (confirmación clara).\n- Si completas un objetivo opcional, también puedes usar su KEY, pero tu diálogo debe reflejar que es algo extra/voluntario.\n- Máximo 1 objetivo por respuesta (una sola KEY).\n- No inventes objetivos ni keys que no estén listadas."
   },
   "questNotifications": [
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772810332592-zmg0wkyf9",
+      "timestamp": "2026-03-06T15:18:52.592Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772810332564-ik1ha2b5x",
+      "timestamp": "2026-03-06T15:18:52.564Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sound \"glohg\" queued for playback, Background changed to \"Habitación\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "casa",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772810181544-bbgljq4ox",
+      "timestamp": "2026-03-06T15:16:21.544Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772810181453-v7fxkam7c",
+      "timestamp": "2026-03-06T15:16:21.453Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772810152365-x4g4ijuwn",
+      "timestamp": "2026-03-06T15:15:52.365Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772810152340-dlm81doq2",
+      "timestamp": "2026-03-06T15:15:52.340Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sound \"glohg\" queued for playback",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "casa",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772810127573-0r8m1m6ib",
+      "timestamp": "2026-03-06T15:15:27.573Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772810127484-cjj18j07y",
+      "timestamp": "2026-03-06T15:15:27.484Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772808756098-761nyjq68",
+      "timestamp": "2026-03-06T14:52:36.098Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772808756073-9hlks1hay",
+      "timestamp": "2026-03-06T14:52:36.073Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Background changed to \"casa\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "casa",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772808207990-nv49tn6je",
+      "timestamp": "2026-03-06T14:43:27.990Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772808207892-9k6wnibsn",
+      "timestamp": "2026-03-06T14:43:27.892Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772808088727-a6em25svo",
+      "timestamp": "2026-03-06T14:41:28.727Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772808088706-yvgp2fpfs",
+      "timestamp": "2026-03-06T14:41:28.706Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Background changed to \"casa\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "casa",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772808067673-dgwhgxebd",
+      "timestamp": "2026-03-06T14:41:07.673Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772808067578-qeksag4st",
+      "timestamp": "2026-03-06T14:41:07.578Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772808056390-doayludde",
+      "timestamp": "2026-03-06T14:40:56.390Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772808056370-u5dj6aq58",
+      "timestamp": "2026-03-06T14:40:56.370Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772806121803-qk53322hw",
+      "timestamp": "2026-03-06T14:08:41.803Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772806121755-ylucp1u37",
+      "timestamp": "2026-03-06T14:08:41.755Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772806115476-d0avi57xg",
+      "timestamp": "2026-03-06T14:08:35.476Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772806115448-u98175th4",
+      "timestamp": "2026-03-06T14:08:35.448Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772806028927-ai0m3qj09",
+      "timestamp": "2026-03-06T14:07:08.927Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772806028879-fcw1f5iu2",
+      "timestamp": "2026-03-06T14:07:08.879Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772806019957-n68390c2f",
+      "timestamp": "2026-03-06T14:06:59.957Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772806019935-d1c6rdibu",
+      "timestamp": "2026-03-06T14:06:59.935Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772805874577-w6far57vm",
+      "timestamp": "2026-03-06T14:04:34.577Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772805874529-x2fwuk7pn",
+      "timestamp": "2026-03-06T14:04:34.529Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772805766908-kha8qc0mv",
+      "timestamp": "2026-03-06T14:02:46.908Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772805766886-7ct2kftmq",
+      "timestamp": "2026-03-06T14:02:46.886Z",
+      "read": true
+    },
     {
       "questId": "asd",
       "questName": "Mision imposible",
@@ -189,372 +675,6 @@
       "message": "Quest \"Mision imposible\" activated",
       "id": "notif-1772721753224-6rh7o9cel",
       "timestamp": "2026-03-05T14:42:33.224Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772721753210-ue8em0e5x",
-      "timestamp": "2026-03-05T14:42:33.210Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772721598601-ius4u9hpl",
-      "timestamp": "2026-03-05T14:39:58.601Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772721598583-2eu3ri6pd",
-      "timestamp": "2026-03-05T14:39:58.583Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objective \"holi crayoli\" completed! Rewards: resistencia: 0 → 10",
-      "rewards": [
-        {
-          "id": "obj-reward-mmbwbjul",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 10,
-          "action": "add"
-        }
-      ],
-      "id": "notif-1772694193664-qn3h9v1eq",
-      "timestamp": "2026-03-05T07:03:13.664Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: holi crayoli",
-      "id": "notif-1772694193627-dp41ptesc",
-      "timestamp": "2026-03-05T07:03:13.627Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772692314952-llouckhv7",
-      "timestamp": "2026-03-05T06:31:54.952Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772692314934-szvgpiapx",
-      "timestamp": "2026-03-05T06:31:54.934Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_complete",
-      "message": "¡Misión completada: Mision imposible! Recompensas: resistencia: 10 → 60, Sprite changed to: /sprites/Moon/1772316532074-3ni00o.png (returns in 5000ms)",
-      "rewards": [
-        {
-          "id": "reward-mmaftw2r",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 50,
-          "action": "add"
-        },
-        {
-          "id": "reward-mmbwmbbp",
-          "type": "sprite",
-          "key": "sprite:win",
-          "value": 0,
-          "action": "add",
-          "returnToIdleMs": 5000
-        }
-      ],
-      "id": "notif-1772627759900-4bdc9yhdw",
-      "timestamp": "2026-03-04T12:35:59.900Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objective \"holi crayoli\" completed! Rewards: resistencia: 0 → 10",
-      "rewards": [
-        {
-          "id": "obj-reward-mmbwbjul",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 10,
-          "action": "add"
-        }
-      ],
-      "id": "notif-1772627759845-nnb34qakg",
-      "timestamp": "2026-03-04T12:35:59.845Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: holi crayoli",
-      "id": "notif-1772627759810-yaa70uygn",
-      "timestamp": "2026-03-04T12:35:59.810Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: asd",
-      "id": "notif-1772627748507-2dcz822ds",
-      "timestamp": "2026-03-04T12:35:48.507Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772627735868-ktj6tlt5k",
-      "timestamp": "2026-03-04T12:35:35.868Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772627735851-ca7xjmmmk",
-      "timestamp": "2026-03-04T12:35:35.851Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_complete",
-      "message": "¡Misión completada: Mision imposible! Recompensas: resistencia: 10 → 60",
-      "rewards": [
-        {
-          "id": "reward-mmaftw2r",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 50,
-          "action": "add"
-        },
-        {
-          "id": "reward-mmbwmbbp",
-          "type": "sprite",
-          "key": "sprite:win",
-          "value": 0,
-          "action": "add",
-          "returnToIdleMs": 5000
-        }
-      ],
-      "id": "notif-1772627322813-cd5kdumt1",
-      "timestamp": "2026-03-04T12:28:42.813Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: asd",
-      "id": "notif-1772627322779-p4kriiphu",
-      "timestamp": "2026-03-04T12:28:42.779Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objective \"holi crayoli\" completed! Rewards: resistencia: 0 → 10",
-      "rewards": [
-        {
-          "id": "obj-reward-mmbwbjul",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 10,
-          "action": "add"
-        }
-      ],
-      "id": "notif-1772627305889-yf47c2wmn",
-      "timestamp": "2026-03-04T12:28:25.889Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: holi crayoli",
-      "id": "notif-1772627305856-chkfsl1jv",
-      "timestamp": "2026-03-04T12:28:25.856Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772627292871-hw4g6bn78",
-      "timestamp": "2026-03-04T12:28:12.871Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772627292853-zhnur8u8g",
-      "timestamp": "2026-03-04T12:28:12.853Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_complete",
-      "message": "¡Misión completada: Mision imposible! Recompensas: resistencia: 10 → 60",
-      "rewards": [
-        {
-          "id": "reward-mmaftw2r",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 50,
-          "action": "add"
-        },
-        {
-          "id": "reward-mmbwmbbp",
-          "type": "sprite",
-          "key": "sprite:win",
-          "value": 0,
-          "action": "add",
-          "returnToIdleMs": 5000
-        }
-      ],
-      "id": "notif-1772627247779-w95l48gq0",
-      "timestamp": "2026-03-04T12:27:27.779Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objective \"holi crayoli\" completed! Rewards: resistencia: 0 → 10",
-      "rewards": [
-        {
-          "id": "obj-reward-mmbwbjul",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 10,
-          "action": "add"
-        }
-      ],
-      "id": "notif-1772627247740-wnd933jfs",
-      "timestamp": "2026-03-04T12:27:27.740Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: holi crayoli",
-      "id": "notif-1772627247706-5320eyd2b",
-      "timestamp": "2026-03-04T12:27:27.706Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: asd",
-      "id": "notif-1772627236209-3ypmuciso",
-      "timestamp": "2026-03-04T12:27:16.209Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772627223409-x9iglu6eb",
-      "timestamp": "2026-03-04T12:27:03.409Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772627223390-d7hfga1ph",
-      "timestamp": "2026-03-04T12:27:03.390Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objective \"holi crayoli\" completed! Rewards: resistencia: 0 → 10",
-      "rewards": [
-        {
-          "id": "obj-reward-mmbwbjul",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 10,
-          "action": "add"
-        }
-      ],
-      "id": "notif-1772626212704-blncpgqad",
-      "timestamp": "2026-03-04T12:10:12.704Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: holi crayoli",
-      "id": "notif-1772626212671-v80bkywwz",
-      "timestamp": "2026-03-04T12:10:12.671Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: asd",
-      "id": "notif-1772626200196-paz9oqw2t",
-      "timestamp": "2026-03-04T12:10:00.196Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772626185796-2jq3ncoeh",
-      "timestamp": "2026-03-04T12:09:45.796Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772626185779-59u0cgf7y",
-      "timestamp": "2026-03-04T12:09:45.779Z",
       "read": true
     }
   ]

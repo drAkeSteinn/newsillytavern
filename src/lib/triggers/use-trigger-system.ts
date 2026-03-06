@@ -597,6 +597,18 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       allCharacters: characters, // Para targetMode en group chats
                       sessionStats: activeSession?.sessionStats,
                       timestamp: Date.now(),
+                      // Pass resources for trigger lookup
+                      soundCollections: store.soundCollections,
+                      soundTriggers: store.soundTriggers,
+                      backgroundPacks: store.backgroundTriggerPacks,
+                      soundSettings: {
+                        enabled: settings.sound?.enabled ?? false,
+                        globalVolume: settings.sound?.globalVolume ?? 0.85,
+                      },
+                      backgroundSettings: {
+                        transitionDuration: settings.backgroundTriggers?.transitionDuration ?? 500,
+                        defaultTransitionType: settings.backgroundTriggers?.defaultTransitionType ?? 'fade',
+                      },
                     };
                     
                     const rewardActions: RewardStoreActions = {
@@ -656,6 +668,18 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       allCharacters: characters, // Para targetMode en group chats
                       sessionStats: updatedSession?.sessionStats,
                       timestamp: Date.now(),
+                      // Pass resources for trigger lookup
+                      soundCollections: store.soundCollections,
+                      soundTriggers: store.soundTriggers,
+                      backgroundPacks: store.backgroundTriggerPacks,
+                      soundSettings: {
+                        enabled: settings.sound?.enabled ?? false,
+                        globalVolume: settings.sound?.globalVolume ?? 0.85,
+                      },
+                      backgroundSettings: {
+                        transitionDuration: settings.backgroundTriggers?.transitionDuration ?? 500,
+                        defaultTransitionType: settings.backgroundTriggers?.defaultTransitionType ?? 'fade',
+                      },
                     };
                     
                     const questRewardActions: RewardStoreActions = {
@@ -711,6 +735,18 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       allCharacters: characters, // Para targetMode en group chats
                       sessionStats: activeSession?.sessionStats,
                       timestamp: Date.now(),
+                      // Pass resources for trigger lookup
+                      soundCollections: store.soundCollections,
+                      soundTriggers: store.soundTriggers,
+                      backgroundPacks: store.backgroundTriggerPacks,
+                      soundSettings: {
+                        enabled: settings.sound?.enabled ?? false,
+                        globalVolume: settings.sound?.globalVolume ?? 0.85,
+                      },
+                      backgroundSettings: {
+                        transitionDuration: settings.backgroundTriggers?.transitionDuration ?? 500,
+                        defaultTransitionType: settings.backgroundTriggers?.defaultTransitionType ?? 'fade',
+                      },
                     };
                     
                     const rewardActions: RewardStoreActions = {

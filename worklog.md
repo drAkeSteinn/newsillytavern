@@ -552,3 +552,106 @@ Stage Summary:
 - Error de SelectItem corregido
 - El selector de "Sprite Principal" ahora funciona correctamente
 - Opción "Primero del pack (automático)" visible en el dropdown
+
+---
+Task ID: quest-trigger-rewards-fix
+Agent: Main Agent
+Task: Fix quest trigger rewards (sound, sprite, background) not executing correctly
+
+Work Log:
+- Analyzed the unified-trigger-executor.ts to understand how trigger rewards are executed
+- Found that the executor was not properly looking up resources from the store
+- Sound triggers were constructing URLs instead of looking up in sound collections
+- Background triggers were not looking up in background packs
+- Sprite search was missing V2 trigger collections and sprite packs
+
+Changes Made:
+1. **Updated TriggerExecutionContext** (unified-trigger-executor.ts)
+   - Added soundCollections, soundTriggers, backgroundPacks fields
+   - Added soundSettings, backgroundSettings fields
+
+2. **Fixed Sound Trigger Execution** (unified-trigger-executor.ts)
+   - Created new findSoundMatch() function that:
+     - Searches in sound triggers by keywords or name
+     - Supports "collection/filename" format
+     - Falls back to searching by collection name
+   - Updated executeSoundTriggerForCharacter() to use findSoundMatch()
+
+3. **Fixed Background Trigger Execution** (unified-trigger-executor.ts)
+   - Created new findBackgroundMatch() function that:
+     - Searches in background packs by triggerKeys or backgroundName
+     - Returns the background URL, name, and overlays
+   - Updated executeBackgroundTriggerForCharacter() to use findBackgroundMatch()
+
+4. **Improved Sprite Matching** (unified-trigger-executor.ts)
+   - Updated findSpriteMatch() to search in:
+     - V2 Trigger Collections (highest priority)
+     - V2 Sprite Packs
+     - Legacy sprite packs
+     - Simple sprite triggers
+     - Sprite config state collections
+   - Added support for direct URLs
+
+5. **Updated Quest Reward Context** (quest-reward-executor.ts)
+   - Added fields for resources in RewardExecutionContext
+   - Updated executeTriggerRewardFromQuest() to pass resources to trigger context
+
+6. **Updated Trigger System** (use-trigger-system.ts)
+   - Updated all 3 places where quest rewards are executed:
+     - Objective completion rewards
+     - Quest auto-completion rewards
+     - Manual quest completion rewards
+   - Each now passes soundCollections, soundTriggers, backgroundPacks, and settings
+
+Stage Summary:
+- Sound rewards now properly look up triggers and collections
+- Background rewards now properly search in background packs
+- Sprite rewards now search in V2 collections and packs
+- All trigger types support direct URLs as fallback
+- Quest rewards now execute triggers using the same lookup logic as post-LLM detection
+
+---
+Task ID: background-trigger-persistence
+Agent: Main Agent
+Task: Implement server-side persistence for Background Trigger Packs
+
+Work Log:
+- Investigated how data is persisted in the project (localStorage via Zustand)
+- Found that backgroundTriggerPacks was NOT in the partialize list for persistence
+- Added backgroundTriggerPacks and backgroundCollections to the persist config in store/index.ts
+
+Changes Made:
+1. **Updated store/index.ts** - Added backgroundTriggerPacks to partialize:
+   ```typescript
+   // Background triggers (unified system)
+   backgroundTriggerPacks: state.backgroundTriggerPacks,
+   backgroundCollections: state.backgroundCollections,
+   ```
+
+2. **Created lib/background-triggers/storage.ts** - Server-side JSON storage:
+   - loadAllBackgroundTriggerPacks() - Load all packs from /data/background-triggers/
+   - loadBackgroundTriggerPackById() - Load single pack
+   - saveBackgroundTriggerPack() - Save pack to JSON file
+   - saveAllBackgroundTriggerPacks() - Bulk save all packs
+   - deleteBackgroundTriggerPack() - Delete pack file
+   - createNewBackgroundTriggerPack() - Factory function
+   - duplicateBackgroundTriggerPack() - Clone pack with new ID
+   - validateBackgroundTriggerPack() - Validation
+
+3. **Created API route /api/background-triggers/route.ts**:
+   - GET: Load packs or single pack
+   - POST: Create new pack or duplicate existing
+   - PUT: Update packs
+   - DELETE: Remove pack
+
+4. **Created hook use-background-trigger-persistence.ts**:
+   - Auto-load packs from server on mount
+   - Auto-save packs to server on change (debounced)
+   - Manual save/load/duplicate/delete functions
+
+Stage Summary:
+- Background Trigger Packs now persist in BOTH localStorage AND server JSON files
+- Data is stored in /data/background-triggers/[id].json
+- API endpoint available at /api/background-triggers
+- Auto-sync hook available for components
+- Survives browser clear, server restart, and cross-session

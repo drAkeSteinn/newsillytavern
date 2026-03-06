@@ -7,7 +7,7 @@
  * Allows creating, editing, duplicating, and deleting quest templates.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTavernStore } from '@/store';
 import type { 
   QuestTemplate, 
@@ -97,7 +97,26 @@ import {
   Crosshair,
   ChevronRight,
   Filter,
+  GripHorizontal,
+  ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // ============================================
 // Main Component
@@ -378,6 +397,712 @@ export function QuestTemplateManager() {
 }
 
 // ============================================
+// Sortable Objective Item Component
+// ============================================
+
+interface SortableObjectiveItemProps {
+  objective: QuestObjectiveTemplate;
+  index: number;
+  totalObjectives: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onUpdate: (updates: Partial<QuestObjectiveTemplate>) => void;
+  onRemove: () => void;
+  allCharacters: Array<{ id: string; name: string }>;
+}
+
+function SortableObjectiveItem({
+  objective,
+  index,
+  totalObjectives,
+  isExpanded,
+  onToggleExpand,
+  onUpdate,
+  onRemove,
+  allCharacters,
+}: SortableObjectiveItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: objective.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  // Helper to get objective summary for collapsed view
+  const getObjectiveSummary = (obj: QuestObjectiveTemplate): string => {
+    const parts: string[] = [];
+    if (obj.description) {
+      parts.push(obj.description.substring(0, 50) + (obj.description.length > 50 ? '...' : ''));
+    }
+    if (obj.completion?.key) {
+      parts.push(`Key: ${obj.completion.key}`);
+    }
+    if (obj.targetCount > 1) {
+      parts.push(`x${obj.targetCount}`);
+    }
+    return parts.join(' | ') || 'Sin configurar';
+  };
+
+  const typeLabels: Record<QuestObjectiveType, string> = {
+    collect: 'Coleccionar',
+    reach: 'Alcanzar',
+    defeat: 'Derrotar',
+    talk: 'Hablar',
+    discover: 'Descubrir',
+    custom: 'Personalizado',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "border rounded-lg overflow-hidden transition-all duration-200",
+        isDragging ? "border-primary/50 shadow-lg shadow-primary/10 z-50" : "border-border/60",
+        isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
+      )}
+    >
+      {/* Accordion Header */}
+      <div
+        className={cn(
+          "flex items-center gap-2 p-3 cursor-pointer select-none",
+          isExpanded && "border-b border-border/50 bg-muted/30"
+        )}
+        onClick={onToggleExpand}
+      >
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </div>
+
+        {/* Index Badge */}
+        <div className="flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary text-xs font-medium">
+          {index + 1}
+        </div>
+
+        {/* Type Icon */}
+        <Target className="w-4 h-4 text-muted-foreground" />
+
+        {/* Title Area */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-medium truncate">
+              {objective.id}
+            </span>
+            <Badge variant="outline" className="text-[10px] h-5">
+              {typeLabels[objective.type]}
+            </Badge>
+            {objective.isOptional && (
+              <Badge variant="secondary" className="text-[10px] h-5 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                Opcional
+              </Badge>
+            )}
+            {objective.characterFilter?.enabled && objective.characterFilter.characterIds.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-5 gap-1">
+                <Users className="w-3 h-3" />
+                {objective.characterFilter.characterIds.length}
+              </Badge>
+            )}
+          </div>
+          {!isExpanded && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {getObjectiveSummary(objective)}
+            </p>
+          )}
+        </div>
+
+        {/* Expand/Collapse Icon */}
+        <ChevronDownIcon
+          className={cn(
+            "w-4 h-4 text-muted-foreground transition-transform duration-200",
+            isExpanded && "rotate-180"
+          )}
+        />
+
+        {/* Delete Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 text-red-500 hover:bg-red-500/10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Accordion Content */}
+      {isExpanded && (
+        <div className="p-4 space-y-4">
+          {/* Basic Fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">ID</Label>
+              <Input
+                value={objective.id}
+                onChange={(e) => onUpdate({ id: e.target.value })}
+                className="bg-background font-mono text-xs h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+              <Select 
+                value={objective.type} 
+                onValueChange={(v) => onUpdate({ type: v as QuestObjectiveType })}
+              >
+                <SelectTrigger className="bg-background h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="collect">Coleccionar</SelectItem>
+                  <SelectItem value="reach">Alcanzar</SelectItem>
+                  <SelectItem value="defeat">Derrotar</SelectItem>
+                  <SelectItem value="talk">Hablar</SelectItem>
+                  <SelectItem value="discover">Descubrir</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Descripción</Label>
+            <Input
+              value={objective.description}
+              onChange={(e) => onUpdate({ description: e.target.value })}
+              placeholder="Descripción del objetivo..."
+              className="bg-background h-8"
+            />
+          </div>
+
+          {/* Completion Keys */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">Key de Completado</Label>
+              <Input
+                value={objective.completion.key}
+                onChange={(e) => onUpdate({ 
+                  completion: { ...objective.completion, key: e.target.value } 
+                })}
+                placeholder="resistencia"
+                className="bg-background font-mono text-xs h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">Keys Alternativas</Label>
+              <Input
+                value={(objective.completion.keys || []).join(', ')}
+                onChange={(e) => onUpdate({ 
+                  completion: { ...objective.completion, keys: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } 
+                })}
+                placeholder="resistance, Resistance"
+                className="bg-background font-mono text-xs h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
+              <Input
+                type="number"
+                min={1}
+                value={objective.targetCount}
+                onChange={(e) => onUpdate({ targetCount: Number(e.target.value) })}
+                className="bg-background h-8"
+              />
+            </div>
+          </div>
+
+          {/* Switches */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={objective.completion.caseSensitive}
+                onCheckedChange={(v) => onUpdate({ 
+                  completion: { ...objective.completion, caseSensitive: v } 
+                })}
+              />
+              <span className="text-xs text-muted-foreground">Case Sensitive</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={objective.isOptional}
+                onCheckedChange={(v) => onUpdate({ isOptional: v })}
+              />
+              <span className="text-xs text-muted-foreground">Opcional</span>
+            </div>
+          </div>
+
+          {/* Character Filter Section */}
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Filter className="w-3 h-3" />
+                Filtro de Personajes
+              </Label>
+              <Switch
+                checked={objective.characterFilter?.enabled || false}
+                onCheckedChange={(v) => onUpdate({ 
+                  characterFilter: { 
+                    enabled: v, 
+                    mode: objective.characterFilter?.mode || 'include',
+                    characterIds: objective.characterFilter?.characterIds || []
+                  } 
+                })}
+              />
+            </div>
+            
+            {objective.characterFilter?.enabled && (
+              <div className="space-y-2 p-2 rounded bg-muted/30">
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-muted-foreground">Modo de Filtro</Label>
+                  <Select 
+                    value={objective.characterFilter.mode} 
+                    onValueChange={(v) => onUpdate({ 
+                      characterFilter: { 
+                        ...objective.characterFilter!, 
+                        mode: v as 'include' | 'exclude'
+                      } 
+                    })}
+                  >
+                    <SelectTrigger className="bg-background h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="include">
+                        <div className="flex items-center gap-2">
+                          <User className="w-3 h-3" />
+                          Incluir (solo estos personajes)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="exclude">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-3 h-3" />
+                          Excluir (todos menos estos)
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-muted-foreground">
+                    {objective.characterFilter.mode === 'include' ? 'Personajes que verán este objetivo' : 'Personajes que NO verán este objetivo'}
+                  </Label>
+                  <div className="flex flex-wrap gap-1 p-2 rounded bg-background min-h-[32px]">
+                    {objective.characterFilter.characterIds.length === 0 ? (
+                      <span className="text-xs text-muted-foreground italic">
+                        Selecciona personajes...
+                      </span>
+                    ) : (
+                      objective.characterFilter.characterIds.map(charId => {
+                        const char = allCharacters.find(c => c.id === charId);
+                        if (!char) return null;
+                        return (
+                          <Badge 
+                            key={charId} 
+                            variant="secondary"
+                            className="text-[10px] gap-1 pr-1"
+                          >
+                            {char.name}
+                            <button
+                              type="button"
+                              className="ml-1 hover:text-red-500"
+                              onClick={() => onUpdate({ 
+                                characterFilter: { 
+                                  ...objective.characterFilter!, 
+                                  characterIds: objective.characterFilter!.characterIds.filter(id => id !== charId)
+                                } 
+                              })}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })
+                    )}
+                  </div>
+                  <Select 
+                    value="" 
+                    onValueChange={(v) => {
+                      if (v && !objective.characterFilter?.characterIds.includes(v)) {
+                        onUpdate({ 
+                          characterFilter: { 
+                            ...objective.characterFilter!, 
+                            characterIds: [...(objective.characterFilter?.characterIds || []), v]
+                          } 
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-background h-7 text-xs">
+                      <SelectValue placeholder="+ Agregar personaje" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allCharacters
+                        .filter(c => !objective.characterFilter?.characterIds.includes(c.id))
+                        .map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <p className="text-[9px] text-muted-foreground flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  {objective.characterFilter.mode === 'include' 
+                    ? 'Solo los personajes seleccionados verán este objetivo en su prompt'
+                    : 'Todos los personajes verán este objetivo EXCEPTO los seleccionados'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Value Condition Section */}
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] text-muted-foreground">Condición de Valor</Label>
+              <Switch
+                checked={!!objective.completion.valueCondition}
+                onCheckedChange={(v) => onUpdate({ 
+                  completion: { 
+                    ...objective.completion, 
+                    valueCondition: v ? { valueType: 'presence' } : undefined 
+                  } 
+                })}
+              />
+            </div>
+            
+            {objective.completion.valueCondition && (
+              <div className="grid grid-cols-3 gap-2 p-2 rounded bg-muted/30">
+                <div className="space-y-1">
+                  <Label className="text-[9px] text-muted-foreground">Tipo de Valor</Label>
+                  <Select 
+                    value={objective.completion.valueCondition.valueType} 
+                    onValueChange={(v) => onUpdate({ 
+                      completion: { 
+                        ...objective.completion, 
+                        valueCondition: { 
+                          ...objective.completion.valueCondition, 
+                          valueType: v as QuestValueType 
+                        } 
+                      } 
+                    })}
+                  >
+                    <SelectTrigger className="bg-background h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="presence">Presencia</SelectItem>
+                      <SelectItem value="number">Número</SelectItem>
+                      <SelectItem value="text">Texto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {objective.completion.valueCondition.valueType !== 'presence' && (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] text-muted-foreground">Operador</Label>
+                      <Select 
+                        value={objective.completion.valueCondition.operator || (objective.completion.valueCondition.valueType === 'number' ? '==' : 'equals')} 
+                        onValueChange={(v) => onUpdate({ 
+                          completion: { 
+                            ...objective.completion, 
+                            valueCondition: { 
+                              ...objective.completion.valueCondition, 
+                              operator: v as any 
+                            } 
+                          } 
+                        })}
+                      >
+                        <SelectTrigger className="bg-background h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {objective.completion.valueCondition.valueType === 'number' ? (
+                            <>
+                              <SelectItem value=">">&gt; Mayor que</SelectItem>
+                              <SelectItem value="<">&lt; Menor que</SelectItem>
+                              <SelectItem value=">=">≥ Mayor o igual</SelectItem>
+                              <SelectItem value="<=">≤ Menor o igual</SelectItem>
+                              <SelectItem value="==">= Igual</SelectItem>
+                              <SelectItem value="!=">≠ Diferente</SelectItem>
+                            </>
+                          ) : (
+                            <>
+                              <SelectItem value="equals">Igual a</SelectItem>
+                              <SelectItem value="contains">Contiene</SelectItem>
+                              <SelectItem value="startsWith">Empieza con</SelectItem>
+                              <SelectItem value="endsWith">Termina con</SelectItem>
+                              <SelectItem value="notEquals">Diferente de</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] text-muted-foreground">Valor Objetivo</Label>
+                      <Input
+                        value={String(objective.completion.valueCondition.targetValue || '')}
+                        onChange={(e) => onUpdate({ 
+                          completion: { 
+                            ...objective.completion, 
+                            valueCondition: { 
+                              ...objective.completion.valueCondition, 
+                              targetValue: objective.completion.valueCondition?.valueType === 'number' 
+                ? Number(e.target.value) 
+                : e.target.value 
+            } 
+          } 
+        })}
+                        placeholder={objective.completion.valueCondition.valueType === 'number' ? '50' : 'texto'}
+                        className="bg-background h-7 text-xs"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {objective.completion.valueCondition.valueType === 'presence' && (
+                  <div className="col-span-2 flex items-center text-xs text-muted-foreground">
+                    <Info className="w-3 h-3 mr-1" />
+                    Detecta si la key existe en el texto
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Objective Rewards Section */}
+          <div className="space-y-2 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Gift className="w-3 h-3" />
+                Recompensas del Objetivo
+              </Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => {
+                  const newReward = createAttributeReward('', 0, 'add', { id: `obj-reward-${Date.now().toString(36)}` });
+                  onUpdate({ 
+                    rewards: [...(objective.rewards || []), newReward] 
+                  });
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Agregar
+              </Button>
+            </div>
+            
+            {(objective.rewards || []).length > 0 && (
+              <div className="space-y-2">
+                {(objective.rewards || []).map((reward, rewardIdx) => {
+                  const normalized = normalizeReward(reward);
+                  const isAttr = normalized.type === 'attribute';
+                  const isTrig = normalized.type === 'trigger';
+                  
+                  return (
+                    <div key={reward.id} className="p-2 rounded bg-muted/20 space-y-2">
+                      {/* Tipo y preview */}
+                      <div className="flex items-center gap-2">
+                        <Select 
+                          value={normalized.type} 
+                          onValueChange={(v) => {
+                            let newReward: QuestReward;
+                            if (v === 'attribute') {
+                              newReward = createAttributeReward(
+                                normalized.attribute?.key || normalized.key || '',
+                                normalized.attribute?.value ?? normalized.value ?? 0,
+                                normalized.attribute?.action || 'add',
+                                { id: reward.id }
+                              );
+                            } else {
+                              newReward = createTriggerReward(
+                                normalized.trigger?.category || 'sprite',
+                                normalized.trigger?.key || normalized.key || '',
+                                normalized.trigger?.targetMode || 'self',
+                                { id: reward.id }
+                              );
+                            }
+                            const updatedRewards = [...(objective.rewards || [])];
+                            updatedRewards[rewardIdx] = newReward;
+                            onUpdate({ rewards: updatedRewards });
+                          }}
+                        >
+                          <SelectTrigger className="bg-background h-6 text-xs w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="attribute">📊 Atributo</SelectItem>
+                            <SelectItem value="trigger">⚡ Trigger</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Badge variant="outline" className="text-[10px]">
+                          {describeReward(normalized)}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
+                          onClick={() => {
+                            const updatedRewards = (objective.rewards || []).filter((_, i) => i !== rewardIdx);
+                            onUpdate({ rewards: updatedRewards });
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      
+                      {/* Config según tipo */}
+                      {isAttr && normalized.attribute && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input
+                            value={normalized.attribute.key}
+                            onChange={(e) => {
+                              const updatedRewards = [...(objective.rewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                attribute: { ...normalized.attribute!, key: e.target.value }
+                              };
+                              onUpdate({ rewards: updatedRewards });
+                            }}
+                            placeholder="Key"
+                            className="bg-background h-6 text-xs"
+                          />
+                          <Input
+                            type="number"
+                            value={normalized.attribute.value}
+                            onChange={(e) => {
+                              const updatedRewards = [...(objective.rewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                attribute: { ...normalized.attribute!, value: Number(e.target.value) }
+                              };
+                              onUpdate({ rewards: updatedRewards });
+                            }}
+                            placeholder="Valor"
+                            className="bg-background h-6 text-xs"
+                          />
+                          <Select 
+                            value={normalized.attribute.action} 
+                            onValueChange={(v) => {
+                              const updatedRewards = [...(objective.rewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                attribute: { ...normalized.attribute!, action: v as AttributeAction }
+                              };
+                              onUpdate({ rewards: updatedRewards });
+                            }}
+                          >
+                            <SelectTrigger className="bg-background h-6 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="add">+</SelectItem>
+                              <SelectItem value="subtract">-</SelectItem>
+                              <SelectItem value="set">=</SelectItem>
+                              <SelectItem value="multiply">×</SelectItem>
+                              <SelectItem value="divide">÷</SelectItem>
+                              <SelectItem value="percent">%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      
+                      {isTrig && normalized.trigger && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <Select 
+                            value={normalized.trigger.category} 
+                            onValueChange={(v) => {
+                              const updatedRewards = [...(objective.rewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                trigger: { ...normalized.trigger!, category: v as TriggerCategory }
+                              };
+                              onUpdate({ rewards: updatedRewards });
+                            }}
+                          >
+                            <SelectTrigger className="bg-background h-6 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                              <SelectItem value="sound">🔊 Sonido</SelectItem>
+                              <SelectItem value="background">🌄 Fondo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={normalized.trigger.key}
+                            onChange={(e) => {
+                              const updatedRewards = [...(objective.rewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                trigger: { ...normalized.trigger!, key: e.target.value }
+                              };
+                              onUpdate({ rewards: updatedRewards });
+                            }}
+                            placeholder="Key"
+                            className="bg-background h-6 text-xs"
+                          />
+                          <Select 
+                            value={normalized.trigger.targetMode} 
+                            onValueChange={(v) => {
+                              const updatedRewards = [...(objective.rewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
+                              };
+                              onUpdate({ rewards: updatedRewards });
+                            }}
+                          >
+                            <SelectTrigger className="bg-background h-6 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="self">👤 Self</SelectItem>
+                              <SelectItem value="all">👥 Todos</SelectItem>
+                              <SelectItem value="target">🎯 Target</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {(objective.rewards || []).length === 0 && (
+              <p className="text-[10px] text-muted-foreground italic">
+                Sin recompensas. Se ejecutarán al completar este objetivo.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // Quest Template Editor Dialog
 // ============================================
 
@@ -434,6 +1159,24 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
 
   // Get all characters for the character filter
   const allCharacters = useTavernStore((state) => state.characters);
+
+  // DnD sensors for objectives
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = objectives.findIndex((obj) => obj.id === active.id);
+      const newIndex = objectives.findIndex((obj) => obj.id === over.id);
+      setObjectives(arrayMove(objectives, oldIndex, newIndex));
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: string[] = [];
@@ -882,7 +1625,12 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
           {activeSection === 'objectives' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Objetivos de la Misión</h3>
+                <div>
+                  <h3 className="text-sm font-medium">Objetivos de la Misión</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Arrastra los objetivos para reordenarlos • Haz clic para expandir/colapsar
+                  </p>
+                </div>
                 <Button variant="outline" size="sm" onClick={addObjective}>
                   <Plus className="w-4 h-4 mr-1.5" />
                   Agregar Objetivo
@@ -895,588 +1643,32 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                   <p className="text-muted-foreground text-sm">No hay objetivos definidos</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {objectives.map((obj, index) => (
-                    <Card key={obj.id} className="border-border/60">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex flex-col gap-0.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => moveObjective(index, 'up')}
-                              disabled={index === 0}
-                            >
-                              <ChevronUp className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => moveObjective(index, 'down')}
-                              disabled={index === objectives.length - 1}
-                            >
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                          
-                          <div className="flex-1 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">ID</Label>
-                                <Input
-                                  value={obj.id}
-                                  onChange={(e) => updateObjective(index, { id: e.target.value })}
-                                  className="bg-background font-mono text-xs h-8"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Tipo</Label>
-                                <Select value={obj.type} onValueChange={(v) => updateObjective(index, { type: v as QuestObjectiveType })}>
-                                  <SelectTrigger className="bg-background h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="collect">Coleccionar</SelectItem>
-                                    <SelectItem value="reach">Alcanzar</SelectItem>
-                                    <SelectItem value="defeat">Derrotar</SelectItem>
-                                    <SelectItem value="talk">Hablar</SelectItem>
-                                    <SelectItem value="discover">Descubrir</SelectItem>
-                                    <SelectItem value="custom">Personalizado</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-
-                            <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground">Descripción</Label>
-                              <Input
-                                value={obj.description}
-                                onChange={(e) => updateObjective(index, { description: e.target.value })}
-                                placeholder="Descripción del objetivo..."
-                                className="bg-background h-8"
-                              />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Key de Completado</Label>
-                                <Input
-                                  value={obj.completion.key}
-                                  onChange={(e) => updateObjective(index, { 
-                                    completion: { ...obj.completion, key: e.target.value } 
-                                  })}
-                                  placeholder="resistencia"
-                                  className="bg-background font-mono text-xs h-8"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Keys Alternativas</Label>
-                                <Input
-                                  value={(obj.completion.keys || []).join(', ')}
-                                  onChange={(e) => updateObjective(index, { 
-                                    completion: { ...obj.completion, keys: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } 
-                                  })}
-                                  placeholder="resistance, Resistance"
-                                  className="bg-background font-mono text-xs h-8"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Cantidad</Label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={obj.targetCount}
-                                  onChange={(e) => updateObjective(index, { targetCount: Number(e.target.value) })}
-                                  className="bg-background h-8"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={obj.completion.caseSensitive}
-                                  onCheckedChange={(v) => updateObjective(index, { 
-                                    completion: { ...obj.completion, caseSensitive: v } 
-                                  })}
-                                />
-                                <span className="text-xs text-muted-foreground">Case Sensitive</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={obj.isOptional}
-                                  onCheckedChange={(v) => updateObjective(index, { isOptional: v })}
-                                />
-                                <span className="text-xs text-muted-foreground">Opcional</span>
-                              </div>
-                            </div>
-
-                            {/* Character Filter Section */}
-                            <div className="space-y-2 pt-2 border-t border-border/50">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                  <Filter className="w-3 h-3" />
-                                  Filtro de Personajes
-                                </Label>
-                                <Switch
-                                  checked={obj.characterFilter?.enabled || false}
-                                  onCheckedChange={(v) => updateObjective(index, { 
-                                    characterFilter: { 
-                                      enabled: v, 
-                                      mode: obj.characterFilter?.mode || 'include',
-                                      characterIds: obj.characterFilter?.characterIds || []
-                                    } 
-                                  })}
-                                />
-                              </div>
-                              
-                              {obj.characterFilter?.enabled && (
-                                <div className="space-y-2 p-2 rounded bg-muted/30">
-                                  <div className="space-y-1">
-                                    <Label className="text-[9px] text-muted-foreground">Modo de Filtro</Label>
-                                    <Select 
-                                      value={obj.characterFilter.mode} 
-                                      onValueChange={(v) => updateObjective(index, { 
-                                        characterFilter: { 
-                                          ...obj.characterFilter!, 
-                                          mode: v as 'include' | 'exclude'
-                                        } 
-                                      })}
-                                    >
-                                      <SelectTrigger className="bg-background h-7 text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="include">
-                                          <div className="flex items-center gap-2">
-                                            <User className="w-3 h-3" />
-                                            Incluir (solo estos personajes)
-                                          </div>
-                                        </SelectItem>
-                                        <SelectItem value="exclude">
-                                          <div className="flex items-center gap-2">
-                                            <Users className="w-3 h-3" />
-                                            Excluir (todos menos estos)
-                                          </div>
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  
-                                  <div className="space-y-1">
-                                    <Label className="text-[9px] text-muted-foreground">
-                                      {obj.characterFilter.mode === 'include' ? 'Personajes que verán este objetivo' : 'Personajes que NO verán este objetivo'}
-                                    </Label>
-                                    <div className="flex flex-wrap gap-1 p-2 rounded bg-background min-h-[32px]">
-                                      {obj.characterFilter.characterIds.length === 0 ? (
-                                        <span className="text-xs text-muted-foreground italic">
-                                          Selecciona personajes...
-                                        </span>
-                                      ) : (
-                                        obj.characterFilter.characterIds.map(charId => {
-                                          const char = allCharacters.find(c => c.id === charId);
-                                          if (!char) return null;
-                                          return (
-                                            <Badge 
-                                              key={charId} 
-                                              variant="secondary"
-                                              className="text-[10px] gap-1 pr-1"
-                                            >
-                                              {char.name}
-                                              <button
-                                                type="button"
-                                                className="ml-1 hover:text-red-500"
-                                                onClick={() => updateObjective(index, { 
-                                                  characterFilter: { 
-                                                    ...obj.characterFilter!, 
-                                                    characterIds: obj.characterFilter!.characterIds.filter(id => id !== charId)
-                                                  } 
-                                                })}
-                                              >
-                                                <X className="w-3 h-3" />
-                                              </button>
-                                            </Badge>
-                                          );
-                                        })
-                                      )}
-                                    </div>
-                                    <Select 
-                                      value="" 
-                                      onValueChange={(v) => {
-                                        if (v && !obj.characterFilter?.characterIds.includes(v)) {
-                                          updateObjective(index, { 
-                                            characterFilter: { 
-                                              ...obj.characterFilter!, 
-                                              characterIds: [...(obj.characterFilter?.characterIds || []), v]
-                                            } 
-                                          });
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="bg-background h-7 text-xs">
-                                        <SelectValue placeholder="+ Agregar personaje" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {allCharacters
-                                          .filter(c => !obj.characterFilter?.characterIds.includes(c.id))
-                                          .map(c => (
-                                            <SelectItem key={c.id} value={c.id}>
-                                              {c.name}
-                                            </SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  
-                                  <p className="text-[9px] text-muted-foreground flex items-center gap-1">
-                                    <Info className="w-3 h-3" />
-                                    {obj.characterFilter.mode === 'include' 
-                                      ? 'Solo los personajes seleccionados verán este objetivo en su prompt'
-                                      : 'Todos los personajes verán este objetivo EXCEPTO los seleccionados'}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Value Condition Section */}
-                            <div className="space-y-2 pt-2 border-t border-border/50">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-[10px] text-muted-foreground">Condición de Valor</Label>
-                                <Switch
-                                  checked={!!obj.completion.valueCondition}
-                                  onCheckedChange={(v) => updateObjective(index, { 
-                                    completion: { 
-                                      ...obj.completion, 
-                                      valueCondition: v ? { valueType: 'presence' } : undefined 
-                                    } 
-                                  })}
-                                />
-                              </div>
-                              
-                              {obj.completion.valueCondition && (
-                                <div className="grid grid-cols-3 gap-2 p-2 rounded bg-muted/30">
-                                  <div className="space-y-1">
-                                    <Label className="text-[9px] text-muted-foreground">Tipo de Valor</Label>
-                                    <Select 
-                                      value={obj.completion.valueCondition.valueType} 
-                                      onValueChange={(v) => updateObjective(index, { 
-                                        completion: { 
-                                          ...obj.completion, 
-                                          valueCondition: { 
-                                            ...obj.completion.valueCondition, 
-                                            valueType: v as QuestValueType 
-                                          } 
-                                        } 
-                                      })}
-                                    >
-                                      <SelectTrigger className="bg-background h-7 text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="presence">Presencia</SelectItem>
-                                        <SelectItem value="number">Número</SelectItem>
-                                        <SelectItem value="text">Texto</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                  {obj.completion.valueCondition.valueType !== 'presence' && (
-                                    <>
-                                      <div className="space-y-1">
-                                        <Label className="text-[9px] text-muted-foreground">Operador</Label>
-                                        <Select 
-                                          value={obj.completion.valueCondition.operator || (obj.completion.valueCondition.valueType === 'number' ? '==' : 'equals')} 
-                                          onValueChange={(v) => updateObjective(index, { 
-                                            completion: { 
-                                              ...obj.completion, 
-                                              valueCondition: { 
-                                                ...obj.completion.valueCondition, 
-                                                operator: v as any 
-                                              } 
-                                            } 
-                                          })}
-                                        >
-                                          <SelectTrigger className="bg-background h-7 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {obj.completion.valueCondition.valueType === 'number' ? (
-                                              <>
-                                                <SelectItem value=">">&gt; Mayor que</SelectItem>
-                                                <SelectItem value="<">&lt; Menor que</SelectItem>
-                                                <SelectItem value=">=">≥ Mayor o igual</SelectItem>
-                                                <SelectItem value="<=">≤ Menor o igual</SelectItem>
-                                                <SelectItem value="==">= Igual</SelectItem>
-                                                <SelectItem value="!=">≠ Diferente</SelectItem>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <SelectItem value="equals">Igual a</SelectItem>
-                                                <SelectItem value="contains">Contiene</SelectItem>
-                                                <SelectItem value="startsWith">Empieza con</SelectItem>
-                                                <SelectItem value="endsWith">Termina con</SelectItem>
-                                                <SelectItem value="notEquals">Diferente de</SelectItem>
-                                              </>
-                                            )}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                      <div className="space-y-1">
-                                        <Label className="text-[9px] text-muted-foreground">Valor Objetivo</Label>
-                                        <Input
-                                          value={String(obj.completion.valueCondition.targetValue || '')}
-                                          onChange={(e) => updateObjective(index, { 
-                                            completion: { 
-                                              ...obj.completion, 
-                                              valueCondition: { 
-                                                ...obj.completion.valueCondition, 
-                                                targetValue: obj.completion.valueCondition?.valueType === 'number' 
-                                                  ? Number(e.target.value) 
-                                                  : e.target.value 
-                                              } 
-                                            } 
-                                          })}
-                                          placeholder={obj.completion.valueCondition.valueType === 'number' ? '50' : 'texto'}
-                                          className="bg-background h-7 text-xs"
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {obj.completion.valueCondition.valueType === 'presence' && (
-                                    <div className="col-span-2 flex items-center text-xs text-muted-foreground">
-                                      <Info className="w-3 h-3 mr-1" />
-                                      Detecta si la key existe en el texto
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Objective Rewards Section */}
-                            <div className="space-y-2 pt-2 border-t border-border/50">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                  <Gift className="w-3 h-3" />
-                                  Recompensas del Objetivo
-                                </Label>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-xs"
-                                  onClick={() => {
-                                    const newReward = createAttributeReward('', 0, 'add', { id: `obj-reward-${Date.now().toString(36)}` });
-                                    updateObjective(index, { 
-                                      rewards: [...(obj.rewards || []), newReward] 
-                                    });
-                                  }}
-                                >
-                                  <Plus className="w-3 h-3 mr-1" />
-                                  Agregar
-                                </Button>
-                              </div>
-                              
-                              {(obj.rewards || []).length > 0 && (
-                                <div className="space-y-2">
-                                  {(obj.rewards || []).map((reward, rewardIdx) => {
-                                    const normalized = normalizeReward(reward);
-                                    const isAttr = normalized.type === 'attribute';
-                                    const isTrig = normalized.type === 'trigger';
-                                    
-                                    return (
-                                      <div key={reward.id} className="p-2 rounded bg-muted/20 space-y-2">
-                                        {/* Tipo y preview */}
-                                        <div className="flex items-center gap-2">
-                                          <Select 
-                                            value={normalized.type} 
-                                            onValueChange={(v) => {
-                                              let newReward: QuestReward;
-                                              if (v === 'attribute') {
-                                                newReward = createAttributeReward(
-                                                  normalized.attribute?.key || normalized.key || '',
-                                                  normalized.attribute?.value ?? normalized.value ?? 0,
-                                                  normalized.attribute?.action || 'add',
-                                                  { id: reward.id }
-                                                );
-                                              } else {
-                                                newReward = createTriggerReward(
-                                                  normalized.trigger?.category || 'sprite',
-                                                  normalized.trigger?.key || normalized.key || '',
-                                                  normalized.trigger?.targetMode || 'self',
-                                                  { id: reward.id }
-                                                );
-                                              }
-                                              const updatedRewards = [...(obj.rewards || [])];
-                                              updatedRewards[rewardIdx] = newReward;
-                                              updateObjective(index, { rewards: updatedRewards });
-                                            }}
-                                          >
-                                            <SelectTrigger className="bg-background h-6 text-xs w-24">
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="attribute">📊 Atributo</SelectItem>
-                                              <SelectItem value="trigger">⚡ Trigger</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                          <Badge variant="outline" className="text-[10px]">
-                                            {describeReward(normalized)}
-                                          </Badge>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
-                                            onClick={() => {
-                                              const updatedRewards = (obj.rewards || []).filter((_, i) => i !== rewardIdx);
-                                              updateObjective(index, { rewards: updatedRewards });
-                                            }}
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </Button>
-                                        </div>
-                                        
-                                        {/* Config según tipo */}
-                                        {isAttr && normalized.attribute && (
-                                          <div className="grid grid-cols-3 gap-2">
-                                            <Input
-                                              value={normalized.attribute.key}
-                                              onChange={(e) => {
-                                                const updatedRewards = [...(obj.rewards || [])];
-                                                updatedRewards[rewardIdx] = {
-                                                  ...reward,
-                                                  attribute: { ...normalized.attribute!, key: e.target.value }
-                                                };
-                                                updateObjective(index, { rewards: updatedRewards });
-                                              }}
-                                              placeholder="Key"
-                                              className="bg-background h-6 text-xs"
-                                            />
-                                            <Input
-                                              type="number"
-                                              value={normalized.attribute.value}
-                                              onChange={(e) => {
-                                                const updatedRewards = [...(obj.rewards || [])];
-                                                updatedRewards[rewardIdx] = {
-                                                  ...reward,
-                                                  attribute: { ...normalized.attribute!, value: Number(e.target.value) }
-                                                };
-                                                updateObjective(index, { rewards: updatedRewards });
-                                              }}
-                                              placeholder="Valor"
-                                              className="bg-background h-6 text-xs"
-                                            />
-                                            <Select 
-                                              value={normalized.attribute.action} 
-                                              onValueChange={(v) => {
-                                                const updatedRewards = [...(obj.rewards || [])];
-                                                updatedRewards[rewardIdx] = {
-                                                  ...reward,
-                                                  attribute: { ...normalized.attribute!, action: v as AttributeAction }
-                                                };
-                                                updateObjective(index, { rewards: updatedRewards });
-                                              }}
-                                            >
-                                              <SelectTrigger className="bg-background h-6 text-xs">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="add">+</SelectItem>
-                                                <SelectItem value="subtract">-</SelectItem>
-                                                <SelectItem value="set">=</SelectItem>
-                                                <SelectItem value="multiply">×</SelectItem>
-                                                <SelectItem value="divide">÷</SelectItem>
-                                                <SelectItem value="percent">%</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        )}
-                                        
-                                        {isTrig && normalized.trigger && (
-                                          <div className="grid grid-cols-3 gap-2">
-                                            <Select 
-                                              value={normalized.trigger.category} 
-                                              onValueChange={(v) => {
-                                                const updatedRewards = [...(obj.rewards || [])];
-                                                updatedRewards[rewardIdx] = {
-                                                  ...reward,
-                                                  trigger: { ...normalized.trigger!, category: v as TriggerCategory }
-                                                };
-                                                updateObjective(index, { rewards: updatedRewards });
-                                              }}
-                                            >
-                                              <SelectTrigger className="bg-background h-6 text-xs">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="sprite">🖼️ Sprite</SelectItem>
-                                                <SelectItem value="sound">🔊 Sonido</SelectItem>
-                                                <SelectItem value="background">🌄 Fondo</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                            <Input
-                                              value={normalized.trigger.key}
-                                              onChange={(e) => {
-                                                const updatedRewards = [...(obj.rewards || [])];
-                                                updatedRewards[rewardIdx] = {
-                                                  ...reward,
-                                                  trigger: { ...normalized.trigger!, key: e.target.value }
-                                                };
-                                                updateObjective(index, { rewards: updatedRewards });
-                                              }}
-                                              placeholder="Key"
-                                              className="bg-background h-6 text-xs"
-                                            />
-                                            <Select 
-                                              value={normalized.trigger.targetMode} 
-                                              onValueChange={(v) => {
-                                                const updatedRewards = [...(obj.rewards || [])];
-                                                updatedRewards[rewardIdx] = {
-                                                  ...reward,
-                                                  trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
-                                                };
-                                                updateObjective(index, { rewards: updatedRewards });
-                                              }}
-                                            >
-                                              <SelectTrigger className="bg-background h-6 text-xs">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="self">👤 Self</SelectItem>
-                                                <SelectItem value="all">👥 Todos</SelectItem>
-                                                <SelectItem value="target">🎯 Target</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                              
-                              {(obj.rewards || []).length === 0 && (
-                                <p className="text-[10px] text-muted-foreground italic">
-                                  Sin recompensas. Se ejecutarán al completar este objetivo.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
-                            onClick={() => removeObjective(index)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={objectives.map(obj => obj.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {objectives.map((obj, index) => (
+                        <SortableObjectiveItem
+                          key={obj.id}
+                          objective={obj}
+                          index={index}
+                          totalObjectives={objectives.length}
+                          isExpanded={expandedObjectives.has(obj.id)}
+                          onToggleExpand={() => toggleObjectiveExpand(obj.id)}
+                          onUpdate={(updates) => updateObjective(index, updates)}
+                          onRemove={() => removeObjective(index)}
+                          allCharacters={allCharacters}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           )}

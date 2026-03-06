@@ -35,6 +35,33 @@
           "key": "resistencia",
           "value": 10,
           "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "casa",
+            "targetMode": "self"
+          }
         }
       ],
       "characterFilter": {
@@ -91,5 +118,5 @@
     }
   ],
   "createdAt": "2026-03-03T10:00:43.053Z",
-  "updatedAt": "2026-03-06T12:39:33.737Z"
+  "updatedAt": "2026-03-06T15:18:44.563Z"
 }

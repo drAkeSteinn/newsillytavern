@@ -116,6 +116,9 @@ export const useTavernStore = create<TavernState>()(
         settings: state.settings,
         soundTriggers: state.soundTriggers,
         soundCollections: state.soundCollections,
+        // Background triggers (unified system)
+        backgroundTriggerPacks: state.backgroundTriggerPacks,
+        backgroundCollections: state.backgroundCollections,
         personas: state.personas,
         backgroundPacks: state.backgroundPacks,
         backgroundIndex: state.backgroundIndex,

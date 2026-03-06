@@ -15,7 +15,7 @@
 // - No duplica lógica de ejecución
 // - Soporta targetMode para grupos
 
-import type { CharacterCard } from '@/types';
+import type { CharacterCard, SoundCollection, SoundTrigger, BackgroundTriggerPack, BackgroundOverlay, BackgroundTransitionType } from '@/types';
 import type { TriggerContext } from './trigger-bus';
 import type { TriggerMatch } from './types';
 import {
@@ -27,7 +27,6 @@ import {
 import {
   executeBackgroundTrigger,
 } from './handlers/background-handler';
-import type { BackgroundOverlay, BackgroundTransitionType } from '@/types';
 
 // ============================================
 // Types
@@ -50,6 +49,13 @@ export interface TriggerExecutionContext {
   // Store access
   storeActions: TriggerStoreActions;
   
+  // Sound resources (for lookup)
+  soundCollections?: SoundCollection[];
+  soundTriggers?: SoundTrigger[];
+  
+  // Background resources (for lookup)
+  backgroundPacks?: BackgroundTriggerPack[];
+  
   // Settings
   soundSettings?: {
     enabled: boolean;
@@ -62,14 +68,22 @@ export interface TriggerExecutionContext {
 }
 
 /**
+ * SpriteTriggerHit type for applyTriggerForCharacter
+ */
+export interface SpriteTriggerHit {
+  spriteUrl: string;
+  spriteLabel?: string | null;
+  returnToIdleMs?: number;
+}
+
+/**
  * Acciones del store necesarias para ejecutar triggers
  */
 export interface TriggerStoreActions {
   // Sprite
   applyTriggerForCharacter: (
     characterId: string,
-    spriteUrl: string,
-    returnToIdleMs?: number
+    hit: SpriteTriggerHit
   ) => void;
   scheduleReturnToIdleForCharacter: (
     characterId: string,
@@ -115,6 +129,16 @@ export interface TriggerBatchResult {
 // ============================================
 
 /**
+ * Check if a key is a direct URL (can be used directly without lookup)
+ */
+function isDirectUrl(key: string): boolean {
+  return key.startsWith('http://') || 
+         key.startsWith('https://') || 
+         key.startsWith('/') || 
+         key.startsWith('data:');
+}
+
+/**
  * Ejecuta un trigger de sprite para un personaje
  */
 function executeSpriteTriggerForCharacter(
@@ -137,18 +161,32 @@ function executeSpriteTriggerForCharacter(
       };
     }
     
-    // Find matching sprite in character's sprite packs or triggers
-    const spriteMatch = findSpriteMatch(key, character);
+    // Determine sprite URL - either direct URL or keyword lookup
+    let spriteUrl: string;
+    let spriteLabel: string | undefined;
     
-    if (!spriteMatch) {
-      console.log(`[UnifiedTriggerExecutor] No sprite found for key "${key}" in character "${character.name}"`);
-      return {
-        success: false,
-        category: 'sprite',
-        key,
-        targetCharacterId: character.id,
-        error: `No sprite found for key "${key}"`,
-      };
+    if (isDirectUrl(key)) {
+      // Use key directly as URL
+      spriteUrl = key;
+      spriteLabel = key.split('/').pop()?.split('?')[0] || key;
+      console.log(`[UnifiedTriggerExecutor] Using direct URL for sprite: ${key}`);
+    } else {
+      // Find matching sprite in character's sprite packs or triggers
+      const spriteMatch = findSpriteMatch(key, character);
+      
+      if (!spriteMatch) {
+        console.log(`[UnifiedTriggerExecutor] No sprite found for key "${key}" in character "${character.name}"`);
+        return {
+          success: false,
+          category: 'sprite',
+          key,
+          targetCharacterId: character.id,
+          error: `No sprite found for key "${key}"`,
+        };
+      }
+      
+      spriteUrl = spriteMatch.url;
+      spriteLabel = spriteMatch.label;
     }
     
     // Create synthetic trigger match
@@ -215,63 +253,219 @@ function executeSpriteTriggerForCharacter(
 
 /**
  * Busca un sprite que coincida con la key en el personaje
+ * Soporta tanto el sistema legacy como V2 (spritePacksV2, triggerCollections)
  */
 function findSpriteMatch(
   key: string,
   character: CharacterCard
 ): { url: string; label?: string } | null {
-  // 1. Search in sprite packs
+  const normalizedKey = key.toLowerCase();
+  
+  // 0. Si es una URL directa, usarla
+  if (isDirectUrl(key)) {
+    return { url: key, label: key.split('/').pop()?.split('?')[0] || key };
+  }
+  
+  // 1. Search in V2 Trigger Collections (highest priority)
+  if (character.triggerCollections && character.triggerCollections.length > 0) {
+    // Sort by priority (higher first)
+    const sortedCollections = [...character.triggerCollections]
+      .filter(c => c.active)
+      .sort((a, b) => b.priority - a.priority);
+    
+    for (const collection of sortedCollections) {
+      // Check collection key
+      if (collection.collectionKey && collection.collectionKey.toLowerCase() === normalizedKey) {
+        // Find the sprite pack
+        const pack = character.spritePacksV2?.find(p => p.id === collection.packId);
+        if (pack && pack.sprites.length > 0) {
+          // Get principal sprite or first one
+          const sprite = collection.principalSpriteId
+            ? pack.sprites.find(s => s.id === collection.principalSpriteId)
+            : pack.sprites[0];
+          if (sprite) {
+            console.log(`[UnifiedTriggerExecutor] Found sprite in V2 collection "${collection.name}": ${sprite.url}`);
+            return { url: sprite.url, label: sprite.label };
+          }
+        }
+      }
+      
+      // Check individual sprite configs
+      for (const [spriteId, config] of Object.entries(collection.spriteConfigs)) {
+        if (!config.enabled) continue;
+        
+        // Check main key
+        if (config.key && config.key.toLowerCase() === normalizedKey) {
+          const pack = character.spritePacksV2?.find(p => p.id === collection.packId);
+          const sprite = pack?.sprites.find(s => s.id === spriteId);
+          if (sprite) {
+            console.log(`[UnifiedTriggerExecutor] Found sprite via V2 config key "${config.key}": ${sprite.url}`);
+            return { url: sprite.url, label: sprite.label };
+          }
+        }
+        
+        // Check alternative keys
+        if (config.keys && config.keys.some(k => k.toLowerCase() === normalizedKey)) {
+          const pack = character.spritePacksV2?.find(p => p.id === collection.packId);
+          const sprite = pack?.sprites.find(s => s.id === spriteId);
+          if (sprite) {
+            console.log(`[UnifiedTriggerExecutor] Found sprite via V2 config alt key: ${sprite.url}`);
+            return { url: sprite.url, label: sprite.label };
+          }
+        }
+      }
+    }
+  }
+  
+  // 2. Search in V2 Sprite Packs directly
+  if (character.spritePacksV2 && character.spritePacksV2.length > 0) {
+    for (const pack of character.spritePacksV2) {
+      // Check if pack name matches
+      if (pack.name.toLowerCase() === normalizedKey && pack.sprites.length > 0) {
+        const sprite = pack.sprites[0];
+        console.log(`[UnifiedTriggerExecutor] Found sprite in V2 pack "${pack.name}": ${sprite.url}`);
+        return { url: sprite.url, label: sprite.label };
+      }
+      
+      // Check sprite labels
+      const spriteByLabel = pack.sprites.find(s => s.label?.toLowerCase() === normalizedKey);
+      if (spriteByLabel) {
+        console.log(`[UnifiedTriggerExecutor] Found sprite by label "${spriteByLabel.label}": ${spriteByLabel.url}`);
+        return { url: spriteByLabel.url, label: spriteByLabel.label };
+      }
+    }
+  }
+  
+  // 3. Search in legacy sprite packs
   if (character.spritePacks) {
     for (const pack of character.spritePacks) {
       if (!pack.active) continue;
       
       // Check pack keywords
-      const normalizedKey = key.toLowerCase();
       const packMatches = pack.keywords.some(kw => kw.toLowerCase() === normalizedKey);
       
       if (packMatches && pack.items && pack.items.length > 0) {
         // Find an item that matches
         const item = pack.items.find(i => i.enabled !== false);
         if (item?.spriteUrl) {
+          console.log(`[UnifiedTriggerExecutor] Found sprite in legacy pack "${pack.name}": ${item.spriteUrl}`);
           return { url: item.spriteUrl, label: item.spriteLabel };
         }
       }
     }
   }
   
-  // 2. Search in simple sprite triggers
+  // 4. Search in simple sprite triggers
   if (character.spriteTriggers) {
-    const normalizedKey = key.toLowerCase();
     const trigger = character.spriteTriggers.find(t => 
       t.active && t.keywords.some(kw => kw.toLowerCase() === normalizedKey)
     );
     
     if (trigger?.spriteUrl) {
+      console.log(`[UnifiedTriggerExecutor] Found sprite in legacy trigger "${trigger.name}": ${trigger.spriteUrl}`);
       return { url: trigger.spriteUrl, label: trigger.spriteState };
     }
   }
   
-  // 3. Search in sprite config state collections
+  // 5. Search in sprite config state collections
   if (character.spriteConfig?.stateCollections) {
-    const normalizedKey = key.toLowerCase();
-    
     // Check if key matches a state name
     for (const [stateName, collection] of Object.entries(character.spriteConfig.stateCollections)) {
       if (stateName.toLowerCase() === normalizedKey && collection.entries.length > 0) {
         const entry = collection.entries.find(e => e.role === 'principal') || collection.entries[0];
         if (entry?.spriteUrl) {
+          console.log(`[UnifiedTriggerExecutor] Found sprite in state collection "${stateName}": ${entry.spriteUrl}`);
           return { url: entry.spriteUrl, label: entry.spriteLabel };
         }
       }
     }
   }
   
+  console.log(`[UnifiedTriggerExecutor] No sprite found for key "${key}" in character "${character.name}"`);
   return null;
 }
 
 // ============================================
 // Sound Trigger Execution
 // ============================================
+
+/**
+ * Busca un sonido que coincida con la key en las colecciones y triggers
+ */
+function findSoundMatch(
+  key: string,
+  context: TriggerExecutionContext
+): { url: string; name: string } | null {
+  const { soundCollections, soundTriggers } = context;
+  const normalizedKey = key.toLowerCase();
+  
+  // 1. Si la key es una URL directa, usarla
+  if (isDirectUrl(key)) {
+    return { url: key, name: key.split('/').pop() || key };
+  }
+  
+  // 2. Buscar en sound triggers (por keywords o nombre)
+  if (soundTriggers && soundTriggers.length > 0) {
+    for (const trigger of soundTriggers) {
+      if (!trigger.active) continue;
+      
+      // Buscar por keywords
+      const keywordMatch = trigger.keywords.some(kw => kw.toLowerCase() === normalizedKey);
+      // O por nombre del trigger
+      const nameMatch = trigger.name.toLowerCase() === normalizedKey;
+      
+      if (keywordMatch || nameMatch) {
+        // Encontrar la colección
+        const collection = soundCollections?.find(c => c.name === trigger.collection);
+        if (collection && collection.files.length > 0) {
+          // Seleccionar archivo (random o cycle)
+          let fileIndex = 0;
+          if (trigger.playMode === 'random') {
+            fileIndex = Math.floor(Math.random() * collection.files.length);
+          }
+          const file = collection.files[fileIndex];
+          const url = `${collection.path}/${file}`;
+          console.log(`[UnifiedTriggerExecutor] Found sound match: trigger "${trigger.name}" -> ${url}`);
+          return { url, name: trigger.name };
+        }
+      }
+    }
+  }
+  
+  // 3. Formato "collection/filename"
+  if (key.includes('/')) {
+    const [collectionName, filename] = key.split('/');
+    const collection = soundCollections?.find(c => c.name.toLowerCase() === collectionName.toLowerCase());
+    if (collection) {
+      // Buscar el archivo en la colección
+      const file = collection.files.find(f => f.toLowerCase().includes(filename.toLowerCase()));
+      if (file) {
+        const url = `${collection.path}/${file}`;
+        return { url, name: `${collectionName}/${file}` };
+      }
+      // Si no encuentra el archivo específico, usar el primero
+      if (collection.files.length > 0) {
+        const url = `${collection.path}/${collection.files[0]}`;
+        return { url, name: `${collectionName}/${collection.files[0]}` };
+      }
+    }
+  }
+  
+  // 4. Buscar por nombre de colección
+  if (soundCollections && soundCollections.length > 0) {
+    for (const collection of soundCollections) {
+      if (collection.name.toLowerCase() === normalizedKey && collection.files.length > 0) {
+        // Usar un archivo random de la colección
+        const fileIndex = Math.floor(Math.random() * collection.files.length);
+        const file = collection.files[fileIndex];
+        const url = `${collection.path}/${file}`;
+        return { url, name: `${collection.name}/${file}` };
+      }
+    }
+  }
+  
+  return null;
+}
 
 /**
  * Ejecuta un trigger de sonido
@@ -285,32 +479,37 @@ function executeSoundTriggerForCharacter(
   const { storeActions, soundSettings } = context;
   
   try {
-    if (!storeActions.playSound) {
+    // Determine sound URL
+    let soundUrl: string;
+    let soundName: string;
+    
+    // Buscar el sonido en las colecciones y triggers
+    const soundMatch = findSoundMatch(key, context);
+    
+    if (soundMatch) {
+      soundUrl = soundMatch.url;
+      soundName = soundMatch.name;
+      console.log(`[UnifiedTriggerExecutor] Found sound match: ${soundName} -> ${soundUrl}`);
+    } else if (isDirectUrl(key)) {
+      // Use key directly as URL
+      soundUrl = key;
+      soundName = key.split('/').pop() || key;
+      console.log(`[UnifiedTriggerExecutor] Using direct URL for sound: ${key}`);
+    } else {
+      // No se encontró el sonido
+      console.log(`[UnifiedTriggerExecutor] No sound found for key "${key}"`);
       return {
         success: false,
         category: 'sound',
         key,
         targetCharacterId: context.characterId,
-        error: 'Sound playback not available',
+        error: `No sound found for key "${key}"`,
       };
     }
     
-    // For sounds, key can be:
-    // - "collection/filename" format
-    // - Just a key that we need to look up in triggers
-    
-    let collection: string;
-    let filename: string;
-    
-    if (key.includes('/')) {
-      [collection, filename] = key.split('/');
-    } else {
-      // Use default collection or interpret key as filename
-      collection = 'default';
-      filename = key;
-    }
-    
     const finalVolume = volume * (soundSettings?.globalVolume ?? 1);
+    
+    console.log(`[UnifiedTriggerExecutor] Executing sound trigger: ${soundUrl} at volume ${finalVolume}`);
     
     // Create synthetic trigger match
     const match: TriggerMatch = {
@@ -318,9 +517,9 @@ function executeSoundTriggerForCharacter(
       triggerType: 'sound',
       keyword: key,
       data: {
-        soundUrl: `/sounds/${collection}/${filename}`,
+        soundUrl,
         volume: finalVolume,
-        triggerName: `Reward: ${key}`,
+        triggerName: `Reward: ${soundName}`,
       },
     };
     
@@ -341,7 +540,7 @@ function executeSoundTriggerForCharacter(
       category: 'sound',
       key,
       targetCharacterId: context.characterId,
-      message: `Sound "${key}" queued for playback`,
+      message: `Sound "${soundName}" queued for playback`,
     };
   } catch (error) {
     return {
@@ -357,6 +556,75 @@ function executeSoundTriggerForCharacter(
 // ============================================
 // Background Trigger Execution
 // ============================================
+
+/**
+ * Busca un fondo que coincida con la key en los background packs
+ */
+function findBackgroundMatch(
+  key: string,
+  context: TriggerExecutionContext
+): { url: string; name: string; overlays?: BackgroundOverlay[] } | null {
+  const { backgroundPacks } = context;
+  const normalizedKey = key.toLowerCase();
+  
+  // 1. Si la key es una URL directa, usarla
+  if (isDirectUrl(key)) {
+    return { url: key, name: key.split('/').pop() || key };
+  }
+  
+  // 2. Buscar en background packs
+  if (backgroundPacks && backgroundPacks.length > 0) {
+    // Ordenar por prioridad (mayor primero)
+    const sortedPacks = [...backgroundPacks]
+      .filter(p => p.active)
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    
+    for (const pack of sortedPacks) {
+      // Buscar en los items del pack
+      for (const item of pack.items) {
+        if (!item.enabled) continue;
+        
+        // Buscar por triggerKeys
+        const keyMatch = item.triggerKeys.some(tk => tk.toLowerCase() === normalizedKey);
+        // Buscar por backgroundName
+        const nameMatch = item.backgroundName.toLowerCase() === normalizedKey;
+        
+        if (keyMatch || nameMatch) {
+          console.log(`[UnifiedTriggerExecutor] Found background match: "${item.backgroundName}" in pack "${pack.name}"`);
+          return {
+            url: item.backgroundUrl,
+            name: item.backgroundName,
+            overlays: item.overlays ?? pack.defaultOverlays ?? [],
+          };
+        }
+      }
+      
+      // También buscar por nombre del pack
+      if (pack.name.toLowerCase() === normalizedKey) {
+        // Usar el defaultBackground del pack o el primer item
+        if (pack.defaultBackground) {
+          return {
+            url: pack.defaultBackground,
+            name: pack.name,
+            overlays: pack.defaultOverlays ?? [],
+          };
+        }
+        if (pack.items.length > 0) {
+          const firstItem = pack.items.find(i => i.enabled);
+          if (firstItem) {
+            return {
+              url: firstItem.backgroundUrl,
+              name: firstItem.backgroundName,
+              overlays: firstItem.overlays ?? pack.defaultOverlays ?? [],
+            };
+          }
+        }
+      }
+    }
+  }
+  
+  return null;
+}
 
 /**
  * Ejecuta un trigger de fondo
@@ -380,19 +648,32 @@ function executeBackgroundTriggerForCharacter(
       };
     }
     
-    // For backgrounds, key can be:
-    // - A URL directly
-    // - A label to look up
-    // - A path to the background
-    
+    // Buscar el fondo en los background packs
     let backgroundUrl: string;
+    let backgroundName: string;
+    let overlays: BackgroundOverlay[] = [];
     
-    if (key.startsWith('http') || key.startsWith('/') || key.startsWith('data:')) {
+    const bgMatch = findBackgroundMatch(key, context);
+    
+    if (bgMatch) {
+      backgroundUrl = bgMatch.url;
+      backgroundName = bgMatch.name;
+      overlays = bgMatch.overlays ?? [];
+      console.log(`[UnifiedTriggerExecutor] Found background match: ${backgroundName} -> ${backgroundUrl}`);
+    } else if (isDirectUrl(key)) {
       // Direct URL
       backgroundUrl = key;
+      backgroundName = key.split('/').pop() || key;
     } else {
-      // Assume it's a path in the backgrounds folder
-      backgroundUrl = `/backgrounds/${key}`;
+      // No se encontró el fondo
+      console.log(`[UnifiedTriggerExecutor] No background found for key "${key}"`);
+      return {
+        success: false,
+        category: 'background',
+        key,
+        targetCharacterId: context.characterId,
+        error: `No background found for key "${key}"`,
+      };
     }
     
     // Create synthetic trigger match
@@ -402,9 +683,10 @@ function executeBackgroundTriggerForCharacter(
       keyword: key,
       data: {
         backgroundUrl,
+        backgroundName,
         transitionDuration: transitionDuration ?? backgroundSettings?.transitionDuration ?? 500,
         transitionType: backgroundSettings?.defaultTransitionType ?? 'fade',
-        overlays: [],
+        overlays,
       },
     };
     
@@ -428,7 +710,7 @@ function executeBackgroundTriggerForCharacter(
       category: 'background',
       key,
       targetCharacterId: context.characterId,
-      message: `Background changed to "${key}"`,
+      message: `Background changed to "${backgroundName}"`,
     };
   } catch (error) {
     return {

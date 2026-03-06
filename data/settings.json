@@ -9,7 +9,7 @@
   "autoSaveInterval": 30000,
   "confirmDelete": true,
   "defaultBackground": "",
-  "backgroundFit": "cover",
+  "backgroundFit": "contain",
   "swipeEnabled": true,
   "quickReplies": [
     "Continue",
@@ -37,14 +37,14 @@
     "realtimeEnabled": true,
     "transitionDuration": 500,
     "returnToDefaultEnabled": false,
-    "defaultBackgroundUrl": "/backgrounds/Biblioteca/ComfyUI_temp_rikdt_00271_.png"
+    "defaultBackgroundUrl": "/backgrounds/Room/Room (1).png"
   },
   "chatLayout": {
     "novelMode": true,
     "chatWidth": 66.54420842610143,
     "chatHeight": 36.11111111111112,
     "chatX": 33.27210421305072,
-    "chatY": 81.94444444444444,
+    "chatY": 81.85185185185185,
     "chatOpacity": 0.96,
     "blurBackground": false,
     "showCharacterSprite": true
