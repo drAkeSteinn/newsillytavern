@@ -3,7 +3,7 @@
 // ============================================
 
 import type { CharacterGroup, GroupMember } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 
 export interface GroupSlice {
   // State

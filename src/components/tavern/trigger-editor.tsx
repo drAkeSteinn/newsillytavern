@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTriggerStore } from '@/store/trigger-store';
+import { useTavernStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,6 @@ import {
   Sparkles, 
   Plus, 
   Trash2, 
-  Edit,
   Play,
   Settings
 } from 'lucide-react';
@@ -29,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { SFXTrigger, BackgroundTrigger, SpriteTrigger } from '@/types/triggers';
+import type { SFXTrigger, BackgroundTrigger } from '@/types/triggers';
 
 interface TriggerEditorProps {
   open: boolean;
@@ -37,19 +36,12 @@ interface TriggerEditorProps {
 }
 
 export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
-  const {
-    settings,
-    updateSettings,
-    sfxTriggers,
-    addSFXTrigger,
-    deleteSFXTrigger,
-    backgroundTriggers,
-    addBackgroundTrigger,
-    deleteBackgroundTrigger,
-    spriteTriggers,
-    addSpriteTrigger,
-    deleteSpriteTrigger,
-  } = useTriggerStore();
+  const store = useTavernStore();
+  const settings = store.settings;
+  
+  // Get triggers from store
+  const sfxTriggers = store.soundTriggers || [];
+  const backgroundTriggers = store.backgroundTriggers || [];
 
   const [newSFXKeyword, setNewSFXKeyword] = useState('');
   const [newSoundPath, setNewSoundPath] = useState('/sounds/pop/pop1.wav');
@@ -59,7 +51,8 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
   const handleAddSFXTrigger = () => {
     if (!newSFXKeyword.trim()) return;
     
-    addSFXTrigger({
+    const newTrigger: SFXTrigger = {
+      id: `sfx_${Date.now()}`,
       title: newSFXKeyword,
       active: true,
       keywords: [newSFXKeyword.toLowerCase()],
@@ -70,15 +63,17 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
       cooldownMs: 800,
       repeatCount: 1,
       soundPack: 'custom',
-    });
+    };
     
+    store.setSoundTriggers([...sfxTriggers, newTrigger]);
     setNewSFXKeyword('');
   };
 
   const handleAddBackgroundTrigger = () => {
     if (!newBgKeyword.trim()) return;
     
-    addBackgroundTrigger({
+    const newTrigger: BackgroundTrigger = {
+      id: `bg_${Date.now()}`,
       title: newBgKeyword,
       active: true,
       keywords: [newBgKeyword.toLowerCase()],
@@ -86,15 +81,24 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
       caseSensitive: false,
       backgroundName: newBgPath || 'Room',
       cooldownMs: 1500,
-    });
+    };
     
+    store.setBackgroundTriggers([...backgroundTriggers, newTrigger]);
     setNewBgKeyword('');
     setNewBgPath('');
   };
 
+  const handleDeleteSFXTrigger = (id: string) => {
+    store.setSoundTriggers(sfxTriggers.filter(t => t.id !== id));
+  };
+
+  const handleDeleteBackgroundTrigger = (id: string) => {
+    store.setBackgroundTriggers(backgroundTriggers.filter(t => t.id !== id));
+  };
+
   const handleTestSound = (src: string) => {
     const audio = new Audio(src);
-    audio.volume = settings.globalVolume;
+    audio.volume = settings.sound?.globalVolume ?? 0.85;
     audio.play().catch((error) => triggerLogger.error('Audio play failed', { error }));
   };
 
@@ -109,7 +113,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
         </DialogHeader>
 
         <Tabs defaultValue="sfx" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="sfx" className="gap-1">
               <Volume2 className="w-4 h-4" />
               SFX
@@ -117,10 +121,6 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
             <TabsTrigger value="backgrounds" className="gap-1">
               <ImageIcon className="w-4 h-4" />
               Backgrounds
-            </TabsTrigger>
-            <TabsTrigger value="sprites" className="gap-1">
-              <Sparkles className="w-4 h-4" />
-              Sprites
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1">
               <Settings className="w-4 h-4" />
@@ -186,7 +186,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive"
-                        onClick={() => deleteSFXTrigger(trigger.id)}
+                        onClick={() => handleDeleteSFXTrigger(trigger.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -235,7 +235,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive"
-                      onClick={() => deleteBackgroundTrigger(trigger.id)}
+                      onClick={() => handleDeleteBackgroundTrigger(trigger.id)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -244,132 +244,42 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
               </div>
             </TabsContent>
 
-            {/* Sprites Tab */}
-            <TabsContent value="sprites" className="space-y-4 mt-0">
-              <div className="text-center py-8 text-muted-foreground">
-                <Sparkles className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Sprite triggers allow changing character expressions based on keywords.</p>
-                <Button variant="outline" className="mt-4">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Sprite Trigger
-                </Button>
-              </div>
-            </TabsContent>
-
             {/* Settings Tab */}
             <TabsContent value="settings" className="space-y-6 mt-0">
               {/* Enable/Disable */}
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Enable Triggers</Label>
+                  <Label>Enable Sound Triggers</Label>
                   <p className="text-xs text-muted-foreground">
-                    Master switch for all trigger systems
+                    Master switch for sound trigger system
                   </p>
                 </div>
                 <Switch
-                  checked={settings.enabled}
-                  onCheckedChange={(enabled) => updateSettings({ enabled })}
+                  checked={settings.sound?.enabled ?? true}
+                  onCheckedChange={(enabled) => store.updateSettings({ 
+                    sound: { ...settings.sound, enabled } 
+                  })}
                 />
-              </div>
-
-              {/* Scan Mode */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Scan Mode</Label>
-                  <p className="text-xs text-muted-foreground">
-                    {settings.scanMode === 'pipes' 
-                      ? 'Only detect |keyword| syntax' 
-                      : 'Also detect plain text keywords'}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={settings.scanMode === 'pipes' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => updateSettings({ scanMode: 'pipes' })}
-                  >
-                    Pipes Only
-                  </Button>
-                  <Button
-                    variant={settings.scanMode === 'pipes+text' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => updateSettings({ scanMode: 'pipes+text' })}
-                  >
-                    Pipes + Text
-                  </Button>
-                </div>
               </div>
 
               {/* Global Volume */}
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <Label>Global Volume</Label>
-                  <span className="text-sm">{Math.round(settings.globalVolume * 100)}%</span>
+                  <span className="text-sm">{Math.round((settings.sound?.globalVolume ?? 0.85) * 100)}%</span>
                 </div>
                 <Slider
-                  value={[settings.globalVolume]}
+                  value={[settings.sound?.globalVolume ?? 0.85]}
                   min={0}
                   max={1}
                   step={0.05}
-                  onValueChange={([volume]) => updateSettings({ globalVolume: volume })}
+                  onValueChange={([volume]) => store.updateSettings({ 
+                    sound: { ...settings.sound, globalVolume: volume } 
+                  })}
                 />
               </div>
 
-              {/* Fuzzy Matching */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Fuzzy Matching</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Allow partial keyword matches
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.fuzzyEnabled}
-                  onCheckedChange={(fuzzyEnabled) => updateSettings({ fuzzyEnabled })}
-                />
-              </div>
-
-              {/* Fuzzy Threshold */}
-              {settings.fuzzyEnabled && (
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label>Fuzzy Threshold</Label>
-                    <span className="text-sm">{settings.fuzzyThreshold.toFixed(2)}</span>
-                  </div>
-                  <Slider
-                    value={[settings.fuzzyThreshold]}
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    onValueChange={([fuzzyThreshold]) => updateSettings({ fuzzyThreshold })}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Lower = stricter matching, Higher = more lenient
-                  </p>
-                </div>
-              )}
-
-              {/* Cooldowns */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Global Cooldown (ms)</Label>
-                  <Input
-                    type="number"
-                    value={settings.globalCooldownMs}
-                    onChange={(e) => updateSettings({ globalCooldownMs: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Max Sounds Per Message</Label>
-                  <Input
-                    type="number"
-                    value={settings.maxSoundsPerMessage}
-                    onChange={(e) => updateSettings({ maxSoundsPerMessage: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-              </div>
-
-              {/* Background Settings */}
+              {/* Background Triggers */}
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Background Triggers</Label>
@@ -378,8 +288,10 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                   </p>
                 </div>
                 <Switch
-                  checked={settings.playBackgroundTriggers}
-                  onCheckedChange={(playBackgroundTriggers) => updateSettings({ playBackgroundTriggers })}
+                  checked={settings.backgroundTriggers?.enabled ?? true}
+                  onCheckedChange={(enabled) => store.updateSettings({ 
+                    backgroundTriggers: { ...settings.backgroundTriggers, enabled } 
+                  })}
                 />
               </div>
 
@@ -392,8 +304,10 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                   </p>
                 </div>
                 <Switch
-                  checked={settings.realtimeEnabled}
-                  onCheckedChange={(realtimeEnabled) => updateSettings({ realtimeEnabled })}
+                  checked={settings.sound?.realtimeEnabled ?? true}
+                  onCheckedChange={(realtimeEnabled) => store.updateSettings({ 
+                    sound: { ...settings.sound, realtimeEnabled } 
+                  })}
                 />
               </div>
             </TabsContent>

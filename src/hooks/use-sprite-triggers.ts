@@ -13,9 +13,14 @@
  * - Realtime streaming support
  * 
  * FASE 2: Enhanced integration with store
+ * 
+ * FASE 3: V2 Trigger Collections support
+ * - Trigger Collections with priority system
+ * - Queue system for triggers of equal priority
+ * - Sprite chains and sound chains
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTavernStore } from '@/store';
 import { setReturnToIdleCallback } from '@/store/slices/spriteSlice';
 import type {
@@ -29,7 +34,23 @@ import type {
   StateSpriteCollection,
   SpriteState,
   CollectionBehavior,
+  // V2 Types
+  TriggerCollection,
+  SpritePackV2,
+  SpriteChain,
+  SoundChain,
+  TriggerQueueEntry,
 } from '@/types';
+import {
+  checkTriggerCollections,
+  createSpriteHandlerState,
+  markCollectionTriggered,
+  executeTriggerCollectionResult,
+  selectSpriteFromPack,
+  type SpriteTriggerContextV2,
+  type TriggerCollectionMatchResult,
+  type SpriteHandlerState,
+} from '@/lib/triggers/handlers/sprite-handler';
 
 // ============================================
 // Token Extraction Utilities
@@ -659,6 +680,160 @@ export function markTriggerFired(packId: string): void {
 }
 
 // ============================================
+// V2 Trigger Collections Matching
+// ============================================
+
+/**
+ * Global handler state for V2 triggers
+ */
+const v2HandlerState = createSpriteHandlerState();
+
+/**
+ * Extract tokens for V2 system (same as legacy but returns DetectedToken array)
+ */
+export function extractTokensForV2(
+  text: string,
+  tagDelimiters: { start: string; end: string } = { start: '|', end: '|' }
+): Array<{ token: string; type: string; wordPosition?: number }> {
+  const tokens: Array<{ token: string; type: string; wordPosition?: number }> = [];
+  
+  // Extract pipe tokens
+  const pipeTokens = extractPipeTokens(text, tagDelimiters);
+  let pipeText = text;
+  let pipeOffset = 0;
+  
+  // Find positions of pipe tokens
+  for (const pipeToken of pipeTokens) {
+    const searchStr = `${tagDelimiters.start}${pipeToken}${tagDelimiters.end}`;
+    const idx = pipeText.indexOf(searchStr, pipeOffset);
+    if (idx !== -1) {
+      tokens.push({
+        token: pipeToken,
+        type: 'pipe',
+        wordPosition: idx,
+      });
+      pipeOffset = idx + searchStr.length;
+    }
+  }
+  
+  // Remove pipe segments and extract word tokens
+  const plainText = removePipeSegments(text, tagDelimiters);
+  const wordTokens = extractWordTokens(plainText);
+  
+  // Find approximate positions for word tokens
+  let wordOffset = 0;
+  for (const wordToken of wordTokens) {
+    const idx = plainText.indexOf(wordToken, wordOffset);
+    if (idx !== -1) {
+      tokens.push({
+        token: wordToken,
+        type: 'word',
+        wordPosition: idx,
+      });
+      wordOffset = idx + wordToken.length;
+    }
+  }
+  
+  // Add HUD tokens
+  const hudTokens = extractHudTokens(text);
+  for (const hudToken of hudTokens) {
+    tokens.push({
+      token: hudToken,
+      type: 'hud',
+    });
+  }
+  
+  return tokens;
+}
+
+/**
+ * Match Trigger Collections against text
+ * 
+ * Returns the best match based on priority and position
+ */
+export function matchTriggerCollections(
+  text: string,
+  triggerCollections: TriggerCollection[],
+  spritePacksV2: SpritePackV2[],
+  options: {
+    tagDelimiters?: { start: string; end: string };
+    caseSensitive?: boolean;
+  } = {}
+): TriggerCollectionMatchResult | null {
+  const { tagDelimiters = { start: '|', end: '|' } } = options;
+  
+  if (triggerCollections.length === 0 || spritePacksV2.length === 0) {
+    return null;
+  }
+  
+  // Extract tokens
+  const rawTokens = extractTokensForV2(text, tagDelimiters);
+  
+  // Convert to DetectedToken format
+  const tokens = rawTokens.map((t, index) => ({
+    token: t.token,
+    type: t.type as 'word' | 'pipe' | 'hud',
+    wordPosition: t.wordPosition,
+    position: index,
+  }));
+  
+  // Build context
+  const context: SpriteTriggerContextV2 = {
+    triggerCollections,
+    spritePacksV2,
+    spriteIndex: { sprites: [] },
+    character: null,
+    messageKey: `msg_${Date.now()}`,
+    isSpriteLocked: false,
+  };
+  
+  // Check collections
+  return checkTriggerCollections(tokens, context, v2HandlerState);
+}
+
+/**
+ * Get sprite from State Collection V2
+ */
+export function getSpriteFromStateCollectionV2(
+  pack: SpritePackV2,
+  behavior: 'principal' | 'random' | 'list',
+  principalSpriteId?: string,
+  excludedSpriteIds?: string[]
+): { url: string | null; label: string | null; spriteId: string | null } {
+  if (!pack || pack.sprites.length === 0) {
+    return { url: null, label: null, spriteId: null };
+  }
+  
+  // Filter out excluded sprites
+  let availableSprites = pack.sprites;
+  if (excludedSpriteIds && excludedSpriteIds.length > 0) {
+    availableSprites = pack.sprites.filter(s => !excludedSpriteIds.includes(s.id));
+  }
+  
+  if (availableSprites.length === 0) {
+    return { url: null, label: null, spriteId: null };
+  }
+  
+  // Create temporary pack with filtered sprites
+  const filteredPack: SpritePackV2 = {
+    ...pack,
+    sprites: availableSprites,
+  };
+  
+  const selected = selectSpriteFromPack(filteredPack, behavior, principalSpriteId);
+  
+  if (!selected) {
+    return { url: null, label: null, spriteId: null };
+  }
+  
+  return {
+    url: selected.url,
+    label: selected.label,
+    spriteId: selected.id,
+  };
+}
+
+// ============================================
 // Main Hook
 // ============================================
 
@@ -677,6 +852,138 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
   } = options;
 
   const store = useTavernStore();
+  
+  // Ref to track handler state per message
+  const handlerStateRef = useRef<SpriteHandlerState>(createSpriteHandlerState());
+
+  /**
+   * Scan text for V2 Trigger Collections and apply them
+   * Uses the new priority and queue system
+   */
+  const scanForTriggerCollectionsV2 = useCallback(
+    (text: string, character: CharacterCard | null) => {
+      if (!enabled || !text.trim() || !character) return null;
+
+      // Check if sprite is locked
+      if (store.isSpriteLocked && store.isSpriteLocked()) {
+        return null;
+      }
+
+      // Get trigger collections and sprite packs from character
+      const triggerCollections = character.triggerCollections || [];
+      const spritePacksV2 = character.spritePacksV2 || store.spritePacksV2 || [];
+      
+      if (triggerCollections.length === 0) {
+        return null;
+      }
+
+      // Match against trigger collections
+      const result = matchTriggerCollections(
+        text,
+        triggerCollections,
+        spritePacksV2,
+        { tagDelimiters }
+      );
+
+      if (!result) {
+        return null;
+      }
+
+      // Mark as triggered for cooldown
+      markCollectionTriggered(result.collection.id, handlerStateRef.current);
+
+      return result;
+    },
+    [enabled, store, tagDelimiters]
+  );
+
+  /**
+   * Apply a V2 trigger collection result
+   */
+  const applyTriggerCollectionResult = useCallback(
+    (result: TriggerCollectionMatchResult, character: CharacterCard | null) => {
+      if (!character?.id) return;
+
+      const characterId = character.id;
+
+      // Check if we should add to queue or execute immediately
+      const charState = store.getCharacterSpriteState(characterId);
+      const hasActiveTrigger = charState.triggerQueue.active !== null;
+
+      if (hasActiveTrigger) {
+        // Add to queue
+        store.addTriggerToQueue(characterId, {
+          triggerCollectionId: result.collection.id,
+          spriteId: result.selectedSprite.id,
+          source: result.matchSource,
+        });
+        return result;
+      }
+
+      // Execute immediately
+      executeTriggerCollectionResult(
+        result,
+        {
+          triggerCollections: character.triggerCollections || [],
+          spritePacksV2: character.spritePacksV2 || store.spritePacksV2 || [],
+          spriteIndex: store.spriteIndex,
+          character,
+          messageKey: `msg_${Date.now()}`,
+          isSpriteLocked: store.isSpriteLocked?.() ?? false,
+        },
+        {
+          applyTriggerForCharacter: (id, hit) => {
+            store.applyTriggerForCharacter(id, {
+              spriteUrl: hit.spriteUrl,
+              spriteLabel: hit.spriteLabel,
+              returnToIdleMs: hit.returnToIdleMs,
+              packId: hit.packId,
+              spriteLabel: hit.spriteLabel,
+            } as SpriteTriggerHit);
+          },
+          scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter,
+          addTriggerToQueue: store.addTriggerToQueue,
+          startSpriteChain: store.startSpriteChain,
+          startSoundChain: store.startSoundChain,
+        },
+        () => {
+          // Get idle sprite from state collection V2
+          const idleCollection = character.stateCollectionsV2?.find(c => c.state === 'idle');
+          if (idleCollection) {
+            const pack = character.spritePacksV2?.find(p => p.id === idleCollection.packId);
+            if (pack) {
+              const { url } = getSpriteFromStateCollectionV2(
+                pack,
+                idleCollection.behavior,
+                idleCollection.principalSpriteId,
+                idleCollection.excludedSpriteIds
+              );
+              return url;
+            }
+          }
+          // Fall back to legacy
+          return character.spriteConfig?.sprites?.['idle'] || character.avatar || null;
+        }
+      );
+
+      return result;
+    },
+    [store]
+  );
+
+  /**
+   * Scan and apply V2 triggers in one call
+   */
+  const scanAndApplyV2 = useCallback(
+    (text: string, character: CharacterCard | null) => {
+      const result = scanForTriggerCollectionsV2(text, character);
+      if (result && character) {
+        return applyTriggerCollectionResult(result, character);
+      }
+      return null;
+    },
+    [scanForTriggerCollectionsV2, applyTriggerCollectionResult]
+  );
 
   /**
    * Scan text for sprite triggers and apply them
@@ -902,7 +1209,20 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
   }, []);
 
   return {
-    // Core functions
+    // ============================================
+    // V2 Trigger Collections System (NEW)
+    // ============================================
+    scanForTriggerCollectionsV2,
+    applyTriggerCollectionResult,
+    scanAndApplyV2,
+    
+    // V2 State helpers
+    getSpriteFromStateCollectionV2,
+    matchTriggerCollections,
+    
+    // ============================================
+    // Legacy Core functions
+    // ============================================
     scanForSpriteTriggers,
     applyTrigger,
     scanAndApply,

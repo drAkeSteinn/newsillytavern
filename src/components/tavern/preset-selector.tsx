@@ -18,8 +18,8 @@ import {
   Plus,
   Check
 } from 'lucide-react';
-import type { SpritePack, SpritePackItem, SpriteLibraryEntry } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
+import type { SpriteLibraryEntry } from '@/types';
+const uuidv4 = () => crypto.randomUUID();
 
 interface PresetItem {
   title: string;
@@ -31,12 +31,6 @@ interface PresetItem {
     poses?: { name: string; prefix: string }[];
     clothes?: { name: string; prefix: string }[];
   };
-  packs?: {
-    title: string;
-    keywords: string[];
-    requirePipes: boolean;
-    items: Partial<SpritePackItem>[];
-  }[];
 }
 
 const PRESETS: PresetItem[] = [
@@ -53,19 +47,6 @@ const PRESETS: PresetItem[] = [
         { name: 'blush', prefix: 'act-' },
       ],
     },
-    packs: [
-      {
-        title: 'Emociones',
-        keywords: ['happy', 'sad', 'angry', 'love'],
-        requirePipes: true,
-        items: [
-          { keys: 'happy', spriteLabel: 'happy-sprite' },
-          { keys: 'sad', spriteLabel: 'sad-sprite' },
-          { keys: 'angry', spriteLabel: 'angry-sprite' },
-          { keys: 'love', spriteLabel: 'blush-sprite' },
-        ],
-      },
-    ],
   },
   {
     title: 'Acciones de Conversación',
@@ -81,18 +62,6 @@ const PRESETS: PresetItem[] = [
         { name: 'think', prefix: 'act-' },
       ],
     },
-    packs: [
-      {
-        title: 'Gestos',
-        keywords: ['wave', 'nod', 'shake', 'point', 'think'],
-        requirePipes: true,
-        items: [
-          { keys: 'act-wave', spriteLabel: 'wave-sprite' },
-          { keys: 'act-nod', spriteLabel: 'nod-sprite' },
-          { keys: 'act-shake', spriteLabel: 'shake-sprite' },
-        ],
-      },
-    ],
   },
   {
     title: 'Posturas',
@@ -107,17 +76,6 @@ const PRESETS: PresetItem[] = [
         { name: 'leaning', prefix: 'pose-' },
       ],
     },
-    packs: [
-      {
-        title: 'Posturas',
-        keywords: ['sit', 'stand', 'lie', 'lean'],
-        requirePipes: true,
-        items: [
-          { keys: 'pose-sitting', spriteLabel: 'sitting-sprite' },
-          { keys: 'pose-standing', spriteLabel: 'standing-sprite' },
-        ],
-      },
-    ],
   },
   {
     title: 'Ropa/Vestimenta',
@@ -147,17 +105,6 @@ const PRESETS: PresetItem[] = [
         { name: 'tear', prefix: 'act-' },
       ],
     },
-    packs: [
-      {
-        title: 'Anime',
-        keywords: ['blush', 'sweat', 'angry', 'sparkle', 'cry'],
-        requirePipes: true,
-        items: [
-          { keys: 'act-blush', spriteLabel: 'blush-sprite', returnToIdleMs: 3000 },
-          { keys: 'act-sweatdrop', spriteLabel: 'sweatdrop-sprite', returnToIdleMs: 2000 },
-        ],
-      },
-    ],
   },
 ];
 
@@ -284,7 +231,6 @@ export function PresetSelector({ onApplyPreset, appliedPresets, className }: Pre
 // Helper to convert preset to actual data
 export function presetToData(preset: PresetItem): {
   libraries: { actions: SpriteLibraryEntry[]; poses: SpriteLibraryEntry[]; clothes: SpriteLibraryEntry[] };
-  packs: SpritePack[];
 } {
   const libraries: { actions: SpriteLibraryEntry[]; poses: SpriteLibraryEntry[]; clothes: SpriteLibraryEntry[] } = {
     actions: [],
@@ -315,32 +261,7 @@ export function presetToData(preset: PresetItem): {
     }));
   }
 
-  // Convert packs
-  const packs: SpritePack[] = (preset.packs || []).map(p => ({
-    id: uuidv4(),
-    title: p.title,
-    active: true,
-    keywords: p.keywords,
-    requirePipes: p.requirePipes,
-    caseSensitive: false,
-    cooldownMs: 1000,
-    items: p.items.map(item => ({
-      id: uuidv4(),
-      spriteLabel: item.spriteLabel || '',
-      spriteUrl: item.spriteUrl,
-      keys: item.keys || '',
-      actionId: item.actionId,
-      poseId: item.poseId,
-      clothesId: item.clothesId,
-      idleSpriteLabel: item.idleSpriteLabel,
-      returnToIdleMs: item.returnToIdleMs,
-      enabled: true,
-    })),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }));
-
-  return { libraries, packs };
+  return { libraries };
 }
 
 export { PRESETS };

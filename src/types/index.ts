@@ -103,31 +103,7 @@ export interface AtmosphereTriggerHit {
 
 // ============ Character Card Types ============
 
-// ============ Sprite Trigger System Types ============
-
-// Return to idle mode for triggers
-export type ReturnToMode = 'idle_collection' | 'custom_sprite';
-
-// Character sprite trigger for automatic sprite changes (simple triggers)
-export interface CharacterSpriteTrigger {
-  id: string;
-  title: string;
-  active: boolean;
-  // Key detection (HUD-style: main key + alternatives)
-  key: string;               // Primary key (e.g., "spritewin", "sprite:win")
-  keys?: string[];           // Alternative keys (ANY of these triggers the sprite)
-  // Legacy support
-  keywords?: string[];       // DEPRECATED: Use key/keys instead
-  requirePipes: boolean;
-  caseSensitive: boolean;
-  spriteUrl: string;         // Sprite to show when triggered
-  spriteState?: SpriteState; // Or reference to a sprite state
-  returnToIdleMs: number;    // Time before returning to idle (0 = no return)
-  returnToMode?: ReturnToMode;  // What to return to: idle collection or custom sprite
-  returnToSpriteUrl?: string;  // Custom sprite URL to return to (if returnToMode is 'custom_sprite')
-  cooldownMs: number;
-  priority: number;          // Higher priority triggers override lower ones
-}
+// ============ Sprite System Types (V2) ============
 
 // Sprite Library Entry - reusable action/pose/clothes definitions
 export interface SpriteLibraryEntry {
@@ -141,34 +117,6 @@ export interface SpriteLibraries {
   actions: SpriteLibraryEntry[];
   poses: SpriteLibraryEntry[];
   clothes: SpriteLibraryEntry[];
-}
-
-// Sprite Pack Item - individual sprite within a pack
-export interface SpritePackItem {
-  id: string;
-  spriteLabel: string;       // Label/name from sprite index
-  spriteUrl?: string;        // Direct URL (can be resolved from index)
-  keys: string;              // CSV of keys that ALL must match (e.g., "act-wave,pose-sitting")
-  actionId?: string;         // Reference to action library entry
-  poseId?: string;           // Reference to pose library entry
-  clothesId?: string;        // Reference to clothes library entry
-  idleSpriteLabel?: string;  // Sprite to return to after delay
-  returnToIdleMs?: number;   // Time before returning to idle (0 = no return)
-  enabled: boolean;
-}
-
-// Sprite Pack - collection of sprites triggered by pack keywords
-export interface SpritePack {
-  id: string;
-  title: string;
-  active: boolean;
-  requirePipes: boolean;     // Keywords must be in |pipes|
-  caseSensitive: boolean;
-  keywords: string[];        // ANY of these triggers the pack
-  cooldownMs: number;
-  items: SpritePackItem[];
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 // Sprite Index Entry - available sprites from filesystem
@@ -196,19 +144,249 @@ export interface SpriteLockState {
   lastApplyAt: number;
 }
 
-// Sprite Trigger Hit - result of matching sprite triggers
+// Sprite Trigger Hit - result of matching sprite triggers (V2)
 export interface SpriteTriggerHit {
   packId: string;
-  pack?: SpritePack;
-  item?: SpritePackItem;
-  spriteLabel: string;
+  collectionId?: string;        // V2: Trigger collection ID
+  spriteLabel: string | null;
   spriteUrl: string;
-  idleSpriteLabel?: string;
   returnToIdleMs?: number;
-  returnToMode?: ReturnToMode;        // What to return to: idle_collection or custom_sprite
-  returnToSpriteUrl?: string;         // Custom sprite URL to return to (if returnToMode is 'custom_sprite')
-  cooldownMs?: number;                // Cooldown before this trigger can fire again
-  score?: number;            // For priority sorting
+  cooldownMs?: number;
+  score?: number;
+}
+
+// ============================================
+// NEW SPRITE PACK SYSTEM (V2)
+// ============================================
+
+/**
+ * Sprite Pack Entry - Individual sprite within a pack
+ * Simple container with no trigger logic
+ */
+export interface SpritePackEntryV2 {
+  id: string;
+  label: string;             // Display name
+  url: string;               // URL to the sprite
+  thumbnail?: string;        // Preview thumbnail
+  tags?: string[];           // For filtering/searching
+  isAnimated?: boolean;      // Is GIF/WebM
+}
+
+/**
+ * Sprite Pack V2 - Simple container for sprites (no trigger logic)
+ * Used as base for State Collections and Trigger Collections
+ */
+export interface SpritePackV2 {
+  id: string;
+  name: string;
+  description?: string;
+  sprites: SpritePackEntryV2[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// STATE COLLECTION V2 (Reference to Pack)
+// ============================================
+
+/**
+ * State Collection V2 - References a SpritePack with behavior config
+ * Used for idle, talk, thinking states
+ */
+export interface StateCollectionV2 {
+  state: SpriteState;              // 'idle' | 'talk' | 'thinking'
+  
+  // Reference to sprite pack
+  packId: string;
+  
+  // Behavior when selecting sprite from pack
+  behavior: 'principal' | 'random' | 'list';
+  
+  // For 'principal' mode - which sprite to use
+  principalSpriteId?: string;
+  
+  // For 'list' mode - custom ordering
+  spriteOrder?: string[];          // Array of sprite IDs
+  
+  // Sprites to exclude from this state
+  excludedSpriteIds?: string[];
+  
+  // Current index for 'list' mode rotation
+  currentIndex?: number;
+}
+
+// ============================================
+// TRIGGER COLLECTION SYSTEM
+// ============================================
+
+/**
+ * Sprite Chain Step - Single step in a sprite animation chain
+ */
+export interface SpriteChainStep {
+  spriteId: string;                // ID of sprite to show
+  durationMs: number;              // How long to show (0 = wait forever)
+  transition?: 'none' | 'fade' | 'slide';
+}
+
+/**
+ * Sprite Chain - Sequence of sprites to play
+ * Replaces displayTime with animated sequence
+ */
+export interface SpriteChain {
+  enabled: boolean;
+  steps: SpriteChainStep[];
+  loop: boolean;                   // Repeat infinitely
+  interruptible: boolean;          // Can be interrupted by new trigger
+}
+
+/**
+ * Sound Chain Step - Single step in a sound sequence
+ */
+export interface SoundChainStep {
+  soundTriggerKey: string;         // Key of existing sound trigger
+  soundUrl?: string;               // Or direct URL to sound file
+  delayMs: number;                 // Delay before playing
+  volume?: number;                 // Override volume (0-1)
+}
+
+/**
+ * Sound Chain - Sequence of sounds to play
+ */
+export interface SoundChain {
+  enabled: boolean;
+  steps: SoundChainStep[];
+  stopOnInterrupt: boolean;        // Stop sounds if trigger interrupted
+  overlap?: boolean;               // Allow overlapping sounds
+  volume?: number;                 // Global volume for chain (0-1)
+}
+
+/**
+ * Fallback mode for trigger sprites
+ */
+export type TriggerFallbackMode = 'idle_collection' | 'custom_sprite' | 'collection_default';
+
+/**
+ * Sprite Trigger Config - Individual sprite configuration within a trigger collection
+ */
+export interface SpriteTriggerConfig {
+  spriteId: string;
+  
+  // Keys for activation
+  key: string;                     // Primary key
+  keys?: string[];                 // Alternative keys
+  requirePipes: boolean;
+  caseSensitive: boolean;
+  
+  // Fallback configuration
+  fallbackMode: TriggerFallbackMode;
+  fallbackSpriteId?: string;       // For 'custom_sprite' mode
+  fallbackDelayMs?: number;        // Override collection default
+  
+  // Chains for this sprite
+  spriteChain?: SpriteChain;
+  soundChain?: SoundChain;
+  
+  // Enable/disable this sprite config
+  enabled: boolean;
+}
+
+/**
+ * Trigger Collection - Collection of triggers using a sprite pack
+ */
+export interface TriggerCollection {
+  id: string;
+  name: string;
+  active: boolean;
+  priority: number;                // Higher = more important (default: 1)
+  
+  // Reference to sprite pack
+  packId: string;
+  
+  // Collection-level key activation
+  collectionKey: string;           // Main key that activates collection
+  collectionKeys?: string[];       // Alternative keys
+  collectionKeyRequirePipes?: boolean;
+  collectionKeyCaseSensitive?: boolean;
+  
+  // Behavior when activated by collection key
+  collectionBehavior: 'principal' | 'random' | 'list';
+  principalSpriteId?: string;      // For 'principal' mode
+  
+  // Default fallback (used if sprite config doesn't override)
+  fallbackMode: TriggerFallbackMode;
+  fallbackSpriteId?: string;
+  fallbackDelayMs: number;         // 0 = persist forever
+  
+  // Default chains (used if sprite config doesn't override)
+  spriteChain?: SpriteChain;
+  soundChain?: SoundChain;
+  
+  // Cooldown
+  cooldownMs: number;
+  
+  // Individual sprite configurations
+  spriteConfigs: Record<string, SpriteTriggerConfig>;
+  
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// TRIGGER QUEUE SYSTEM
+// ============================================
+
+/**
+ * Trigger Queue Entry - Pending trigger in queue
+ */
+export interface TriggerQueueEntry {
+  id: string;
+  triggerCollectionId: string;
+  spriteId?: string;               // If triggered by individual sprite key
+  spriteUrl: string;               // URL of the sprite to show
+  spriteLabel?: string;            // Label for display
+  triggeredAt: number;
+  source: 'collection_key' | 'sprite_key';
+  
+  // Fallback configuration
+  fallbackMode?: TriggerFallbackMode;
+  fallbackDelayMs?: number;
+  fallbackSpriteId?: string;
+  fallbackSpriteUrl?: string;      // URL of fallback sprite (resolved when queued)
+}
+
+/**
+ * Active Trigger - Currently executing trigger
+ */
+export interface ActiveTrigger {
+  triggerCollectionId: string;
+  spriteId: string;
+  startedAt: number;
+  
+  // Chain progress
+  chainProgress?: {
+    currentStep: number;
+    chainType: 'sprite' | 'sound';
+    totalSteps: number;
+  };
+  
+  // Fallback scheduled
+  fallbackScheduled: boolean;
+  fallbackAt?: number;             // When fallback should execute
+}
+
+/**
+ * Trigger Queue State - Per-character queue management
+ */
+export interface TriggerQueueState {
+  // Queued triggers waiting to execute
+  queue: TriggerQueueEntry[];
+  
+  // Currently active trigger
+  active: ActiveTrigger | null;
+  
+  // Configuration
+  maxQueueSize: number;            // Default: 5
 }
 
 export interface CharacterCard {
@@ -228,10 +406,14 @@ export interface CharacterCard {
   avatar: string;
   sprites: CharacterSprite[];
   spriteConfig?: SpriteConfig;  // Sprite configuration for this character
-  spriteTriggers?: CharacterSpriteTrigger[];  // Simple character-specific sprite triggers
-  spritePacks?: SpritePack[];   // Advanced sprite packs (DOP Tirano style)
-  spriteLibraries?: SpriteLibraries;  // Reusable action/pose/clothes definitions
-  spriteIndex?: SpriteIndex;    // Cached sprite file index
+  
+  // SPRITE SYSTEM V2
+  spritePacksV2?: SpritePackV2[];           // Packs of sprites (containers)
+  stateCollectionsV2?: StateCollectionV2[];  // State collections (idle/talk/thinking)
+  triggerCollections?: TriggerCollection[];  // Trigger collections
+  spriteLibraries?: SpriteLibraries;         // Reusable action/pose/clothes definitions
+  spriteIndex?: SpriteIndex;                 // Cached sprite file index
+  
   voice: VoiceSettings | null;
   hudTemplateId?: string | null;  // HUD template to use for this character
   lorebookIds?: string[];         // Lorebooks to use for this character
@@ -1257,6 +1439,20 @@ export interface QuestValueCondition {
 }
 
 // ============================================
+// QUEST CHARACTER FILTER
+// ============================================
+
+/**
+ * Filtro de personajes para objetivos
+ * Permite restringir qué personajes pueden ver/completar un objetivo
+ */
+export interface QuestCharacterFilter {
+  enabled: boolean;
+  mode: 'include' | 'exclude';  // include = solo estos, exclude = todos menos estos
+  characterIds: string[];        // IDs de personajes
+}
+
+// ============================================
 // QUEST OBJECTIVE TEMPLATE
 // ============================================
 
@@ -1284,6 +1480,10 @@ export interface QuestObjectiveTemplate {
   
   // Recompensas al completar este objetivo (se ejecutan para el personaje que responde)
   rewards?: QuestReward[];
+  
+  // Filtro de personajes (opcional)
+  // Si se especifica, solo los personajes que coinciden ven este objetivo
+  characterFilter?: QuestCharacterFilter;
   
   // Metadata opcional
   metadata?: Record<string, unknown>;
@@ -2318,3 +2518,111 @@ export const DEFAULT_STATS_CONFIG: CharacterStatsConfig = {
   invitations: [],
   blockHeaders: DEFAULT_STATS_BLOCK_HEADERS,
 };
+
+// ============================================
+// DEFAULT VALUES FOR NEW SPRITE SYSTEM V2
+// ============================================
+
+/**
+ * Create default sprite pack entry
+ */
+export const createDefaultSpritePackEntryV2 = (overrides?: Partial<SpritePackEntryV2>): SpritePackEntryV2 => ({
+  id: '',
+  label: '',
+  url: '',
+  ...overrides,
+});
+
+/**
+ * Create default sprite pack V2
+ */
+export const createDefaultSpritePackV2 = (overrides?: Partial<SpritePackV2>): SpritePackV2 => ({
+  id: '',
+  name: 'New Pack',
+  sprites: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  ...overrides,
+});
+
+/**
+ * Create default state collection V2
+ */
+export const createDefaultStateCollectionV2 = (
+  state: SpriteState,
+  overrides?: Partial<StateCollectionV2>
+): StateCollectionV2 => ({
+  state,
+  packId: '',
+  behavior: 'principal',
+  currentIndex: 0,
+  ...overrides,
+});
+
+/**
+ * Create default sprite trigger config
+ */
+export const createDefaultSpriteTriggerConfig = (
+  spriteId: string,
+  overrides?: Partial<SpriteTriggerConfig>
+): SpriteTriggerConfig => ({
+  spriteId,
+  key: '',
+  keys: [],
+  requirePipes: true,
+  caseSensitive: false,
+  fallbackMode: 'collection_default',
+  enabled: true,
+  ...overrides,
+});
+
+/**
+ * Create default trigger collection
+ */
+export const createDefaultTriggerCollection = (overrides?: Partial<TriggerCollection>): TriggerCollection => ({
+  id: '',
+  name: 'New Trigger Collection',
+  active: true,
+  priority: 1,
+  packId: '',
+  collectionKey: '',
+  collectionKeys: [],
+  collectionKeyRequirePipes: true,
+  collectionKeyCaseSensitive: false,
+  collectionBehavior: 'principal',
+  fallbackMode: 'idle_collection',
+  fallbackDelayMs: 3000,
+  cooldownMs: 500,
+  spriteConfigs: {},
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  ...overrides,
+});
+
+/**
+ * Create default sprite chain
+ */
+export const createDefaultSpriteChain = (): SpriteChain => ({
+  enabled: false,
+  steps: [],
+  loop: false,
+  interruptible: true,
+});
+
+/**
+ * Create default sound chain
+ */
+export const createDefaultSoundChain = (): SoundChain => ({
+  enabled: false,
+  steps: [],
+  stopOnInterrupt: true,
+});
+
+/**
+ * Create default trigger queue state
+ */
+export const createDefaultTriggerQueueState = (): TriggerQueueState => ({
+  queue: [],
+  active: null,
+  maxQueueSize: 5,
+});

@@ -337,6 +337,55 @@ function processParsedTag(
 // ============================================
 
 /**
+ * Check if an objective should be visible to a specific character
+ * based on the characterFilter configuration
+ */
+export function isObjectiveVisibleForCharacter(
+  objective: QuestObjectiveTemplate,
+  characterId: string
+): boolean {
+  // If no filter is configured, objective is visible to all
+  if (!objective.characterFilter?.enabled) {
+    console.log(`[QuestHandler] Objective "${objective.description}" - no filter, visible to all`);
+    return true;
+  }
+  
+  const { mode, characterIds } = objective.characterFilter;
+  
+  // If no character IDs specified, treat as visible to all
+  if (!characterIds || characterIds.length === 0) {
+    console.log(`[QuestHandler] Objective "${objective.description}" - no characterIds in filter, visible to all`);
+    return true;
+  }
+  
+  const isInList = characterIds.includes(characterId);
+  
+  // include mode: only characters in the list can see it
+  // exclude mode: all characters EXCEPT those in the list can see it
+  const isVisible = mode === 'include' ? isInList : !isInList;
+  
+  console.log(`[QuestHandler] Objective "${objective.description}" - filter: ${JSON.stringify(objective.characterFilter)}, characterId: ${characterId}, isInList: ${isInList}, mode: ${mode}, isVisible: ${isVisible}`);
+  
+  return isVisible;
+}
+
+/**
+ * Filter objectives for a specific character
+ * Returns only objectives that the character can see
+ */
+export function filterObjectivesForCharacter(
+  objectives: QuestObjectiveTemplate[],
+  characterId: string | undefined
+): QuestObjectiveTemplate[] {
+  // If no character ID specified, return all objectives (no filtering)
+  if (!characterId) {
+    return objectives;
+  }
+  
+  return objectives.filter(obj => isObjectiveVisibleForCharacter(obj, characterId));
+}
+
+/**
  * Build quest section for prompt
  * 
  * Format:
@@ -350,12 +399,16 @@ function processParsedTag(
  * 
  * - Only shows incomplete objectives
  * - Optional objectives section only appears if there are pending optional objectives
+ * - Filters objectives by character if characterId is provided
  */
 export function buildQuestPromptSection(
   templates: QuestTemplate[],
   sessionQuests: SessionQuestInstance[],
-  templateStr: string
+  templateStr: string,
+  characterId?: string
 ): string {
+  console.log(`[QuestHandler] buildQuestPromptSection called with characterId: ${characterId}`);
+  
   // Get active quests
   const activeQuests = sessionQuests.filter(q => q.status === 'active');
   
@@ -367,11 +420,24 @@ export function buildQuestPromptSection(
     const questTemplate = templates.find(t => t.id === q.templateId);
     if (!questTemplate) return '';
     
+    console.log(`[QuestHandler] Processing quest "${questTemplate.name}" with ${questTemplate.objectives.length} objectives`);
+    
+    // Filter objectives for this character first
+    const visibleObjectives = filterObjectivesForCharacter(
+      questTemplate.objectives,
+      characterId
+    );
+    
+    console.log(`[QuestHandler] Quest "${questTemplate.name}" - visible objectives: ${visibleObjectives.length} of ${questTemplate.objectives.length}`);
+    
+    // If no objectives are visible for this character, don't show the quest
+    if (visibleObjectives.length === 0) return '';
+    
     // Separate objectives: pending (not completed) vs optional
     const pendingObjectives: string[] = [];
     const optionalObjectives: string[] = [];
     
-    for (const obj of questTemplate.objectives) {
+    for (const obj of visibleObjectives) {
       const sessionObj = q.objectives.find(o => o.templateId === obj.id);
       const isCompleted = sessionObj?.isCompleted || false;
       
@@ -391,6 +457,9 @@ export function buildQuestPromptSection(
         pendingObjectives.push(objectiveLine);
       }
     }
+    
+    // If all visible objectives are completed, don't show the quest for this character
+    if (pendingObjectives.length === 0 && optionalObjectives.length === 0) return '';
     
     // Build the quest block
     let questBlock = `- Misión: ${questTemplate.name}

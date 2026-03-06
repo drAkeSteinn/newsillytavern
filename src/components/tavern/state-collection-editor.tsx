@@ -45,7 +45,7 @@ import type {
   SpriteIndexEntry 
 } from '@/types';
 import { SpritePreview } from './sprite-preview';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 
 // Check if URL is a video file
 function isVideoUrl(url: string): boolean {

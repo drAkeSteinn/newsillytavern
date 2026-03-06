@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useTavernStore } from '@/store/tavern-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,16 +42,17 @@ import {
 } from 'lucide-react';
 import type { CharacterCard, SpriteLibraries } from '@/types';
 import { SpriteManager } from './sprite-manager';
-import { CharacterTriggerEditor } from './character-trigger-editor';
+// Legacy components removed - using V2 system now
 import { SpriteLibraryEditor } from './sprite-library-editor';
-import { SpritePackEditor } from './sprite-pack-editor';
 import { SpriteDebugPanel } from './sprite-debug-panel';
 import { PresetSelector, presetToData } from './preset-selector';
 import { HUDSelector } from './hud-selector';
 import { LorebookSelector } from './lorebook-selector';
 import { QuestSelector } from './quest-selector';
 import { StatsEditor } from './stats-editor';
+import { TriggerCollectionEditor } from './trigger-collection-editor';
 import { getLogger } from '@/lib/logger';
+import { getMigrationStatus, type MigrationStatus } from '@/lib/migration/sprite-migration';
 
 const editorLogger = getLogger('editor');
 
@@ -167,8 +168,13 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
     }));
   };
 
+  // Get migration status
+  const migrationStatus: MigrationStatus = useMemo(() => {
+    return getMigrationStatus(character);
+  }, [character.triggerCollections, character.spritePacksV2, character.stateCollectionsV2]);
+
   // Apply preset
-  const handleApplyPreset = (preset: { title: string; libraries?: any; packs?: any }) => {
+  const handleApplyPreset = (preset: { title: string; libraries?: any }) => {
     const data = presetToData(preset);
     
     setCharacter(prev => {
@@ -197,7 +203,6 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
           poses: dedupeLibraries(mergedLibraries.poses),
           clothes: dedupeLibraries(mergedLibraries.clothes),
         },
-        spritePacks: [...(prev.spritePacks || []), ...data.packs],
       };
     });
     
@@ -637,7 +642,7 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
               />
             </TabsContent>
 
-            {/* Triggers Tab - Sub-tabs for Simple, Libraries, Packs, Presets, Debug */}
+            {/* Triggers Tab - Sub-tabs for Collections, Libraries, Presets, Debug */}
             <TabsContent value="triggers" className="mt-0 space-y-3">
               {/* Explanation Banner */}
               <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg p-3">
@@ -651,42 +656,51 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                       Los triggers detectan <strong>palabras clave</strong> en el chat y cambian el sprite automáticamente. 
                       Funcionan junto con el sistema de Sprites estáticos.
                     </p>
+                    {/* V2 status indicator */}
+                    {migrationStatus.hasV2Data && (
+                      <div className="flex gap-2 mt-2 mb-1">
+                        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600">
+                          <Layers className="w-3 h-3 mr-1" />
+                          V2 Activo ({migrationStatus.v2Collections} coll, {migrationStatus.v2Packs} packs)
+                        </Badge>
+                      </div>
+                    )}
                     <div className="grid grid-cols-4 gap-2 mt-2 text-xs">
-                      <div className="p-1.5 bg-amber-500/10 rounded text-center">
-                        <Zap className="w-3 h-3 mx-auto text-amber-500" />
-                        <span className="block mt-0.5">Simple</span>
-                        <span className="text-muted-foreground">keyword → sprite</span>
+                      <div className="p-1.5 bg-purple-500/10 rounded text-center">
+                        <Layers className="w-3 h-3 mx-auto text-purple-500" />
+                        <span className="block mt-0.5">Collections</span>
+                        <span className="text-muted-foreground">Triggers V2</span>
                       </div>
                       <div className="p-1.5 bg-blue-500/10 rounded text-center">
                         <Library className="w-3 h-3 mx-auto text-blue-500" />
                         <span className="block mt-0.5">Libraries</span>
-                        <span className="text-muted-foreground">act-*, pose-*</span>
+                        <span className="text-muted-foreground">act-*</span>
                       </div>
-                      <div className="p-1.5 bg-green-500/10 rounded text-center">
-                        <Package className="w-3 h-3 mx-auto text-green-500" />
-                        <span className="block mt-0.5">Packs</span>
-                        <span className="text-muted-foreground">ANY + ALL</span>
+                      <div className="p-1.5 bg-pink-500/10 rounded text-center">
+                        <Wand2 className="w-3 h-3 mx-auto text-pink-500" />
+                        <span className="block mt-0.5">Presets</span>
+                        <span className="text-muted-foreground">config</span>
                       </div>
-                      <div className="p-1.5 bg-purple-500/10 rounded text-center">
-                        <Bug className="w-3 h-3 mx-auto text-purple-500" />
+                      <div className="p-1.5 bg-cyan-500/10 rounded text-center">
+                        <Bug className="w-3 h-3 mx-auto text-cyan-500" />
                         <span className="block mt-0.5">Debug</span>
-                        <span className="text-muted-foreground">probar</span>
+                        <span className="text-muted-foreground">test</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               
-              <Tabs defaultValue="simple" className="w-full">
-                <TabsList className="grid grid-cols-5 w-full">
+              <Tabs defaultValue="collections" className="w-full">
+                <TabsList className="grid grid-cols-4 w-full">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <TabsTrigger value="simple" className="text-xs gap-1">
-                        <Zap className="w-3.5 h-3.5" />
-                        Simple
+                      <TabsTrigger value="collections" className="text-xs gap-1 bg-purple-500/5">
+                        <Layers className="w-3.5 h-3.5 text-purple-500" />
+                        Collections
                       </TabsTrigger>
                     </TooltipTrigger>
-                    <TooltipContent><p>Triggers básicos: una keyword → un sprite</p></TooltipContent>
+                    <TooltipContent><p>Sistema de Trigger Collections con prioridades y cadenas</p></TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -696,15 +710,6 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                       </TabsTrigger>
                     </TooltipTrigger>
                     <TooltipContent><p>Define acciones (act-wave), posturas (pose-sitting), ropa (cloth-casual)</p></TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger value="packs" className="text-xs gap-1">
-                        <Package className="w-3.5 h-3.5" />
-                        Packs
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Sistema avanzado: CUALQUIER keyword activa + TODAS las keys deben coincidir</p></TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -726,9 +731,9 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                   </Tooltip>
                 </TabsList>
 
-                {/* Simple Triggers */}
-                <TabsContent value="simple" className="mt-0">
-                  <CharacterTriggerEditor
+                {/* Trigger Collections V2 */}
+                <TabsContent value="collections" className="mt-0">
+                  <TriggerCollectionEditor
                     character={character}
                     onChange={(updates) => setCharacter(prev => ({ ...prev, ...updates }))}
                   />
@@ -739,16 +744,6 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                   <SpriteLibraryEditor
                     libraries={character.spriteLibraries || { actions: [], poses: [], clothes: [] }}
                     onChange={(libraries: SpriteLibraries) => setCharacter(prev => ({ ...prev, spriteLibraries: libraries }))}
-                  />
-                </TabsContent>
-
-                {/* Sprite Packs */}
-                <TabsContent value="packs" className="mt-0">
-                  <SpritePackEditor
-                    packs={character.spritePacks || []}
-                    libraries={character.spriteLibraries || { actions: [], poses: [], clothes: [] }}
-                    spriteIndex={character.spriteIndex}
-                    onChange={(packs) => setCharacter(prev => ({ ...prev, spritePacks: packs }))}
                   />
                 </TabsContent>
 

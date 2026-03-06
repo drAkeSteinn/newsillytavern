@@ -45,8 +45,13 @@ import {
   executeSpriteTrigger,
   resetSpriteHandlerState,
   clearSpriteHandlerState,
+  checkTriggerCollections,
+  executeTriggerCollectionResult,
+  markCollectionTriggered,
   type SpriteHandlerState,
   type SpriteTriggerContext,
+  type SpriteTriggerContextV2,
+  type TriggerCollectionMatchResult,
 } from './handlers/sprite-handler';
 import {
   createHUDHandlerState,
@@ -313,7 +318,135 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     }
     
     // Process sprite triggers
+    // Priority: V2 Trigger Collections > Legacy Sprite Packs > Simple Triggers
     if (config.spriteEnabled !== false) {
+      // Get idle sprite URL helper (used by both V2 and legacy)
+      const getIdleSpriteUrl = (): string | null => {
+        if (!character) return null;
+        
+        // Try V2 state collections first
+        const idleCollectionV2 = character.stateCollectionsV2?.find(c => c.state === 'idle');
+        if (idleCollectionV2) {
+          const pack = character.spritePacksV2?.find(p => p.id === idleCollectionV2.packId);
+          if (pack && idleCollectionV2.principalSpriteId) {
+            const sprite = pack.sprites.find(s => s.id === idleCollectionV2.principalSpriteId);
+            if (sprite) return sprite.url;
+          }
+          if (pack && pack.sprites.length > 0) {
+            return pack.sprites[0].url;
+          }
+        }
+        
+        // Fall back to legacy state collections
+        const idleCollection = character.spriteConfig?.stateCollections?.['idle'];
+        if (idleCollection?.entries.length) {
+          const entry = idleCollection.entries.find(e => e.role === 'principal') || idleCollection.entries[0];
+          if (entry?.spriteUrl) return entry.spriteUrl;
+        }
+        if (character.spriteConfig?.sprites?.['idle']) {
+          return character.spriteConfig.sprites['idle'];
+        }
+        if (character.avatar) {
+          return character.avatar;
+        }
+        return null;
+      };
+      
+      // Try V2 Trigger Collections first (highest priority)
+      const hasV2Data = (character?.triggerCollections && character.triggerCollections.length > 0) ||
+                        (character?.spritePacksV2 && character.spritePacksV2.length > 0);
+      
+      if (hasV2Data) {
+        const v2Context: SpriteTriggerContextV2 = {
+          ...context,
+          triggerCollections: character?.triggerCollections ?? [],
+          spritePacksV2: character?.spritePacksV2 ?? store.spritePacksV2 ?? [],
+          spriteIndex: store.spriteIndex,
+          character: character,
+          isSpriteLocked: store.isSpriteLocked(),
+        };
+        
+        const v2Results = checkTriggerCollections(
+          newTokens,
+          v2Context,
+          spriteHandlerState
+        );
+        
+        // Process ALL matched triggers
+        if (v2Results.length > 0) {
+          console.log('[TriggerSystem] V2 triggers matched:', v2Results.length, v2Results.map(r => ({
+            collectionId: r.collection.id,
+            collectionName: r.collection.name,
+            spriteUrl: r.selectedSprite.url,
+            spriteLabel: r.selectedSprite.label,
+            matchSource: r.matchSource,
+          })));
+          
+          // Process each result
+          for (let i = 0; i < v2Results.length; i++) {
+            const v2Result = v2Results[i];
+            
+            // Mark collection as triggered for cooldown
+            markCollectionTriggered(v2Result.collection.id, spriteHandlerState);
+            
+            if (i === 0) {
+              // First trigger - apply immediately
+              console.log('[TriggerSystem] Applying first trigger immediately:', v2Result.selectedSprite.label);
+              executeTriggerCollectionResult(v2Result, v2Context, {
+                applyTriggerForCharacter: store.applyTriggerForCharacter.bind(store),
+                scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter.bind(store),
+                addTriggerToQueue: store.addTriggerToQueue.bind(store),
+                startSpriteChain: store.startSpriteChain.bind(store),
+                startSoundChain: store.startSoundChain.bind(store),
+              }, getIdleSpriteUrl);
+            } else {
+              // Subsequent triggers - add to queue
+              console.log('[TriggerSystem] Adding trigger to queue:', v2Result.selectedSprite.label);
+              
+              // Resolve fallback sprite URL based on mode
+              const fallbackMode = v2Result.spriteConfig?.fallbackMode ?? v2Result.collection.fallbackMode;
+              const fallbackSpriteId = v2Result.spriteConfig?.fallbackSpriteId ?? v2Result.collection.fallbackSpriteId;
+              let fallbackSpriteUrl: string | undefined;
+              
+              if (fallbackMode === 'custom_sprite' && fallbackSpriteId) {
+                const fallbackSprite = v2Result.spritePack.sprites.find(s => s.id === fallbackSpriteId);
+                if (fallbackSprite) {
+                  fallbackSpriteUrl = fallbackSprite.url;
+                }
+              } else if (fallbackMode === 'idle_collection') {
+                fallbackSpriteUrl = getIdleSpriteUrl() ?? undefined;
+              } else if (fallbackMode === 'collection_default') {
+                // Use collection's principal sprite or first sprite
+                const principalSprite = v2Result.spritePack.sprites.find(
+                  s => s.id === v2Result.collection.principalSpriteId
+                ) ?? v2Result.spritePack.sprites[0];
+                if (principalSprite) {
+                  fallbackSpriteUrl = principalSprite.url;
+                } else {
+                  fallbackSpriteUrl = getIdleSpriteUrl() ?? undefined;
+                }
+              }
+              
+              store.addTriggerToQueue(character!.id, {
+                triggerCollectionId: v2Result.collection.id,
+                spriteId: v2Result.selectedSprite.id,
+                spriteUrl: v2Result.selectedSprite.url,
+                spriteLabel: v2Result.selectedSprite.label,
+                source: v2Result.matchSource,
+                fallbackMode,
+                fallbackDelayMs: v2Result.spriteConfig?.fallbackDelayMs ?? v2Result.collection.fallbackDelayMs,
+                fallbackSpriteId,
+                fallbackSpriteUrl,
+              });
+            }
+          }
+          
+          // V2 matched, don't check legacy
+          return;
+        }
+      }
+      
+      // Fall back to legacy sprite system
       const spriteContext: SpriteTriggerContext = {
         ...context,
         spritePacks: character?.spritePacks ?? store.spritePacks ?? [],
@@ -330,24 +463,6 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       );
       
       if (spriteResult?.matched && spriteResult.trigger) {
-        // Get idle sprite URL helper
-        const getIdleSpriteUrl = (): string | null => {
-          if (!character) return null;
-          
-          const idleCollection = character.spriteConfig?.stateCollections?.['idle'];
-          if (idleCollection?.entries.length) {
-            const entry = idleCollection.entries.find(e => e.role === 'principal') || idleCollection.entries[0];
-            if (entry?.spriteUrl) return entry.spriteUrl;
-          }
-          if (character.spriteConfig?.sprites?.['idle']) {
-            return character.spriteConfig.sprites['idle'];
-          }
-          if (character.avatar) {
-            return character.avatar;
-          }
-          return null;
-        };
-        
         // Execute sprite trigger using the handler function
         executeSpriteTrigger(spriteResult.trigger, context, {
           applyTriggerForCharacter: store.applyTriggerForCharacter.bind(store),

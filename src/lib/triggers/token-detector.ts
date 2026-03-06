@@ -141,10 +141,47 @@ function extractWordTokens(
   _existingTokens: Set<string> = new Set() // Kept for API compatibility, but not used
 ): DetectedToken[] {
   const tokens: DetectedToken[] = [];
+  
+  // Standard word regex: letters, numbers, underscores, hyphens (2-40 chars)
   const wordRe = /[\p{L}\p{N}_-]{2,40}/gu;
   
+  // Key:value pattern regex: word:word (like sprite:ind01, mision:test, etc.)
+  // This captures patterns like "sprite:ind01", "mision:rescate", "quest:test"
+  const keyValueRe = /[\p{L}\p{N}_-]{2,30}:[\p{L}\p{N}_-]{2,30}/gu;
+  
+  // Track positions to avoid duplicates
+  const usedPositions = new Set<number>();
+  
+  // First, extract key:value patterns (higher priority)
+  for (const match of text.matchAll(keyValueRe)) {
+    if (match[0]) {
+      const original = match[0];
+      const normalized = normalizeToken(original);
+      const position = match.index ?? 0;
+      
+      // Mark these positions as used
+      for (let i = position; i < position + original.length; i++) {
+        usedPositions.add(i);
+      }
+      
+      tokens.push({
+        token: normalized,
+        original,
+        type: 'word', // Use 'word' type for compatibility
+        position,
+        wordPosition: startWordPosition + tokens.length,
+      });
+    }
+  }
+  
+  // Then, extract standard words (avoiding positions already used by key:value)
   for (const match of text.matchAll(wordRe)) {
     if (match[0]) {
+      const position = match.index ?? 0;
+      
+      // Skip if this position is already part of a key:value token
+      if (usedPositions.has(position)) continue;
+      
       const original = match[0];
       const normalized = normalizeToken(original);
       
@@ -152,7 +189,7 @@ function extractWordTokens(
         token: normalized,
         original,
         type: 'word',
-        position: match.index ?? 0,
+        position,
         wordPosition: startWordPosition + tokens.length,
       });
     }

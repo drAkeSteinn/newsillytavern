@@ -24,6 +24,7 @@ import type {
   AttributeAction,
   TriggerCategory,
   TriggerTargetMode,
+  QuestCharacterFilter,
 } from '@/types';
 import { cn, generateId } from '@/lib/utils';
 import {
@@ -55,6 +56,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import {
   Plus,
   Pencil,
@@ -88,6 +95,8 @@ import {
   Users,
   User,
   Crosshair,
+  ChevronRight,
+  Filter,
 } from 'lucide-react';
 
 // ============================================
@@ -420,6 +429,12 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
   // Active tab for the editor
   const [activeSection, setActiveSection] = useState<'basic' | 'activation' | 'objectives' | 'completion' | 'rewards'>('basic');
 
+  // Track expanded objectives (for accordion)
+  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
+
+  // Get all characters for the character filter
+  const allCharacters = useTavernStore((state) => state.characters);
+
   const validate = (): boolean => {
     const newErrors: string[] = [];
     
@@ -527,6 +542,42 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
     const newObjectives = [...objectives];
     [newObjectives[index], newObjectives[newIndex]] = [newObjectives[newIndex], newObjectives[index]];
     setObjectives(newObjectives);
+  };
+
+  const toggleObjectiveExpand = (objectiveId: string) => {
+    setExpandedObjectives((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(objectiveId)) {
+        newSet.delete(objectiveId);
+      } else {
+        newSet.add(objectiveId);
+      }
+      return newSet;
+    });
+  };
+
+  // Helper to get objective summary for collapsed view
+  const getObjectiveSummary = (obj: QuestObjectiveTemplate): string => {
+    const parts: string[] = [];
+    if (obj.description) {
+      parts.push(obj.description.substring(0, 40) + (obj.description.length > 40 ? '...' : ''));
+    }
+    if (obj.completion?.key) {
+      parts.push(`Key: ${obj.completion.key}`);
+    }
+    if (obj.targetCount > 1) {
+      parts.push(`x${obj.targetCount}`);
+    }
+    if (obj.characterFilter?.enabled && obj.characterFilter.characterIds.length > 0) {
+      const charNames = obj.characterFilter.characterIds
+        .map(id => allCharacters.find(c => c.id === id)?.name)
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(', ');
+      const remaining = obj.characterFilter.characterIds.length - 2;
+      parts.push(`👥 ${charNames}${remaining > 0 ? ` +${remaining}` : ''}`);
+    }
+    return parts.join(' | ') || 'Sin configurar';
   };
 
   // Reward management
@@ -960,6 +1011,133 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                                 />
                                 <span className="text-xs text-muted-foreground">Opcional</span>
                               </div>
+                            </div>
+
+                            {/* Character Filter Section */}
+                            <div className="space-y-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                  <Filter className="w-3 h-3" />
+                                  Filtro de Personajes
+                                </Label>
+                                <Switch
+                                  checked={obj.characterFilter?.enabled || false}
+                                  onCheckedChange={(v) => updateObjective(index, { 
+                                    characterFilter: { 
+                                      enabled: v, 
+                                      mode: obj.characterFilter?.mode || 'include',
+                                      characterIds: obj.characterFilter?.characterIds || []
+                                    } 
+                                  })}
+                                />
+                              </div>
+                              
+                              {obj.characterFilter?.enabled && (
+                                <div className="space-y-2 p-2 rounded bg-muted/30">
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] text-muted-foreground">Modo de Filtro</Label>
+                                    <Select 
+                                      value={obj.characterFilter.mode} 
+                                      onValueChange={(v) => updateObjective(index, { 
+                                        characterFilter: { 
+                                          ...obj.characterFilter!, 
+                                          mode: v as 'include' | 'exclude'
+                                        } 
+                                      })}
+                                    >
+                                      <SelectTrigger className="bg-background h-7 text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="include">
+                                          <div className="flex items-center gap-2">
+                                            <User className="w-3 h-3" />
+                                            Incluir (solo estos personajes)
+                                          </div>
+                                        </SelectItem>
+                                        <SelectItem value="exclude">
+                                          <div className="flex items-center gap-2">
+                                            <Users className="w-3 h-3" />
+                                            Excluir (todos menos estos)
+                                          </div>
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  
+                                  <div className="space-y-1">
+                                    <Label className="text-[9px] text-muted-foreground">
+                                      {obj.characterFilter.mode === 'include' ? 'Personajes que verán este objetivo' : 'Personajes que NO verán este objetivo'}
+                                    </Label>
+                                    <div className="flex flex-wrap gap-1 p-2 rounded bg-background min-h-[32px]">
+                                      {obj.characterFilter.characterIds.length === 0 ? (
+                                        <span className="text-xs text-muted-foreground italic">
+                                          Selecciona personajes...
+                                        </span>
+                                      ) : (
+                                        obj.characterFilter.characterIds.map(charId => {
+                                          const char = allCharacters.find(c => c.id === charId);
+                                          if (!char) return null;
+                                          return (
+                                            <Badge 
+                                              key={charId} 
+                                              variant="secondary"
+                                              className="text-[10px] gap-1 pr-1"
+                                            >
+                                              {char.name}
+                                              <button
+                                                type="button"
+                                                className="ml-1 hover:text-red-500"
+                                                onClick={() => updateObjective(index, { 
+                                                  characterFilter: { 
+                                                    ...obj.characterFilter!, 
+                                                    characterIds: obj.characterFilter!.characterIds.filter(id => id !== charId)
+                                                  } 
+                                                })}
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </Badge>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+                                    <Select 
+                                      value="" 
+                                      onValueChange={(v) => {
+                                        if (v && !obj.characterFilter?.characterIds.includes(v)) {
+                                          updateObjective(index, { 
+                                            characterFilter: { 
+                                              ...obj.characterFilter!, 
+                                              characterIds: [...(obj.characterFilter?.characterIds || []), v]
+                                            } 
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="bg-background h-7 text-xs">
+                                        <SelectValue placeholder="+ Agregar personaje" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {allCharacters
+                                          .filter(c => !obj.characterFilter?.characterIds.includes(c.id))
+                                          .map(c => (
+                                            <SelectItem key={c.id} value={c.id}>
+                                              {c.name}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  
+                                  <p className="text-[9px] text-muted-foreground flex items-center gap-1">
+                                    <Info className="w-3 h-3" />
+                                    {obj.characterFilter.mode === 'include' 
+                                      ? 'Solo los personajes seleccionados verán este objetivo en su prompt'
+                                      : 'Todos los personajes verán este objetivo EXCEPTO los seleccionados'}
+                                  </p>
+                                </div>
+                              )}
                             </div>
 
                             {/* Value Condition Section */}

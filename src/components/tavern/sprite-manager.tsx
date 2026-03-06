@@ -42,6 +42,9 @@ import {
   Film,
   FolderOpen,
   Check,
+  Layers,
+  Zap,
+  Settings,
 } from 'lucide-react';
 import type { 
   SpriteConfig, 
@@ -53,9 +56,11 @@ import type {
   CollectionBehavior
 } from '@/types';
 import { StateCollectionEditor } from './state-collection-editor';
+import { SpritePackEditorV2 } from './sprite-pack-editor-v2';
+import { StateCollectionEditorV2 } from './state-collection-editor-v2';
 import { SpritePreview } from './sprite-preview';
 import { getLogger } from '@/lib/logger';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 
 const spriteLogger = getLogger('sprite');
 
@@ -361,101 +366,38 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
       />
 
       {/* Tabs for State Collections and Custom Sprites */}
-      <Tabs defaultValue="collections" className="w-full">
-        <TabsList className="grid grid-cols-2 w-full">
+      <Tabs defaultValue="packs" className="w-full">
+        <TabsList className="grid grid-cols-3 w-full">
+          <TabsTrigger value="packs" className="text-xs gap-1">
+            <Layers className="w-3.5 h-3.5" />
+            Sprite Packs
+          </TabsTrigger>
           <TabsTrigger value="collections" className="text-xs gap-1">
             <Package className="w-3.5 h-3.5" />
-            Colecciones de Estado
+            Colecciones
           </TabsTrigger>
           <TabsTrigger value="custom" className="text-xs gap-1">
             <ImageIcon className="w-3.5 h-3.5" />
-            Sprites Personalizados
+            Sprites
           </TabsTrigger>
         </TabsList>
 
-        {/* State Collections Tab */}
+        {/* Sprite Packs V2 Tab */}
+        <TabsContent value="packs" className="space-y-4 mt-3">
+          <SpritePackEditorV2
+            character={character}
+            customSprites={spritesInSelectedCollection}
+            selectedCollectionName={selectedCollectionName}
+            onChange={onChange}
+          />
+        </TabsContent>
+
+        {/* State Collections V2 Tab */}
         <TabsContent value="collections" className="space-y-4 mt-3">
-          {/* Info Banner */}
-          <div className="text-xs bg-muted/50 border rounded-lg p-3 space-y-2">
-            <div className="flex items-center gap-2 font-medium text-foreground">
-              <Package className="w-4 h-4 text-purple-500" />
-              Colecciones de Estado
-            </div>
-            <p className="text-muted-foreground">
-              Cada estado (Idle, Talk, Thinking) ahora es una <strong>colección de sprites</strong>. 
-              Agrega sprites desde tus Sprites Personalizados y define cuál es el principal y cuáles son alternativos.
-            </p>
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              <div className="p-2 bg-amber-500/10 rounded border border-amber-500/20">
-                <div className="flex items-center gap-1 text-amber-600 text-xs font-medium">
-                  <Crown className="w-3 h-3" />
-                  Principal
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Sprite que se usará por defecto
-                </p>
-              </div>
-              <div className="p-2 bg-blue-500/10 rounded border border-blue-500/20">
-                <div className="flex items-center gap-1 text-blue-600 text-xs font-medium">
-                  <Star className="w-3 h-3" />
-                  Alternativos
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Variantes adicionales
-                </p>
-              </div>
-              <div className="p-2 bg-green-500/10 rounded border border-green-500/20">
-                <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
-                  <RefreshCw className="w-3 h-3" />
-                  Comportamiento
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Principal/Aleatorio/Lista
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* State Collections Grid */}
-          <div className="grid grid-cols-1 gap-4">
-            {STANDARD_STATES.map(state => (
-              <StateCollectionEditor
-                key={state.key}
-                stateKey={state.key}
-                stateLabel={state.label}
-                stateIcon={state.icon}
-                stateDescription={state.description}
-                collection={spriteConfig.stateCollections?.[state.key]}
-                customSprites={spritesInSelectedCollection}
-                selectedCollectionName={selectedCollectionName}
-                onChange={(collection) => handleStateCollectionChange(state.key, collection)}
-              />
-            ))}
-          </div>
-
-          {/* Collection selector for state collections - shows character's configured collection */}
-          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg text-xs">
-            <FolderOpen className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              Sprites disponibles desde la colección:
-            </span>
-            <span className="font-medium text-foreground">
-              {spriteConfig.collection || selectedCollectionName}
-            </span>
-            <span className="text-muted-foreground">
-              ({spritesInSelectedCollection.length} sprites)
-            </span>
-          </div>
-
-          {spritesInSelectedCollection.length === 0 && (
-            <div className="text-center py-4 text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <ImageIcon className="w-6 h-6 mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-medium">No hay sprites en "{selectedCollectionName}"</p>
-              <p className="text-xs mt-1">
-                Ve a la pestaña "Sprites Personalizados" para subir sprites a esta colección.
-              </p>
-            </div>
-          )}
+          <StateCollectionEditorV2
+            character={character}
+            onChange={onChange}
+          />
         </TabsContent>
 
         {/* Custom Sprites Tab */}

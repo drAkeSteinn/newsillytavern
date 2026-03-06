@@ -7,8 +7,6 @@ import type {
   SFXTrigger, 
   BackgroundTrigger, 
   BackgroundPack,
-  SpriteTrigger,
-  SpritePack,
   EmotionTrigger,
   MessageScanResult,
   TriggerSystemSettings,
@@ -165,8 +163,6 @@ export class TriggerScanner {
   private sfxTriggers: SFXTrigger[] = [];
   private backgroundTriggers: BackgroundTrigger[] = [];
   private backgroundPacks: BackgroundPack[] = [];
-  private spriteTriggers: SpriteTrigger[] = [];
-  private spritePacks: SpritePack[] = [];
   private emotionTriggers: EmotionTrigger[] = [];
   private settings: TriggerSystemSettings;
   
@@ -174,7 +170,6 @@ export class TriggerScanner {
   private lastPlayedById = new Map<string, number>();
   private lastGlobalPlay = 0;
   private lastBackgroundChange = 0;
-  private lastSpriteChange = 0;
 
   constructor(settings?: Partial<TriggerSystemSettings>) {
     this.settings = { 
@@ -196,14 +191,6 @@ export class TriggerScanner {
 
   setBackgroundPacks(packs: BackgroundPack[]): void {
     this.backgroundPacks = packs.filter(p => p.active);
-  }
-
-  setSpriteTriggers(triggers: SpriteTrigger[]): void {
-    this.spriteTriggers = triggers.filter(t => t.active);
-  }
-
-  setSpritePacks(packs: SpritePack[]): void {
-    this.spritePacks = packs.filter(p => p.active);
   }
 
   setEmotionTriggers(triggers: EmotionTrigger[]): void {
@@ -250,7 +237,6 @@ export class TriggerScanner {
       return {
         sfxTriggers: [],
         backgroundTriggers: [],
-        spriteTriggers: [],
         emotionTriggers: [],
         detectedKeywords: [],
         detectedEmotions: [],
@@ -261,7 +247,6 @@ export class TriggerScanner {
     const result: MessageScanResult = {
       sfxTriggers: [],
       backgroundTriggers: [],
-      spriteTriggers: [],
       emotionTriggers: [],
       detectedKeywords: [],
       detectedEmotions: [],
@@ -289,7 +274,6 @@ export class TriggerScanner {
           if (triggerMatchesKeywords(pack, tokens, this.settings)) {
             // Find matching item in pack
             const matchingItem = pack.items.find(item => {
-              const itemTokens = extractTokens(item.key, this.settings);
               return triggerMatchesKeywords(
                 { keywords: [item.key], requirePipes: false },
                 tokens,
@@ -311,33 +295,6 @@ export class TriggerScanner {
             if (this.isCooldownReady(trigger.id, trigger.cooldownMs) &&
                 triggerMatchesKeywords(trigger, tokens, this.settings)) {
               result.backgroundTriggers.push(trigger);
-              result.detectedKeywords.push(...trigger.keywords);
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // Scan sprite triggers/packs
-    if (this.settings.playSpriteTriggers) {
-      const now = Date.now();
-      if ((now - this.lastSpriteChange) >= this.settings.spriteGlobalCooldownMs) {
-        // Check sprite packs
-        for (const pack of this.spritePacks) {
-          if (triggerMatchesKeywords(pack, tokens, this.settings)) {
-            result.spriteTriggers.push(pack);
-            result.detectedKeywords.push(...pack.keywords);
-            break;
-          }
-        }
-        
-        // Fall back to simple sprite triggers
-        if (result.spriteTriggers.length === 0) {
-          for (const trigger of this.spriteTriggers) {
-            if (this.isCooldownReady(trigger.id, trigger.cooldownMs) &&
-                triggerMatchesKeywords(trigger, tokens, this.settings)) {
-              result.spriteTriggers.push(trigger);
               result.detectedKeywords.push(...trigger.keywords);
               break;
             }
@@ -372,7 +329,6 @@ export class TriggerScanner {
       return {
         sfxTriggers: [],
         backgroundTriggers: [],
-        spriteTriggers: [],
         emotionTriggers: [],
         detectedKeywords: [],
         detectedEmotions: [],
@@ -385,7 +341,6 @@ export class TriggerScanner {
       return {
         sfxTriggers: [],
         backgroundTriggers: [],
-        spriteTriggers: [],
         emotionTriggers: [],
         detectedKeywords: [],
         detectedEmotions: [],

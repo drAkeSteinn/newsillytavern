@@ -125,6 +125,8 @@ export const useTavernStore = create<TavernState>()(
         spritePacks: state.spritePacks,
         spriteIndex: state.spriteIndex,
         spriteLibraries: state.spriteLibraries,
+        // NEW V2: Sprite Packs V2 (global templates)
+        spritePacksV2: state.spritePacksV2,
         // HUD data (templates only, not session state)
         hudTemplates: state.hudTemplates,
         // Active states

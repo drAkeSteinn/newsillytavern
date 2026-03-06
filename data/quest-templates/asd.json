@@ -16,12 +16,15 @@
   "objectives": [
     {
       "id": "obj-mmafuc58",
-      "description": "holi crayoli",
+      "description": "Objetivo tenebroso y medico",
       "type": "custom",
       "completion": {
         "key": "objetivo:holis",
         "keys": [],
-        "caseSensitive": false
+        "caseSensitive": false,
+        "valueCondition": {
+          "valueType": "presence"
+        }
       },
       "targetCount": 1,
       "isOptional": false,
@@ -33,19 +36,36 @@
           "value": 10,
           "action": "add"
         }
-      ]
+      ],
+      "characterFilter": {
+        "enabled": true,
+        "mode": "include",
+        "characterIds": [
+          "fbbdc8e8-12e1-421b-8a38-d4a37231de2a"
+        ]
+      }
     },
     {
       "id": "obj-mmbwe737",
-      "description": "asd",
+      "description": "objetivo sin precedentes",
       "type": "custom",
       "completion": {
         "key": "asdddasd",
         "keys": [],
-        "caseSensitive": false
+        "caseSensitive": false,
+        "valueCondition": {
+          "valueType": "presence"
+        }
       },
       "targetCount": 1,
-      "isOptional": false
+      "isOptional": false,
+      "characterFilter": {
+        "enabled": true,
+        "mode": "include",
+        "characterIds": [
+          "611876f7-399e-49a3-a32f-aa847e8f28da"
+        ]
+      }
     }
   ],
   "completion": {
@@ -71,5 +91,5 @@
     }
   ],
   "createdAt": "2026-03-03T10:00:43.053Z",
-  "updatedAt": "2026-03-05T14:39:51.381Z"
+  "updatedAt": "2026-03-06T12:39:33.737Z"
 }

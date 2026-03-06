@@ -1,5 +1,6 @@
 // ============================================
 // Sprite Handler - Handles Sprite Triggers
+// Supports Legacy System and V2 Trigger Collections
 // ============================================
 
 import type { TriggerMatch } from '../types';
@@ -11,6 +12,15 @@ import type {
   CharacterCard,
   CharacterSpriteTrigger,
   SpriteLibraryEntry,
+  // V2 Types
+  TriggerCollection,
+  SpritePackV2,
+  SpritePackEntryV2,
+  SpriteTriggerConfig,
+  SpriteChain,
+  SoundChain,
+  TriggerQueueEntry,
+  ActiveTrigger,
 } from '@/types';
 
 // ============================================
@@ -45,10 +55,89 @@ export interface SpriteTriggerContext extends TriggerContext {
   isSpriteLocked: boolean;
 }
 
+// ============================================
+// V2 Trigger Collections Context
+// ============================================
+
+/**
+ * V2 Sprite Trigger Context - For Trigger Collections system
+ */
+export interface SpriteTriggerContextV2 extends TriggerContext {
+  // V2 Sprite Packs (simple containers)
+  spritePacksV2: SpritePackV2[];
+  
+  // V2 Trigger Collections
+  triggerCollections: TriggerCollection[];
+  
+  // Legacy support
+  spriteIndex: { sprites: Array<{ label: string; url: string }> };
+  
+  // Current character
+  character: CharacterCard | null;
+  
+  // Chain execution callbacks
+  onSpriteChainStart?: (characterId: string, chain: SpriteChain) => void;
+  onSoundChainStart?: (characterId: string, chain: SoundChain) => void;
+}
+
+/**
+ * V2 Trigger Match Result
+ */
+export interface TriggerCollectionMatchResult {
+  matched: boolean;
+  trigger: {
+    triggerId: string;
+    triggerType: 'sprite';
+    keyword: string;
+    data: {
+      spriteUrl: string;
+      spriteLabel: string | null;
+      characterId?: string;
+      collectionId: string;
+      packId: string;
+      spriteId: string;
+      triggerName: string;
+      priority: number;
+      fallbackMode?: string;
+      fallbackSpriteId?: string;
+      fallbackDelayMs?: number;
+      matchSource: 'collection_key' | 'sprite_key';
+      hasSpriteChain: boolean;
+      hasSoundChain: boolean;
+    };
+  };
+  tokens: DetectedToken[];
+  
+  // V2 specific data
+  collection: TriggerCollection;
+  spritePack: SpritePackV2;
+  selectedSprite: SpritePackEntryV2;
+  spriteConfig?: SpriteTriggerConfig;  // If matched via individual sprite key
+  matchSource: 'collection_key' | 'sprite_key';
+  
+  // Chain data
+  spriteChain?: SpriteChain;
+  soundChain?: SoundChain;
+}
+
 export interface SpriteHandlerResult {
   matched: boolean;
   trigger: TriggerMatch;
   tokens: DetectedToken[];
+}
+
+// ============================================
+// V2 Queue System Types
+// ============================================
+
+/**
+ * Queue entry for trigger processing
+ */
+export interface TriggerQueueProcessorState {
+  characterId: string;
+  queue: TriggerQueueEntry[];
+  active: ActiveTrigger | null;
+  lastProcessedAt: number;
 }
 
 // ============================================
@@ -360,6 +449,33 @@ function getSpriteUrl(
 }
 
 /**
+ * Normalize a keyword for matching (same as token normalization)
+ * - Lowercase (unless caseSensitive)
+ * - Remove accents
+ * - Keep only letters, numbers, spaces, underscores, hyphens
+ */
+function normalizeKeyword(keyword: string, caseSensitive: boolean): string {
+  let result = keyword.trim();
+  if (!result) return '';
+  
+  // Lowercase if not case sensitive
+  if (!caseSensitive) {
+    result = result.toLowerCase();
+  }
+  
+  // Remove accents
+  result = result
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  
+  // Keep letters, numbers, spaces, underscores, hyphens
+  // This matches the normalization in token-detector.ts
+  result = result.replace(/[^\p{L}\p{N}\s_-]/gu, '');
+  
+  return result.trim();
+}
+
+/**
  * Check if token matches keyword
  * 
  * Matching rules:
@@ -371,7 +487,8 @@ function getSpriteUrl(
  * - "alegría" triggering "ale" (no longer matches)
  */
 function tokenMatchesKeyword(token: DetectedToken, keyword: string, caseSensitive: boolean): boolean {
-  const kw = caseSensitive ? keyword : keyword.toLowerCase();
+  // Normalize BOTH the token and keyword the same way
+  const kw = normalizeKeyword(keyword, caseSensitive);
   const tk = caseSensitive ? token.token : token.token.toLowerCase();
   
   if (!kw || !tk) return false;
@@ -462,4 +579,567 @@ export function resetSpriteHandlerState(state: SpriteHandlerState, messageKey: s
 export function clearSpriteHandlerState(state: SpriteHandlerState): void {
   state.triggeredPositions.clear();
   state.lastPackMatches.clear();
+}
+
+// ============================================
+// V2 TRIGGER COLLECTIONS SYSTEM
+// ============================================
+
+/**
+ * Check Trigger Collections for matches
+ * 
+ * Priority system:
+ * 1. Filter active collections
+ * 2. Sort by priority (descending)
+ * 3. Check collection-level keys first
+ * 4. Then check individual sprite keys
+ * 5. Return ALL matches (for queue processing)
+ */
+export function checkTriggerCollections(
+  tokens: DetectedToken[],
+  context: SpriteTriggerContextV2,
+  state: SpriteHandlerState,
+  queueState?: TriggerQueueProcessorState
+): TriggerCollectionMatchResult[] {
+  const { triggerCollections, spritePacksV2, character, isSpriteLocked } = context;
+  
+  // Check if sprite is locked
+  if (isSpriteLocked) {
+    console.log('[SpriteHandler] Sprite is locked, skipping trigger check');
+    return [];
+  }
+  
+  if (!character) {
+    console.log('[SpriteHandler] No character in context, skipping trigger check');
+    return [];
+  }
+  
+  // Check if there's already an active non-interruptible chain
+  if (queueState?.active) {
+    // Check if current chain is interruptible
+    // This is stored in the chain progress, not directly in ActiveTrigger
+    // For now, we allow new triggers to queue up
+  }
+  
+  // Get triggered positions for this message
+  const triggered = state.triggeredPositions.get(context.messageKey) ?? new Set();
+  
+  // Filter active collections and sort by priority (descending)
+  const activeCollections = triggerCollections
+    .filter(c => c.active)
+    .sort((a, b) => b.priority - a.priority);
+  
+  console.log('[SpriteHandler] checkTriggerCollections:', {
+    tokenCount: tokens.length,
+    tokens: tokens.map(t => ({ token: t.token, original: t.original, type: t.type })),
+    collectionCount: triggerCollections.length,
+    activeCollectionCount: activeCollections.length,
+    characterId: character.id,
+    characterName: character.name,
+  });
+  
+  const allResults: TriggerCollectionMatchResult[] = [];
+  
+  for (const collection of activeCollections) {
+    // Get the sprite pack for this collection
+    const spritePack = spritePacksV2.find(p => p.id === collection.packId);
+    if (!spritePack || spritePack.sprites.length === 0) continue;
+    
+    // Check cooldown
+    if (!isCollectionCooldownReady(collection, state)) continue;
+    
+    // Try to match collection-level keys first
+    const collectionKeyResults = matchCollectionKey(
+      tokens,
+      collection,
+      spritePack,
+      triggered,
+      context
+    );
+    
+    // Add all collection-level matches
+    for (const collectionKeyResult of collectionKeyResults) {
+      const result = buildTriggerCollectionResult(
+        collection,
+        spritePack,
+        collectionKeyResult.sprite,
+        undefined, // No sprite config for collection key match
+        'collection_key',
+        collectionKeyResult.token,
+        collectionKeyResult.matchedKey
+      );
+      
+      allResults.push(result);
+    }
+    
+    // Try individual sprite keys
+    const spriteKeyResults = matchSpriteKeys(
+      tokens,
+      collection,
+      spritePack,
+      triggered,
+      context
+    );
+    
+    // Add all sprite-level matches
+    for (const spriteKeyResult of spriteKeyResults) {
+      const result = buildTriggerCollectionResult(
+        collection,
+        spritePack,
+        spriteKeyResult.sprite,
+        spriteKeyResult.spriteConfig,
+        'sprite_key',
+        spriteKeyResult.token,
+        spriteKeyResult.matchedKey
+      );
+      
+      allResults.push(result);
+    }
+  }
+  
+  // Update triggered positions
+  if (allResults.length > 0) {
+    state.triggeredPositions.set(context.messageKey, triggered);
+  }
+  
+  // Sort by priority (descending), then by position (ascending)
+  allResults.sort((a, b) => {
+    if (a.collection.priority !== b.collection.priority) {
+      return b.collection.priority - a.collection.priority;
+    }
+    const aPos = a.tokens[0]?.wordPosition ?? 0;
+    const bPos = b.tokens[0]?.wordPosition ?? 0;
+    return aPos - bPos;
+  });
+  
+  return allResults;
+}
+
+/**
+ * Match collection-level key
+ * Returns ALL matches found (not just the first)
+ */
+function matchCollectionKey(
+  tokens: DetectedToken[],
+  collection: TriggerCollection,
+  spritePack: SpritePackV2,
+  triggeredPositions: Set<number>,
+  context: SpriteTriggerContextV2
+): Array<{ sprite: SpritePackEntryV2; token: DetectedToken; matchedKey: string }> {
+  const results: Array<{ sprite: SpritePackEntryV2; token: DetectedToken; matchedKey: string }> = [];
+  const caseSensitive = collection.collectionKeyCaseSensitive ?? false;
+  const requirePipes = collection.collectionKeyRequirePipes ?? false;
+  
+  // Get all collection keys (main + alternatives)
+  const allKeys = [collection.collectionKey];
+  if (collection.collectionKeys && collection.collectionKeys.length > 0) {
+    allKeys.push(...collection.collectionKeys);
+  }
+  
+  console.log('[SpriteHandler] matchCollectionKey checking:', {
+    collectionName: collection.name,
+    keys: allKeys,
+    caseSensitive,
+    requirePipes,
+    tokenCount: tokens.length,
+  });
+  
+  for (const token of tokens) {
+    if (token.wordPosition !== undefined && triggeredPositions.has(token.wordPosition)) continue;
+    
+    // Check if token is in pipes if required
+    if (requirePipes && token.type !== 'pipe') continue;
+    
+    for (const key of allKeys) {
+      const normalizedKey = normalizeKeyword(key, caseSensitive);
+      const matches = tokenMatchesKeyword(token, key, caseSensitive);
+      
+      if (matches) {
+        console.log('[SpriteHandler] Collection key matched:', {
+          key,
+          normalizedKey,
+          token: token.token,
+          tokenType: token.type,
+        });
+        
+        // Select sprite based on collection behavior
+        const sprite = selectSpriteFromPack(
+          spritePack,
+          collection.collectionBehavior,
+          collection.principalSpriteId
+        );
+        
+        if (sprite) {
+          results.push({ sprite, token, matchedKey: key });
+          // Mark this position as triggered
+          if (token.wordPosition !== undefined) {
+            triggeredPositions.add(token.wordPosition);
+          }
+          // Continue to find more matches (don't return immediately)
+        }
+      }
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Match individual sprite keys
+ * Returns ALL matches found (not just the first)
+ */
+function matchSpriteKeys(
+  tokens: DetectedToken[],
+  collection: TriggerCollection,
+  spritePack: SpritePackV2,
+  triggeredPositions: Set<number>,
+  context: SpriteTriggerContextV2
+): Array<{ sprite: SpritePackEntryV2; spriteConfig: SpriteTriggerConfig; token: DetectedToken; matchedKey: string }> {
+  const results: Array<{ sprite: SpritePackEntryV2; spriteConfig: SpriteTriggerConfig; token: DetectedToken; matchedKey: string }> = [];
+  
+  // Get all sprite configs for this collection
+  const spriteConfigs = Object.values(collection.spriteConfigs).filter(c => c.enabled);
+  
+  console.log('[SpriteHandler] matchSpriteKeys checking:', {
+    collectionName: collection.name,
+    spriteConfigCount: spriteConfigs.length,
+    spriteConfigs: spriteConfigs.map(c => ({
+      key: c.key,
+      keys: c.keys,
+      spriteId: c.spriteId,
+      enabled: c.enabled,
+    })),
+  });
+  
+  for (const token of tokens) {
+    if (token.wordPosition !== undefined && triggeredPositions.has(token.wordPosition)) continue;
+    
+    for (const config of spriteConfigs) {
+      // Find the sprite in the pack
+      const sprite = spritePack.sprites.find(s => s.id === config.spriteId);
+      if (!sprite) continue;
+      
+      // Check if token is in pipes if required
+      if (config.requirePipes && token.type !== 'pipe') continue;
+      
+      // Get all keys for this config
+      const allKeys = [config.key];
+      if (config.keys && config.keys.length > 0) {
+        allKeys.push(...config.keys);
+      }
+      
+      for (const key of allKeys) {
+        const normalizedKey = normalizeKeyword(key, config.caseSensitive);
+        const matches = tokenMatchesKeyword(token, key, config.caseSensitive);
+        
+        if (matches) {
+          console.log('[SpriteHandler] Sprite key matched:', {
+            key,
+            normalizedKey,
+            token: token.token,
+            tokenType: token.type,
+            spriteLabel: sprite.label,
+          });
+          
+          results.push({ sprite, spriteConfig: config, token, matchedKey: key });
+          // Mark this position as triggered
+          if (token.wordPosition !== undefined) {
+            triggeredPositions.add(token.wordPosition);
+          }
+          // Continue to find more matches (don't return immediately)
+        }
+      }
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Select sprite from pack based on behavior
+ */
+export function selectSpriteFromPack(
+  pack: SpritePackV2,
+  behavior: 'principal' | 'random' | 'list',
+  principalSpriteId?: string
+): SpritePackEntryV2 | null {
+  if (pack.sprites.length === 0) return null;
+  
+  switch (behavior) {
+    case 'principal':
+      // Use principal sprite if specified, otherwise first sprite
+      if (principalSpriteId) {
+        const principal = pack.sprites.find(s => s.id === principalSpriteId);
+        if (principal) return principal;
+      }
+      return pack.sprites[0];
+    
+    case 'random':
+      // Random selection
+      const randomIndex = Math.floor(Math.random() * pack.sprites.length);
+      return pack.sprites[randomIndex];
+    
+    case 'list':
+      // Rotate through sprites (uses first for now, rotation handled by state)
+      // TODO: Implement proper list rotation with state tracking
+      return pack.sprites[0];
+    
+    default:
+      return pack.sprites[0];
+  }
+}
+
+/**
+ * Build trigger collection match result
+ */
+function buildTriggerCollectionResult(
+  collection: TriggerCollection,
+  spritePack: SpritePackV2,
+  sprite: SpritePackEntryV2,
+  spriteConfig: SpriteTriggerConfig | undefined,
+  matchSource: 'collection_key' | 'sprite_key',
+  token: DetectedToken,
+  matchedKey: string
+): TriggerCollectionMatchResult {
+  // Determine which chains to use (sprite config overrides collection)
+  let spriteChain: SpriteChain | undefined;
+  let soundChain: SoundChain | undefined;
+  
+  if (spriteConfig) {
+    // Use sprite config chains if defined, otherwise fall back to collection
+    spriteChain = spriteConfig.spriteChain?.enabled ? spriteConfig.spriteChain : collection.spriteChain;
+    soundChain = spriteConfig.soundChain?.enabled ? spriteConfig.soundChain : collection.soundChain;
+  } else {
+    spriteChain = collection.spriteChain;
+    soundChain = collection.soundChain;
+  }
+  
+  // Determine fallback mode
+  const fallbackMode = spriteConfig?.fallbackMode ?? collection.fallbackMode;
+  const fallbackSpriteId = spriteConfig?.fallbackSpriteId ?? collection.fallbackSpriteId;
+  const fallbackDelayMs = spriteConfig?.fallbackDelayMs ?? collection.fallbackDelayMs;
+  
+  return {
+    matched: true,
+    trigger: {
+      triggerId: collection.id,
+      triggerType: 'sprite',
+      keyword: matchedKey,
+      data: {
+        spriteUrl: sprite.url,
+        spriteLabel: sprite.label,
+        characterId: undefined, // Set by caller
+        collectionId: collection.id,
+        packId: spritePack.id,
+        spriteId: sprite.id,
+        triggerName: collection.name,
+        priority: collection.priority,
+        fallbackMode,
+        fallbackSpriteId,
+        fallbackDelayMs,
+        matchSource,
+        // Chain data
+        hasSpriteChain: spriteChain?.enabled ?? false,
+        hasSoundChain: soundChain?.enabled ?? false,
+      },
+    },
+    tokens: [token],
+    collection,
+    spritePack,
+    selectedSprite: sprite,
+    spriteConfig,
+    matchSource,
+    spriteChain: spriteChain?.enabled ? spriteChain : undefined,
+    soundChain: soundChain?.enabled ? soundChain : undefined,
+  };
+}
+
+/**
+ * Check if collection cooldown is ready
+ */
+function isCollectionCooldownReady(
+  collection: TriggerCollection,
+  state: SpriteHandlerState
+): boolean {
+  if (collection.cooldownMs <= 0) return true;
+  
+  const now = Date.now();
+  const lastTriggerKey = `collection_${collection.id}`;
+  // Use a map to track last trigger times
+  const lastTriggerMap = (state as any)._collectionCooldowns as Map<string, number> | undefined;
+  
+  if (!lastTriggerMap) return true;
+  
+  const lastTriggered = lastTriggerMap.get(lastTriggerKey) ?? 0;
+  return now - lastTriggered >= collection.cooldownMs;
+}
+
+/**
+ * Mark collection as triggered (for cooldown)
+ */
+export function markCollectionTriggered(
+  collectionId: string,
+  state: SpriteHandlerState
+): void {
+  const lastTriggerMap = ((state as any)._collectionCooldowns as Map<string, number>) ?? new Map<string, number>();
+  lastTriggerMap.set(`collection_${collectionId}`, Date.now());
+  (state as any)._collectionCooldowns = lastTriggerMap;
+}
+
+/**
+ * Execute trigger collection result
+ * Applies sprite, starts chains, schedules fallback
+ */
+export function executeTriggerCollectionResult(
+  result: TriggerCollectionMatchResult,
+  context: SpriteTriggerContextV2,
+  storeActions: {
+    applyTriggerForCharacter: (characterId: string, hit: {
+      spriteUrl: string;
+      spriteLabel: string | null;
+      returnToIdleMs?: number;
+      packId?: string;
+      collectionId?: string;
+    }) => void;
+    scheduleReturnToIdleForCharacter: (
+      characterId: string,
+      triggerSpriteUrl: string,
+      returnToMode: 'idle' | 'talk' | 'thinking' | 'clear',
+      returnSpriteUrl: string,
+      returnSpriteLabel: string | null,
+      delayMs: number
+    ) => void;
+    addTriggerToQueue: (characterId: string, entry: Omit<TriggerQueueEntry, 'id' | 'triggeredAt'>) => void;
+    startSpriteChain: (characterId: string, chain: SpriteChain) => void;
+    startSoundChain: (characterId: string, chain: SoundChain) => void;
+  },
+  getIdleSpriteUrl: () => string | null
+): void {
+  const { collection, selectedSprite, spriteChain, soundChain } = result;
+  const { spriteUrl, spriteLabel, fallbackMode, fallbackDelayMs, fallbackSpriteId } = result.trigger.data as {
+    spriteUrl: string;
+    spriteLabel: string | null;
+    fallbackMode?: string;
+    fallbackDelayMs?: number;
+    fallbackSpriteId?: string;
+  };
+  
+  // Get characterId from context (not from trigger.data which may be undefined)
+  const characterId = context.character?.id;
+  
+  if (!characterId || !spriteUrl) {
+    console.log('[SpriteHandler] executeTriggerCollectionResult: Missing characterId or spriteUrl', { 
+      characterId, 
+      spriteUrl,
+      hasContext: !!context,
+      hasCharacter: !!context.character 
+    });
+    return;
+  }
+  
+  // Apply the trigger sprite
+  storeActions.applyTriggerForCharacter(characterId, {
+    spriteUrl,
+    spriteLabel,
+    packId: collection.packId,
+    collectionId: collection.id,
+  });
+  
+  // Mark collection as triggered for cooldown
+  // This would need access to handler state - handled by caller
+  
+  // Start sprite chain if configured
+  if (spriteChain && spriteChain.enabled && spriteChain.steps.length > 0) {
+    storeActions.startSpriteChain(characterId, spriteChain);
+    // Don't schedule fallback if chain is active and not looping
+    if (!spriteChain.loop) {
+      return;
+    }
+  }
+  
+  // Start sound chain if configured
+  if (soundChain && soundChain.enabled && soundChain.steps.length > 0) {
+    storeActions.startSoundChain(characterId, soundChain);
+  }
+  
+  // Schedule fallback if configured
+  if (fallbackDelayMs && fallbackDelayMs > 0) {
+    let returnSpriteUrl: string | null = null;
+    let returnSpriteLabel: string | null = null;
+    
+    if (fallbackMode === 'custom_sprite' && fallbackSpriteId) {
+      // Find fallback sprite in pack
+      const fallbackSprite = result.spritePack.sprites.find(s => s.id === fallbackSpriteId);
+      if (fallbackSprite) {
+        returnSpriteUrl = fallbackSprite.url;
+        returnSpriteLabel = fallbackSprite.label;
+      }
+    } else if (fallbackMode === 'idle_collection') {
+      // Get idle sprite
+      returnSpriteUrl = getIdleSpriteUrl();
+      returnSpriteLabel = 'idle';
+    } else if (fallbackMode === 'collection_default') {
+      // Use collection's principal sprite or first sprite
+      const principalSprite = selectSpriteFromPack(
+        result.spritePack,
+        'principal',
+        result.collection.principalSpriteId
+      );
+      if (principalSprite) {
+        returnSpriteUrl = principalSprite.url;
+        returnSpriteLabel = principalSprite.label;
+      } else {
+        // Fallback to idle if no principal sprite
+        returnSpriteUrl = getIdleSpriteUrl();
+        returnSpriteLabel = 'idle';
+      }
+    }
+    
+    console.log('[SpriteHandler] Scheduling fallback:', {
+      characterId,
+      fallbackMode,
+      fallbackDelayMs,
+      returnSpriteUrl,
+      returnSpriteLabel,
+    });
+    
+    if (returnSpriteUrl) {
+      storeActions.scheduleReturnToIdleForCharacter(
+        characterId,
+        spriteUrl,
+        'idle',  // Apply the return sprite
+        returnSpriteUrl,
+        returnSpriteLabel,
+        fallbackDelayMs
+      );
+    }
+  }
+}
+
+/**
+ * Get fallback sprite URL
+ */
+export function getFallbackSpriteUrl(
+  mode: 'idle_collection' | 'custom_sprite' | 'collection_default',
+  collection: TriggerCollection,
+  spritePack: SpritePackV2,
+  getIdleSpriteUrl: () => string | null
+): string | null {
+  switch (mode) {
+    case 'custom_sprite':
+      if (collection.fallbackSpriteId) {
+        const sprite = spritePack.sprites.find(s => s.id === collection.fallbackSpriteId);
+        return sprite?.url ?? null;
+      }
+      return null;
+    
+    case 'idle_collection':
+      return getIdleSpriteUrl();
+    
+    case 'collection_default':
+    default:
+      // Use collection's principal sprite or first sprite
+      const principalSprite = selectSpriteFromPack(spritePack, 'principal', collection.principalSpriteId);
+      return principalSprite?.url ?? getIdleSpriteUrl();
+  }
 }

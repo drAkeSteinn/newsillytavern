@@ -20,6 +20,18 @@
       "messagesSinceLastSummary": 1,
       "lastSummaryMessageIndex": 0,
       "isGroupChat": false
+    },
+    "5eed8df9-d124-40f5-894a-8509486f88c8": {
+      "sessionId": "5eed8df9-d124-40f5-894a-8509486f88c8",
+      "messagesSinceLastSummary": 2,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
+    },
+    "f69225a9-46f2-4fe7-9e13-281ddab88850": {
+      "sessionId": "f69225a9-46f2-4fe7-9e13-281ddab88850",
+      "messagesSinceLastSummary": 1,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
     }
   }
 }

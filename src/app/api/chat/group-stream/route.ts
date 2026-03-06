@@ -252,16 +252,8 @@ export async function POST(request: NextRequest) {
     // Note: HUD context section is built inside the character loop
     // so it can resolve keys for each specific character
 
-    // Build quest section if enabled (pre-LLM integration)
-    // Note: Content will be resolved per-character in the loop
-    let questSectionContent: string | null = null;
-    if (questSettings.enabled && questSettings.promptInclude && sessionQuests.length > 0 && questTemplates.length > 0) {
-      questSectionContent = buildQuestPromptSection(
-        questTemplates,
-        sessionQuests,
-        questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate
-      );
-    }
+    // Note: Quest section is built inside the character loop
+    // so each character sees only their relevant objectives
 
     // Create a TransformStream for SSE
     const stream = new ReadableStream({
@@ -342,16 +334,24 @@ export async function POST(request: NextRequest) {
             // Build HUD context section for this character (resolves keys!)
             const hudContextSection = typedHUDContext ? buildHUDContextSection(typedHUDContext, keyContext) : null;
 
-            // Resolve keys in quest section if present
+            // Build quest section for this character (filters objectives by characterId)
             let resolvedQuestSection: PromptSection | null = null;
-            if (questSectionContent) {
-              const resolvedQuestContent = resolveAllKeys(questSectionContent, keyContext);
-              resolvedQuestSection = {
-                type: 'lorebook',
-                label: 'Active Quests',
-                content: resolvedQuestContent,
-                color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-              };
+            if (questSettings.enabled && questSettings.promptInclude && sessionQuests.length > 0 && questTemplates.length > 0) {
+              const questSectionContent = buildQuestPromptSection(
+                questTemplates,
+                sessionQuests,
+                questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate,
+                responder.id  // Filter objectives for this character
+              );
+              if (questSectionContent) {
+                const resolvedQuestContent = resolveAllKeys(questSectionContent, keyContext);
+                resolvedQuestSection = {
+                  type: 'quest',
+                  label: 'Active Quests',
+                  content: resolvedQuestContent,
+                  color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                };
+              }
             }
 
             // Add quest section to the system prompt if present

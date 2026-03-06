@@ -150,12 +150,14 @@ export async function POST(request: NextRequest) {
     const hudContextSection = hudContext ? buildHUDContextSection(hudContext, keyContext) : null;
 
     // Build quest section if enabled (pre-LLM integration)
+    // Pass characterId to filter objectives for this character
     let questSection: PromptSection | null = null;
     if (questSettings.enabled && questSettings.promptInclude && sessionQuests.length > 0 && questTemplates.length > 0) {
       const questPromptContent = buildQuestPromptSection(
         questTemplates,
         sessionQuests,
-        questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate
+        questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate,
+        effectiveCharacter.id  // Filter objectives for this character
       );
       if (questPromptContent) {
         const resolvedQuestContent = resolveAllKeys(questPromptContent, keyContext);

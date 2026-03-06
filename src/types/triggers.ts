@@ -79,67 +79,6 @@ export interface BackgroundEntry {
   category?: string;
 }
 
-// ============ Sprite Trigger Types ============
-
-export interface SpriteTrigger {
-  id: string;
-  title: string;
-  active: boolean;
-  keywords: string[];
-  requirePipes: boolean;
-  expressionName: string; // Nombre de la expresión/sprite
-  cooldownMs: number;
-}
-
-export interface SpritePack {
-  id: string;
-  title: string;
-  active: boolean;
-  requirePipes: boolean;
-  caseSensitive: boolean;
-  keywords: string[];
-  cooldownMs: number;
-  items: SpritePackItem[];
-}
-
-export interface SpritePackItem {
-  id: string;
-  spriteLabel: string; // Nombre del sprite
-  keys: string; // Keywords para activar
-  actionId?: string;
-  poseId?: string;
-  clothesId?: string;
-  idleSpriteLabel?: string; // Sprite de idle
-  returnToIdleMs?: number; // Tiempo para volver a idle
-  enabled: boolean;
-}
-
-export interface SpriteLibrary {
-  actions: SpriteLibraryEntry[];
-  poses: SpriteLibraryEntry[];
-  clothes: SpriteLibraryEntry[];
-}
-
-export interface SpriteLibraryEntry {
-  id: string;
-  name: string;
-  prefix: string; // Prefijo para el trigger key
-}
-
-export interface SpriteIndex {
-  sprites: SpriteEntry[];
-  lastUpdated: number;
-  source: string;
-}
-
-export interface SpriteEntry {
-  id: string;
-  label: string;
-  path: string;
-  thumbnail?: string;
-  expressions?: string[]; // Expresiones disponibles
-}
-
 // ============ Emotion Trigger Types ============
 
 export interface EmotionTrigger {
@@ -217,15 +156,6 @@ export interface TriggerSystemSettings {
   backgroundGlobalCooldownMs: number;
   backgroundMultiMode: 'random' | 'shuffle-cycle';
   
-  // Sprite settings
-  playSpriteTriggers: boolean;
-  spriteGlobalCooldownMs: number;
-  spriteApplyDelayMs: number;
-  spriteMultiMode: 'random' | 'shuffle';
-  spriteLockEnabled: boolean;
-  spriteLockDurationMs: number;
-  spriteLockReapplyIntervalMs: number;
-  
   // Emotion settings
   playEmotionSounds: boolean;
   playEmotionOnChangeOnly: boolean;
@@ -257,7 +187,6 @@ export interface AudioBusState {
 export interface MessageScanResult {
   sfxTriggers: SFXTrigger[];
   backgroundTriggers: (BackgroundTrigger | BackgroundPack)[];
-  spriteTriggers: (SpriteTrigger | SpritePack)[];
   emotionTriggers: EmotionTrigger[];
   detectedKeywords: string[];
   detectedEmotions: string[];
@@ -280,13 +209,6 @@ export const DEFAULT_TRIGGER_SETTINGS: TriggerSystemSettings = {
   playBackgroundTriggers: true,
   backgroundGlobalCooldownMs: 250,
   backgroundMultiMode: 'random',
-  playSpriteTriggers: true,
-  spriteGlobalCooldownMs: 250,
-  spriteApplyDelayMs: 180,
-  spriteMultiMode: 'random',
-  spriteLockEnabled: false,
-  spriteLockDurationMs: 0,
-  spriteLockReapplyIntervalMs: 450,
   playEmotionSounds: true,
   playEmotionOnChangeOnly: true,
   emotionSource: 'sprite+tags',

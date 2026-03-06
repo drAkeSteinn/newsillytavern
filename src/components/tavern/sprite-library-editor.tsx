@@ -27,7 +27,7 @@ import {
   Library,
 } from 'lucide-react';
 import type { SpriteLibraries, SpriteLibraryEntry } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 
 interface SpriteLibraryEditorProps {
   libraries: SpriteLibraries;
