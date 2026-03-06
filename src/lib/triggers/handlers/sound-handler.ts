@@ -339,6 +339,11 @@ export function clearAudioQueue(): void {
 
 /**
  * Get sound file from trigger's collection
+ * 
+ * IMPORTANT: The files array already contains FULL URLs (e.g., "/sounds/glohg/glohg46.wav")
+ * The collection.path is also a full path, but we just need the filename from the files array.
+ * 
+ * Note: We return just the file entry from the array, which is already a complete URL.
  */
 function getSoundFile(trigger: SoundTrigger, collections: SoundCollection[]): string | null {
   const collection = collections.find(c => c.name === trigger.collection);
@@ -354,6 +359,7 @@ function getSoundFile(trigger: SoundTrigger, collections: SoundCollection[]): st
     soundIndex = getCycleIndex(trigger.id, collection.files.length);
   }
   
+  // Files array already contains full URLs like "/sounds/collection/file.mp3"
   return collection.files[soundIndex] || null;
 }
 

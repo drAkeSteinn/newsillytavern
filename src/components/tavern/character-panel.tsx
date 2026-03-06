@@ -176,8 +176,9 @@ export function CharacterPanel() {
 
       const { character, avatar } = result;
       
-      // Add the character to the store
+      // Add the character to the store - preserve ALL fields from import
       addCharacter({
+        // Basic fields
         name: character.name || 'Personaje sin nombre',
         description: character.description || '',
         personality: character.personality || '',
@@ -191,8 +192,28 @@ export function CharacterPanel() {
         alternateGreetings: character.alternateGreetings || [],
         tags: character.tags || [],
         avatar: avatar,
-        sprites: [],
-        voice: null
+        sprites: character.sprites || [],
+        voice: character.voice || null,
+        statsConfig: character.statsConfig,
+        // V2 Sprite System fields
+        spritePacksV2: character.spritePacksV2,
+        stateCollectionsV2: character.stateCollectionsV2,
+        triggerCollections: character.triggerCollections,
+        spriteLibraries: character.spriteLibraries,
+        spriteIndex: character.spriteIndex,
+        // Legacy sprite fields
+        spriteConfig: character.spriteConfig,
+        spritePacks: character.spritePacks,
+        spriteTriggers: character.spriteTriggers,
+        // Reference IDs
+        hudTemplateId: character.hudTemplateId,
+        lorebookIds: character.lorebookIds,
+        questTemplateIds: character.questTemplateIds,
+        // Additional fields
+        creator: character.creator,
+        characterVersion: character.characterVersion,
+        memory: character.memory,
+        chatStats: character.chatStats,
       });
 
       toast({
@@ -331,8 +352,9 @@ export function CharacterPanel() {
           continue;
         }
 
-        // Add character using store action
+        // Add character using store action - preserve ALL fields from export
         addCharacter({
+          // Basic fields
           name: character.name || 'Personaje sin nombre',
           description: character.description || '',
           personality: character.personality || '',
@@ -348,7 +370,27 @@ export function CharacterPanel() {
           avatar: character.avatar || '',
           sprites: character.sprites || [],
           voice: character.voice || null,
-          statsConfig: character.statsConfig
+          statsConfig: character.statsConfig,
+          // V2 Sprite System fields
+          spritePacksV2: character.spritePacksV2,
+          stateCollectionsV2: character.stateCollectionsV2,
+          triggerCollections: character.triggerCollections,
+          spriteLibraries: character.spriteLibraries,
+          spriteIndex: character.spriteIndex,
+          spriteConfig: character.spriteConfig,
+          // Legacy sprite fields
+          spritePacks: character.spritePacks,
+          spriteTriggers: character.spriteTriggers,
+          // Reference IDs
+          hudTemplateId: character.hudTemplateId,
+          lorebookIds: character.lorebookIds,
+          questTemplateIds: character.questTemplateIds,
+          // Additional fields
+          creator: character.creator,
+          characterVersion: character.characterVersion,
+          extensions: character.extensions,
+          chatStats: character.chatStats,
+          memory: character.memory,
         });
         importedCharacters++;
       }
@@ -360,7 +402,7 @@ export function CharacterPanel() {
           const exists = groups.some(g => g.id === group.id);
           if (exists) continue;
 
-          // Add group using store action
+          // Add group using store action - preserve ALL fields from export
           addGroup({
             name: group.name || 'Grupo sin nombre',
             description: group.description || '',
@@ -372,7 +414,18 @@ export function CharacterPanel() {
             maxResponsesPerTurn: group.maxResponsesPerTurn || 3,
             allowMentions: group.allowMentions ?? true,
             mentionTriggers: group.mentionTriggers || [],
-            conversationStyle: group.conversationStyle || 'sequential'
+            conversationStyle: group.conversationStyle || 'sequential',
+            // Reference IDs
+            hudTemplateId: group.hudTemplateId,
+            lorebookIds: group.lorebookIds,
+            questTemplateIds: group.questTemplateIds,
+            // Additional fields
+            scenario: group.scenario,
+            firstMes: group.firstMes,
+            tags: group.tags,
+            creatorNotes: group.creatorNotes,
+            alternateGreetings: group.alternateGreetings,
+            characterNote: group.characterNote,
           });
           importedGroups++;
         }
@@ -434,7 +487,9 @@ export function CharacterPanel() {
 
       const { character, avatar } = result;
       
+      // Add character using store action - preserve ALL fields from import
       addCharacter({
+        // Basic fields
         name: character.name || 'Personaje sin nombre',
         description: character.description || '',
         personality: character.personality || '',
@@ -448,8 +503,28 @@ export function CharacterPanel() {
         alternateGreetings: character.alternateGreetings || [],
         tags: character.tags || [],
         avatar: avatar,
-        sprites: [],
-        voice: null
+        sprites: character.sprites || [],
+        voice: character.voice || null,
+        statsConfig: character.statsConfig,
+        // V2 Sprite System fields
+        spritePacksV2: character.spritePacksV2,
+        stateCollectionsV2: character.stateCollectionsV2,
+        triggerCollections: character.triggerCollections,
+        spriteLibraries: character.spriteLibraries,
+        spriteIndex: character.spriteIndex,
+        // Legacy sprite fields
+        spriteConfig: character.spriteConfig,
+        spritePacks: character.spritePacks,
+        spriteTriggers: character.spriteTriggers,
+        // Reference IDs
+        hudTemplateId: character.hudTemplateId,
+        lorebookIds: character.lorebookIds,
+        questTemplateIds: character.questTemplateIds,
+        // Additional fields
+        creator: character.creator,
+        characterVersion: character.characterVersion,
+        memory: character.memory,
+        chatStats: character.chatStats,
       });
 
       toast({

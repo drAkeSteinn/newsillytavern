@@ -9,7 +9,7 @@
   "autoSaveInterval": 30000,
   "confirmDelete": true,
   "defaultBackground": "",
-  "backgroundFit": "contain",
+  "backgroundFit": "cover",
   "swipeEnabled": true,
   "quickReplies": [
     "Continue",
@@ -43,8 +43,8 @@
     "novelMode": true,
     "chatWidth": 66.54420842610143,
     "chatHeight": 36.11111111111112,
-    "chatX": 33.27210421305072,
-    "chatY": 81.85185185185185,
+    "chatX": 36.58824275394976,
+    "chatY": 81.94444444444444,
     "chatOpacity": 0.96,
     "blurBackground": false,
     "showCharacterSprite": true

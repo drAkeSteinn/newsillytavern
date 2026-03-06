@@ -59,7 +59,7 @@
           "type": "trigger",
           "trigger": {
             "category": "background",
-            "key": "casa",
+            "key": "test",
             "targetMode": "self"
           }
         }
@@ -118,5 +118,5 @@
     }
   ],
   "createdAt": "2026-03-03T10:00:43.053Z",
-  "updatedAt": "2026-03-06T15:18:44.563Z"
+  "updatedAt": "2026-03-06T18:54:16.160Z"
 }

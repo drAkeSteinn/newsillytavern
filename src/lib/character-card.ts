@@ -126,13 +126,24 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       // TavernFlow extended fields from extensions
       avatar: (extensions?.avatar as string) || '',
       sprites: (extensions?.sprites as CharacterCard['sprites']) || [],
+      // V2 Sprite System
+      spritePacksV2: extensions?.spritePacksV2 as CharacterCard['spritePacksV2'],
+      stateCollectionsV2: extensions?.stateCollectionsV2 as CharacterCard['stateCollectionsV2'],
+      triggerCollections: extensions?.triggerCollections as CharacterCard['triggerCollections'],
+      spriteLibraries: extensions?.spriteLibraries as CharacterCard['spriteLibraries'],
+      spriteIndex: extensions?.spriteIndex as CharacterCard['spriteIndex'],
+      // Legacy sprite system
       spriteConfig: extensions?.spriteConfig as CharacterCard['spriteConfig'],
       spriteTriggers: extensions?.spriteTriggers as CharacterCard['spriteTriggers'],
       spritePacks: extensions?.spritePacks as CharacterCard['spritePacks'],
-      spriteLibraries: extensions?.spriteLibraries as CharacterCard['spriteLibraries'],
+      // Other extensions
       voice: extensions?.voice as CharacterCard['voice'],
       hudTemplateId: extensions?.hudTemplateId as string | null,
       statsConfig: extensions?.statsConfig as CharacterCard['statsConfig'],
+      lorebookIds: extensions?.lorebookIds as string[],
+      questTemplateIds: extensions?.questTemplateIds as string[],
+      memory: extensions?.memory as CharacterCard['memory'],
+      chatStats: extensions?.chatStats as CharacterCard['chatStats'],
     };
   }
   
@@ -155,12 +166,24 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       // Extended fields
       avatar: (v1Data.avatar as string) || '',
       sprites: (v1Data.sprites as CharacterCard['sprites']) || [],
+      // V2 Sprite System
+      spritePacksV2: v1Data.spritePacksV2 as CharacterCard['spritePacksV2'],
+      stateCollectionsV2: v1Data.stateCollectionsV2 as CharacterCard['stateCollectionsV2'],
+      triggerCollections: v1Data.triggerCollections as CharacterCard['triggerCollections'],
+      spriteLibraries: v1Data.spriteLibraries as CharacterCard['spriteLibraries'],
+      spriteIndex: v1Data.spriteIndex as CharacterCard['spriteIndex'],
+      // Legacy sprite system
       spriteConfig: v1Data.spriteConfig as CharacterCard['spriteConfig'],
       spriteTriggers: v1Data.spriteTriggers as CharacterCard['spriteTriggers'],
       spritePacks: v1Data.spritePacks as CharacterCard['spritePacks'],
+      // Other extensions
       voice: v1Data.voice as CharacterCard['voice'],
       hudTemplateId: v1Data.hudTemplateId as string | null,
       statsConfig: v1Data.statsConfig as CharacterCard['statsConfig'],
+      lorebookIds: v1Data.lorebookIds as string[],
+      questTemplateIds: v1Data.questTemplateIds as string[],
+      memory: v1Data.memory as CharacterCard['memory'],
+      chatStats: v1Data.chatStats as CharacterCard['chatStats'],
     };
   }
   

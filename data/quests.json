@@ -14,6 +14,348 @@
     {
       "questId": "asd",
       "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sprite \"goth\" applied to Dra. Moon (fallback in 6000ms), Sound \"glohg\" queued for playback, Background changed to \"Room (4)\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "test",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772825782698-xokkoe25e",
+      "timestamp": "2026-03-06T19:36:22.698Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772825782523-78gjp8o9k",
+      "timestamp": "2026-03-06T19:36:22.523Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772825769253-lpyzua6ub",
+      "timestamp": "2026-03-06T19:36:09.253Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772825769226-sd9ziog8n",
+      "timestamp": "2026-03-06T19:36:09.227Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sprite \"goth\" applied to Dra. Moon, Sound \"glohg\" queued for playback, Background changed to \"Room (4)\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "test",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772825075271-669kxbtx4",
+      "timestamp": "2026-03-06T19:24:35.271Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772825075137-uiyxzzktw",
+      "timestamp": "2026-03-06T19:24:35.137Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772825054549-n1qeq5on5",
+      "timestamp": "2026-03-06T19:24:14.549Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772825054524-vd6h4gq7z",
+      "timestamp": "2026-03-06T19:24:14.524Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sound \"glohg\" queued for playback, Background changed to \"Room (4)\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "test",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772823517455-ymvogjupr",
+      "timestamp": "2026-03-06T18:58:37.455Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772823517344-mxs6f2vfu",
+      "timestamp": "2026-03-06T18:58:37.344Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772823474837-koqrrlse3",
+      "timestamp": "2026-03-06T18:57:54.837Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772823474807-27ofo5v93",
+      "timestamp": "2026-03-06T18:57:54.807Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sound \"glohg\" queued for playback, Background changed to \"Room (4)\"",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "test",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772823362385-wupuxdp7v",
+      "timestamp": "2026-03-06T18:56:02.385Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772823362266-5ayuk3q7w",
+      "timestamp": "2026-03-06T18:56:02.266Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772823326192-p87gyl79q",
+      "timestamp": "2026-03-06T18:55:26.192Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772823326169-xrh4exn5z",
+      "timestamp": "2026-03-06T18:55:26.169Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sound \"glohg\" queued for playback",
+      "rewards": [
+        {
+          "id": "obj-reward-mmbwbjul",
+          "type": "attribute",
+          "key": "resistencia",
+          "value": 10,
+          "action": "add"
+        },
+        {
+          "id": "obj-reward-mmeystt4",
+          "type": "trigger",
+          "trigger": {
+            "category": "sprite",
+            "key": "sprite:ind01",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmeywuus",
+          "type": "trigger",
+          "trigger": {
+            "category": "sound",
+            "key": "glohg",
+            "targetMode": "self"
+          }
+        },
+        {
+          "id": "obj-reward-mmezfvr3",
+          "type": "trigger",
+          "trigger": {
+            "category": "background",
+            "key": "casa",
+            "targetMode": "self"
+          }
+        }
+      ],
+      "id": "notif-1772816556912-i4rhhg01g",
+      "timestamp": "2026-03-06T17:02:36.912Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "objective_complete",
+      "message": "Objetivo completado: Objetivo tenebroso y medico",
+      "id": "notif-1772816556855-caidv6zvl",
+      "timestamp": "2026-03-06T17:02:36.855Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
       "type": "quest_activated",
       "message": "Quest \"Mision imposible\" activated",
       "id": "notif-1772810332592-zmg0wkyf9",
@@ -513,168 +855,6 @@
       "message": "¡Nueva misión activada: Mision imposible!",
       "id": "notif-1772800794607-kdtcqxg1h",
       "timestamp": "2026-03-06T12:39:54.607Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772800684245-pnyp0qg0w",
-      "timestamp": "2026-03-06T12:38:04.245Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772800684219-wqhmu6vqy",
-      "timestamp": "2026-03-06T12:38:04.219Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: asd",
-      "id": "notif-1772794665359-f8879eatc",
-      "timestamp": "2026-03-06T10:57:45.359Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772794654708-y9w5fs7p9",
-      "timestamp": "2026-03-06T10:57:34.708Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772794654679-2frlecu7g",
-      "timestamp": "2026-03-06T10:57:34.679Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772786972570-1pig39aan",
-      "timestamp": "2026-03-06T08:49:32.570Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772786972548-u7zhuh85s",
-      "timestamp": "2026-03-06T08:49:32.548Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772786961794-3tqkyrv8i",
-      "timestamp": "2026-03-06T08:49:21.794Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772786961767-lzcbdfxsf",
-      "timestamp": "2026-03-06T08:49:21.767Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772784754489-wy7hg9y2l",
-      "timestamp": "2026-03-06T08:12:34.489Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772784754468-w86lwndsb",
-      "timestamp": "2026-03-06T08:12:34.468Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772759363740-ar3op0g41",
-      "timestamp": "2026-03-06T01:09:23.740Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772759363723-3pifzf009",
-      "timestamp": "2026-03-06T01:09:23.723Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772757387412-24gsoopjl",
-      "timestamp": "2026-03-06T00:36:27.412Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772757387391-1ew2zyxr3",
-      "timestamp": "2026-03-06T00:36:27.391Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772721770069-ivqap3g7s",
-      "timestamp": "2026-03-05T14:42:50.069Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772721770052-c2fg0kytf",
-      "timestamp": "2026-03-05T14:42:50.052Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772721753224-6rh7o9cel",
-      "timestamp": "2026-03-05T14:42:33.224Z",
       "read": true
     }
   ]

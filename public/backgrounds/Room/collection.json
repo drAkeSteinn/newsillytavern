@@ -8,25 +8,34 @@
       "id": "room_default",
       "name": "Habitación",
       "url": "/backgrounds/Room/Room (1).png",
-      "triggerKeys": ["habitación", "room", "cuarto"],
+      "triggerKeys": [],
       "contextKeys": [],
-      "tags": ["interior", "default"]
+      "tags": [
+        "interior",
+        "default"
+      ]
     },
     {
       "id": "room_night",
-      "name": "Habitación Nocturna",
+      "name": "Habitación Nocturna2",
       "url": "/backgrounds/Room/Room (2).png",
-      "triggerKeys": ["habitación", "room", "cuarto"],
-      "contextKeys": ["noche", "night", "oscuro", "luna", "dormir"],
-      "tags": ["interior", "nocturno"]
+      "triggerKeys": [],
+      "contextKeys": [],
+      "tags": [
+        "interior",
+        "nocturno"
+      ]
     },
     {
       "id": "room_morning",
       "name": "Habitación Matutina",
       "url": "/backgrounds/Room/Room (3).png",
-      "triggerKeys": ["habitación", "room", "cuarto"],
-      "contextKeys": ["mañana", "morning", "sol", "amanecer", "despertar"],
-      "tags": ["interior", "matutino"]
+      "triggerKeys": [],
+      "contextKeys": [],
+      "tags": [
+        "interior",
+        "matutino"
+      ]
     }
   ]
 }

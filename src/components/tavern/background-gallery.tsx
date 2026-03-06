@@ -16,8 +16,10 @@ import {
   Loader2,
   Maximize,
   Shrink,
-  Move
+  Move,
+  Settings
 } from 'lucide-react';
+import { BackgroundCollectionManager } from './background-collection-manager';
 import {
   Dialog,
   DialogContent,
@@ -65,6 +67,7 @@ export function BackgroundGallery({ open, onOpenChange }: BackgroundGalleryProps
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showCollectionManager, setShowCollectionManager] = useState(false);
   
   const activeBackground = useTavernStore((state) => state.activeBackground);
   const setActiveBackground = useTavernStore((state) => state.setActiveBackground);
@@ -160,6 +163,15 @@ export function BackgroundGallery({ open, onOpenChange }: BackgroundGalleryProps
                 </div>
               </TooltipProvider>
               
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowCollectionManager(true)}
+                title="Manage Collections"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="ml-1 hidden sm:inline">Manage</span>
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -294,6 +306,12 @@ export function BackgroundGallery({ open, onOpenChange }: BackgroundGalleryProps
             )}
           </div>
         )}
+
+        {/* Collection Manager */}
+        <BackgroundCollectionManager
+          open={showCollectionManager}
+          onOpenChange={setShowCollectionManager}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -140,6 +140,7 @@ function isDirectUrl(key: string): boolean {
 
 /**
  * Ejecuta un trigger de sprite para un personaje
+ * Ahora maneja correctamente el fallback según la configuración del sprite
  */
 function executeSpriteTriggerForCharacter(
   key: string,
@@ -164,11 +165,18 @@ function executeSpriteTriggerForCharacter(
     // Determine sprite URL - either direct URL or keyword lookup
     let spriteUrl: string;
     let spriteLabel: string | undefined;
+    let fallbackMode: 'idle_collection' | 'custom_sprite' | 'collection_default' | undefined;
+    let fallbackDelayMs: number | undefined;
+    let fallbackSpriteId: string | undefined;
+    let packId: string | undefined;
+    let principalSpriteId: string | undefined;
     
     if (isDirectUrl(key)) {
       // Use key directly as URL
       spriteUrl = key;
       spriteLabel = key.split('/').pop()?.split('?')[0] || key;
+      // Use provided returnToIdleMs for direct URLs
+      fallbackDelayMs = returnToIdleMs > 0 ? returnToIdleMs : undefined;
       console.log(`[UnifiedTriggerExecutor] Using direct URL for sprite: ${key}`);
     } else {
       // Find matching sprite in character's sprite packs or triggers
@@ -187,6 +195,13 @@ function executeSpriteTriggerForCharacter(
       
       spriteUrl = spriteMatch.url;
       spriteLabel = spriteMatch.label;
+      // Get fallback config from sprite match
+      fallbackMode = spriteMatch.fallbackMode;
+      // Use sprite's fallbackDelayMs if defined, otherwise use provided returnToIdleMs
+      fallbackDelayMs = spriteMatch.fallbackDelayMs ?? (returnToIdleMs > 0 ? returnToIdleMs : undefined);
+      fallbackSpriteId = spriteMatch.fallbackSpriteId;
+      packId = spriteMatch.packId;
+      principalSpriteId = spriteMatch.principalSpriteId;
     }
     
     // Create synthetic trigger match
@@ -195,9 +210,9 @@ function executeSpriteTriggerForCharacter(
       triggerType: 'sprite',
       keyword: key,
       data: {
-        spriteUrl: spriteMatch.url,
-        spriteLabel: spriteMatch.label,
-        returnToIdleMs,
+        spriteUrl,
+        spriteLabel,
+        returnToIdleMs: fallbackDelayMs ?? 0,
         characterId: character.id,
       },
     };
@@ -213,6 +228,20 @@ function executeSpriteTriggerForCharacter(
     
     // Get idle sprite URL helper
     const getIdleSpriteUrl = (): string | null => {
+      // Try V2 state collections first
+      const idleCollectionV2 = character.stateCollectionsV2?.find(c => c.state === 'idle');
+      if (idleCollectionV2) {
+        const pack = character.spritePacksV2?.find(p => p.id === idleCollectionV2.packId);
+        if (pack && idleCollectionV2.principalSpriteId) {
+          const sprite = pack.sprites.find(s => s.id === idleCollectionV2.principalSpriteId);
+          if (sprite) return sprite.url;
+        }
+        if (pack && pack.sprites.length > 0) {
+          return pack.sprites[0].url;
+        }
+      }
+      
+      // Fall back to legacy state collections
       const idleCollection = character.spriteConfig?.stateCollections?.['idle'];
       if (idleCollection?.entries.length) {
         const entry = idleCollection.entries.find(e => e.role === 'principal') || idleCollection.entries[0];
@@ -227,18 +256,77 @@ function executeSpriteTriggerForCharacter(
       return null;
     };
     
-    // Execute sprite trigger
+    // Execute sprite trigger - apply the sprite
     executeSpriteTrigger(match, triggerContext, {
       applyTriggerForCharacter: storeActions.applyTriggerForCharacter,
       scheduleReturnToIdleForCharacter: storeActions.scheduleReturnToIdleForCharacter,
     }, getIdleSpriteUrl);
+    
+    // Handle fallback scheduling if fallbackDelayMs > 0
+    if (fallbackDelayMs && fallbackDelayMs > 0) {
+      let returnSpriteUrl: string | null = null;
+      let returnSpriteLabel: string | null = null;
+      
+      if (fallbackMode === 'custom_sprite' && fallbackSpriteId && packId) {
+        // Find fallback sprite in pack
+        const pack = character.spritePacksV2?.find(p => p.id === packId);
+        const fallbackSprite = pack?.sprites.find(s => s.id === fallbackSpriteId);
+        if (fallbackSprite) {
+          returnSpriteUrl = fallbackSprite.url;
+          returnSpriteLabel = fallbackSprite.label;
+        }
+      } else if (fallbackMode === 'idle_collection') {
+        // Get idle sprite
+        returnSpriteUrl = getIdleSpriteUrl();
+        returnSpriteLabel = 'idle';
+      } else if (fallbackMode === 'collection_default' && packId) {
+        // Use collection's principal sprite or first sprite
+        const pack = character.spritePacksV2?.find(p => p.id === packId);
+        if (pack && pack.sprites.length > 0) {
+          const principalSprite = principalSpriteId
+            ? pack.sprites.find(s => s.id === principalSpriteId)
+            : pack.sprites[0];
+          if (principalSprite) {
+            returnSpriteUrl = principalSprite.url;
+            returnSpriteLabel = principalSprite.label;
+          }
+        }
+        if (!returnSpriteUrl) {
+          returnSpriteUrl = getIdleSpriteUrl();
+          returnSpriteLabel = 'idle';
+        }
+      } else {
+        // Default fallback: use idle sprite
+        returnSpriteUrl = getIdleSpriteUrl();
+        returnSpriteLabel = 'idle';
+      }
+      
+      if (returnSpriteUrl) {
+        console.log(`[UnifiedTriggerExecutor] Scheduling fallback for sprite:`, {
+          characterId: character.id,
+          fallbackMode,
+          fallbackDelayMs,
+          returnSpriteUrl,
+          returnSpriteLabel,
+        });
+        
+        storeActions.scheduleReturnToIdleForCharacter(
+          character.id,
+          spriteUrl,
+          'idle',  // Apply the return sprite
+          returnSpriteUrl,
+          returnSpriteLabel,
+          fallbackDelayMs
+        );
+      }
+    }
     
     return {
       success: true,
       category: 'sprite',
       key,
       targetCharacterId: character.id,
-      message: `Sprite "${spriteMatch.label || spriteMatch.url}" applied to ${character.name}`,
+      message: `Sprite "${spriteLabel || spriteUrl}" applied to ${character.name}${fallbackDelayMs ? ` (fallback in ${fallbackDelayMs}ms)` : ''}`,
     };
   } catch (error) {
     return {
@@ -252,13 +340,30 @@ function executeSpriteTriggerForCharacter(
 }
 
 /**
+ * Resultado de búsqueda de sprite
+ */
+interface SpriteMatchResult {
+  url: string;
+  label?: string;
+  // Fallback configuration
+  fallbackMode?: 'idle_collection' | 'custom_sprite' | 'collection_default';
+  fallbackDelayMs?: number;
+  fallbackSpriteId?: string;
+  // For finding fallback sprite
+  packId?: string;
+  collectionId?: string;
+  principalSpriteId?: string;
+}
+
+/**
  * Busca un sprite que coincida con la key en el personaje
  * Soporta tanto el sistema legacy como V2 (spritePacksV2, triggerCollections)
+ * Ahora devuelve también la configuración de fallback
  */
 function findSpriteMatch(
   key: string,
   character: CharacterCard
-): { url: string; label?: string } | null {
+): SpriteMatchResult | null {
   const normalizedKey = key.toLowerCase();
   
   // 0. Si es una URL directa, usarla
@@ -285,7 +390,16 @@ function findSpriteMatch(
             : pack.sprites[0];
           if (sprite) {
             console.log(`[UnifiedTriggerExecutor] Found sprite in V2 collection "${collection.name}": ${sprite.url}`);
-            return { url: sprite.url, label: sprite.label };
+            return { 
+              url: sprite.url, 
+              label: sprite.label,
+              fallbackMode: collection.fallbackMode,
+              fallbackDelayMs: collection.fallbackDelayMs,
+              fallbackSpriteId: collection.fallbackSpriteId,
+              packId: collection.packId,
+              collectionId: collection.id,
+              principalSpriteId: collection.principalSpriteId,
+            };
           }
         }
       }
@@ -300,7 +414,16 @@ function findSpriteMatch(
           const sprite = pack?.sprites.find(s => s.id === spriteId);
           if (sprite) {
             console.log(`[UnifiedTriggerExecutor] Found sprite via V2 config key "${config.key}": ${sprite.url}`);
-            return { url: sprite.url, label: sprite.label };
+            return { 
+              url: sprite.url, 
+              label: sprite.label,
+              fallbackMode: config.fallbackMode ?? collection.fallbackMode,
+              fallbackDelayMs: config.fallbackDelayMs ?? collection.fallbackDelayMs,
+              fallbackSpriteId: config.fallbackSpriteId ?? collection.fallbackSpriteId,
+              packId: collection.packId,
+              collectionId: collection.id,
+              principalSpriteId: collection.principalSpriteId,
+            };
           }
         }
         
@@ -310,7 +433,16 @@ function findSpriteMatch(
           const sprite = pack?.sprites.find(s => s.id === spriteId);
           if (sprite) {
             console.log(`[UnifiedTriggerExecutor] Found sprite via V2 config alt key: ${sprite.url}`);
-            return { url: sprite.url, label: sprite.label };
+            return { 
+              url: sprite.url, 
+              label: sprite.label,
+              fallbackMode: config.fallbackMode ?? collection.fallbackMode,
+              fallbackDelayMs: config.fallbackDelayMs ?? collection.fallbackDelayMs,
+              fallbackSpriteId: config.fallbackSpriteId ?? collection.fallbackSpriteId,
+              packId: collection.packId,
+              collectionId: collection.id,
+              principalSpriteId: collection.principalSpriteId,
+            };
           }
         }
       }
@@ -324,14 +456,14 @@ function findSpriteMatch(
       if (pack.name.toLowerCase() === normalizedKey && pack.sprites.length > 0) {
         const sprite = pack.sprites[0];
         console.log(`[UnifiedTriggerExecutor] Found sprite in V2 pack "${pack.name}": ${sprite.url}`);
-        return { url: sprite.url, label: sprite.label };
+        return { url: sprite.url, label: sprite.label, packId: pack.id };
       }
       
       // Check sprite labels
       const spriteByLabel = pack.sprites.find(s => s.label?.toLowerCase() === normalizedKey);
       if (spriteByLabel) {
         console.log(`[UnifiedTriggerExecutor] Found sprite by label "${spriteByLabel.label}": ${spriteByLabel.url}`);
-        return { url: spriteByLabel.url, label: spriteByLabel.label };
+        return { url: spriteByLabel.url, label: spriteByLabel.label, packId: pack.id };
       }
     }
   }
@@ -349,7 +481,11 @@ function findSpriteMatch(
         const item = pack.items.find(i => i.enabled !== false);
         if (item?.spriteUrl) {
           console.log(`[UnifiedTriggerExecutor] Found sprite in legacy pack "${pack.name}": ${item.spriteUrl}`);
-          return { url: item.spriteUrl, label: item.spriteLabel };
+          return { 
+            url: item.spriteUrl, 
+            label: item.spriteLabel,
+            fallbackDelayMs: item.returnToIdleMs,
+          };
         }
       }
     }
@@ -363,7 +499,11 @@ function findSpriteMatch(
     
     if (trigger?.spriteUrl) {
       console.log(`[UnifiedTriggerExecutor] Found sprite in legacy trigger "${trigger.name}": ${trigger.spriteUrl}`);
-      return { url: trigger.spriteUrl, label: trigger.spriteState };
+      return { 
+        url: trigger.spriteUrl, 
+        label: trigger.spriteState,
+        fallbackDelayMs: trigger.returnToIdleMs,
+      };
     }
   }
   
@@ -391,6 +531,9 @@ function findSpriteMatch(
 
 /**
  * Busca un sonido que coincida con la key en las colecciones y triggers
+ * 
+ * IMPORTANTE: Los archivos en collection.files ya contienen URLs completas
+ * (ej: "/sounds/glohg/glohg46.wav"), por lo que NO se debe añadir el path.
  */
 function findSoundMatch(
   key: string,
@@ -423,8 +566,10 @@ function findSoundMatch(
           if (trigger.playMode === 'random') {
             fileIndex = Math.floor(Math.random() * collection.files.length);
           }
+          // Los archivos ya contienen la URL completa
           const file = collection.files[fileIndex];
-          const url = `${collection.path}/${file}`;
+          // Si el archivo ya es una URL completa, usarla directamente
+          const url = file.startsWith('/') ? file : `${collection.path}/${file}`;
           console.log(`[UnifiedTriggerExecutor] Found sound match: trigger "${trigger.name}" -> ${url}`);
           return { url, name: trigger.name };
         }
@@ -440,13 +585,15 @@ function findSoundMatch(
       // Buscar el archivo en la colección
       const file = collection.files.find(f => f.toLowerCase().includes(filename.toLowerCase()));
       if (file) {
-        const url = `${collection.path}/${file}`;
+        // Los archivos ya contienen la URL completa
+        const url = file.startsWith('/') ? file : `${collection.path}/${file}`;
         return { url, name: `${collectionName}/${file}` };
       }
       // Si no encuentra el archivo específico, usar el primero
       if (collection.files.length > 0) {
-        const url = `${collection.path}/${collection.files[0]}`;
-        return { url, name: `${collectionName}/${collection.files[0]}` };
+        const firstFile = collection.files[0];
+        const url = firstFile.startsWith('/') ? firstFile : `${collection.path}/${firstFile}`;
+        return { url, name: `${collectionName}/${firstFile}` };
       }
     }
   }
@@ -458,7 +605,8 @@ function findSoundMatch(
         // Usar un archivo random de la colección
         const fileIndex = Math.floor(Math.random() * collection.files.length);
         const file = collection.files[fileIndex];
-        const url = `${collection.path}/${file}`;
+        // Los archivos ya contienen la URL completa
+        const url = file.startsWith('/') ? file : `${collection.path}/${file}`;
         return { url, name: `${collection.name}/${file}` };
       }
     }

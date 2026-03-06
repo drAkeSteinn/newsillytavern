@@ -125,7 +125,7 @@ export function BackgroundTriggersSettings() {
   };
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div className="h-full flex flex-col gap-4 min-h-0">
       {/* Global Settings */}
       <div className="p-4 rounded-lg border bg-muted/30 space-y-4 flex-shrink-0">
         <h4 className="font-medium flex items-center gap-2">
@@ -300,7 +300,7 @@ export function BackgroundTriggersSettings() {
 
       {/* Trigger Packs Accordion */}
       {backgroundTriggerPacks.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        <div className="flex-1 flex items-center justify-center text-muted-foreground min-h-0">
           <div className="text-center">
             <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>No hay packs de background triggers configurados</p>
@@ -308,13 +308,14 @@ export function BackgroundTriggersSettings() {
           </div>
         </div>
       ) : (
-        <ScrollArea className="flex-1">
-          <Accordion
-            type="multiple"
-            value={expandedPacks}
-            onValueChange={setExpandedPacks}
-            className="space-y-2 pr-4"
-          >
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <Accordion
+              type="multiple"
+              value={expandedPacks}
+              onValueChange={setExpandedPacks}
+              className="space-y-2 pr-4"
+            >
             {backgroundTriggerPacks
               .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
               .map((pack) => {
@@ -738,6 +739,7 @@ export function BackgroundTriggersSettings() {
               })}
           </Accordion>
         </ScrollArea>
+        </div>
       )}
 
       {/* Preview Modal */}

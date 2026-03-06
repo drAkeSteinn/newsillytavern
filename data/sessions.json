@@ -6,33 +6,43 @@
     "name": "Chat with Dra. Moon",
     "messages": [
       {
-        "id": "ea2a12ac-944b-4e23-9d8f-62b15a06ad0b",
+        "id": "fa40cb5b-31cb-42e4-b44c-9f3cfe4161e5",
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "assistant",
-        "content": "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\nsprite:ind01 glohg",
-        "timestamp": "2026-03-06T15:17:49.123Z",
+        "content": "La Dra. Sarah Moon objetivo:holis",
+        "timestamp": "2026-03-06T19:36:00.478Z",
         "isDeleted": false,
-        "swipeId": "c141d7ca-92a4-4ab7-9f0e-9d3d7b0d8050",
+        "swipeId": "0176fade-00d4-4959-902f-26924f798863",
         "swipeIndex": 0,
         "swipes": [
-          "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\nsprite:ind01 glohg"
+          "La Dra. Sarah Moon objetivo:holis"
         ]
       }
     ],
     "createdAt": "2026-03-06T12:39:48.301Z",
-    "updatedAt": "2026-03-06T15:23:04.715Z",
+    "updatedAt": "2026-03-06T19:36:22.554Z",
     "sessionStats": {
       "characterStats": {
         "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
           "attributeValues": {
-            "resistencia": 0,
+            "resistencia": 10,
             "estamina": 0
           },
           "lastUpdated": {
-            "resistencia": 1772810269123,
-            "estamina": 1772810269123
+            "resistencia": 1772825782554,
+            "estamina": 1772825760478
           },
-          "changeLog": []
+          "changeLog": [
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 0,
+              "newValue": 10,
+              "reason": "trigger",
+              "timestamp": 1772825782554
+            }
+          ]
         },
         "611876f7-399e-49a3-a32f-aa847e8f28da": {
           "attributeValues": {
@@ -40,14 +50,14 @@
             "resistencia": 10
           },
           "lastUpdated": {
-            "holi": 1772810269123,
-            "resistencia": 1772810269123
+            "holi": 1772825760478,
+            "resistencia": 1772825760478
           },
           "changeLog": []
         }
       },
       "initialized": true,
-      "lastModified": 1772810269123
+      "lastModified": 1772825782554
     },
     "sessionQuests": [
       {
@@ -56,8 +66,8 @@
         "objectives": [
           {
             "templateId": "obj-mmafuc58",
-            "currentCount": 0,
-            "isCompleted": false
+            "currentCount": 1,
+            "isCompleted": true
           },
           {
             "templateId": "obj-mmbwe737",
@@ -65,8 +75,8 @@
             "isCompleted": false
           }
         ],
-        "progress": 0,
-        "activatedAt": "2026-03-06T15:18:52.546Z",
+        "progress": 50,
+        "activatedAt": "2026-03-06T19:36:09.206Z",
         "activatedAtTurn": 0
       },
       {
