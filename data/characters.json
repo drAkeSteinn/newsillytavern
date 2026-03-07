@@ -23,7 +23,7 @@
     "voice": null,
     "id": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
     "createdAt": "2026-03-01T21:41:38.289Z",
-    "updatedAt": "2026-03-06T19:31:26.998Z",
+    "updatedAt": "2026-03-07T15:16:53.423Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -151,71 +151,8 @@
         "keys": []
       }
     ],
-    "spritePacksV2": [
-      {
-        "id": "67987eca-99d8-4e7c-adbc-e04944a373b0",
-        "name": "asd",
-        "description": "asd",
-        "sprites": [
-          {
-            "id": "5bd06b63-51b8-492b-96bc-3bec8e08fe5f",
-            "label": "goth",
-            "url": "/sprites/Moon/1772325779628-igzukb.png",
-            "isAnimated": false
-          },
-          {
-            "id": "90c30ffa-8f21-4155-ab1b-14d33c914c85",
-            "label": "win",
-            "url": "/sprites/Moon/1772316532074-3ni00o.png",
-            "isAnimated": false
-          }
-        ],
-        "createdAt": "2026-03-06T06:42:35.673Z",
-        "updatedAt": "2026-03-06T06:43:01.275Z"
-      },
-      {
-        "id": "ffd3db01-b413-4c3c-87fd-45767b6cb59c",
-        "name": "idle",
-        "sprites": [
-          {
-            "id": "d2a4ff04-5d24-43e0-a7ae-92bd9f11bc79",
-            "label": "01",
-            "url": "/sprites/Moon/1772240870166-656lst.webm",
-            "isAnimated": true
-          }
-        ],
-        "createdAt": "2026-03-06T06:43:48.021Z",
-        "updatedAt": "2026-03-06T06:43:57.413Z"
-      },
-      {
-        "id": "ea6ae683-7529-4bcf-9f5a-f92929242ac2",
-        "name": "talk",
-        "sprites": [
-          {
-            "id": "8cd6e742-3d14-4afb-9722-99423358f17c",
-            "label": "talk",
-            "url": "/sprites/Moon/1772241191129-43nt0y.webm",
-            "isAnimated": true
-          }
-        ],
-        "createdAt": "2026-03-06T06:44:17.380Z",
-        "updatedAt": "2026-03-06T06:44:22.524Z"
-      }
-    ],
-    "stateCollectionsV2": [
-      {
-        "state": "idle",
-        "packId": "ffd3db01-b413-4c3c-87fd-45767b6cb59c",
-        "behavior": "principal",
-        "currentIndex": 0
-      },
-      {
-        "state": "talk",
-        "packId": "ea6ae683-7529-4bcf-9f5a-f92929242ac2",
-        "behavior": "principal",
-        "currentIndex": 0
-      }
-    ],
+    "spritePacksV2": [],
+    "stateCollectionsV2": [],
     "triggerCollections": [
       {
         "id": "b6a3e7ab-420f-43c8-923d-14d6eda6aab2",

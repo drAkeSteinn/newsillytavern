@@ -108,5 +108,105 @@
       }
     ],
     "turnCount": 0
+  },
+  {
+    "id": "b09d64d2-909f-4fe7-8271-aad92212ba0e",
+    "characterId": "611876f7-399e-49a3-a32f-aa847e8f28da",
+    "name": "Chat with SCP-8642",
+    "messages": [
+      {
+        "id": "9f513fe0-c7fa-4024-b9b5-94ef4e4b07a3",
+        "characterId": "611876f7-399e-49a3-a32f-aa847e8f28da",
+        "role": "assistant",
+        "content": "objetivo:holis",
+        "timestamp": "2026-03-07T15:15:36.150Z",
+        "isDeleted": false,
+        "swipeId": "3f0090e9-67ad-48fa-959d-9ce878156def",
+        "swipeIndex": 0,
+        "swipes": [
+          "objetivo:holis"
+        ]
+      }
+    ],
+    "createdAt": "2026-03-07T15:15:36.150Z",
+    "updatedAt": "2026-03-07T15:15:36.150Z",
+    "sessionStats": {
+      "characterStats": {
+        "611876f7-399e-49a3-a32f-aa847e8f28da": {
+          "attributeValues": {
+            "holi": 2,
+            "resistencia": 10
+          },
+          "lastUpdated": {
+            "holi": 1772896536150,
+            "resistencia": 1772896536150
+          },
+          "changeLog": []
+        }
+      },
+      "initialized": true,
+      "lastModified": 1772896536150
+    },
+    "sessionQuests": [],
+    "turnCount": 0
+  },
+  {
+    "id": "9a687020-88a2-404f-8bb2-c6d2fea5ced3",
+    "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
+    "name": "Chat with Dra. Moon",
+    "messages": [
+      {
+        "id": "375886e9-74a5-4f4b-b280-d09004842317",
+        "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
+        "role": "assistant",
+        "content": "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01",
+        "timestamp": "2026-03-07T15:15:37.086Z",
+        "isDeleted": false,
+        "swipeId": "1f4b1487-01fb-4b12-9726-cca664768dd4",
+        "swipeIndex": 0,
+        "swipes": [
+          "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01"
+        ]
+      }
+    ],
+    "createdAt": "2026-03-07T15:15:37.086Z",
+    "updatedAt": "2026-03-07T15:15:37.086Z",
+    "sessionStats": {
+      "characterStats": {
+        "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
+          "attributeValues": {
+            "resistencia": 0,
+            "estamina": 0
+          },
+          "lastUpdated": {
+            "resistencia": 1772896537085,
+            "estamina": 1772896537085
+          },
+          "changeLog": []
+        }
+      },
+      "initialized": true,
+      "lastModified": 1772896537085
+    },
+    "sessionQuests": [
+      {
+        "templateId": "asd",
+        "status": "available",
+        "objectives": [
+          {
+            "templateId": "obj-mmafuc58",
+            "currentCount": 0,
+            "isCompleted": false
+          },
+          {
+            "templateId": "obj-mmbwe737",
+            "currentCount": 0,
+            "isCompleted": false
+          }
+        ],
+        "progress": 0
+      }
+    ],
+    "turnCount": 0
   }
 ]

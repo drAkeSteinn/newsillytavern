@@ -427,8 +427,28 @@ export function StateCollectionEditorV2({
                 </div>
               )}
 
+              {/* Pack was deleted (broken reference) */}
+              {collection && !pack && (
+                <div className="text-center py-4 text-destructive border border-destructive/30 rounded-lg bg-destructive/5">
+                  <Package className="w-6 h-6 mx-auto mb-1 opacity-50" />
+                  <p className="text-xs font-medium">⚠️ Pack no encontrado</p>
+                  <p className="text-[10px] mt-0.5">
+                    El sprite pack fue eliminado. El personaje usará su avatar como fallback.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 mt-2 text-xs"
+                    onClick={() => handleClearStateCollection(stateConfig.key)}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Limpiar referencia
+                  </Button>
+                </div>
+              )}
+
               {/* Pack empty */}
-              {collection && sprites.length === 0 && (
+              {collection && pack && sprites.length === 0 && (
                 <div className="text-center py-4 text-amber-600 border border-amber-500/30 rounded-lg bg-amber-500/5">
                   <Package className="w-6 h-6 mx-auto mb-1 opacity-50" />
                   <p className="text-xs">El pack "{pack?.name}" está vacío</p>

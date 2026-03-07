@@ -30,12 +30,6 @@ import {
   Image as ImageIcon,
   Loader2,
   RefreshCw,
-  Sparkles,
-  MessageSquare,
-  Brain,
-  X,
-  Crown,
-  Star,
   Package,
   Edit,
   Video,
@@ -43,19 +37,13 @@ import {
   FolderOpen,
   Check,
   Layers,
-  Zap,
-  Settings,
 } from 'lucide-react';
 import type { 
   SpriteConfig, 
-  SpriteState, 
   SpriteCollection, 
   CharacterCard,
-  SpriteIndexEntry,
-  StateSpriteCollection,
-  CollectionBehavior
+  SpriteIndexEntry
 } from '@/types';
-import { StateCollectionEditor } from './state-collection-editor';
 import { SpritePackEditorV2 } from './sprite-pack-editor-v2';
 import { StateCollectionEditorV2 } from './state-collection-editor-v2';
 import { SpritePreview } from './sprite-preview';
@@ -68,13 +56,6 @@ interface SpriteManagerProps {
   character: CharacterCard;
   onChange: (updates: Partial<CharacterCard>) => void;
 }
-
-// Standard sprite state definitions (only base states)
-const STANDARD_STATES: { key: SpriteState; label: string; icon: React.ReactNode; description: string }[] = [
-  { key: 'idle', label: 'Idle (Reposo)', icon: <Sparkles className="w-4 h-4" />, description: 'Sprite por defecto cuando no hace nada' },
-  { key: 'talk', label: 'Talk (Hablando)', icon: <MessageSquare className="w-4 h-4" />, description: 'Sprite cuando está hablando' },
-  { key: 'thinking', label: 'Thinking (Pensando)', icon: <Brain className="w-4 h-4" />, description: 'Sprite cuando está pensando' },
-];
 
 // Check if URL is a video file
 function isVideoUrl(url: string): boolean {
@@ -182,19 +163,6 @@ export function SpriteManager({ character, onChange }: SpriteManagerProps) {
       spriteConfig: {
         ...spriteConfig,
         collection: collectionName,
-      },
-    });
-  };
-
-  // Handle state collection change
-  const handleStateCollectionChange = (state: SpriteState, collection: StateSpriteCollection) => {
-    onChange({
-      spriteConfig: {
-        ...spriteConfig,
-        stateCollections: {
-          ...spriteConfig.stateCollections,
-          [state]: collection,
-        },
       },
     });
   };

@@ -14,6 +14,42 @@
     {
       "questId": "asd",
       "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772894174951-013ckqecx",
+      "timestamp": "2026-03-07T14:36:14.951Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772894174932-obe8hmtra",
+      "timestamp": "2026-03-07T14:36:14.932Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772893655396-s2yxn7ri7",
+      "timestamp": "2026-03-07T14:27:35.396Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772893655380-cmn3oxyt7",
+      "timestamp": "2026-03-07T14:27:35.380Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
       "type": "objective_complete",
       "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sprite \"goth\" applied to Dra. Moon (fallback in 6000ms), Sound \"glohg\" queued for playback, Background changed to \"Room (4)\"",
       "rewards": [
@@ -819,42 +855,6 @@
       "message": "Objetivo completado: Objetivo tenebroso y medico",
       "id": "notif-1772805874529-x2fwuk7pn",
       "timestamp": "2026-03-06T14:04:34.529Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772805766908-kha8qc0mv",
-      "timestamp": "2026-03-06T14:02:46.908Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772805766886-7ct2kftmq",
-      "timestamp": "2026-03-06T14:02:46.886Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772800794640-1i8mz2kfs",
-      "timestamp": "2026-03-06T12:39:54.640Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772800794607-kdtcqxg1h",
-      "timestamp": "2026-03-06T12:39:54.607Z",
       "read": true
     }
   ]

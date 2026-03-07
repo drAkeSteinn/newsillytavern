@@ -137,13 +137,25 @@ export function SpritePackEditorV2({
     const pack = spritePacksV2.find(p => p.id === packId);
     if (!pack) return;
     
-    if (!confirm(`¿Eliminar el pack "${pack.name}"? Los sprites no se eliminarán, solo se quitarán del pack.`)) return;
+    if (!confirm(`¿Eliminar el pack "${pack.name}"? Los sprites no se eliminarán, solo se quitarán del pack.\n\nSi este pack está siendo usado en Colecciones de Estado, se eliminará la referencia.`)) return;
+    
+    // Remove pack from spritePacksV2
+    const updatedPacks = spritePacksV2.filter(p => p.id !== packId);
+    
+    // Also clean up stateCollectionsV2 references to this pack
+    const stateCollectionsV2 = character.stateCollectionsV2 || [];
+    const updatedStateCollections = stateCollectionsV2
+      .filter(c => c.packId !== packId); // Remove collections that reference this pack
     
     onChange({
-      spritePacksV2: spritePacksV2.filter(p => p.id !== packId),
+      spritePacksV2: updatedPacks,
+      stateCollectionsV2: updatedStateCollections,
     });
     
-    logger.info('Deleted sprite pack', { packId });
+    logger.info('Deleted sprite pack and cleaned up state collection references', { 
+      packId,
+      removedCollections: stateCollectionsV2.length - updatedStateCollections.length
+    });
   };
 
   // Rename pack

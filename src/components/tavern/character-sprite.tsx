@@ -21,10 +21,9 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { SpriteConfig, SpriteState, StateSpriteCollection, CharacterCard, SpritePackV2, StateCollectionV2 } from '@/types';
+import type { SpriteState, CharacterCard, SpritePackV2, StateCollectionV2 } from '@/types';
 import { SpritePreview } from './sprite-preview';
 import { useTavernStore } from '@/store';
-import { getSpriteFromCollection } from '@/hooks/use-sprite-triggers';
 import { createDefaultCharacterState } from '@/store/slices/spriteSlice';
 
 interface SpriteSettings {
@@ -39,7 +38,6 @@ interface CharacterSpriteProps {
   characterId: string;
   characterName: string;
   avatarUrl: string;
-  spriteConfig?: SpriteConfig;  // Sprite configuration from character (legacy)
   character?: CharacterCard;    // Full character data for V2 system
   isStreaming?: boolean;         // Is the character currently generating?
   hasContent?: boolean;          // Is there streaming content? (for thinking vs talk)
@@ -94,15 +92,18 @@ function getSpriteFromStateCollectionV2(
 }
 
 // Get the appropriate sprite URL based on state and config
-// Priority: V2 State Collections > Legacy State Collections > Legacy Sprites > Avatar
+// Priority: V2 State Collections > Avatar (legacy system removed)
 function getSpriteUrl(
   state: SpriteState,
-  spriteConfig?: SpriteConfig,
   avatarUrl?: string,
   character?: CharacterCard
 ): { url: string; label: string | null } {
-  // First, try V2 state collections (new system)
-  if (character?.stateCollectionsV2 && character?.spritePacksV2) {
+  // Try V2 state collections (new system)
+  // Check for non-empty arrays (empty arrays should not be considered as "configured")
+  const hasV2Collections = character?.stateCollectionsV2 && character.stateCollectionsV2.length > 0;
+  const hasV2Packs = character?.spritePacksV2 && character.spritePacksV2.length > 0;
+  
+  if (hasV2Collections && hasV2Packs) {
     const v2Result = getSpriteFromStateCollectionV2(
       state,
       character.stateCollectionsV2,
@@ -113,44 +114,17 @@ function getSpriteUrl(
     }
   }
 
-  // Try legacy state collections
-  const stateCollection = spriteConfig?.stateCollections?.[state];
-  if (stateCollection && stateCollection.entries.length > 0) {
-    const result = getSpriteFromCollection(stateCollection, false);
-    if (result.url) {
-      return { url: result.url, label: result.label };
-    }
-  }
-
-  // Fall back to legacy sprites
-  if (spriteConfig?.sprites?.[state]) {
-    return { url: spriteConfig.sprites[state]!, label: null };
-  }
-
-  // Additional fallbacks for talk and thinking states
+  // Additional fallback for talk and thinking states - try V2 idle collection
   if (state === 'talk' || state === 'thinking') {
-    // Try V2 idle collection first
-    if (character?.stateCollectionsV2 && character?.spritePacksV2) {
+    if (hasV2Collections && hasV2Packs) {
       const v2IdleResult = getSpriteFromStateCollectionV2(
         'idle',
-        character.stateCollectionsV2,
-        character.spritePacksV2
+        character!.stateCollectionsV2,
+        character!.spritePacksV2
       );
       if (v2IdleResult.url) {
         return v2IdleResult;
       }
-    }
-    
-    // Try legacy idle collection
-    const idleCollection = spriteConfig?.stateCollections?.['idle'];
-    if (idleCollection && idleCollection.entries.length > 0) {
-      const result = getSpriteFromCollection(idleCollection, false);
-      if (result.url) {
-        return { url: result.url, label: result.label };
-      }
-    }
-    if (spriteConfig?.sprites?.['idle']) {
-      return { url: spriteConfig.sprites['idle']!, label: null };
     }
   }
 
@@ -176,7 +150,6 @@ export function CharacterSprite({
   characterId, 
   characterName, 
   avatarUrl,
-  spriteConfig,
   character,
   isStreaming = false,
   hasContent = false,
@@ -221,15 +194,13 @@ export function CharacterSprite({
   //      b) Another trigger replaces it
   //      c) User manually clears it
   //
-  // 2. STATE COLLECTION SPRITES
+  // 2. STATE COLLECTION V2 SPRITES
   //    - Talk sprite (streaming with content)
   //    - Thinking sprite (generating without content)
+  //    - Idle sprite (default state)
   //    - Only shown when NO trigger sprite is active
   //
-  // 3. LEGACY SPRITES (fallback)
-  //    - From character.spriteConfig.sprites[state]
-  //
-  // 4. AVATAR (lowest priority)
+  // 3. AVATAR (lowest priority)
   //    - Character avatar as final fallback
   //
   // See: /docs/SPRITE_PRIORITY_SYSTEM.md
@@ -298,19 +269,28 @@ export function CharacterSprite({
   // PRIORITY:
   // 1. Trigger sprite from store (highest priority)
   // 2. State collection V2 (if available)
-  // 3. Legacy state collections
-  // 4. Legacy sprites
-  // 5. Avatar (lowest priority)
+  // 3. Avatar (lowest priority)
   const spriteResult = charSpriteState.triggerSpriteUrl 
     ? { url: charSpriteState.triggerSpriteUrl, label: charSpriteState.triggerSpriteLabel }
     : getSpriteUrl(
         effectiveSpriteState,
-        spriteConfig,
         avatarUrl,
         character
       );
   const currentSpriteUrl = spriteResult.url;
   const currentSpriteLabel = spriteResult.label;
+
+  // Debug: Log when sprite data changes
+  useEffect(() => {
+    console.log('[CharacterSprite] Sprite data:', {
+      characterId,
+      hasCharacter: !!character,
+      spritePacksV2Count: character?.spritePacksV2?.length ?? 'undefined',
+      stateCollectionsV2Count: character?.stateCollectionsV2?.length ?? 'undefined',
+      currentSpriteUrl: currentSpriteUrl?.substring(0, 50),
+      avatarUrl: avatarUrl?.substring(0, 50),
+    });
+  }, [characterId, character?.spritePacksV2, character?.stateCollectionsV2, currentSpriteUrl, avatarUrl]);
 
   // Save settings to localStorage
   useEffect(() => {

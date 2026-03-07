@@ -993,7 +993,6 @@ export function ChatPanel() {
           characterId={activeCharacter.id}
           characterName={activeCharacter.name}
           avatarUrl={activeCharacter.avatar}
-          spriteConfig={activeCharacter.spriteConfig}
           character={activeCharacter}
           isStreaming={isGenerating}
           hasContent={!!streamingContent}

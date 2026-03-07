@@ -11,10 +11,48 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import type { CharacterCard, SpriteConfig, SpriteState } from '@/types';
+import type { CharacterCard, SpriteState, SpritePackV2, StateCollectionV2 } from '@/types';
 import { SpritePreview } from './sprite-preview';
-import { getSpriteFromCollection } from '@/hooks/use-sprite-triggers';
 import { useTavernStore } from '@/store';
+
+// Get sprite from State Collection V2 (uses sprite packs)
+function getSpriteFromStateCollectionV2(
+  state: SpriteState,
+  stateCollectionsV2: StateCollectionV2[],
+  spritePacksV2: SpritePackV2[]
+): { url: string | null; label: string | null } {
+  const stateCollection = stateCollectionsV2.find(c => c.state === state);
+  if (!stateCollection) return { url: null, label: null };
+  
+  const pack = spritePacksV2.find(p => p.id === stateCollection.packId);
+  if (!pack || pack.sprites.length === 0) return { url: null, label: null };
+  
+  switch (stateCollection.behavior) {
+    case 'principal':
+      // Use principal sprite if specified, otherwise first sprite
+      if (stateCollection.principalSpriteId) {
+        const principal = pack.sprites.find(s => s.id === stateCollection.principalSpriteId);
+        if (principal) return { url: principal.url, label: principal.label };
+      }
+      return { url: pack.sprites[0].url, label: pack.sprites[0].label };
+    
+    case 'random':
+      // Random selection
+      const randomIndex = Math.floor(Math.random() * pack.sprites.length);
+      const randomSprite = pack.sprites[randomIndex];
+      return { url: randomSprite.url, label: randomSprite.label };
+    
+    case 'list':
+      // Rotate through sprites (use currentIndex if available)
+      const index = stateCollection.currentIndex ?? 0;
+      const safeIndex = Math.min(index, pack.sprites.length - 1);
+      const listSprite = pack.sprites[safeIndex];
+      return { url: listSprite.url, label: listSprite.label };
+    
+    default:
+      return { url: pack.sprites[0].url, label: pack.sprites[0].label };
+  }
+}
 
 // Format milliseconds to readable time
 function formatTime(ms: number): string {
@@ -71,44 +109,44 @@ const STORAGE_KEY = 'group-sprite-settings';
 const POSITIONS_KEY = 'group-sprite-positions';
 
 // Get the appropriate sprite URL based on state and config
-// Uses new state collections system with fallback to legacy sprites and avatar
+// Priority: V2 State Collections > Avatar (legacy system removed)
 function getSpriteUrl(
   state: SpriteState,
-  spriteConfig?: SpriteConfig,
-  avatarUrl?: string
+  character?: CharacterCard
 ): { url: string; label: string | null } {
-  // First, try state collections (new system)
-  const stateCollection = spriteConfig?.stateCollections?.[state];
-  if (stateCollection && stateCollection.entries.length > 0) {
-    const result = getSpriteFromCollection(stateCollection, false);
-    if (result.url) {
-      return { url: result.url, label: result.label };
+  // Check for non-empty arrays (empty arrays should not be considered as "configured")
+  const hasV2Collections = character?.stateCollectionsV2 && character.stateCollectionsV2.length > 0;
+  const hasV2Packs = character?.spritePacksV2 && character.spritePacksV2.length > 0;
+  
+  // Try V2 state collections (new system)
+  if (hasV2Collections && hasV2Packs) {
+    const v2Result = getSpriteFromStateCollectionV2(
+      state,
+      character.stateCollectionsV2,
+      character.spritePacksV2
+    );
+    if (v2Result.url) {
+      return v2Result;
     }
   }
 
-  // Fall back to legacy sprites
-  if (spriteConfig?.sprites?.[state]) {
-    return { url: spriteConfig.sprites[state]!, label: null };
-  }
-
-  // Additional fallbacks for talk and thinking states
+  // Additional fallbacks for talk and thinking states - try V2 idle collection
   if (state === 'talk' || state === 'thinking') {
-    // Try idle as fallback
-    const idleCollection = spriteConfig?.stateCollections?.['idle'];
-    if (idleCollection && idleCollection.entries.length > 0) {
-      const result = getSpriteFromCollection(idleCollection, false);
-      if (result.url) {
-        return { url: result.url, label: result.label };
+    if (hasV2Collections && hasV2Packs) {
+      const v2IdleResult = getSpriteFromStateCollectionV2(
+        'idle',
+        character!.stateCollectionsV2,
+        character!.spritePacksV2
+      );
+      if (v2IdleResult.url) {
+        return v2IdleResult;
       }
-    }
-    if (spriteConfig?.sprites?.['idle']) {
-      return { url: spriteConfig.sprites['idle']!, label: null };
     }
   }
 
   // Final fallback to avatar
-  if (avatarUrl) {
-    return { url: avatarUrl, label: 'avatar' };
+  if (character?.avatar) {
+    return { url: character.avatar, label: 'avatar' };
   }
 
   return { url: '', label: null };
@@ -368,12 +406,8 @@ export function GroupSprites({
           spriteUrl = charSpriteState.triggerSpriteUrl!;
           spriteLabel = charSpriteState.triggerSpriteLabel;
         } else {
-          // Use state collection or fallback
-          const spriteResult = getSpriteUrl(
-            spriteState,
-            character.spriteConfig,
-            character.avatar
-          );
+          // Use state collection or fallback - pass full character for V2 support
+          const spriteResult = getSpriteUrl(spriteState, character);
           spriteUrl = spriteResult.url;
           spriteLabel = spriteResult.label;
         }
