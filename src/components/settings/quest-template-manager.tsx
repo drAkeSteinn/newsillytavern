@@ -99,6 +99,7 @@ import {
   Filter,
   GripHorizontal,
   ChevronDown as ChevronDownIcon,
+  Music,
 } from 'lucide-react';
 import {
   DndContext,
@@ -1047,6 +1048,7 @@ function SortableObjectiveItem({
                               <SelectItem value="sprite">🖼️ Sprite</SelectItem>
                               <SelectItem value="sound">🔊 Sonido</SelectItem>
                               <SelectItem value="background">🌄 Fondo</SelectItem>
+                              <SelectItem value="soundSequence">🎵 Secuencia</SelectItem>
                             </SelectContent>
                           </Select>
                           <Input
@@ -2017,6 +2019,12 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                                               Fondo
                                             </div>
                                           </SelectItem>
+                                          <SelectItem value="soundSequence">
+                                            <div className="flex items-center gap-2">
+                                              <Music className="w-3.5 h-3.5" />
+                                              Secuencia
+                                            </div>
+                                          </SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </div>
@@ -2109,6 +2117,30 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                                       <div className="flex items-end pb-1">
                                         <p className="text-[10px] text-muted-foreground">
                                           Formato key: "coleccion/archivo"
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {normalized.trigger.category === 'soundSequence' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px] text-muted-foreground">Volumen (0-1)</Label>
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          max={1}
+                                          step={0.1}
+                                          value={normalized.trigger.volume ?? 0.8}
+                                          onChange={(e) => updateReward(index, { 
+                                            trigger: { ...normalized.trigger!, volume: Number(e.target.value) } 
+                                          })}
+                                          className="bg-background h-8"
+                                        />
+                                      </div>
+                                      <div className="flex items-end pb-1">
+                                        <p className="text-[10px] text-muted-foreground">
+                                          Key: activationKey de la secuencia
                                         </p>
                                       </div>
                                     </div>

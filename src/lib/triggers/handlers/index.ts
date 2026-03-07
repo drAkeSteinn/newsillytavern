@@ -9,3 +9,4 @@ export * from './atmosphere-handler';
 export * from './quest-handler';
 export * from './item-handler';
 export * from './stats-handler';
+export * from './skill-activation-handler';

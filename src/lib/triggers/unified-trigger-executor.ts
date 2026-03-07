@@ -15,7 +15,7 @@
 // - No duplica lógica de ejecución
 // - Soporta targetMode para grupos
 
-import type { CharacterCard, SoundCollection, SoundTrigger, BackgroundTriggerPack, BackgroundOverlay, BackgroundTransitionType } from '@/types';
+import type { CharacterCard, SoundCollection, SoundTrigger, BackgroundTriggerPack, BackgroundOverlay, BackgroundTransitionType, SoundSequenceTrigger } from '@/types';
 import type { TriggerContext } from './trigger-bus';
 import type { TriggerMatch } from './types';
 import {
@@ -32,7 +32,7 @@ import {
 // Types
 // ============================================
 
-export type TriggerCategory = 'sprite' | 'sound' | 'background';
+export type TriggerCategory = 'sprite' | 'sound' | 'background' | 'soundSequence';
 export type TriggerTargetMode = 'self' | 'all' | 'target';
 
 /**
@@ -52,6 +52,7 @@ export interface TriggerExecutionContext {
   // Sound resources (for lookup)
   soundCollections?: SoundCollection[];
   soundTriggers?: SoundTrigger[];
+  soundSequenceTriggers?: SoundSequenceTrigger[];
   
   // Background resources (for lookup)
   backgroundPacks?: BackgroundTriggerPack[];
@@ -872,6 +873,146 @@ function executeBackgroundTriggerForCharacter(
 }
 
 // ============================================
+// Sound Sequence Trigger Execution
+// ============================================
+
+/**
+ * Ejecuta un trigger de secuencia de sonido
+ * Busca la secuencia por su key (activationKey o nombre) y reproduce todos los sonidos en orden
+ */
+function executeSoundSequenceTriggerForCharacter(
+  key: string,
+  context: TriggerExecutionContext,
+  _character: CharacterCard,
+  volume: number = 0.8
+): TriggerExecutionResult {
+  const { soundSequenceTriggers, soundTriggers, soundCollections, soundSettings } = context;
+
+  try {
+    // Check if we have the required resources
+    if (!soundSequenceTriggers || soundSequenceTriggers.length === 0) {
+      return {
+        success: false,
+        category: 'soundSequence',
+        key,
+        targetCharacterId: context.characterId,
+        error: 'No sound sequence triggers configured',
+      };
+    }
+
+    const normalizedKey = key.toLowerCase();
+
+    // Find the sequence by activationKey or name
+    const sequence = soundSequenceTriggers.find(s =>
+      s.active && (
+        (s.activationKey && s.activationKey.toLowerCase() === normalizedKey) ||
+        s.name.toLowerCase() === normalizedKey
+      )
+    );
+
+    if (!sequence) {
+      return {
+        success: false,
+        category: 'soundSequence',
+        key,
+        targetCharacterId: context.characterId,
+        error: `No sound sequence found for key "${key}"`,
+      };
+    }
+
+    console.log(`[UnifiedTriggerExecutor] Executing sound sequence "${sequence.name}" with ${sequence.sequence.length} sounds`);
+
+    // Track cyclic indexes per trigger
+    const cycleIndexes = new Map<string, number>();
+    const globalVolume = soundSettings?.globalVolume ?? 1;
+    const sequenceVolume = sequence.volume ?? 1;
+
+    // Process each sound in the sequence
+    for (const keyword of sequence.sequence) {
+      // Find the sound trigger for this keyword
+      const trigger = soundTriggers?.find(t =>
+        t.active && t.keywords.includes(keyword) && t.keywordsEnabled?.[keyword] !== false
+      );
+
+      if (!trigger) {
+        console.warn(`[UnifiedTriggerExecutor] Sound sequence: No trigger found for keyword "${keyword}"`);
+        continue;
+      }
+
+      // Find the collection
+      const collection = soundCollections?.find(c => c.name === trigger.collection);
+      if (!collection || collection.files.length === 0) {
+        console.warn(`[UnifiedTriggerExecutor] Sound sequence: No collection "${trigger.collection}" for trigger "${trigger.name}"`);
+        continue;
+      }
+
+      // Get sound file based on trigger's play mode
+      let soundFile: string;
+      if (trigger.playMode === 'random') {
+        const randomIndex = Math.floor(Math.random() * collection.files.length);
+        soundFile = collection.files[randomIndex];
+      } else {
+        // Cyclic mode - track index per trigger
+        const currentIdx = cycleIndexes.get(trigger.id) ?? trigger.currentIndex ?? 0;
+        soundFile = collection.files[currentIdx];
+        cycleIndexes.set(trigger.id, (currentIdx + 1) % collection.files.length);
+      }
+
+      if (!soundFile) continue;
+
+      // Calculate volume: sequence volume * trigger volume * reward volume * global volume
+      const triggerVolume = trigger.volume ?? 1;
+      const finalVolume = sequenceVolume * triggerVolume * volume * globalVolume;
+
+      // Build sound URL
+      const soundUrl = soundFile.startsWith('/') ? soundFile : `${collection.path}/${soundFile}`;
+
+      // Create synthetic trigger match for each sound in sequence
+      const match: TriggerMatch = {
+        triggerId: `reward-sound-sequence-${Date.now()}-${keyword}`,
+        triggerType: 'sound',
+        keyword: keyword,
+        data: {
+          soundUrl,
+          volume: Math.min(1, Math.max(0, finalVolume)),
+          triggerName: `${sequence.name} → ${trigger.name}`,
+        },
+      };
+
+      // Create trigger context
+      const triggerContext: TriggerContext = {
+        character: context.character,
+        fullText: `[REWARD:soundSequence:${key}:${keyword}]`,
+        messageKey: `reward-${Date.now()}`,
+        isStreaming: false,
+        timestamp: Date.now(),
+      };
+
+      // Execute sound trigger (adds to audio queue)
+      executeSoundTrigger(match, triggerContext);
+
+      console.log(`[UnifiedTriggerExecutor] Sound sequence: Queued "${trigger.name}" (${keyword})`);
+    }
+
+    return {
+      success: true,
+      category: 'soundSequence',
+      key,
+      targetCharacterId: context.characterId,
+      message: `Sound sequence "${sequence.name}" queued (${sequence.sequence.length} sounds)`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      category: 'soundSequence',
+      key,
+      targetCharacterId: context.characterId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// ============================================
 // Main Execution Functions
 // ============================================
 
@@ -896,6 +1037,8 @@ export function executeTriggerForCharacter(
       return executeSoundTriggerForCharacter(key, context, character, options?.volume ?? 0.8);
     case 'background':
       return executeBackgroundTriggerForCharacter(key, context, character, options?.transitionDuration);
+    case 'soundSequence':
+      return executeSoundSequenceTriggerForCharacter(key, context, character, options?.volume ?? 0.8);
     default:
       return {
         success: false,

@@ -49,8 +49,8 @@
           "id": "obj-reward-mmeywuus",
           "type": "trigger",
           "trigger": {
-            "category": "sound",
-            "key": "glohg",
+            "category": "soundSequence",
+            "key": "sec1",
             "targetMode": "self"
           }
         },
@@ -114,9 +114,15 @@
       "key": "sprite:win",
       "value": 0,
       "action": "add",
-      "returnToIdleMs": 5000
+      "returnToIdleMs": 5000,
+      "trigger": {
+        "category": "sprite",
+        "key": "sprite:win",
+        "targetMode": "all",
+        "returnToIdleMs": 5000
+      }
     }
   ],
   "createdAt": "2026-03-03T10:00:43.053Z",
-  "updatedAt": "2026-03-06T18:54:16.160Z"
+  "updatedAt": "2026-03-07T18:33:25.718Z"
 }

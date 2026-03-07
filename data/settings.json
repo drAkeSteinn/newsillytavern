@@ -27,7 +27,7 @@
   "sound": {
     "enabled": true,
     "globalVolume": 0.85,
-    "maxSoundsPerMessage": 3,
+    "maxSoundsPerMessage": 50,
     "globalCooldown": 150,
     "realtimeEnabled": true
   },

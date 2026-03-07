@@ -13,7 +13,7 @@ const PERSIST_KEYS = [
   // LLM & TTS
   'llmConfigs', 'ttsConfigs', 'promptTemplates',
   // Sound system
-  'soundTriggers', 'soundCollections',
+  'soundTriggers', 'soundCollections', 'soundSequenceTriggers',
   // Visual systems
   'backgrounds', 'backgroundPacks', 'spritePacks', 'hudTemplates',
   // Advanced systems
@@ -97,6 +97,9 @@ export function usePersistenceSync() {
         }
         if (data.soundCollections && Array.isArray(data.soundCollections)) {
           updates.soundCollections = data.soundCollections;
+        }
+        if (data.soundSequenceTriggers && Array.isArray(data.soundSequenceTriggers)) {
+          updates.soundSequenceTriggers = data.soundSequenceTriggers;
         }
 
         // Visual systems
@@ -259,6 +262,7 @@ export function usePersistenceSync() {
         // Sound system
         soundTriggers: state.soundTriggers,
         soundCollections: state.soundCollections,
+        soundSequenceTriggers: state.soundSequenceTriggers,
         // Visual systems
         backgrounds: state.backgrounds,
         backgroundPacks: state.backgroundPacks,

@@ -42,6 +42,8 @@ import {
   Info,
   Zap,
   CaseSensitive,
+  Minus,
+  Coins,
 } from 'lucide-react';
 import type {
   CharacterStatsConfig,
@@ -52,6 +54,8 @@ import type {
   StatRequirement,
   AttributeType,
   RequirementOperator,
+  ActivationCost,
+  CostOperator,
 } from '@/types';
 import { DEFAULT_STATS_BLOCK_HEADERS, DEFAULT_STATS_CONFIG } from '@/types';
 
@@ -753,6 +757,116 @@ function RequirementEditor({ requirement, availableAttributes, onChange, onDelet
 }
 
 // ============================================
+// Activation Cost Editor Component
+// ============================================
+
+interface ActivationCostEditorProps {
+  cost: ActivationCost;
+  availableAttributes: AttributeDefinition[];
+  onChange: (updates: Partial<ActivationCost>) => void;
+  onDelete: () => void;
+}
+
+// Cost operator definitions with descriptions
+const COST_OPERATOR_OPTIONS: { value: CostOperator; label: string; description: string; symbol: string }[] = [
+  { value: '-', label: '-', description: 'Restar', symbol: '−' },
+  { value: '+', label: '+', description: 'Sumar', symbol: '+' },
+  { value: '*', label: '×', description: 'Multiplicar', symbol: '×' },
+  { value: '/', label: '÷', description: 'Dividir', symbol: '÷' },
+  { value: '=', label: '=', description: 'Establecer', symbol: '=' },
+  { value: 'set_min', label: 'Min', description: 'Establecer mínimo', symbol: '⌊' },
+  { value: 'set_max', label: 'Max', description: 'Establecer máximo', symbol: '⌈' },
+];
+
+function ActivationCostEditor({ cost, availableAttributes, onChange, onDelete }: ActivationCostEditorProps) {
+  const selectedOperator = COST_OPERATOR_OPTIONS.find(op => op.value === cost.operator);
+  const selectedAttr = availableAttributes.find(attr => attr.key === cost.attributeKey);
+  
+  return (
+    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded p-2 flex-wrap">
+      <Coins className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+      
+      {/* Attribute selector */}
+      <Select
+        value={cost.attributeKey}
+        onValueChange={(value) => onChange({ attributeKey: value })}
+      >
+        <SelectTrigger className="h-7 w-24 text-xs">
+          <SelectValue placeholder="Atributo" />
+        </SelectTrigger>
+        <SelectContent>
+          {availableAttributes.map(attr => (
+            <SelectItem key={attr.id} value={attr.key}>{attr.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      
+      {/* Operator selector with descriptions */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Select
+            value={cost.operator}
+            onValueChange={(value: CostOperator) => onChange({ operator: value })}
+          >
+            <SelectTrigger className="h-7 w-16 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COST_OPERATOR_OPTIONS.map(op => (
+                <SelectItem key={op.value} value={op.value}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono w-4">{op.label}</span>
+                    <span className="text-muted-foreground text-xs">{op.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="font-medium">{selectedOperator?.description}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {cost.operator === '-' 
+              ? `Resta ${cost.value} de ${selectedAttr?.name || cost.attributeKey}`
+              : cost.operator === '+'
+              ? `Suma ${cost.value} a ${selectedAttr?.name || cost.attributeKey}`
+              : cost.operator === '='
+              ? `Establece ${selectedAttr?.name || cost.attributeKey} en ${cost.value}`
+              : cost.operator === 'set_min'
+              ? `${selectedAttr?.name || cost.attributeKey} será al menos ${cost.value}`
+              : cost.operator === 'set_max'
+              ? `${selectedAttr?.name || cost.attributeKey} será como máximo ${cost.value}`
+              : `Aplica ${cost.operator}${cost.value} a ${selectedAttr?.name || cost.attributeKey}`
+            }
+          </p>
+        </TooltipContent>
+      </Tooltip>
+      
+      {/* Value input */}
+      <Input
+        type="number"
+        value={cost.value}
+        onChange={(e) => onChange({ value: parseFloat(e.target.value) || 0 })}
+        className="h-7 w-16 text-xs"
+      />
+      
+      {/* Description input (optional) */}
+      <Input
+        value={cost.description || ''}
+        onChange={(e) => onChange({ description: e.target.value || undefined })}
+        placeholder="Descripción opcional..."
+        className="h-7 w-32 text-xs"
+      />
+      
+      {/* Delete button */}
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}>
+        <Trash2 className="w-3 h-3 text-muted-foreground" />
+      </Button>
+    </div>
+  );
+}
+
+// ============================================
 // Skill Editor Component
 // ============================================
 
@@ -865,6 +979,105 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
             />
           </div>
           
+          {/* Activation Key Section */}
+          <div className="space-y-3 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-purple-400" />
+              <Label className="text-xs font-medium text-purple-400">Key de Activación (Trigger)</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm">
+                  <p>Cuando el LLM escriba esta key en su respuesta, la habilidad se activará automáticamente.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Diferente a la key de template - esta es para detección post-LLM.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Label className="text-xs text-muted-foreground">Key principal</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Key principal que activará la habilidad.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Se detectará en múltiples formatos: key:value, key=value, key_x, |key|</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  value={skill.activationKey || ''}
+                  onChange={(e) => onChange(index, { activationKey: e.target.value.toLowerCase().replace(/\s+/g, '_') || undefined })}
+                  placeholder="golpe, hab1, skill_x"
+                  className="h-8 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Label className="text-xs text-muted-foreground">Keys alternativas</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Keys adicionales que también activarán la habilidad.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Separar con comas: gf, golpe1, g_furioso</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  value={(skill.activationKeys || []).join(', ')}
+                  onChange={(e) => {
+                    const keys = e.target.value.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean);
+                    onChange(index, { activationKeys: keys.length > 0 ? keys : undefined });
+                  }}
+                  placeholder="gf, golpe1, g_furioso"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+            
+            {/* Case sensitivity */}
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={skill.activationKeyCaseSensitive ?? false}
+                onCheckedChange={(checked) => onChange(index, { activationKeyCaseSensitive: checked })}
+              />
+              <Label className="text-xs flex items-center gap-1">
+                <CaseSensitive className="w-3 h-3" />
+                Distinguir mayúsculas/minúsculas
+              </Label>
+            </div>
+            
+            {/* Detection Examples */}
+            {skill.activationKey && (
+              <div className="text-[10px] text-muted-foreground space-y-1 p-2 bg-background/50 rounded">
+                <p className="font-medium text-foreground/70">Formatos que activarán "{skill.activationKey}":</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                  <p>• <code>{skill.activationKey}:uso</code></p>
+                  <p>• <code>{skill.activationKey}=activo</code></p>
+                  <p>• <code>{skill.activationKey}_1</code></p>
+                  <p>• <code>|{skill.activationKey}|</code></p>
+                </div>
+              </div>
+            )}
+            
+            {/* Show all activation keys */}
+            {((skill.activationKeys?.length || 0) > 0 || skill.activationKey) && (
+              <div className="flex flex-wrap gap-1">
+                {[skill.activationKey, ...(skill.activationKeys || [])].filter(Boolean).map((key, i) => (
+                  <Badge key={i} variant="outline" className="text-[10px] font-mono border-purple-500/30 text-purple-300">
+                    {key}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -911,6 +1124,58 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
               ))}
               {skill.requirements.length === 0 && (
                 <p className="text-xs text-muted-foreground italic">Sin requisitos - siempre disponible</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Activation Costs Section */}
+          <div className="space-y-2 pt-2 border-t border-red-500/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Coins className="w-3.5 h-3.5 text-red-400" />
+                <Label className="text-xs font-medium text-red-400">Costo de Activación</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Modificaciones a los atributos cuando se activa la habilidad.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Ejemplo: Maná -10, Energía -5</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs border-red-500/30 hover:bg-red-500/10"
+                onClick={() => {
+                  const newCost: ActivationCost = { attributeKey: '', operator: '-', value: 0 };
+                  onChange(index, { activationCosts: [...(skill.activationCosts || []), newCost] });
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1" /> Agregar Costo
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {(skill.activationCosts || []).map((cost, costIndex) => (
+                <ActivationCostEditor
+                  key={costIndex}
+                  cost={cost}
+                  availableAttributes={availableAttributes}
+                  onChange={(updates) => {
+                    const newCosts = [...(skill.activationCosts || [])];
+                    newCosts[costIndex] = { ...newCosts[costIndex], ...updates };
+                    onChange(index, { activationCosts: newCosts });
+                  }}
+                  onDelete={() => {
+                    onChange(index, { 
+                      activationCosts: (skill.activationCosts || []).filter((_, i) => i !== costIndex) 
+                    });
+                  }}
+                />
+              ))}
+              {(skill.activationCosts || []).length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Sin costos - activación gratuita</p>
               )}
             </div>
           </div>

@@ -89,7 +89,7 @@ export async function PUT(request: NextRequest) {
       // LLM & TTS
       llmConfigs, ttsConfigs, promptTemplates,
       // Sound system
-      soundTriggers, soundCollections,
+      soundTriggers, soundCollections, soundSequenceTriggers,
       // Visual systems
       backgrounds, backgroundPacks, spritePacks, sprites, hudTemplates,
       // Advanced systems
@@ -137,6 +137,9 @@ export async function PUT(request: NextRequest) {
     }
     if (soundCollections !== undefined) {
       results.soundCollections = writePersistentData('soundCollections', soundCollections);
+    }
+    if (soundSequenceTriggers !== undefined) {
+      results.soundSequenceTriggers = writePersistentData('soundSequenceTriggers', soundSequenceTriggers);
     }
 
     // Visual systems

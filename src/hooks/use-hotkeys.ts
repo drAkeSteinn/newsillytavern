@@ -33,8 +33,9 @@ export function useHotkeys(hotkeys: HotkeyConfig, actions: HotkeyActions, enable
 
   const matchesHotkey = useCallback((event: KeyboardEvent, hotkey: string) => {
     const { key, modifiers } = parseHotkey(hotkey);
-    
+
     // Check if key matches
+    if (!event.key) return false;
     const eventKey = event.key.toLowerCase();
     if (eventKey !== key) return false;
     

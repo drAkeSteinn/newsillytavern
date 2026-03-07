@@ -36,8 +36,11 @@ import {
   executeAllSoundTriggers,
   resetSoundHandlerState,
   clearSoundHandlerState,
+  checkSoundSequenceTriggers,
+  executeAllSoundSequenceTriggers,
   type SoundHandlerState,
   type SoundTriggerContext,
+  type SoundSequenceContext,
 } from './handlers/sound-handler';
 import {
   createSpriteHandlerState,
@@ -102,6 +105,15 @@ import {
   type StatsHandlerState,
   type StatsTriggerContext,
 } from './handlers/stats-handler';
+import {
+  createSkillActivationHandlerState,
+  checkSkillActivationTriggersInText,
+  executeAllSkillActivations,
+  resetSkillActivationState,
+  clearSkillActivationHandlerState,
+  type SkillActivationHandlerState,
+  type SkillActivationTriggerContext,
+} from './handlers/skill-activation-handler';
 import type { BackgroundOverlay, BackgroundTransitionType } from '@/types';
 
 // ============================================
@@ -164,6 +176,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   const questHandlerState = useMemo(() => createQuestHandlerState(), []);
   const itemHandlerState = useMemo(() => createItemHandlerState(), []);
   const statsHandlerState = useMemo(() => createStatsHandlerState(), []);
+  const skillActivationHandlerState = useMemo(() => createSkillActivationHandlerState(), []);
   
   // Track last processed content per message
   const lastProcessedRef = useRef<Map<string, string>>(new Map());
@@ -314,6 +327,29 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       // Execute ALL matched sound triggers (they queue up automatically)
       if (soundResult?.matched && soundResult.triggers.length > 0) {
         executeAllSoundTriggers(soundResult, context);
+      }
+      
+      // Process sound sequence triggers (activation key detection)
+      if (store.soundSequenceTriggers && store.soundSequenceTriggers.length > 0) {
+        const sequenceContext: SoundSequenceContext = {
+          ...context,
+          soundSequenceTriggers: store.soundSequenceTriggers,
+          soundTriggers: store.soundTriggers,
+          soundCollections: store.soundCollections,
+          soundSettings: {
+            enabled: settings.sound?.enabled ?? false,
+            globalVolume: settings.sound?.globalVolume ?? 0.85,
+            globalCooldown: settings.sound?.globalCooldown ?? 0,
+          },
+          cooldownContextKey: character?.id || 'default',
+        };
+        
+        const sequenceResult = checkSoundSequenceTriggers(newTokens, sequenceContext);
+        
+        if (sequenceResult.matched && sequenceResult.sequences.length > 0) {
+          console.log(`[TriggerSystem] Sound sequences matched: ${sequenceResult.sequences.map(s => s.sequence.name).join(', ')}`);
+          executeAllSoundSequenceTriggers(sequenceResult, sequenceContext);
+        }
       }
     }
     
@@ -600,6 +636,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       // Pass resources for trigger lookup
                       soundCollections: store.soundCollections,
                       soundTriggers: store.soundTriggers,
+                      soundSequenceTriggers: store.soundSequenceTriggers,
                       backgroundPacks: store.backgroundTriggerPacks,
                       soundSettings: {
                         enabled: settings.sound?.enabled ?? false,
@@ -671,6 +708,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       // Pass resources for trigger lookup
                       soundCollections: store.soundCollections,
                       soundTriggers: store.soundTriggers,
+                      soundSequenceTriggers: store.soundSequenceTriggers,
                       backgroundPacks: store.backgroundTriggerPacks,
                       soundSettings: {
                         enabled: settings.sound?.enabled ?? false,
@@ -738,6 +776,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                       // Pass resources for trigger lookup
                       soundCollections: store.soundCollections,
                       soundTriggers: store.soundTriggers,
+                      soundSequenceTriggers: store.soundSequenceTriggers,
                       backgroundPacks: store.backgroundTriggerPacks,
                       soundSettings: {
                         enabled: settings.sound?.enabled ?? false,
@@ -923,7 +962,51 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         }
       }
     }
-  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, getActiveHUDTemplate]);
+    
+    // Process Skill Activation triggers
+    // Detects when LLM uses a skill activation key and applies activation costs
+    if (config.statsEnabled !== false) {
+      const activeSession = store.getActiveSession?.();
+      const sessionId = store.activeSessionId || '';
+
+      // Only process for the speaking character
+      if (character?.statsConfig?.enabled) {
+        const skillsWithActivationKeys = character.statsConfig.skills.filter(
+          s => s.activationKey || (s.activationKeys && s.activationKeys.length > 0)
+        );
+
+        if (skillsWithActivationKeys.length > 0) {
+          const skillActivationContext: SkillActivationTriggerContext = {
+            ...context,
+            characterId: character.id,
+            statsConfig: character.statsConfig,
+            sessionStats: activeSession?.sessionStats,
+          };
+
+          const skillResult = checkSkillActivationTriggersInText(
+            content,
+            skillActivationContext,
+            skillActivationHandlerState
+          );
+
+          if (skillResult.matched && skillResult.matches.length > 0) {
+            const activationResults = executeAllSkillActivations(skillResult, {
+              sessionId,
+              characterId: character.id,
+              sessionStats: activeSession?.sessionStats,
+              statsConfig: character.statsConfig,
+            }, {
+              updateCharacterStat: store.updateCharacterStat.bind(store),
+            });
+
+            if (activationResults.length > 0) {
+              console.log(`[TriggerSystem] Skills activated for ${character.name}: ${activationResults.map(r => `${r.skillName} (${r.changes.length} changes)`).join(', ')}`);
+            }
+          }
+        }
+      }
+    }
+  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, getActiveHUDTemplate]);
   
   /**
    * Process full content at once (non-streaming)
@@ -965,13 +1048,14 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     resetQuestHandlerState(questHandlerState, messageKey, sessionId);
     resetItemHandlerState(itemHandlerState, messageKey);
     resetStatsHandlerState(statsHandlerState, character?.id || '', messageKey);
+    resetSkillActivationState(skillActivationHandlerState, messageKey);
     
     // Clear last processed
     lastProcessedRef.current.delete(messageKey);
     
     // Emit message end event
     bus.emit(createMessageEndEvent(messageKey, character, ''));
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, store.activeSessionId]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, store.activeSessionId]);
   
   /**
    * Clear ALL trigger state - call this when chat is reset
@@ -986,12 +1070,13 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     clearQuestHandlerState(questHandlerState);
     clearItemHandlerState(itemHandlerState);
     clearStatsHandlerState(statsHandlerState);
+    clearSkillActivationHandlerState(skillActivationHandlerState);
     
     // Clear processed tracking
     lastProcessedRef.current.clear();
     
     console.log('[TriggerSystem] All state cleared');
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState]);
   
   return {
     processStreamingContent,

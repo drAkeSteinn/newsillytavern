@@ -156,47 +156,57 @@
     "name": "Chat with Dra. Moon",
     "messages": [
       {
-        "id": "375886e9-74a5-4f4b-b280-d09004842317",
+        "id": "e7805bbb-725c-4cf5-ac58-f65f9e37bb6d",
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "assistant",
-        "content": "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01",
-        "timestamp": "2026-03-07T15:15:37.086Z",
+        "content": "objetivo:holis",
+        "timestamp": "2026-03-07T18:33:58.342Z",
         "isDeleted": false,
-        "swipeId": "1f4b1487-01fb-4b12-9726-cca664768dd4",
+        "swipeId": "55bd43d1-abe3-413a-a305-5877cee96b10",
         "swipeIndex": 0,
         "swipes": [
-          "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01"
+          "objetivo:holis"
         ]
       }
     ],
     "createdAt": "2026-03-07T15:15:37.086Z",
-    "updatedAt": "2026-03-07T15:15:37.086Z",
+    "updatedAt": "2026-03-07T18:36:11.601Z",
     "sessionStats": {
       "characterStats": {
         "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
           "attributeValues": {
-            "resistencia": 0,
+            "resistencia": 10,
             "estamina": 0
           },
           "lastUpdated": {
-            "resistencia": 1772896537085,
-            "estamina": 1772896537085
+            "resistencia": 1772908571601,
+            "estamina": 1772908438342
           },
-          "changeLog": []
+          "changeLog": [
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 0,
+              "newValue": 10,
+              "reason": "trigger",
+              "timestamp": 1772908571601
+            }
+          ]
         }
       },
       "initialized": true,
-      "lastModified": 1772896537085
+      "lastModified": 1772908571601
     },
     "sessionQuests": [
       {
         "templateId": "asd",
-        "status": "available",
+        "status": "active",
         "objectives": [
           {
             "templateId": "obj-mmafuc58",
-            "currentCount": 0,
-            "isCompleted": false
+            "currentCount": 1,
+            "isCompleted": true
           },
           {
             "templateId": "obj-mmbwe737",
@@ -204,7 +214,9 @@
             "isCompleted": false
           }
         ],
-        "progress": 0
+        "progress": 50,
+        "activatedAt": "2026-03-07T18:34:05.667Z",
+        "activatedAtTurn": 0
       }
     ],
     "turnCount": 0

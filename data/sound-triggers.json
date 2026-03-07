@@ -17,5 +17,24 @@
     "currentIndex": 0,
     "createdAt": "2026-03-03T09:40:38.829Z",
     "updatedAt": "2026-03-03T09:40:51.441Z"
+  },
+  {
+    "name": "gluck",
+    "active": true,
+    "keywords": [
+      "gluck"
+    ],
+    "keywordsEnabled": {
+      "gluck": true
+    },
+    "collection": "gluck",
+    "playMode": "random",
+    "volume": 0.8,
+    "cooldown": 0,
+    "delay": 0,
+    "id": "7435a464-45d4-4bb4-bbff-d86215394558",
+    "currentIndex": 0,
+    "createdAt": "2026-03-07T17:49:06.234Z",
+    "updatedAt": "2026-03-07T17:49:21.252Z"
   }
 ]

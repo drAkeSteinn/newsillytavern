@@ -5,7 +5,7 @@
 import type { TriggerMatch } from '../types';
 import type { DetectedToken } from '../token-detector';
 import type { TriggerContext } from '../trigger-bus';
-import type { SoundTrigger, SoundCollection } from '@/types';
+import type { SoundTrigger, SoundCollection, SoundSequenceTrigger } from '@/types';
 import { getCooldownManager } from '../cooldown-manager';
 
 // ============================================
@@ -394,4 +394,243 @@ function checkTokenMatch(token: DetectedToken, keyword: string): boolean {
   
   // Also check if the full keyword phrase appears in token
   return normalizedToken.includes(normalizedKeyword);
+}
+
+// ============================================
+// Sound Sequence Trigger System
+// ============================================
+
+export interface SoundSequenceContext extends TriggerContext {
+  soundSequenceTriggers: SoundSequenceTrigger[];
+  soundTriggers: SoundTrigger[];
+  soundCollections: SoundCollection[];
+  soundSettings: {
+    enabled: boolean;
+    globalVolume: number;
+    globalCooldown: number;
+  };
+  cooldownContextKey?: string;
+}
+
+export interface SoundSequenceResult {
+  matched: boolean;
+  sequences: Array<{
+    sequence: SoundSequenceTrigger;
+    matchedKey: string;
+    matchedToken: string;
+  }>;
+}
+
+/**
+ * Check if a token matches a sequence trigger's activation key
+ * Similar to skill activation key matching
+ */
+function tokenMatchesSequenceKey(
+  token: DetectedToken,
+  activationKey: string,
+  caseSensitive: boolean = false
+): boolean {
+  const normalizedToken = caseSensitive ? token.token : token.token.toLowerCase();
+  const normalizedKey = caseSensitive ? activationKey : activationKey.toLowerCase();
+  
+  if (!normalizedKey || !normalizedToken) return false;
+  
+  // 1. Exact match
+  if (normalizedToken === normalizedKey) return true;
+  
+  // 2. Key:value format
+  if (normalizedToken.includes(':')) {
+    const [keyPart] = normalizedToken.split(':');
+    if (keyPart === normalizedKey) return true;
+  }
+  
+  // 3. Key=value format
+  if (normalizedToken.includes('=')) {
+    const [keyPart] = normalizedToken.split('=');
+    if (keyPart === normalizedKey) return true;
+  }
+  
+  // 4. Key_suffix format
+  if (normalizedToken.startsWith(normalizedKey + '_')) return true;
+  
+  // 5. Token starts with key followed by separator or number
+  if (normalizedToken.startsWith(normalizedKey) && normalizedToken.length > normalizedKey.length) {
+    const afterKey = normalizedToken.slice(normalizedKey.length);
+    if (/^[_:=-]/.test(afterKey) || /^\d/.test(afterKey)) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check for sound sequence triggers in tokens
+ */
+export function checkSoundSequenceTriggers(
+  tokens: DetectedToken[],
+  context: SoundSequenceContext
+): SoundSequenceResult {
+  const result: SoundSequenceResult = {
+    matched: false,
+    sequences: [],
+  };
+  
+  const { soundSequenceTriggers, soundSettings, cooldownContextKey } = context;
+  
+  if (!soundSettings?.enabled) return result;
+  
+  const cooldownManager = getCooldownManager();
+  const cooldownKey = cooldownContextKey || 'default';
+  
+  // Filter active sequence triggers with activation keys
+  const activeSequences = soundSequenceTriggers.filter(
+    s => s.active && s.activationKey
+  );
+  
+  for (const token of tokens) {
+    for (const sequence of activeSequences) {
+      // Skip if already matched this sequence
+      if (result.sequences.some(s => s.sequence.id === sequence.id)) continue;
+      
+      const caseSensitive = sequence.activationKeyCaseSensitive ?? false;
+      
+      // Check primary activation key
+      let matched = tokenMatchesSequenceKey(token, sequence.activationKey, caseSensitive);
+      let matchedKey = sequence.activationKey;
+      
+      // Check alternative keys if primary didn't match
+      if (!matched && sequence.activationKeys) {
+        for (const altKey of sequence.activationKeys) {
+          if (tokenMatchesSequenceKey(token, altKey, caseSensitive)) {
+            matched = true;
+            matchedKey = altKey;
+            break;
+          }
+        }
+      }
+      
+      if (!matched) continue;
+      
+      // Check cooldown
+      const sequenceCooldown = sequence.cooldown ?? 0;
+      if (sequenceCooldown > 0) {
+        const isReady = cooldownManager.isReady(cooldownKey, `seq_${sequence.id}`, {
+          global: 0,
+          perTrigger: sequenceCooldown,
+        });
+        
+        if (!isReady) {
+          console.log(`[SoundHandler] Sequence "${sequence.name}" on cooldown, skipping`);
+          continue;
+        }
+      }
+      
+      // Mark cooldown as fired
+      if (sequenceCooldown > 0) {
+        cooldownManager.markFired(cooldownKey, `seq_${sequence.id}`);
+      }
+      
+      result.sequences.push({
+        sequence,
+        matchedKey,
+        matchedToken: token.original,
+      });
+      
+      result.matched = true;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Execute a sound sequence trigger
+ * Plays all sounds in the sequence, respecting each trigger's play mode
+ */
+export async function executeSoundSequence(
+  sequenceMatch: SoundSequenceResult['sequences'][0],
+  context: SoundSequenceContext
+): Promise<void> {
+  const { sequence } = sequenceMatch;
+  const { soundTriggers, soundCollections, soundSettings } = context;
+  
+  console.log(`[SoundHandler] Executing sequence "${sequence.name}" with ${sequence.sequence.length} sounds`);
+  
+  // Get the cycle indexes map for tracking cyclic mode
+  const cycleIndexes = new Map<string, number>();
+  
+  for (const keyword of sequence.sequence) {
+    // Find the sound trigger by keyword
+    const trigger = soundTriggers.find(t => 
+      t.active && t.keywords.includes(keyword) && t.keywordsEnabled?.[keyword] !== false
+    );
+    
+    if (!trigger) {
+      console.warn(`[SoundHandler] Sequence: No trigger found for keyword "${keyword}"`);
+      continue;
+    }
+    
+    // Get the collection
+    const collection = soundCollections.find(c => c.name === trigger.collection);
+    if (!collection || collection.files.length === 0) {
+      console.warn(`[SoundHandler] Sequence: No collection "${trigger.collection}" for trigger "${trigger.name}"`);
+      continue;
+    }
+    
+    // Get sound file based on trigger's play mode
+    let soundFile: string;
+    if (trigger.playMode === 'random') {
+      soundFile = collection.files[getRandomIndex(collection.files.length)];
+    } else {
+      // Cyclic mode - track index per trigger
+      const currentIdx = cycleIndexes.get(trigger.id) ?? trigger.currentIndex ?? 0;
+      soundFile = collection.files[currentIdx];
+      cycleIndexes.set(trigger.id, (currentIdx + 1) % collection.files.length);
+    }
+    
+    if (!soundFile) continue;
+    
+    // Calculate volume: sequence volume * trigger volume * global volume
+    const sequenceVolume = sequence.volume ?? 1;
+    const triggerVolume = trigger.volume ?? 1;
+    const globalVolume = soundSettings.globalVolume ?? 1;
+    const finalVolume = sequenceVolume * triggerVolume * globalVolume;
+    
+    // Add to queue
+    audioQueue.push({
+      src: soundFile,
+      volume: Math.min(1, Math.max(0, finalVolume)),
+      triggerName: `${sequence.name} → ${trigger.name}`,
+      keyword: keyword,
+    });
+    
+    console.log(`[SoundHandler] Sequence: Queued "${trigger.name}" (${keyword})`);
+    
+    // Wait for delay between sounds if specified
+    const delayBetween = sequence.delayBetween ?? 0;
+    if (delayBetween > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayBetween));
+    }
+  }
+  
+  // Start processing queue if not already playing
+  if (!isPlaying) {
+    processAudioQueue();
+  }
+}
+
+/**
+ * Execute all sound sequence triggers
+ */
+export function executeAllSoundSequenceTriggers(
+  result: SoundSequenceResult,
+  context: SoundSequenceContext
+): void {
+  if (!result.matched || result.sequences.length === 0) return;
+  
+  console.log(`[SoundHandler] Executing ${result.sequences.length} sound sequence(s)`);
+  
+  // Execute sequences sequentially
+  for (const sequenceMatch of result.sequences) {
+    executeSoundSequence(sequenceMatch, context);
+  }
 }

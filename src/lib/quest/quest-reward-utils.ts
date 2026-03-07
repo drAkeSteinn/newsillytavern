@@ -74,7 +74,7 @@ export function createTriggerReward(
   if (category === 'sprite' && options?.returnToIdleMs !== undefined) {
     reward.trigger!.returnToIdleMs = options.returnToIdleMs;
   }
-  if (category === 'sound' && options?.volume !== undefined) {
+  if ((category === 'sound' || category === 'soundSequence') && options?.volume !== undefined) {
     reward.trigger!.volume = options.volume;
   }
   if (category === 'background' && options?.transitionDuration !== undefined) {
@@ -295,6 +295,7 @@ export function getCategoryIcon(category: TriggerCategory): string {
     sprite: '🖼️',
     sound: '🔊',
     background: '🌄',
+    soundSequence: '🎵',
   };
   return icons[category] || '❓';
 }
@@ -367,13 +368,15 @@ export function normalizeReward(reward: QuestReward): QuestReward {
     };
   }
 
-  if (reward.type === 'trigger' || ['sprite', 'sound', 'background'].includes(reward.type as string)) {
+  if (reward.type === 'trigger' || ['sprite', 'sound', 'background', 'soundSequence'].includes(reward.type as string)) {
     // Determinar categoría desde tipo legacy o trigger.category
     let category: TriggerCategory = 'sprite';
     if (reward.type === 'sound' || reward.trigger?.category === 'sound') {
       category = 'sound';
     } else if (reward.type === 'background' || reward.trigger?.category === 'background') {
       category = 'background';
+    } else if (reward.type === 'soundSequence' || reward.trigger?.category === 'soundSequence') {
+      category = 'soundSequence';
     }
 
     return {

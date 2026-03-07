@@ -48,6 +48,7 @@ export interface RewardExecutionContext {
   // Resources for trigger lookup
   soundCollections?: Array<{ name: string; path: string; files: string[] }>;
   soundTriggers?: Array<{ id: string; name: string; keywords: string[]; collection: string; active: boolean; playMode?: string }>;
+  soundSequenceTriggers?: Array<{ id: string; name: string; active: boolean; activationKey?: string; sequence: string[]; volume?: number }>;
   backgroundPacks?: Array<{ id: string; name: string; active: boolean; priority: number; items: Array<{ backgroundUrl: string; backgroundName: string; triggerKeys: string[]; enabled: boolean; overlays?: unknown[] }>; defaultOverlays?: unknown[]; defaultBackground?: string }>;
   
   // Settings
@@ -333,6 +334,7 @@ export function executeTriggerRewardFromQuest(
       // Pass resources for lookup
       soundCollections: context.soundCollections as any,
       soundTriggers: context.soundTriggers as any,
+      soundSequenceTriggers: context.soundSequenceTriggers as any,
       backgroundPacks: context.backgroundPacks as any,
       // Pass settings
       soundSettings: context.soundSettings as any,
@@ -581,6 +583,7 @@ export function describeReward(reward: QuestReward): string {
       sprite: '🖼️',
       sound: '🔊',
       background: '🌄',
+      soundSequence: '🎵',
     };
     const icon = categoryIcons[trig.category] || '⚡';
     const targetLabels: Record<string, string> = {

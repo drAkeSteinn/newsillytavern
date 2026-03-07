@@ -20,6 +20,7 @@ export const DATA_FILES = {
   // Sound system
   soundTriggers: path.join(DATA_DIR, 'sound-triggers.json'),
   soundCollections: path.join(DATA_DIR, 'sound-collections.json'),
+  soundSequenceTriggers: path.join(DATA_DIR, 'sound-sequence-triggers.json'),
   // Visual systems
   backgrounds: path.join(DATA_DIR, 'backgrounds.json'),
   backgroundPacks: path.join(DATA_DIR, 'background-packs.json'),
@@ -43,7 +44,7 @@ export const VALID_DATA_TYPES = [
   // LLM & TTS
   'llmConfigs', 'ttsConfigs', 'promptTemplates',
   // Sound system
-  'soundTriggers', 'soundCollections',
+  'soundTriggers', 'soundCollections', 'soundSequenceTriggers',
   // Visual systems
   'backgrounds', 'backgroundPacks', 'spritePacks', 'sprites', 'hudTemplates',
   // Advanced systems
@@ -193,6 +194,7 @@ export const DEFAULT_DATA = {
   // Sound system
   soundTriggers: [],
   soundCollections: [],
+  soundSequenceTriggers: [],
   // Visual systems
   backgrounds: [],
   backgroundPacks: [],
@@ -313,6 +315,7 @@ export function readAllPersistentData() {
     // Sound system
     soundTriggers: readDataFile(DATA_FILES.soundTriggers, DEFAULT_DATA.soundTriggers),
     soundCollections: readDataFile(DATA_FILES.soundCollections, DEFAULT_DATA.soundCollections),
+    soundSequenceTriggers: readDataFile(DATA_FILES.soundSequenceTriggers, DEFAULT_DATA.soundSequenceTriggers),
     // Visual systems
     backgrounds: readDataFile(DATA_FILES.backgrounds, DEFAULT_DATA.backgrounds),
     backgroundPacks: readDataFile(DATA_FILES.backgroundPacks, DEFAULT_DATA.backgroundPacks),

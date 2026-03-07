@@ -738,6 +738,23 @@ export interface SoundSettings {
   realtimeEnabled: boolean;
 }
 
+// Sound Sequence Trigger - plays multiple sound triggers in sequence
+export interface SoundSequenceTrigger {
+  id: string;
+  name: string;
+  active: boolean;
+  activationKey: string;           // Key detected by post-LLM system
+  activationKeys?: string[];       // Alternative keys
+  activationKeyCaseSensitive?: boolean;
+  sequence: string[];              // Array of sound trigger keywords to play in order
+                                   // Each entry references an existing sound trigger's keyword
+  volume: number;                  // Override volume (0-1), or use individual trigger volumes
+  delayBetween: number;            // Delay in ms between each sound in sequence
+  cooldown: number;                // Cooldown before this sequence can trigger again
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ============ Background Trigger Types ============
 
 export type OverlayPlacement = 'none' | 'back' | 'front';
@@ -1506,7 +1523,7 @@ export type QuestRewardType = 'attribute' | 'trigger';
 export type TriggerTargetMode = 'self' | 'all' | 'target';
 
 // Categorías de triggers disponibles
-export type TriggerCategory = 'sprite' | 'sound' | 'background';
+export type TriggerCategory = 'sprite' | 'sound' | 'background' | 'soundSequence';
 
 // Acciones para atributos
 export type AttributeAction = 'set' | 'add' | 'subtract' | 'multiply' | 'divide' | 'percent';
@@ -2342,12 +2359,23 @@ export type AttributeType = 'number' | 'keyword' | 'text';
 // Requirement operator for skill/intention/invitation conditions
 export type RequirementOperator = '<' | '<=' | '>' | '>=' | '==' | '!=' | 'between';
 
+// Cost operator for activation costs (how to modify attribute)
+export type CostOperator = '+' | '-' | '*' | '/' | '=' | 'set_min' | 'set_max';
+
 // Single requirement for skills/intentions/invitations
 export interface StatRequirement {
   attributeKey: string;      // Key del atributo: "vida", "mana"
   operator: RequirementOperator;
   value: number | string;
   valueMax?: number;         // Para operador 'between'
+}
+
+// Activation cost - modifies attribute when skill is used
+export interface ActivationCost {
+  attributeKey: string;      // Key del atributo a modificar: "vida", "mana"
+  operator: CostOperator;    // How to modify: '+' = add, '-' = subtract, etc.
+  value: number;             // Value to apply
+  description?: string;      // Optional description: "Cuesta 10 de maná"
 }
 
 // Attribute definition (stored in CharacterCard)
@@ -2395,6 +2423,20 @@ export interface SkillDefinition {
   key: string;               // Template key: "golpe_furioso" → {{golpe_furioso}}
   requirements: StatRequirement[];
   category?: string;         // "combate", "magia", "social"
+  
+  // Activation costs - modify attributes when skill is used
+  activationCosts?: ActivationCost[];
+  
+  // Activation key - detected by post-LLM system to trigger skill execution
+  // When detected in LLM response, applies activationCosts automatically
+  activationKey?: string;    // Primary activation key: "golpe", "hab1"
+  activationKeys?: string[]; // Alternative keys: ["golpe_furioso", "gf", "golpe1"]
+  activationKeyCaseSensitive?: boolean; // Default: false
+  // Detection patterns (flexible matching):
+  // - key:value  (golpe:uso, habilidad:1)
+  // - key=value  (golpe=activo, hab=1)
+  // - key_suffix (golpe_1, habilidad_x)
+  // - |key|      (pipe delimiters)
   
   // Formato de inyección personalizado
   injectFormat?: string;     // Default: "- {name}: {description}"
