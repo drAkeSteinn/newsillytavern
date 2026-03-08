@@ -474,6 +474,7 @@ export function ChatPanel() {
                       isDeleted: false,
                       swipeId: generateId(),
                       swipeIndex: 0,
+                      isNarratorMessage: parsed.isNarrator || false,
                       metadata: {
                         promptData: parsed.promptSections || []
                       }
@@ -672,7 +673,18 @@ export function ChatPanel() {
         }
       }
     } catch (error) {
-      chatLogger.error('Generation error', { error });
+      // Capture detailed error information
+      const errorMessage = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      chatLogger.error('Generation error', {
+        message: errorMessage,
+        stack: errorStack,
+        type: typeof error
+      });
+
       if (isStillActive() && activeSessionId) {
         addMessage(activeSessionId, {
           characterId: activeCharacter?.id || 'system',
@@ -1007,6 +1019,7 @@ export function ChatPanel() {
           )}
           activeCharacterId={streamingCharacter?.id || null}
           isStreaming={isGenerating && !!streamingContent}
+          activeGroup={activeGroup}
         />
       )}
 

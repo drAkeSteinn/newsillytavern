@@ -3,7 +3,7 @@
 // ============================================
 
 import type { Persona } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 import { defaultPersona } from '../defaults';
 
 export interface PersonaSlice {

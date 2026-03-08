@@ -8,9 +8,21 @@
     "showCompletedInLog": true,
     "maxActiveQuests": 10,
     "promptInclude": true,
-    "promptTemplate": "{{activeQuests}}\n\nPROTOCOLO DE MISIONES (para tu respuesta)\n- Siempre muestra el HUD al inicio:\n  [Personaje: Juan | Objetivo: <KEY o NINGUNO>]\n- Objetivo solo puede ser NINGUNO o una key exacta listada arriba.\n- Usa NINGUNO si solo hablas del tema, preguntas o aún no lo cumples.\n- Usa la KEY solo cuando tu respuesta confirme que el objetivo fue cumplido (confirmación clara).\n- Si completas un objetivo opcional, también puedes usar su KEY, pero tu diálogo debe reflejar que es algo extra/voluntario.\n- Máximo 1 objetivo por respuesta (una sola KEY).\n- No inventes objetivos ni keys que no estén listadas."
+    "promptTemplate": "{{activeQuests}}\n\nPROTOCOLO DE MISIONES (para tu respuesta)\n- Siempre muestra el HUD al inicio:\n  [Personaje: Juan | Objetivo: <KEY o NINGUNO>]\n- Objetivo solo puede ser NINGUNO o una key exacta listada arriba.\n- Usa NINGUNO si solo hablas del tema, preguntas o aún no lo cumples.\n- Usa la KEY solo cuando tu respuesta confirme que el objetivo fue cumplido (confirmación clara).\n- Si completas un objetivo opcional, también puedes usar su KEY, pero tu diálogo debe reflejar que es algo extra/voluntario.\n- Máximo 1 objetivo por respuesta (una sola KEY).\n- No inventes objetivos ni keys que no estén listadas.",
+    "autoQuestEnabled": false,
+    "autoQuestInterval": 5,
+    "autoQuestMode": "random"
   },
   "questNotifications": [
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772972293708-6r5ma1b82",
+      "timestamp": "2026-03-08T12:18:13.708Z",
+      "read": true
+    },
     {
       "questId": "asd",
       "questName": "Mision imposible",
@@ -846,15 +858,6 @@
       ],
       "id": "notif-1772808207990-nv49tn6je",
       "timestamp": "2026-03-06T14:43:27.990Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: Objetivo tenebroso y medico",
-      "id": "notif-1772808207892-9k6wnibsn",
-      "timestamp": "2026-03-06T14:43:27.892Z",
       "read": true
     }
   ]

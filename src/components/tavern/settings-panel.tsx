@@ -114,7 +114,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
   const handleExportConfig = () => {
     try {
       const configData = {
-        version: '1.0',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         type: 'config',
         data: {
@@ -128,20 +128,39 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           personas: store.personas,
           // Lorebooks
           lorebooks: store.lorebooks,
+          activeLorebookIds: store.activeLorebookIds,
           // Sound system
           soundTriggers: store.soundTriggers,
           soundCollections: store.soundCollections,
-          // Visual systems
+          soundSequenceTriggers: store.soundSequenceTriggers,
+          // Visual systems - Backgrounds
           backgrounds: store.backgrounds,
           backgroundPacks: store.backgroundPacks,
+          backgroundIndex: store.backgroundIndex,
+          backgroundTriggerPacks: store.backgroundTriggerPacks,
+          backgroundCollections: store.backgroundCollections,
+          // Visual systems - Sprites
           spritePacks: store.spritePacks,
+          spriteIndex: store.spriteIndex,
+          spriteLibraries: store.spriteLibraries,
+          spritePacksV2: store.spritePacksV2,
+          // HUD
           hudTemplates: store.hudTemplates,
-          // Advanced systems
+          // Atmosphere
           atmosphereSettings: store.atmosphereSettings,
+          activeAtmospherePresetId: store.activeAtmospherePresetId,
+          // Memory
           summarySettings: store.summarySettings,
+          characterMemories: store.characterMemories,
+          sessionTracking: store.sessionTracking,
+          // Quest
           questSettings: store.questSettings,
+          questNotifications: store.questNotifications,
+          // Dialogue
           dialogueSettings: store.dialogueSettings,
+          // Inventory
           inventorySettings: store.inventorySettings,
+          inventoryNotifications: store.inventoryNotifications,
         }
       };
 
@@ -185,63 +204,36 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
         }
 
         const { data } = imported;
+        const updates: Record<string, unknown> = {};
 
-        // Import each section if present
-        if (data.settings) {
-          useTavernStore.setState({ settings: data.settings });
-        }
-        if (data.llmConfigs && Array.isArray(data.llmConfigs)) {
-          useTavernStore.setState({ llmConfigs: data.llmConfigs });
-        }
-        if (data.ttsConfigs && Array.isArray(data.ttsConfigs)) {
-          useTavernStore.setState({ ttsConfigs: data.ttsConfigs });
-        }
-        if (data.promptTemplates && Array.isArray(data.promptTemplates)) {
-          useTavernStore.setState({ promptTemplates: data.promptTemplates });
-        }
-        if (data.personas && Array.isArray(data.personas)) {
-          useTavernStore.setState({ personas: data.personas });
-        }
-        if (data.lorebooks && Array.isArray(data.lorebooks)) {
-          useTavernStore.setState({ lorebooks: data.lorebooks });
-        }
-        if (data.soundTriggers && Array.isArray(data.soundTriggers)) {
-          useTavernStore.setState({ soundTriggers: data.soundTriggers });
-        }
-        if (data.soundCollections && Array.isArray(data.soundCollections)) {
-          useTavernStore.setState({ soundCollections: data.soundCollections });
-        }
-        if (data.backgrounds && Array.isArray(data.backgrounds)) {
-          useTavernStore.setState({ backgrounds: data.backgrounds });
-        }
-        if (data.backgroundPacks && Array.isArray(data.backgroundPacks)) {
-          useTavernStore.setState({ backgroundPacks: data.backgroundPacks });
-        }
-        if (data.spritePacks && Array.isArray(data.spritePacks)) {
-          useTavernStore.setState({ spritePacks: data.spritePacks });
-        }
-        if (data.hudTemplates && Array.isArray(data.hudTemplates)) {
-          useTavernStore.setState({ hudTemplates: data.hudTemplates });
-        }
-        if (data.atmosphereSettings) {
-          useTavernStore.setState({ atmosphereSettings: data.atmosphereSettings });
-        }
-        if (data.summarySettings) {
-          useTavernStore.setState({ summarySettings: data.summarySettings });
-        }
-        if (data.questSettings) {
-          useTavernStore.setState({ questSettings: data.questSettings });
-        }
-        if (data.dialogueSettings) {
-          useTavernStore.setState({ dialogueSettings: data.dialogueSettings });
-        }
-        if (data.inventorySettings) {
-          useTavernStore.setState({ inventorySettings: data.inventorySettings });
+        // Config data keys (same as in export)
+        const configKeys = [
+          'settings', 'llmConfigs', 'ttsConfigs', 'promptTemplates',
+          'personas', 'lorebooks', 'activeLorebookIds',
+          'soundTriggers', 'soundCollections', 'soundSequenceTriggers',
+          'backgrounds', 'backgroundPacks', 'backgroundIndex', 'backgroundTriggerPacks', 'backgroundCollections',
+          'spritePacks', 'spriteIndex', 'spriteLibraries', 'spritePacksV2',
+          'hudTemplates',
+          'atmosphereSettings', 'activeAtmospherePresetId',
+          'summarySettings', 'characterMemories', 'sessionTracking',
+          'questSettings', 'questNotifications',
+          'dialogueSettings',
+          'inventorySettings', 'inventoryNotifications'
+        ];
+
+        configKeys.forEach(key => {
+          if (data[key] !== undefined) {
+            updates[key] = data[key];
+          }
+        });
+
+        if (Object.keys(updates).length > 0) {
+          useTavernStore.setState(updates);
         }
 
         toast({
           title: 'Configuración importada',
-          description: 'La configuración se ha importado correctamente.',
+          description: `${Object.keys(updates).length} secciones de configuración importadas correctamente.`,
         });
       } catch (error) {
         toast({
@@ -263,7 +255,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
   const handleExportAll = () => {
     try {
       const allData = {
-        version: '1.0',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         type: 'full',
         data: {
@@ -273,29 +265,58 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           ttsConfigs: store.ttsConfigs,
           promptTemplates: store.promptTemplates,
           personas: store.personas,
+          // Lorebooks
           lorebooks: store.lorebooks,
+          activeLorebookIds: store.activeLorebookIds,
+          // Sound system
           soundTriggers: store.soundTriggers,
           soundCollections: store.soundCollections,
+          soundSequenceTriggers: store.soundSequenceTriggers,
+          // Visual systems - Backgrounds
           backgrounds: store.backgrounds,
           backgroundPacks: store.backgroundPacks,
+          backgroundIndex: store.backgroundIndex,
+          backgroundTriggerPacks: store.backgroundTriggerPacks,
+          backgroundCollections: store.backgroundCollections,
+          // Visual systems - Sprites
           spritePacks: store.spritePacks,
+          spriteIndex: store.spriteIndex,
+          spriteLibraries: store.spriteLibraries,
+          spritePacksV2: store.spritePacksV2,
+          // HUD
           hudTemplates: store.hudTemplates,
+          // Atmosphere
           atmosphereSettings: store.atmosphereSettings,
+          activeAtmospherePresetId: store.activeAtmospherePresetId,
+          // Memory
           summarySettings: store.summarySettings,
+          summaries: store.summaries,
+          characterMemories: store.characterMemories,
+          sessionTracking: store.sessionTracking,
+          // Quest
           questSettings: store.questSettings,
+          quests: store.quests,
+          questNotifications: store.questNotifications,
+          // Dialogue
           dialogueSettings: store.dialogueSettings,
+          // Inventory
           inventorySettings: store.inventorySettings,
+          items: store.items,
+          containers: store.containers,
+          currencies: store.currencies,
+          inventoryNotifications: store.inventoryNotifications,
           // Data
           characters: store.characters,
           sessions: store.sessions,
           groups: store.groups,
-          // Advanced data
-          quests: store.quests,
-          items: store.items,
-          containers: store.containers,
-          currencies: store.currencies,
-          summaries: store.summaries,
-          characterMemories: store.characterMemories,
+          // Active states
+          activeSessionId: store.activeSessionId,
+          activeCharacterId: store.activeCharacterId,
+          activeGroupId: store.activeGroupId,
+          activeBackground: store.activeBackground,
+          activeOverlayBack: store.activeOverlayBack,
+          activeOverlayFront: store.activeOverlayFront,
+          activePersonaId: store.activePersonaId,
         }
       };
 
@@ -340,19 +361,28 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
         const { data } = imported;
         const updates: Record<string, unknown> = {};
 
-        // Import all data sections
-        const dataKeys = [
+        // All data keys (same as in export)
+        const allDataKeys = [
+          // Config
           'settings', 'llmConfigs', 'ttsConfigs', 'promptTemplates',
-          'personas', 'lorebooks', 'soundTriggers', 'soundCollections',
-          'backgrounds', 'backgroundPacks', 'spritePacks', 'hudTemplates',
-          'atmosphereSettings', 'summarySettings', 'questSettings',
-          'dialogueSettings', 'inventorySettings',
+          'personas', 'lorebooks', 'activeLorebookIds',
+          'soundTriggers', 'soundCollections', 'soundSequenceTriggers',
+          'backgrounds', 'backgroundPacks', 'backgroundIndex', 'backgroundTriggerPacks', 'backgroundCollections',
+          'spritePacks', 'spriteIndex', 'spriteLibraries', 'spritePacksV2',
+          'hudTemplates',
+          'atmosphereSettings', 'activeAtmospherePresetId',
+          'summarySettings', 'summaries', 'characterMemories', 'sessionTracking',
+          'questSettings', 'quests', 'questNotifications',
+          'dialogueSettings',
+          'inventorySettings', 'items', 'containers', 'currencies', 'inventoryNotifications',
+          // Data
           'characters', 'sessions', 'groups',
-          'quests', 'items', 'containers', 'currencies',
-          'summaries', 'characterMemories'
+          // Active states
+          'activeSessionId', 'activeCharacterId', 'activeGroupId',
+          'activeBackground', 'activeOverlayBack', 'activeOverlayFront', 'activePersonaId'
         ];
 
-        dataKeys.forEach(key => {
+        allDataKeys.forEach(key => {
           if (data[key] !== undefined) {
             updates[key] = data[key];
           }

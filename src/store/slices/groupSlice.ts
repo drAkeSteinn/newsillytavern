@@ -3,7 +3,7 @@
 // ============================================
 
 import type { CharacterGroup, GroupMember } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 
 export interface GroupSlice {
   // State
@@ -11,7 +11,7 @@ export interface GroupSlice {
   activeGroupId: string | null;
 
   // Actions
-  addGroup: (group: Omit<CharacterGroup, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addGroup: (group: Partial<CharacterGroup> & { name: string }, preserveId?: boolean) => void;
   updateGroup: (id: string, updates: Partial<CharacterGroup>) => void;
   deleteGroup: (id: string) => void;
   setActiveGroup: (id: string | null) => void;
@@ -22,6 +22,7 @@ export interface GroupSlice {
   updateGroupMember: (groupId: string, characterId: string, updates: Partial<GroupMember>) => void;
   toggleGroupMemberActive: (groupId: string, characterId: string) => void;
   toggleGroupMemberPresent: (groupId: string, characterId: string) => void;
+  toggleGroupMemberNarrator: (groupId: string, characterId: string) => void;
 
   // Utilities
   getGroupById: (id: string) => CharacterGroup | undefined;
@@ -33,15 +34,16 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
   activeGroupId: null,
 
   // Actions
-  addGroup: (group) => set((state: any) => ({
+  addGroup: (group, preserveId = false) => set((state: any) => ({
     groups: [...state.groups, {
       ...group,
-      id: uuidv4(),
+      id: (preserveId && group.id) ? group.id : uuidv4(),
       // Ensure members array is initialized from characterIds if not provided
       members: group.members || (group.characterIds || []).map((id, index) => ({
         characterId: id,
         isActive: true,
         isPresent: true,
+        isNarrator: false,
         joinOrder: index
       })),
       // Set defaults for new fields
@@ -49,7 +51,7 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
       allowMentions: group.allowMentions ?? true,
       mentionTriggers: group.mentionTriggers ?? [],
       conversationStyle: group.conversationStyle ?? 'sequential',
-      createdAt: new Date().toISOString(),
+      createdAt: group.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }]
   })),
@@ -77,6 +79,7 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
         characterId,
         isActive: true,
         isPresent: true,
+        isNarrator: false,
         joinOrder: g.members?.length || 0
       };
       return {
@@ -133,6 +136,19 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
         ...g,
         members: (g.members || []).map(m =>
           m.characterId === characterId ? { ...m, isPresent: !m.isPresent } : m
+        ),
+        updatedAt: new Date().toISOString()
+      };
+    })
+  })),
+
+  toggleGroupMemberNarrator: (groupId, characterId) => set((state: any) => ({
+    groups: state.groups.map((g: CharacterGroup) => {
+      if (g.id !== groupId) return g;
+      return {
+        ...g,
+        members: (g.members || []).map(m =>
+          m.characterId === characterId ? { ...m, isNarrator: !m.isNarrator } : m
         ),
         updatedAt: new Date().toISOString()
       };

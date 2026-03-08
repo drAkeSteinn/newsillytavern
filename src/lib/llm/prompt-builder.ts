@@ -543,7 +543,8 @@ export function buildChatHistorySections(
   userName: string
 ): PromptSection[] {
   const sections: PromptSection[] = [];
-  const visibleMessages = messages.filter(m => !m.isDeleted);
+  // Exclude narrator messages from chat history display
+  const visibleMessages = messages.filter(m => !m.isDeleted && !m.isNarratorMessage);
 
   const historyParts: string[] = [];
   for (const msg of visibleMessages) {
@@ -590,7 +591,9 @@ export function buildChatMessages(
   });
 
   // 2. Chat history
-  const visibleMessages = messages.filter(m => !m.isDeleted);
+  // Note: Narrator messages are excluded from prompt building
+  // They can still activate triggers but won't appear in chat history for other characters
+  const visibleMessages = messages.filter(m => !m.isDeleted && !m.isNarratorMessage);
 
   for (const msg of visibleMessages) {
     if (msg.role === 'user') {
@@ -638,7 +641,8 @@ export function buildCompletionPrompt(config: CompletionPromptConfig): string {
   parts.push(systemPrompt);
   parts.push('\n---\n');
 
-  const visibleMessages = messages.filter(m => !m.isDeleted);
+  // Exclude narrator messages from prompt
+  const visibleMessages = messages.filter(m => !m.isDeleted && !m.isNarratorMessage);
 
   for (const msg of visibleMessages) {
     if (msg.role === 'user') {
@@ -819,6 +823,8 @@ export function buildGroupSystemPrompt(
  * 3. Previous responses from this turn
  * 4. Author's Note (injected AFTER chat history, as system message)
  * 5. Post-History Instructions (injected AFTER Author's Note, as system message)
+ *
+ * @param isForNarrator - If true, narrator messages ARE included (narrator sees all)
  */
 export function buildGroupChatMessages(
   systemPrompt: string,
@@ -828,7 +834,8 @@ export function buildGroupChatMessages(
   userName: string = 'User',
   previousResponses?: Array<{ characterName: string; content: string }>,
   postHistoryInstructions?: string,
-  authorNote?: string
+  authorNote?: string,
+  isForNarrator: boolean = false
 ): GroupPromptBuildResult {
   const chatMessages: ChatApiMessage[] = [];
 
@@ -836,7 +843,11 @@ export function buildGroupChatMessages(
   chatMessages.push({ role: 'assistant', content: systemPrompt });
 
   // Filter visible messages
-  const visibleMessages = messages.filter(m => !m.isDeleted);
+  // - For narrator: show all messages (including other narrator messages)
+  // - For non-narrator: exclude narrator messages (they are "ghost" messages)
+  const visibleMessages = isForNarrator
+    ? messages.filter(m => !m.isDeleted)
+    : messages.filter(m => !m.isDeleted && !m.isNarratorMessage);
 
   // Build chat history content for prompt viewer
   const historyLines: string[] = [];
@@ -1048,12 +1059,14 @@ export function buildSummaryInstructionsSection(
 /**
  * Get messages for summarization
  * Returns messages that should be included in summary generation
+ * Note: Narrator messages are excluded from summaries
  */
 export function getMessagesForSummary(
   messages: ChatMessage[],
   summarySettings: { triggerThreshold: number; keepRecentMessages: number }
 ): ChatMessage[] {
-  const visibleMessages = messages.filter(m => !m.isDeleted);
+  // Exclude deleted and narrator messages from summaries
+  const visibleMessages = messages.filter(m => !m.isDeleted && !m.isNarratorMessage);
 
   if (visibleMessages.length <= summarySettings.triggerThreshold) {
     return [];
@@ -1115,29 +1128,31 @@ export function buildQuestPromptForLLM(
 ): PromptSection | null {
   // Filter to active quests only
   const activeQuests = sessionQuests.filter(q => q.status === 'active');
-  
+
   if (activeQuests.length === 0) {
     return null;
   }
-  
+
+  // Get template string from options
+  const templateStr = options.questTemplate || '{{activeQuests}}';
+
   // Build quest section using the handler function
-  const questSection = buildQuestPromptSection(
+  const questContent = buildQuestPromptSection(
     templates,
     activeQuests,
-    {
-      enabled: options.questInclude ?? true,
-      promptTemplate: options.questTemplate,
-      showKeys: options.showKeys ?? true,
-      showProgress: options.showProgress ?? true,
-    },
-    keyContext
+    templateStr
   );
-  
+
   // Resolve keys if keyContext provided
-  const resolvedContent = resolveAllKeys(questSection.content, keyContext);
-  questSection.content = resolvedContent;
-  
-  return questSection;
+  const resolvedContent = resolveAllKeys(questContent, keyContext);
+
+  // Return as a PromptSection
+  return {
+    type: 'quest',
+    label: 'Active Quests',
+    content: resolvedContent,
+    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+  };
 }
 
 /**

@@ -386,51 +386,149 @@ export function filterObjectivesForCharacter(
 }
 
 /**
+ * Build quest section for NARRATOR
+ *
+ * Narrator sees both active and available quests in a simplified format:
+ *
+ * [MISIONES ACTIVAS]
+ *   1) Nombre de la misión
+ *      - descripción: descripción
+ *
+ * [MISIONES DISPONIBLES]
+ *   1) Nombre de la misión
+ *      - descripción: descripción
+ *      - key de activación: activation_key
+ */
+function buildNarratorQuestSection(
+  templates: QuestTemplate[],
+  sessionQuests: SessionQuestInstance[],
+  templateStr: string
+): string {
+  // Get active and available quests
+  const activeQuests = sessionQuests.filter(q => q.status === 'active');
+  const availableQuests = sessionQuests.filter(q => q.status === 'available');
+
+  const sections: string[] = [];
+
+  // Build ACTIVE quests section
+  if (activeQuests.length > 0) {
+    const activeLines: string[] = [];
+    activeQuests.forEach((q, index) => {
+      const questTemplate = templates.find(t => t.id === q.templateId);
+      if (!questTemplate) return;
+
+      activeLines.push(`  ${index + 1}) ${questTemplate.name}`);
+      activeLines.push(`     - descripción: ${questTemplate.description}`);
+    });
+
+    if (activeLines.length > 0) {
+      sections.push(`[MISIONES ACTIVAS]\n${activeLines.join('\n')}`);
+    }
+  }
+
+  // Build AVAILABLE quests section
+  if (availableQuests.length > 0) {
+    const availableLines: string[] = [];
+    availableQuests.forEach((q, index) => {
+      const questTemplate = templates.find(t => t.id === q.templateId);
+      if (!questTemplate) return;
+
+      availableLines.push(`  ${index + 1}) ${questTemplate.name}`);
+      availableLines.push(`     - descripción: ${questTemplate.description}`);
+
+      // Add activation key for available quests
+      const activation = questTemplate.activation || {};
+      const activationKey = activation.key ||
+        (activation.keys && activation.keys[0]);
+      if (activationKey) {
+        availableLines.push(`     - key de activación: ${activationKey}`);
+      }
+    });
+
+    if (availableLines.length > 0) {
+      sections.push(`[MISIONES DISPONIBLES]\n${availableLines.join('\n')}`);
+    }
+  }
+
+  // If no quests at all, return empty
+  if (sections.length === 0) {
+    return '';
+  }
+
+  // Join sections with double newline
+  const fullQuestSection = sections.join('\n\n');
+
+  // Replace placeholder in template
+  return templateStr.replace('{{activeQuests}}', fullQuestSection);
+}
+
+/**
  * Build quest section for prompt
- * 
- * Format:
+ *
+ * REGULAR CHARACTER FORMAT:
  * MISIONES ACTIVAS
  * - Misión: nombre
  *   Descripción: descripción
  *   OBJETIVOS PRINCIPALES (pendientes):
- *   - key: objective_key
- *     texto: descripción del objetivo
+ *   1) descripción del objetivo
+ *      - key de activación: objective_key
+ *   2) otro objetivo
+ *      - key de activación: another_key
  *   OBJETIVOS OPCIONALES (pendientes):
- *   - key: optional_key
- *     texto: descripción del objetivo
- * 
+ *   1) objetivo opcional
+ *      - key de activación: optional_key
+ *
+ * NARRATOR FORMAT:
+ * [MISIONES ACTIVAS]
+ *   1) Nombre de la misión
+ *      - descripción: descripción de la misión
+ *
+ * [MISIONES DISPONIBLES]
+ *   1) Nombre de la misión
+ *      - descripción: descripción de la misión
+ *      - key de activación: activation_key
+ *
  * - Only shows incomplete objectives
+ * - Objectives are numbered dynamically
  * - Optional objectives section only appears if there are pending optional objectives
  * - Filters objectives by character if characterId is provided
+ * - For narrator: shows both active and available quests
  */
 export function buildQuestPromptSection(
   templates: QuestTemplate[],
   sessionQuests: SessionQuestInstance[],
   templateStr: string,
-  characterId?: string
+  characterId?: string,
+  isForNarrator: boolean = false
 ): string {
-  console.log(`[QuestHandler] buildQuestPromptSection called with characterId: ${characterId}`);
-  
-  // Get active quests
+  console.log(`[QuestHandler] buildQuestPromptSection called with characterId: ${characterId}, isForNarrator: ${isForNarrator}`);
+
+  // For narrator, show different format with both active and available quests
+  if (isForNarrator) {
+    return buildNarratorQuestSection(templates, sessionQuests, templateStr);
+  }
+
+  // Regular character format - only active quests
   const activeQuests = sessionQuests.filter(q => q.status === 'active');
-  
+
   if (activeQuests.length === 0) {
     return '';
   }
-  
+
   const questList = activeQuests.map(q => {
     const questTemplate = templates.find(t => t.id === q.templateId);
     if (!questTemplate) return '';
     
-    console.log(`[QuestHandler] Processing quest "${questTemplate.name}" with ${questTemplate.objectives.length} objectives`);
+    const objectives = questTemplate.objectives || [];
+    console.log(`[QuestHandler] Processing quest "${questTemplate.name}" with ${objectives.length} objectives`);
     
     // Filter objectives for this character first
     const visibleObjectives = filterObjectivesForCharacter(
-      questTemplate.objectives,
+      objectives,
       characterId
     );
     
-    console.log(`[QuestHandler] Quest "${questTemplate.name}" - visible objectives: ${visibleObjectives.length} of ${questTemplate.objectives.length}`);
+    console.log(`[QuestHandler] Quest "${questTemplate.name}" - visible objectives: ${visibleObjectives.length} of ${objectives.length}`);
     
     // If no objectives are visible for this character, don't show the quest
     if (visibleObjectives.length === 0) return '';
@@ -441,7 +539,7 @@ export function buildQuestPromptSection(
     const optionalObjectives: { key: string; text: string }[] = [];
     
     for (const obj of visibleObjectives) {
-      const sessionObj = q.objectives.find(o => o.templateId === obj.id);
+      const sessionObj = q.objectives?.find(o => o.templateId === obj.id);
       const isCompleted = sessionObj?.isCompleted || false;
       
       // Skip completed objectives - they should not appear
@@ -453,7 +551,7 @@ export function buildQuestPromptSection(
         : '';
       
       // Get the completion key for this objective
-      const objectiveKey = obj.completion.key;
+      const objectiveKey = obj.completion?.key || '';
       const objectiveText = `${obj.description}${progress}`;
       
       if (obj.isOptional) {
@@ -471,19 +569,21 @@ export function buildQuestPromptSection(
   Descripción: ${questTemplate.description}`;
     
     // Add pending objectives section (always show if there are any)
+    // Format: numbered list with description and activation key
     if (pendingObjectives.length > 0) {
-      const objectiveLines = pendingObjectives.map(obj => 
-        `  - key: ${obj.key}\n    texto: ${obj.text}`
+      const objectiveLines = pendingObjectives.map((obj, index) => 
+        `  ${index + 1}) ${obj.text}\n     - key de activación: ${obj.key}`
       ).join('\n');
       questBlock += `
   OBJETIVOS PRINCIPALES (pendientes):
 ${objectiveLines}`;
     }
-    
+
     // Add optional objectives section only if there are pending optional objectives
+    // Format: numbered list with description and activation key
     if (optionalObjectives.length > 0) {
-      const objectiveLines = optionalObjectives.map(obj => 
-        `  - key: ${obj.key}\n    texto: ${obj.text}`
+      const objectiveLines = optionalObjectives.map((obj, index) => 
+        `  ${index + 1}) ${obj.text}\n     - key de activación: ${obj.key}`
       ).join('\n');
       questBlock += `
   OBJETIVOS OPCIONALES (pendientes):

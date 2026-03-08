@@ -77,12 +77,17 @@ export function getAttributeValue(
 
 /**
  * Format attribute value for prompt
+ * 
+ * Format:
+ * - Number type: "Nombre: (valor/max)" e.g., "Resistencia física: (40/100)"
+ * - Keyword/Text type: "Nombre: valor" e.g., "Detección: mágica"
+ * - Custom outputFormat takes precedence if defined
  */
 export function formatAttributeValue(
   attribute: AttributeDefinition,
   value: number | string
 ): string {
-  // Use new outputFormat field first
+  // Use new outputFormat field first (custom format takes precedence)
   if (attribute.outputFormat) {
     return attribute.outputFormat.replace('{value}', String(value));
   }
@@ -90,7 +95,18 @@ export function formatAttributeValue(
   if (attribute.keywordFormat) {
     return attribute.keywordFormat.replace('{value}', String(value));
   }
-  return `${attribute.name}: ${value}`;
+  
+  // Default formatting based on attribute type
+  const attributeType = attribute.type || 'number';
+  
+  if (attributeType === 'number') {
+    // For numeric attributes, show (current/max) format
+    const max = attribute.max ?? 100;
+    return `${attribute.name}: (${value}/${max})`;
+  } else {
+    // For keyword and text types, show just the value
+    return `${attribute.name}: ${value}`;
+  }
 }
 
 /**
@@ -132,6 +148,13 @@ export function resolveAllAttributes(
 
 /**
  * Build skills block for injection
+ * 
+ * Format:
+ * 1) Skill Name
+ *    - Descripción: description text
+ *    - key de activación: activation_key
+ * 
+ * Numbers are dynamic based on available skills count.
  */
 export function buildSkillsBlock(
   skills: SkillDefinition[],
@@ -144,20 +167,43 @@ export function buildSkillsBlock(
     return '';
   }
   
-  const lines = availableSkills.map(skill => {
+  const lines: string[] = [header];
+  
+  availableSkills.forEach((skill, index) => {
+    const skillNumber = index + 1;
+    
+    // Check for custom inject format first
     if (skill.injectFormat) {
-      return skill.injectFormat
+      const formatted = skill.injectFormat
         .replace('{name}', skill.name)
-        .replace('{description}', skill.description);
+        .replace('{description}', skill.description)
+        .replace('{key}', skill.activationKey || skill.key || '');
+      lines.push(`${skillNumber}) ${formatted}`);
+    } else {
+      // Default format with description and activation key
+      lines.push(`${skillNumber}) ${skill.name}`);
+      lines.push(`   - Descripción: ${skill.description}`);
+      
+      // Show activation key if available
+      const activationKey = skill.activationKey || (skill.activationKeys && skill.activationKeys[0]) || skill.key;
+      if (activationKey) {
+        lines.push(`   - key de activación: ${activationKey}`);
+      }
     }
-    return `- ${skill.name}: ${skill.description}`;
   });
   
-  return `${header}\n${lines.join('\n')}`;
+  return lines.join('\n');
 }
 
 /**
  * Build intentions block for injection
+ *
+ * Format (same as skills):
+ * 1) Intention Name
+ *    - Descripción: description text
+ *    - key de activación: activation_key (only if key exists)
+ *
+ * Numbers are dynamic based on available intentions count.
  */
 export function buildIntentionsBlock(
   intentions: IntentionDefinition[],
@@ -165,20 +211,47 @@ export function buildIntentionsBlock(
   header: string
 ): string {
   const availableIntentions = filterIntentionsByRequirements(intentions, attributeValues);
-  
+
   if (availableIntentions.length === 0) {
     return '';
   }
-  
-  const lines = availableIntentions.map(intention => {
-    return `- ${intention.name}: ${intention.description}`;
+
+  const lines: string[] = [header];
+
+  availableIntentions.forEach((intention, index) => {
+    const intentionNumber = index + 1;
+
+    // Check for custom inject format first
+    if (intention.injectFormat) {
+      const formatted = intention.injectFormat
+        .replace('{name}', intention.name)
+        .replace('{description}', intention.description)
+        .replace('{key}', intention.key || '');
+      lines.push(`${intentionNumber}) ${formatted}`);
+    } else {
+      // Default format with description and activation key
+      lines.push(`${intentionNumber}) ${intention.name}`);
+      lines.push(`   - Descripción: ${intention.description}`);
+
+      // Show activation key only if it exists
+      if (intention.key) {
+        lines.push(`   - key de activación: ${intention.key}`);
+      }
+    }
   });
-  
-  return `${header}\n${lines.join('\n')}`;
+
+  return lines.join('\n');
 }
 
 /**
  * Build invitations block for injection
+ *
+ * Format (same as skills):
+ * 1) Invitation Name
+ *    - Descripción: description text
+ *    - key de activación: activation_key (only if key exists)
+ *
+ * Numbers are dynamic based on available invitations count.
  */
 export function buildInvitationsBlock(
   invitations: InvitationDefinition[],
@@ -186,16 +259,36 @@ export function buildInvitationsBlock(
   header: string
 ): string {
   const availableInvitations = filterInvitationsByRequirements(invitations, attributeValues);
-  
+
   if (availableInvitations.length === 0) {
     return '';
   }
-  
-  const lines = availableInvitations.map(invitation => {
-    return `- ${invitation.name}: ${invitation.description}`;
+
+  const lines: string[] = [header];
+
+  availableInvitations.forEach((invitation, index) => {
+    const invitationNumber = index + 1;
+
+    // Check for custom inject format first
+    if (invitation.injectFormat) {
+      const formatted = invitation.injectFormat
+        .replace('{name}', invitation.name)
+        .replace('{description}', invitation.description)
+        .replace('{key}', invitation.key || '');
+      lines.push(`${invitationNumber}) ${formatted}`);
+    } else {
+      // Default format with description and activation key
+      lines.push(`${invitationNumber}) ${invitation.name}`);
+      lines.push(`   - Descripción: ${invitation.description}`);
+
+      // Show activation key only if it exists
+      if (invitation.key) {
+        lines.push(`   - key de activación: ${invitation.key}`);
+      }
+    }
   });
-  
-  return `${header}\n${lines.join('\n')}`;
+
+  return lines.join('\n');
 }
 
 /**

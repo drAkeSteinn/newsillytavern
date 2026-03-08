@@ -41,10 +41,10 @@
   },
   "chatLayout": {
     "novelMode": true,
-    "chatWidth": 66.54420842610143,
-    "chatHeight": 36.11111111111112,
-    "chatX": 36.671092795374776,
-    "chatY": 81.94444444444444,
+    "chatWidth": 90,
+    "chatHeight": 33.8888888888889,
+    "chatX": 48.86177678139653,
+    "chatY": 82.68518518518518,
     "chatOpacity": 0.96,
     "blurBackground": false,
     "showCharacterSprite": true

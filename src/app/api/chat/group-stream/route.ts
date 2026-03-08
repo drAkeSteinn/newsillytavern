@@ -50,6 +50,7 @@ import { buildQuestPromptSection } from '@/lib/triggers/handlers/quest-handler';
 
 /**
  * Determine responders based on strategy
+ * Note: Narrators are excluded from normal response flow and handled separately
  */
 function getResponders(
   message: string,
@@ -59,15 +60,18 @@ function getResponders(
 ): CharacterCard[] {
   const strategy = group.activationStrategy;
 
-  // Get active members
+  // Get active members, EXCLUDING narrators (they have their own response logic)
   const activeMemberIds = (group.members || [])
-    .filter(m => m.isActive && m.isPresent !== false)
+    .filter(m => m.isActive && m.isPresent !== false && !m.isNarrator)
     .map(m => m.characterId);
 
-  // If no members defined, use characterIds
+  // If no members defined, use characterIds (excluding narrators)
   const eligibleIds = activeMemberIds.length > 0
     ? activeMemberIds
-    : (group.characterIds || []);
+    : (group.characterIds || []).filter(id => {
+        const member = (group.members || []).find(m => m.characterId === id);
+        return !member?.isNarrator;
+      });
 
   // Filter to only characters that exist and are eligible
   const eligibleCharacters = characters.filter(c => eligibleIds.includes(c.id));
@@ -76,8 +80,9 @@ function getResponders(
     return [];
   }
 
-  // Get ordered member IDs
+  // Get ordered member IDs (excluding narrators)
   const orderedIds = (group.members || [])
+    .filter(m => !m.isNarrator)
     .sort((a, b) => a.joinOrder - b.joinOrder)
     .map(m => m.characterId);
 
@@ -212,6 +217,44 @@ export async function POST(request: NextRequest) {
     // Determine if we should use per-character lorebooks
     const useGroupLorebooks = lorebooks.length > 0;
 
+    // Extract narrator-related data
+    const turnCount: number = body.turnCount || 0;
+    const activeQuestsCount: number = sessionQuests.filter(q => q.status === 'active').length;
+    const narratorLastTurn: number = body.narratorLastTurn || -999; // Turn when narrator last spoke
+
+    // Get narrator settings from group
+    const narratorSettings = group.narratorSettings;
+
+    // Find narrator character (if any)
+    const narratorMember = (group.members || []).find(m => m.isNarrator);
+    const narratorCharacter = narratorMember
+      ? characters.find(c => c.id === narratorMember.characterId)
+      : null;
+
+    // Determine if narrator should intervene based on conditions
+    const shouldNarratorIntervene = (): boolean => {
+      if (!narratorCharacter || !narratorSettings) return false;
+
+      const { conditional } = narratorSettings;
+
+      // Check turn interval
+      if (conditional.minTurnInterval > 0) {
+        const turnsSinceLastNarration = turnCount - narratorLastTurn;
+        if (turnsSinceLastNarration < conditional.minTurnInterval) {
+          return false;
+        }
+      }
+
+      // Check if only when no active quests
+      if (conditional.onlyWhenNoActiveQuests && activeQuestsCount > 0) {
+        return false;
+      }
+
+      return true;
+    };
+
+    const narratorCanIntervene = shouldNarratorIntervene();
+
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
     }
@@ -254,6 +297,24 @@ export async function POST(request: NextRequest) {
 
     // Note: Quest section is built inside the character loop
     // so each character sees only their relevant objectives
+
+    // ========================================
+    // Narrator Integration
+    // ========================================
+    // Add narrator to responders based on response mode and conditions
+    let narratorAddedToResponders = false;
+    if (narratorCharacter && narratorCanIntervene && narratorSettings) {
+      const mode = narratorSettings.responseMode;
+      if (mode === 'turn_start') {
+        // Add narrator at the beginning
+        responders.unshift(narratorCharacter);
+        narratorAddedToResponders = true;
+      } else if (mode === 'turn_end' || mode === 'before_each' || mode === 'after_each') {
+        // Add narrator at the end (for turn_end, before_each, after_each we treat similarly for now)
+        responders.push(narratorCharacter);
+        narratorAddedToResponders = true;
+      }
+    }
 
     // Create a TransformStream for SSE
     const stream = new ReadableStream({
@@ -334,14 +395,20 @@ export async function POST(request: NextRequest) {
             // Build HUD context section for this character (resolves keys!)
             const hudContextSection = typedHUDContext ? buildHUDContextSection(typedHUDContext, keyContext) : null;
 
+            // Check if this responder is a narrator in the group (MUST be before buildQuestPromptSection)
+            const responderMember = group.members?.find(m => m.characterId === responder.id);
+            const isResponderNarrator = responderMember?.isNarrator || false;
+
             // Build quest section for this character (filters objectives by characterId)
+            // For narrator, show both active and available quests with different format
             let resolvedQuestSection: PromptSection | null = null;
             if (questSettings.enabled && questSettings.promptInclude && sessionQuests.length > 0 && questTemplates.length > 0) {
               const questSectionContent = buildQuestPromptSection(
                 questTemplates,
                 sessionQuests,
                 questSettings.promptTemplate || DEFAULT_QUEST_SETTINGS.promptTemplate,
-                responder.id  // Filter objectives for this character
+                responder.id,  // Filter objectives for this character
+                isResponderNarrator  // Pass narrator flag for different format
               );
               if (questSectionContent) {
                 const resolvedQuestContent = resolveAllKeys(questSectionContent, keyContext);
@@ -406,6 +473,8 @@ export async function POST(request: NextRequest) {
               keyContext
             );
 
+            // Note: isResponderNarrator is already defined above before buildQuestPromptSection
+
             const { chatMessages, chatHistorySection } = buildGroupChatMessages(
               finalSystemPrompt,
               messagesForPrompt,
@@ -413,7 +482,9 @@ export async function POST(request: NextRequest) {
               characters,
               effectiveUserName,
               previousResponses,
-              resolvedPostHistoryInstructions  // Post-history instructions AFTER chat (with keys resolved)
+              resolvedPostHistoryInstructions,  // Post-history instructions AFTER chat (with keys resolved)
+              undefined,  // authorNote
+              isResponderNarrator  // If responder is narrator, they see all messages
             );
 
             // Combine prompt sections with chat history for the viewer
@@ -524,12 +595,14 @@ export async function POST(request: NextRequest) {
               });
 
               // Send character_done event with prompt sections (including chat history)
+              // Include isNarrator flag so frontend can tag the message appropriately
               controller.enqueue(createSSEJSON({
                 type: 'character_done',
                 characterId: responder.id,
                 characterName: responder.name,
                 fullContent: cleanedContent,
-                promptSections: allPromptSections
+                promptSections: allPromptSections,
+                isNarrator: isResponderNarrator
               }));
 
             } catch (charError) {

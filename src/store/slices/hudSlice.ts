@@ -3,7 +3,7 @@
 // ============================================
 
 import type { HUDTemplate, HUDField, HUDSessionState } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 
 // ============================================
 // Types

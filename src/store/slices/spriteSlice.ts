@@ -53,8 +53,7 @@ import {
   createDefaultTriggerQueueState,
 } from '@/types';
 
-// UUID generator using crypto.randomUUID (available in Node.js 19+ and modern browsers)
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 
 // ============================================
 // Per-Character Sprite State

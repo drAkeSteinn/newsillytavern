@@ -10,8 +10,8 @@ import type {
   SessionQuestInstance,
   QuestTemplate,
 } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
 import { processMessageTemplate } from '@/lib/prompt-template';
+import { uuidv4 } from '@/lib/uuid';
 
 // ============================================
 // Helper Functions for Session Stats
@@ -139,6 +139,7 @@ export interface SessionSlice {
   initializeSessionQuests: (sessionId: string, questTemplateIds: string[]) => void;
   activateQuest: (sessionId: string, questTemplateId: string) => void;
   activateQuestFromTemplate: (sessionId: string, template: QuestTemplate) => void;  // NEW: Direct activation from template
+  deactivateQuest: (sessionId: string, questTemplateId: string) => void;  // Deactivate quest back to available
   completeQuest: (sessionId: string, questTemplateId: string, characterId?: string) => void;
   failQuest: (sessionId: string, questTemplateId: string) => void;
   progressQuestObjective: (sessionId: string, questTemplateId: string, objectiveId: string, amount?: number, characterId?: string) => void;
@@ -667,6 +668,49 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
         questTitle: template.name,
         type: 'quest_activated',
         message: `¡Nueva misión activada: ${template.name}!`,
+      });
+    }
+  },
+
+  deactivateQuest: (sessionId, questTemplateId) => {
+    // Get template for notification
+    const template = get().getTemplateById?.(questTemplateId);
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: ChatSession) => {
+        if (s.id !== sessionId) return s;
+        
+        return {
+          ...s,
+          sessionQuests: (s.sessionQuests || []).map((q: SessionQuestInstance) =>
+            q.templateId === questTemplateId && q.status === 'active'
+              ? {
+                  ...q,
+                  status: 'available' as const,
+                  activatedAt: undefined,
+                  activatedAtTurn: undefined,
+                  // Reset objective progress
+                  objectives: q.objectives.map(obj => ({
+                    ...obj,
+                    currentCount: 0,
+                    isCompleted: false,
+                  })),
+                  progress: 0,
+                }
+              : q
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+    
+    // Add notification for quest deactivation
+    if (template) {
+      get().addQuestNotification?.({
+        questId: questTemplateId,
+        questTitle: template.name,
+        type: 'quest_updated',
+        message: `Misión desactivada: ${template.name}`,
       });
     }
   },

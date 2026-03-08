@@ -3,7 +3,7 @@
 // ============================================
 
 import type { CharacterCard } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 
 export interface CharacterSlice {
   // State
@@ -11,7 +11,7 @@ export interface CharacterSlice {
   activeCharacterId: string | null;
 
   // Actions
-  addCharacter: (character: Omit<CharacterCard, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addCharacter: (character: Partial<CharacterCard> & { name: string }, preserveId?: boolean) => void;
   updateCharacter: (id: string, updates: Partial<CharacterCard>) => void;
   deleteCharacter: (id: string) => void;
   setActiveCharacter: (id: string | null) => void;
@@ -27,11 +27,11 @@ export const createCharacterSlice = (set: any, get: any): CharacterSlice => ({
   activeCharacterId: null,
 
   // Actions
-  addCharacter: (character) => set((state: any) => ({
+  addCharacter: (character, preserveId = false) => set((state: any) => ({
     characters: [...state.characters, {
       ...character,
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
+      id: (preserveId && character.id) ? character.id : uuidv4(),
+      createdAt: character.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }]
   })),

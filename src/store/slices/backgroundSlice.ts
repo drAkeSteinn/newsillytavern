@@ -11,7 +11,7 @@ import type {
   BackgroundCollection,
   BackgroundOverlay,
 } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 
 export interface BackgroundSlice {
   // State - Legacy System

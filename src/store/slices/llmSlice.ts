@@ -3,7 +3,7 @@
 // ============================================
 
 import type { LLMConfig, TTSConfig, PromptTemplate } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 import { defaultLLMConfig, defaultPromptTemplate } from '../defaults';
 
 export interface LLMSlice {

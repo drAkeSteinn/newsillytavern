@@ -3,7 +3,7 @@
 // ============================================
 
 import type { SoundTrigger, SoundCollection, SoundSequenceTrigger } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 
 export interface SoundSlice {
   // State

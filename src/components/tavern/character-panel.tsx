@@ -280,7 +280,7 @@ export function CharacterPanel() {
   const handleExportAll = () => {
     try {
       const exportData: ExportedData = {
-        version: '1.0',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         characters: characters,
         groups: groups
@@ -343,17 +343,28 @@ export function CharacterPanel() {
       let importedGroups = 0;
       let skippedCharacters = 0;
 
+      // Build a map of old ID to new ID for updating group references
+      const idMapping: Record<string, string> = {};
+
       // Import characters
       for (const character of data.characters) {
         // Check if character with same ID already exists
         const exists = characters.some(c => c.id === character.id);
         if (exists) {
           skippedCharacters++;
+          // Map the existing ID to itself for group references
+          if (character.id) {
+            idMapping[character.id] = character.id;
+          }
           continue;
         }
 
-        // Add character using store action - preserve ALL fields from export
+        // Add character using store action - preserve ALL fields including ID
+        // Use preserveId=true to maintain the original ID for group/reward references
         addCharacter({
+          // Preserve original ID
+          id: character.id,
+          createdAt: character.createdAt,
           // Basic fields
           name: character.name || 'Personaje sin nombre',
           description: character.description || '',
@@ -365,6 +376,7 @@ export function CharacterPanel() {
           characterNote: character.characterNote || '',
           systemPrompt: character.systemPrompt || '',
           postHistoryInstructions: character.postHistoryInstructions || '',
+          authorNote: character.authorNote || '',
           alternateGreetings: character.alternateGreetings || [],
           tags: character.tags || [],
           avatar: character.avatar || '',
@@ -391,7 +403,7 @@ export function CharacterPanel() {
           extensions: character.extensions,
           chatStats: character.chatStats,
           memory: character.memory,
-        });
+        }, true); // preserveId = true
         importedCharacters++;
       }
 
@@ -402,8 +414,12 @@ export function CharacterPanel() {
           const exists = groups.some(g => g.id === group.id);
           if (exists) continue;
 
-          // Add group using store action - preserve ALL fields from export
+          // Add group using store action - preserve ALL fields including ID
+          // Use preserveId=true to maintain the original ID
           addGroup({
+            // Preserve original ID
+            id: group.id,
+            createdAt: group.createdAt,
             name: group.name || 'Grupo sin nombre',
             description: group.description || '',
             characterIds: group.characterIds || [],
@@ -426,7 +442,7 @@ export function CharacterPanel() {
             creatorNotes: group.creatorNotes,
             alternateGreetings: group.alternateGreetings,
             characterNote: group.characterNote,
-          });
+          }, true); // preserveId = true
           importedGroups++;
         }
       }

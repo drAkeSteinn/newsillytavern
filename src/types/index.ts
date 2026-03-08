@@ -505,6 +505,7 @@ export interface ChatMessage {
   swipeId: string;
   swipeIndex: number;
   swipes: string[];           // Array of all swipe alternatives (content is swipes[swipeIndex])
+  isNarratorMessage?: boolean; // Message from narrator (hidden from prompt building but triggers still work)
   metadata?: MessageMetadata;
 }
 
@@ -557,15 +558,38 @@ export interface GroupMember {
   characterId: string;
   isActive: boolean;      // Can respond
   isPresent: boolean;     // Is in the scene
+  isNarrator: boolean;    // Is a narrator (ghost character, messages hidden from others)
   joinOrder: number;      // Order they joined the group
 }
 
-export type GroupActivationStrategy = 
+export type GroupActivationStrategy =
   | 'all'           // All active members respond
   | 'round_robin'   // Take turns in order
   | 'random'        // Random selection
   | 'reactive'      // Only mentioned characters respond
   | 'smart';        // AI decides who should respond
+
+// Narrator response timing modes
+export type NarratorResponseMode =
+  | 'turn_start'      // Narrator speaks at the beginning of each turn
+  | 'turn_end'        // Narrator speaks at the end of each turn
+  | 'before_each'     // Narrator speaks before each character
+  | 'after_each';     // Narrator speaks after each character
+
+// Narrator conditional intervention settings
+export interface NarratorConditionalSettings {
+  minTurnInterval: number;        // Minimum turns between narrator interventions (0 = always)
+  onlyWhenNoActiveQuests: boolean; // Only intervene when no active quests
+}
+
+// Complete narrator settings for a group
+export interface NarratorSettings {
+  responseMode: NarratorResponseMode;
+  customPrompt?: string;          // Custom prompt for the narrator (separate from group prompt)
+  conditional: NarratorConditionalSettings;
+  hiddenFromChat: boolean;        // Hide narrator messages from chat display entirely
+  showSprite: boolean;            // Show narrator sprite on screen (default: false)
+}
 
 export interface CharacterGroup {
   id: string;
@@ -583,6 +607,7 @@ export interface CharacterGroup {
   hudTemplateId?: string | null;  // HUD template to use for this group
   lorebookIds?: string[];         // Lorebooks to use for this group
   questTemplateIds?: string[];       // Quest templates to use for this group
+  narratorSettings?: NarratorSettings;  // Narrator behavior configuration
   createdAt: string;
   updatedAt: string;
 }
@@ -1706,6 +1731,13 @@ export interface QuestTemplate {
   isRepeatable: boolean;
   isHidden: boolean;              // No mostrar hasta activarse
   
+  // Auto Quest Settings
+  autoQuest?: {
+    enabled: boolean;             // Si esta misión puede ser activada automáticamente
+    weight: number;               // Peso para selección aleatoria (default: 1)
+    order: number;                // Orden para selección por lista (default: 0)
+  };
+  
   // Prerrequisitos (IDs de otros templates)
   prerequisites?: string[];
   
@@ -1761,6 +1793,10 @@ export interface QuestSettings {
   maxActiveQuests: number;        // Maximum active quests at once
   promptInclude: boolean;         // Include active quests in prompt
   promptTemplate: string;         // Template for quest prompt section
+  // Auto Quest System
+  autoQuestEnabled: boolean;      // Enable auto quest activation
+  autoQuestInterval: number;      // Activate quest every X turns/messages
+  autoQuestMode: 'random' | 'list'; // Selection mode: random or by list order
 }
 
 export const DEFAULT_QUEST_SETTINGS: QuestSettings = {
@@ -1775,6 +1811,10 @@ export const DEFAULT_QUEST_SETTINGS: QuestSettings = {
 {{activeQuests}}
 
 Instrucciones: Usa la información de las misiones activas para contextualizar tus respuestas. Progresa en las misiones a través de la narrativa cuando sea apropiado.`,
+  // Auto Quest defaults
+  autoQuestEnabled: false,
+  autoQuestInterval: 5,
+  autoQuestMode: 'random',
 };
 
 // ============================================
@@ -2487,6 +2527,9 @@ export interface IntentionDefinition {
   key: string;               // Template key
   requirements: StatRequirement[];
   examples?: string[];       // Examples of how to manifest this intention
+
+  // Formato de inyección personalizado
+  injectFormat?: string;     // Default: numbered format with name, description, and key
 }
 
 // Invitation definition (stored in CharacterCard)
@@ -2497,6 +2540,9 @@ export interface InvitationDefinition {
   key: string;               // Template key
   requirements: StatRequirement[];
   triggers?: string[];       // Contexts where this invitation is appropriate
+
+  // Formato de inyección personalizado
+  injectFormat?: string;     // Default: numbered format with name, description, and key
 }
 
 // Block headers configuration (customizable headers for injected content)

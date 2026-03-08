@@ -3,7 +3,7 @@
 // ============================================
 
 import type { Lorebook, LorebookEntry, SillyTavernLorebook } from '@/types';
-const uuidv4 = () => crypto.randomUUID();
+import { uuidv4 } from '@/lib/uuid';
 import { defaultLorebookSettings } from '../defaults';
 
 export interface LorebookSlice {

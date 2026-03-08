@@ -27,11 +27,11 @@ import {
 } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { 
-  Plus, 
-  Trash2, 
-  Users, 
-  UserCheck, 
+import {
+  Plus,
+  Trash2,
+  Users,
+  UserCheck,
   UserX,
   Eye,
   EyeOff,
@@ -47,13 +47,53 @@ import {
   BookOpen,
   ScrollText,
   Package,
-  Palette
+  Palette,
+  Ghost
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import type { GroupMember, GroupActivationStrategy } from '@/types';
+import type { GroupMember, GroupActivationStrategy, NarratorResponseMode, NarratorSettings } from '@/types';
 import { HUDSelector } from './hud-selector';
 import { LorebookSelector } from './lorebook-selector';
 import { QuestSelector } from './quest-selector';
+
+// Default narrator settings
+const DEFAULT_NARRATOR_SETTINGS: NarratorSettings = {
+  responseMode: 'turn_end',
+  conditional: {
+    minTurnInterval: 0,
+    onlyWhenNoActiveQuests: false
+  },
+  hiddenFromChat: false,
+  showSprite: false
+};
+
+// Narrator response mode info
+const narratorModeInfo: Record<NarratorResponseMode, {
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+}> = {
+  turn_start: {
+    name: 'Inicio del Turno',
+    description: 'El narrador habla primero, antes que cualquier personaje',
+    icon: <RefreshCw className="w-3.5 h-3.5" />
+  },
+  turn_end: {
+    name: 'Final del Turno',
+    description: 'El narrador habla último, después de todos los personajes',
+    icon: <RefreshCw className="w-3.5 h-3.5" />
+  },
+  before_each: {
+    name: 'Antes de Cada Personaje',
+    description: 'El narrador habla antes de cada respuesta de personaje',
+    icon: <Users className="w-3.5 h-3.5" />
+  },
+  after_each: {
+    name: 'Después de Cada Personaje',
+    description: 'El narrador habla después de cada respuesta de personaje',
+    icon: <Users className="w-3.5 h-3.5" />
+  }
+};
 
 interface GroupEditorProps {
   groupId: string | null;
@@ -115,6 +155,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
     removeGroupMember,
     toggleGroupMemberActive,
     toggleGroupMemberPresent,
+    toggleGroupMemberNarrator,
     updateGroupMember
   } = useTavernStore();
 
@@ -135,7 +176,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
         conversationStyle: existingGroup.conversationStyle || 'sequential' as 'sequential' | 'parallel',
         hudTemplateId: existingGroup?.hudTemplateId || null,
         lorebookIds: existingGroup?.lorebookIds || [],
-        questTemplateIds: existingGroup?.questTemplateIds || []
+        questTemplateIds: existingGroup?.questTemplateIds || [],
+        narratorSettings: existingGroup?.narratorSettings || DEFAULT_NARRATOR_SETTINGS
       };
     }
     return {
@@ -149,7 +191,8 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       conversationStyle: 'sequential' as 'sequential' | 'parallel',
       hudTemplateId: null,
       lorebookIds: [],
-      questTemplateIds: []
+      questTemplateIds: [],
+      narratorSettings: DEFAULT_NARRATOR_SETTINGS
     };
   }, [existingGroup]);
 
@@ -167,6 +210,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   const [hudTemplateId, setHudTemplateId] = useState<string | null>(initialValues.hudTemplateId);
   const [lorebookIds, setLorebookIds] = useState<string[]>(initialValues.lorebookIds);
   const [questTemplateIds, setQuestTemplateIds] = useState<string[]>(initialValues.questTemplateIds);
+  const [narratorSettings, setNarratorSettings] = useState<NarratorSettings>(initialValues.narratorSettings);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string>('');
 
   // Get members - either from existing group or local state
@@ -200,6 +244,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       characterId,
       isActive: true,
       isPresent: true,
+      isNarrator: false,
       joinOrder: localMembers.length
     };
     setLocalMembers([...localMembers, newMember]);
@@ -216,8 +261,14 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   };
 
   const handleLocalTogglePresent = (characterId: string) => {
-    setLocalMembers(localMembers.map(m => 
+    setLocalMembers(localMembers.map(m =>
       m.characterId === characterId ? { ...m, isPresent: !m.isPresent } : m
+    ));
+  };
+
+  const handleLocalToggleNarrator = (characterId: string) => {
+    setLocalMembers(localMembers.map(m =>
+      m.characterId === characterId ? { ...m, isNarrator: !m.isNarrator } : m
     ));
   };
 
@@ -231,6 +282,9 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       alert('Agrega al menos un personaje al grupo');
       return;
     }
+
+    // Check if there's a narrator in the group
+    const hasNarrator = members.some(m => m.isNarrator);
 
     const groupData = {
       name: name.trim(),
@@ -246,7 +300,9 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       avatar: existingGroup?.avatar || '',
       hudTemplateId,
       lorebookIds,
-      questTemplateIds
+      questTemplateIds,
+      // Only include narratorSettings if there's a narrator in the group
+      ...(hasNarrator && { narratorSettings })
     };
 
     if (isNewGroup) {
@@ -297,6 +353,14 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       handleLocalTogglePresent(characterId);
     } else {
       toggleGroupMemberPresent(groupId, characterId);
+    }
+  };
+
+  const handleToggleNarrator = (characterId: string) => {
+    if (isNewGroup) {
+      handleLocalToggleNarrator(characterId);
+    } else {
+      toggleGroupMemberNarrator(groupId, characterId);
     }
   };
 
@@ -564,10 +628,10 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{member.character?.name}</p>
-                          
+
                           {/* Status */}
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <Badge 
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <Badge
                               variant={member.isActive ? 'default' : 'secondary'}
                               className={cn(
                                 "text-[10px] cursor-pointer py-0 px-1",
@@ -577,7 +641,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                             >
                               {member.isActive ? 'Activo' : 'Inactivo'}
                             </Badge>
-                            <Badge 
+                            <Badge
                               variant={member.isPresent ? 'outline' : 'secondary'}
                               className={cn(
                                 "text-[10px] cursor-pointer py-0 px-1",
@@ -587,6 +651,24 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                             >
                               {member.isPresent ? 'Presente' : 'Ausente'}
                             </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant={member.isNarrator ? 'default' : 'secondary'}
+                                  className={cn(
+                                    "text-[10px] cursor-pointer py-0 px-1",
+                                    member.isNarrator && "bg-violet-500/20 text-violet-600 hover:bg-violet-500/30"
+                                  )}
+                                  onClick={() => handleToggleNarrator(member.characterId)}
+                                >
+                                  <Ghost className="w-2.5 h-2.5 mr-0.5" />
+                                  {member.isNarrator ? 'Narrador' : 'Normal'}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p><strong>Narrador:</strong> Un personaje narrador es un "fantasma" que puede dirigir la escena. Sus mensajes no aparecen en el historial para otros personajes, pero pueden activar triggers.</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
 
@@ -745,6 +827,168 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                     Este prompt se añadirá a las instrucciones de cada personaje del grupo.
                   </p>
                 </div>
+
+                {/* Narrator Settings - Only show if there's a narrator in the group */}
+                {members.some(m => m.isNarrator) && (
+                  <div className="p-3 bg-violet-500/10 rounded-lg border border-violet-500/20 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Ghost className="w-4 h-4 text-violet-500" />
+                      <span className="text-xs font-medium text-violet-600">Configuración del Narrador</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Configura cómo y cuándo el narrador interviene en la conversación.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Response Mode */}
+                    <div>
+                      <Label className="text-xs mb-1.5 block">Método de Respuesta</Label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(Object.entries(narratorModeInfo) as [NarratorResponseMode, typeof narratorModeInfo.turn_start][]).map(([mode, info]) => (
+                          <button
+                            key={mode}
+                            onClick={() => setNarratorSettings(prev => ({ ...prev, responseMode: mode }))}
+                            className={cn(
+                              "p-2 rounded-lg border text-left transition-colors",
+                              narratorSettings.responseMode === mode
+                                ? "border-violet-500 bg-violet-500/20"
+                                : "hover:bg-muted/50 border-border/40"
+                            )}
+                          >
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <span className="text-violet-500">{info.icon}</span>
+                              <span className="text-[10px] font-medium">{info.name}</span>
+                            </div>
+                            <p className="text-[9px] text-muted-foreground leading-tight">{info.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Narrator Prompt */}
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Label className="text-xs">Prompt del Narrador</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Instrucciones específicas para el narrador. Si está vacío, usa el prompt del grupo.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        value={narratorSettings.customPrompt || ''}
+                        onChange={(e) => setNarratorSettings(prev => ({ ...prev, customPrompt: e.target.value }))}
+                        placeholder="Eres un narrador omnisciente que describe la escena, ambiente y transiciones..."
+                        rows={3}
+                        className="text-xs font-mono"
+                      />
+                    </div>
+
+                    {/* Conditional Settings */}
+                    <div className="space-y-2">
+                      <Label className="text-xs">Intervención Condicional</Label>
+
+                      {/* Min Turn Interval */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">Turnos mínimos entre intervenciones</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-2.5 h-2.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>0 = siempre interviene. 1 = cada turno, 2 = cada 2 turnos, etc.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={narratorSettings.conditional.minTurnInterval}
+                          onChange={(e) => setNarratorSettings(prev => ({
+                            ...prev,
+                            conditional: { ...prev.conditional, minTurnInterval: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="w-14 h-7 text-xs"
+                        />
+                      </div>
+
+                      {/* Only when no active quests */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">Solo cuando no hay misiones activas</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-2.5 h-2.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>El narrador solo interviene cuando no hay misiones en curso.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Switch
+                          checked={narratorSettings.conditional.onlyWhenNoActiveQuests}
+                          onCheckedChange={(checked) => setNarratorSettings(prev => ({
+                            ...prev,
+                            conditional: { ...prev.conditional, onlyWhenNoActiveQuests: checked }
+                          }))}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Hidden from Chat */}
+                    <div className="flex items-center justify-between pt-1 border-t border-violet-500/20">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-medium">Ocultar mensajes del narrador</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-2.5 h-2.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Los mensajes del narrador no se mostrarán en el chat (pero siguen activando triggers).</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">Solo funcionan en segundo plano</p>
+                      </div>
+                      <Switch
+                        checked={narratorSettings.hiddenFromChat}
+                        onCheckedChange={(checked) => setNarratorSettings(prev => ({ ...prev, hiddenFromChat: checked }))}
+                      />
+                    </div>
+
+                    {/* Show Sprite */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-medium">Mostrar sprite del narrador</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-2.5 h-2.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Muestra el sprite del personaje narrador en pantalla.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">El narrador suele ser invisible</p>
+                      </div>
+                      <Switch
+                        checked={narratorSettings.showSprite}
+                        onCheckedChange={(checked) => setNarratorSettings(prev => ({ ...prev, showSprite: checked }))}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

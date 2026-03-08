@@ -696,12 +696,27 @@ export function NovelChatBox({
         <>
           <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
             <div className="p-2 space-y-2">
-              {activeSession.messages.filter(m => !m.isDeleted).map((message) => {
+              {activeSession.messages.filter(m => {
+                // Filter deleted messages
+                if (m.isDeleted) return false;
+
+                // Check if this is a narrator message and if narrator is hidden from chat
+                if (isGroupMode && activeGroup?.narratorSettings?.hiddenFromChat && m.role === 'assistant') {
+                  // Find if this character is a narrator
+                  const memberInfo = activeGroup.members?.find(mem => mem.characterId === m.characterId);
+                  if (memberInfo?.isNarrator) {
+                    return false; // Hide narrator messages from chat display
+                  }
+                }
+
+                return true;
+              }).map((message) => {
                 // Determine character for this message
                 let messageCharacter: CharacterCard | undefined;
                 let displayName: string | undefined;
                 let displayAvatar: string | undefined;
-                
+                let isNarratorMessage = false;
+
                 if (message.role === 'user') {
                   displayName = activePersona?.name || t('message.you');
                   displayAvatar = activePersona?.avatar || undefined;
@@ -711,7 +726,13 @@ export function NovelChatBox({
                   messageCharacter = characterList.find(c => c.id === message.characterId);
                   displayName = messageCharacter?.name;
                   displayAvatar = messageCharacter?.avatar;
-                  
+
+                  // Check if this character is a narrator in the group
+                  if (activeGroup?.members) {
+                    const memberInfo = activeGroup.members.find(m => m.characterId === message.characterId);
+                    isNarratorMessage = memberInfo?.isNarrator || false;
+                  }
+
                   // Debug: log if character not found
                   if (!messageCharacter && message.characterId) {
                     console.warn('[NovelChatBox] Character not found:', message.characterId, 'Available:', characterList.map(c => c.id));
@@ -721,7 +742,7 @@ export function NovelChatBox({
                   displayName = activeCharacter?.name;
                   displayAvatar = activeCharacter?.avatar;
                 }
-                
+
                 return (
                   <ChatMessageBubble
                     key={message.id}
@@ -741,6 +762,7 @@ export function NovelChatBox({
                     onRegenerate={() => onRegenerate?.(message.id)}
                     onEdit={onEdit}
                     onReplay={onReplay}
+                    isNarrator={isNarratorMessage}
                   />
                 );
               })}

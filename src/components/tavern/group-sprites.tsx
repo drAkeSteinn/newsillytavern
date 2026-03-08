@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Settings, RotateCcw, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,15 @@ interface GroupSpritesProps {
   activeCharacterId: string | null;
   isStreaming: boolean;
   maxVisible?: number;
+  activeGroup?: {
+    members?: Array<{
+      characterId: string;
+      isNarrator?: boolean;
+    }>;
+    narratorSettings?: {
+      showSprite?: boolean;
+    };
+  } | null;
 }
 
 interface SpritePosition {
@@ -157,6 +166,7 @@ export function GroupSprites({
   activeCharacterId,
   isStreaming,
   maxVisible = 3,
+  activeGroup,
 }: GroupSpritesProps) {
   const [settings, setSettings] = useState<GroupSpriteSettings>(() => {
     if (typeof window !== 'undefined') {
@@ -356,11 +366,26 @@ export function GroupSprites({
   const resetPositions = () => setPositions({});
   const resetSettings = () => setSettings(DEFAULT_SETTINGS);
 
+  // Filter out narrator characters if showSprite is false
+  const filteredCharacters = useMemo(() => {
+    if (!activeGroup?.narratorSettings?.showSprite) {
+      // Find narrator character IDs
+      const narratorIds = new Set(
+        (activeGroup?.members || [])
+          .filter(m => m.isNarrator)
+          .map(m => m.characterId)
+      );
+      // Filter out narrators
+      return characters.filter(c => !narratorIds.has(c.id));
+    }
+    return characters;
+  }, [characters, activeGroup]);
+
   // Determine display mode
-  const displayMode = characters.length <= maxVisible ? 'multi' : 'single';
+  const displayMode = filteredCharacters.length <= maxVisible ? 'multi' : 'single';
   const visibleCharacters = displayMode === 'multi'
-    ? characters
-    : (characters.find(c => c.id === activeCharacterId) ? [characters.find(c => c.id === activeCharacterId)!] : characters.slice(0, 1));
+    ? filteredCharacters
+    : (filteredCharacters.find(c => c.id === activeCharacterId) ? [filteredCharacters.find(c => c.id === activeCharacterId)!] : filteredCharacters.slice(0, 1));
 
   return (
     <div ref={containerRef} className="absolute inset-0 z-5">

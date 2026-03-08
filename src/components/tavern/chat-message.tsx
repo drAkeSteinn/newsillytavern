@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType, PromptSection } from '@/types';
-import { Copy, Check, Trash2, RefreshCw, ChevronLeft, ChevronRight, Volume2, Eye, Edit2, Play, X, Check as CheckIcon } from 'lucide-react';
+import { Copy, Check, Trash2, RefreshCw, ChevronLeft, ChevronRight, Volume2, Eye, Edit2, Play, X, Check as CheckIcon, Ghost } from 'lucide-react';
 import { useState, memo, Fragment } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +31,7 @@ interface ChatMessageProps {
   currentIndex?: number;
   totalAlternatives?: number;
   displayMode?: MessageDisplayMode;
+  isNarrator?: boolean;
 }
 
 export const ChatMessageBubble = memo(function ChatMessageBubble({
@@ -50,7 +51,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   hasAlternatives = false,
   currentIndex = 0,
   totalAlternatives = 1,
-  displayMode = 'bubble'
+  displayMode = 'bubble',
+  isNarrator = false
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
@@ -58,7 +60,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   const [editContent, setEditContent] = useState(message.content);
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
-  
+
   const isCompact = displayMode === 'compact';
   const isFull = displayMode === 'full';
 
@@ -107,10 +109,17 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
   // Determine display name and avatar
   const displayName = isUser ? userName : characterName;
   const displayAvatar = isUser ? userAvatar : characterAvatar;
-  const avatarBorder = isUser ? 'border-blue-500' : 'border-amber-500';
-  const avatarGradient = isUser 
-    ? 'from-blue-400 to-blue-600' 
-    : 'from-amber-400 to-orange-600';
+  // Narrator has special styling - subtle ghost-like appearance
+  const avatarBorder = isNarrator
+    ? 'border-violet-400/50'
+    : isUser
+      ? 'border-blue-500'
+      : 'border-amber-500';
+  const avatarGradient = isNarrator
+    ? 'from-violet-300 to-violet-500'
+    : isUser
+      ? 'from-blue-400 to-blue-600'
+      : 'from-amber-400 to-orange-600';
 
   // Full mode: simpler layout, no bubbles
   if (isFull) {
@@ -118,10 +127,15 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
       <Fragment>
         <div className={cn(
           'group py-2 px-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300',
-          isUser && 'bg-primary/5'
+          isUser && 'bg-primary/5',
+          isNarrator && 'bg-violet-500/5'
         )}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-sm">{displayName}</span>
+            {isNarrator && <Ghost className="w-3.5 h-3.5 text-violet-400" />}
+            <span className={cn(
+              'font-medium text-sm',
+              isNarrator && 'text-violet-400/80'
+            )}>{displayName}</span>
             {showTimestamp && (
               <span className="text-xs text-muted-foreground">
                 {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
@@ -269,9 +283,11 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
           'flex items-center gap-2 mb-1',
           isUser ? 'flex-row-reverse' : 'flex-row'
         )}>
+          {isNarrator && !isUser && <Ghost className="w-3.5 h-3.5 text-violet-400" />}
           <span className={cn(
             'font-medium',
-            isCompact ? 'text-xs' : 'text-sm'
+            isCompact ? 'text-xs' : 'text-sm',
+            isNarrator && 'text-violet-400/80'
           )}>
             {displayName}
           </span>
@@ -291,9 +307,11 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
         <div className={cn(
           'rounded-2xl relative group/message',
           isCompact ? 'px-3 py-2' : 'px-4 py-3',
-          isUser 
-            ? 'bg-primary text-primary-foreground rounded-tr-sm' 
-            : 'bg-muted rounded-tl-sm'
+          isNarrator
+            ? 'bg-violet-500/10 border border-violet-500/20 text-violet-200 rounded-tl-sm'
+            : isUser
+              ? 'bg-primary text-primary-foreground rounded-tr-sm'
+              : 'bg-muted rounded-tl-sm'
         )}>
           {isEditing ? (
             <div className="space-y-2 min-w-[200px]">
