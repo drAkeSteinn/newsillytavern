@@ -41,11 +41,11 @@
   },
   "chatLayout": {
     "novelMode": true,
-    "chatWidth": 90,
-    "chatHeight": 33.8888888888889,
+    "chatWidth": 85,
+    "chatHeight": 36,
     "chatX": 48.86177678139653,
     "chatY": 82.68518518518518,
-    "chatOpacity": 0.96,
+    "chatOpacity": 1,
     "blurBackground": false,
     "showCharacterSprite": true
   },
@@ -56,5 +56,84 @@
     "keepLastN": 20,
     "enableSummaries": false,
     "summaryThreshold": 40
+  },
+  "chatboxAppearance": {
+    "theme": "default",
+    "background": {
+      "transparency": 0.95,
+      "blur": 8,
+      "useGlassEffect": true
+    },
+    "font": {
+      "fontFamily": "system",
+      "fontSize": "base",
+      "fontWeight": "normal",
+      "lineHeight": "relaxed",
+      "letterSpacing": "normal"
+    },
+    "textFormatting": {
+      "enableMarkdown": true,
+      "enableCodeHighlight": true,
+      "enableQuotes": true,
+      "codeBlockTheme": "auto"
+    },
+    "textColors": {
+      "userMessage": "#3b82f6",
+      "characterMessage": "#f59e0b",
+      "narratorMessage": "#8b5cf6",
+      "systemMessage": "#6b7280",
+      "linkColor": "#3b82f6",
+      "codeColor": "#10b981"
+    },
+    "bubbles": {
+      "style": "neon",
+      "transparency": 0.1,
+      "borderRadius": 16,
+      "shadowEnabled": true,
+      "shadowIntensity": "soft",
+      "maxWidth": 100,
+      "userBubbleColor": "#3b82f6",
+      "userBubbleTextColor": "#ffffff",
+      "characterBubbleColor": "#27272a",
+      "characterBubbleTextColor": "#fafafa",
+      "narratorBubbleColor": "#7c3aed",
+      "narratorBubbleTextColor": "#ffffff",
+      "systemBubbleColor": "#3f3f46",
+      "systemBubbleTextColor": "#a1a1aa"
+    },
+    "avatars": {
+      "show": true,
+      "shape": "circle",
+      "size": "md",
+      "borderRadius": 8,
+      "showBorder": true,
+      "borderColor": "#3b82f6",
+      "borderWidth": 2
+    },
+    "streaming": {
+      "animationStyle": "typing-cursor",
+      "animationSpeed": 50,
+      "streamingTextColor": "#fbbf24",
+      "cursorStyle": "block",
+      "cursorColor": "#fbbf24",
+      "cursorBlinkRate": 530,
+      "showCursor": true
+    },
+    "input": {
+      "backgroundColor": "#18181b",
+      "textColor": "#fafafa",
+      "placeholderColor": "#71717a",
+      "borderColor": "#3f3f46",
+      "borderRadius": 12,
+      "focusBorderColor": "#3b82f6",
+      "fontSize": "base"
+    },
+    "messageSpacing": "normal",
+    "groupMessages": false,
+    "showTimestamps": true,
+    "showTokens": true,
+    "animateEntry": true,
+    "entryAnimation": "fade",
+    "animationDurationMs": 200
   }
 }

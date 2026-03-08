@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTavernStore } from '@/store/tavern-store';
 import { ChatMessageBubble } from './chat-message';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { ChatLayoutSettings, CharacterCard, CharacterGroup, Persona } from '@/types';
+import type { ChatLayoutSettings, CharacterCard, CharacterGroup, Persona, ChatboxAppearanceSettings } from '@/types';
+import { DEFAULT_CHATBOX_APPEARANCE } from '@/types';
 import { t } from '@/lib/i18n';
 
 interface NovelChatBoxProps {
@@ -106,6 +107,30 @@ export function NovelChatBox({
   const activeSession = getActiveSession();
   const layout = settings.chatLayout;
   const hotkeys = settings.hotkeys;
+
+  // Get appearance settings
+  const appearance = settings.chatboxAppearance || DEFAULT_CHATBOX_APPEARANCE;
+  const safeAppearance = useMemo(() => ({
+    ...DEFAULT_CHATBOX_APPEARANCE,
+    ...appearance,
+    background: { ...DEFAULT_CHATBOX_APPEARANCE.background, ...appearance?.background },
+    font: { ...DEFAULT_CHATBOX_APPEARANCE.font, ...appearance?.font },
+    textFormatting: { ...DEFAULT_CHATBOX_APPEARANCE.textFormatting, ...appearance?.textFormatting },
+    textColors: { ...DEFAULT_CHATBOX_APPEARANCE.textColors, ...appearance?.textColors },
+    bubbles: { ...DEFAULT_CHATBOX_APPEARANCE.bubbles, ...appearance?.bubbles },
+    avatars: { ...DEFAULT_CHATBOX_APPEARANCE.avatars, ...appearance?.avatars },
+    streaming: { ...DEFAULT_CHATBOX_APPEARANCE.streaming, ...appearance?.streaming },
+    input: { ...DEFAULT_CHATBOX_APPEARANCE.input, ...appearance?.input },
+  }), [appearance]);
+
+  // Helper function to convert hex color to rgba with transparency
+  const hexToRgba = useCallback((hex: string, alpha: number): string => {
+    const cleanHex = hex.replace('#', '');
+    const r = parseInt(cleanHex.substring(0, 2), 16);
+    const g = parseInt(cleanHex.substring(2, 4), 16);
+    const b = parseInt(cleanHex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }, []);
 
   // Get session stats for the variables panel
   const sessionStats = activeSession?.sessionStats;
@@ -771,7 +796,22 @@ export function NovelChatBox({
               {isGenerating && (
                 <div className="flex gap-2 py-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
                   {/* Avatar */}
-                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-amber-500 flex-shrink-0 flex items-center justify-center">
+                  <div 
+                    className={cn(
+                      'overflow-hidden flex-shrink-0 flex items-center justify-center',
+                      safeAppearance.avatars.size === 'sm' ? 'w-8 h-8' : 
+                      safeAppearance.avatars.size === 'md' ? 'w-10 h-10' :
+                      safeAppearance.avatars.size === 'lg' ? 'w-12 h-12' : 'w-14 h-14',
+                      safeAppearance.avatars.shape === 'circle' ? 'rounded-full' :
+                      safeAppearance.avatars.shape === 'square' ? 'rounded-none' :
+                      safeAppearance.avatars.shape === 'rounded' ? 'rounded-lg' : 'rounded-sm'
+                    )}
+                    style={{
+                      borderWidth: safeAppearance.avatars.showBorder ? safeAppearance.avatars.borderWidth : 0,
+                      borderColor: safeAppearance.avatars.borderColor,
+                      borderStyle: 'solid',
+                    }}
+                  >
                     {isGroupMode && streamingCharacter ? (
                       streamingCharacter.avatar ? (
                         <img 
@@ -817,13 +857,38 @@ export function NovelChatBox({
                     </div>
                     
                     {/* Content bubble */}
-                    <div className="bg-muted rounded-lg rounded-tl-sm px-3 py-2 max-w-[85%]">
+                    <div 
+                      className="px-3 py-2"
+                      style={{
+                        backgroundColor: hexToRgba(safeAppearance.bubbles.characterBubbleColor, safeAppearance.bubbles.transparency),
+                        borderRadius: safeAppearance.bubbles.borderRadius,
+                        borderTopLeftRadius: 4,
+                        maxWidth: `${safeAppearance.bubbles.maxWidth}%`,
+                        boxShadow: safeAppearance.bubbles.shadowEnabled 
+                          ? safeAppearance.bubbles.shadowIntensity === 'soft' ? '0 1px 3px rgba(0,0,0,0.1)' :
+                            safeAppearance.bubbles.shadowIntensity === 'medium' ? '0 4px 6px rgba(0,0,0,0.15)' :
+                            '0 10px 15px rgba(0,0,0,0.2)' : undefined,
+                      }}
+                    >
                       {streamingContent ? (
-                        <StreamingText 
-                          content={streamingContent}
-                          isStreaming={true}
+                        <div 
                           className="text-xs"
-                        />
+                          style={{ 
+                            color: safeAppearance.bubbles.characterBubbleTextColor,
+                          }}
+                        >
+                          {streamingContent}
+                          {safeAppearance.streaming.showCursor && (
+                            <span 
+                              className="inline-block ml-0.5 animate-pulse"
+                              style={{ color: safeAppearance.streaming.cursorColor }}
+                            >
+                              {safeAppearance.streaming.cursorStyle === 'block' ? '▋' :
+                               safeAppearance.streaming.cursorStyle === 'line' ? '|' :
+                               safeAppearance.streaming.cursorStyle === 'underscore' ? '_' : '●'}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -859,7 +924,13 @@ export function NovelChatBox({
           )}
 
           {/* Input Area - Always visible */}
-          <div className="p-2 border-t bg-background/50 flex-shrink-0">
+          <div 
+            className="p-2 border-t flex-shrink-0"
+            style={{
+              backgroundColor: safeAppearance.input.backgroundColor,
+              borderColor: safeAppearance.input.borderColor,
+            }}
+          >
             <div className="flex gap-2 items-end">
               <EmojiPicker onEmojiSelect={(emoji) => setInput(prev => prev + emoji)} />
               <Textarea
@@ -868,7 +939,14 @@ export function NovelChatBox({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={t('chat.messagePlaceholder')}
-                className="min-h-[32px] max-h-[80px] resize-none text-xs flex-1"
+                className="min-h-[32px] max-h-[80px] resize-none flex-1 placeholder:text-muted-foreground"
+                style={{
+                  color: safeAppearance.input.textColor,
+                  borderColor: safeAppearance.input.borderColor,
+                  borderRadius: safeAppearance.input.borderRadius,
+                  fontSize: safeAppearance.input.fontSize === 'sm' ? '0.75rem' : 
+                           safeAppearance.input.fontSize === 'lg' ? '1.125rem' : '1rem',
+                }}
                 disabled={isGenerating}
                 rows={1}
               />

@@ -3,12 +3,13 @@
 import { memo, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useTavernStore } from '@/store/tavern-store';
-import { DEFAULT_TYPOGRAPHY_SETTINGS, DEFAULT_CONTENT_STYLE_SETTINGS } from '@/types';
+import { DEFAULT_TYPOGRAPHY_SETTINGS, DEFAULT_CONTENT_STYLE_SETTINGS, type ChatboxAppearanceSettings } from '@/types';
 
 interface TextFormatterProps {
   content: string;
   className?: string;
   isUser?: boolean;
+  appearance?: ChatboxAppearanceSettings;
 }
 
 /**
@@ -25,13 +26,18 @@ interface TextFormatterProps {
 export const TextFormatter = memo(function TextFormatter({
   content,
   className,
-  isUser = false
+  isUser = false,
+  appearance
 }: TextFormatterProps) {
   const { dialogueSettings } = useTavernStore();
 
   // Get typography settings
   const typography = dialogueSettings.typography ?? DEFAULT_TYPOGRAPHY_SETTINGS;
   const contentStyles = dialogueSettings.contentStyles ?? DEFAULT_CONTENT_STYLE_SETTINGS;
+
+  // Get link and code colors from appearance settings if provided
+  const linkColor = appearance?.textColors?.linkColor;
+  const codeColor = appearance?.textColors?.codeColor;
 
   // Build typography classes
   const typographyClasses = useMemo(() => {
@@ -69,8 +75,8 @@ export const TextFormatter = memo(function TextFormatter({
   }, [typography]);
 
   const formattedContent = useMemo(() => {
-    return parseSillyTavernFormat(content, isUser, contentStyles, dialogueSettings.enabled);
-  }, [content, isUser, contentStyles, dialogueSettings.enabled]);
+    return parseSillyTavernFormat(content, isUser, contentStyles, dialogueSettings.enabled, codeColor, linkColor);
+  }, [content, isUser, contentStyles, dialogueSettings.enabled, codeColor, linkColor]);
 
   return (
     <div
@@ -120,7 +126,9 @@ function parseSillyTavernFormat(
   text: string,
   isUser: boolean,
   contentStyles: typeof DEFAULT_CONTENT_STYLE_SETTINGS,
-  dialogueEnabled: boolean
+  dialogueEnabled: boolean,
+  codeColor?: string,
+  linkColor?: string
 ): React.ReactNode[] {
   const elements: React.ReactNode[] = [];
   let key = 0;
@@ -239,7 +247,11 @@ function parseSillyTavernFormat(
     } else if (match[8]) {
       // Code `text`
       elements.push(
-        <code key={key++} className="px-1.5 py-0.5 rounded bg-muted font-mono text-sm">
+        <code 
+          key={key++} 
+          className="px-1.5 py-0.5 rounded bg-muted font-mono text-sm"
+          style={codeColor ? { color: codeColor } : undefined}
+        >
           {matchedText.slice(1, -1)}
         </code>
       );

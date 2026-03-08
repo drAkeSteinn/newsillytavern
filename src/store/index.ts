@@ -54,7 +54,7 @@ import type {
 
 // Import defaults for merge function
 import { defaultSettings, defaultPersona } from './defaults';
-import { DEFAULT_DIALOGUE_SETTINGS, DEFAULT_SUMMARY_SETTINGS, DEFAULT_QUEST_SETTINGS } from '@/types';
+import { DEFAULT_DIALOGUE_SETTINGS, DEFAULT_SUMMARY_SETTINGS, DEFAULT_QUEST_SETTINGS, DEFAULT_CHATBOX_APPEARANCE } from '@/types';
 
 // Combined store type
 export type TavernState = CharacterSlice &
@@ -168,6 +168,7 @@ export const useTavernStore = create<TavernState>()(
 
         // Merge settings with defaults to ensure new fields exist
         const persistedSettings = persisted.settings as Record<string, unknown> | undefined;
+        const persistedChatboxAppearance = persistedSettings?.chatboxAppearance as Record<string, unknown> | undefined;
         const mergedSettings = {
           ...currentState.settings,
           ...(persistedSettings || {}),
@@ -185,6 +186,44 @@ export const useTavernStore = create<TavernState>()(
           chatLayout: {
             ...currentState.settings.chatLayout,
             ...((persistedSettings?.chatLayout as Record<string, unknown>) || {})
+          },
+          // Ensure chatboxAppearance settings exist with defaults
+          chatboxAppearance: {
+            ...DEFAULT_CHATBOX_APPEARANCE,
+            ...(persistedChatboxAppearance || {}),
+            // Deep merge nested objects
+            background: {
+              ...DEFAULT_CHATBOX_APPEARANCE.background,
+              ...((persistedChatboxAppearance?.background as Record<string, unknown>) || {})
+            },
+            font: {
+              ...DEFAULT_CHATBOX_APPEARANCE.font,
+              ...((persistedChatboxAppearance?.font as Record<string, unknown>) || {})
+            },
+            textFormatting: {
+              ...DEFAULT_CHATBOX_APPEARANCE.textFormatting,
+              ...((persistedChatboxAppearance?.textFormatting as Record<string, unknown>) || {})
+            },
+            textColors: {
+              ...DEFAULT_CHATBOX_APPEARANCE.textColors,
+              ...((persistedChatboxAppearance?.textColors as Record<string, unknown>) || {})
+            },
+            bubbles: {
+              ...DEFAULT_CHATBOX_APPEARANCE.bubbles,
+              ...((persistedChatboxAppearance?.bubbles as Record<string, unknown>) || {})
+            },
+            avatars: {
+              ...DEFAULT_CHATBOX_APPEARANCE.avatars,
+              ...((persistedChatboxAppearance?.avatars as Record<string, unknown>) || {})
+            },
+            streaming: {
+              ...DEFAULT_CHATBOX_APPEARANCE.streaming,
+              ...((persistedChatboxAppearance?.streaming as Record<string, unknown>) || {})
+            },
+            input: {
+              ...DEFAULT_CHATBOX_APPEARANCE.input,
+              ...((persistedChatboxAppearance?.input as Record<string, unknown>) || {})
+            }
           }
         };
 

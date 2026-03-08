@@ -3,6 +3,7 @@
 // ============================================
 
 import type { LLMConfig, AppSettings, PromptTemplate, Persona, LorebookSettings, ContextSettings } from '@/types';
+import { DEFAULT_CHATBOX_APPEARANCE } from '@/types';
 
 export const defaultLLMConfig: LLMConfig = {
   id: 'default',
@@ -67,7 +68,12 @@ export const defaultSettings: AppSettings = {
     enabled: true,
     globalCooldown: 250,
     realtimeEnabled: true,
-    transitionDuration: 500
+    transitionDuration: 500,
+    defaultTransitionType: 'fade',
+    returnToDefaultEnabled: false,
+    returnToDefaultAfter: 300000,
+    defaultBackgroundUrl: '',
+    globalOverlays: []
   },
   chatLayout: {
     novelMode: true,
@@ -79,7 +85,8 @@ export const defaultSettings: AppSettings = {
     blurBackground: true,
     showCharacterSprite: true
   },
-  context: defaultContextSettings
+  context: defaultContextSettings,
+  chatboxAppearance: DEFAULT_CHATBOX_APPEARANCE
 };
 
 export const defaultPromptTemplate: PromptTemplate = {

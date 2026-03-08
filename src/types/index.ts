@@ -1024,6 +1024,249 @@ export interface ContextSettings {
   summaryThreshold: number;      // When to trigger summarization
 }
 
+// ============ Chatbox Appearance Settings ============
+
+// Predefined themes
+export type ChatboxTheme = 
+  | 'default'      // Dark/Light based on system
+  | 'midnight'     // Deep dark blue
+  | 'forest'       // Green nature theme
+  | 'sunset'       // Warm orange/red
+  | 'ocean'        // Blue ocean theme
+  | 'lavender'     // Soft purple
+  | 'cherry'       // Pink sakura theme
+  | 'custom';      // User-defined colors
+
+// Avatar shape options
+export type AvatarShape = 'circle' | 'square' | 'rounded' | 'rectangular';
+
+// Bubble style options
+export type BubbleStyleType = 'modern' | 'classic' | 'minimal' | 'neon' | 'elegant' | 'dark';
+
+// Streaming animation style
+export type StreamingAnimationStyle = 'typing-cursor' | 'fade-in' | 'grow' | 'typewriter';
+
+// Cursor style for streaming
+export type StreamingCursorStyle = 'block' | 'line' | 'underscore' | 'dot';
+
+// Font family options
+export type FontFamilyType = 'system' | 'serif' | 'sans' | 'mono' | 'custom';
+
+// Background settings for chatbox
+export interface ChatboxBackgroundSettings {
+  transparency: number;        // 0-1, background opacity
+  blur: number;                // 0-20, blur radius in pixels
+  useGlassEffect: boolean;     // Glassmorphism effect
+  customBackgroundColor?: string; // Custom background color (hex)
+}
+
+// Font settings for chatbox
+export interface ChatboxFontSettings {
+  fontFamily: FontFamilyType;
+  customFontFamily?: string;   // For custom font
+  fontSize: 'xs' | 'sm' | 'base' | 'lg' | 'xl';
+  fontWeight: 'normal' | 'medium' | 'semibold' | 'bold';
+  lineHeight: 'tight' | 'normal' | 'relaxed' | 'loose';
+  letterSpacing: 'tighter' | 'tight' | 'normal' | 'wide' | 'wider';
+}
+
+// Text formatting settings
+export interface ChatboxTextFormatting {
+  enableMarkdown: boolean;
+  enableCodeHighlight: boolean;
+  enableQuotes: boolean;       // Show quotes in blockquote style
+  codeBlockTheme: 'dark' | 'light' | 'auto';
+}
+
+// Text colors for different message types
+export interface ChatboxTextColors {
+  userMessage: string;         // Color for user messages
+  characterMessage: string;    // Color for character/assistant messages
+  narratorMessage: string;     // Color for narrator messages
+  systemMessage: string;       // Color for system messages
+  linkColor: string;           // Color for links
+  codeColor: string;           // Color for inline code
+}
+
+// Message bubble settings
+export interface MessageBubbleSettings {
+  style: BubbleStyleType;
+  transparency: number;        // 0-1
+  borderRadius: number;        // 0-32, border radius in pixels
+  shadowEnabled: boolean;
+  shadowIntensity: 'none' | 'soft' | 'medium' | 'strong';
+  maxWidth: number;            // 50-100, percentage
+  
+  // Colors for different bubble types
+  userBubbleColor: string;
+  userBubbleTextColor: string;
+  characterBubbleColor: string;
+  characterBubbleTextColor: string;
+  narratorBubbleColor: string;
+  narratorBubbleTextColor: string;
+  systemBubbleColor: string;
+  systemBubbleTextColor: string;
+}
+
+// Avatar settings
+export interface ChatboxAvatarSettings {
+  show: boolean;
+  shape: AvatarShape;
+  size: 'sm' | 'md' | 'lg' | 'xl';
+  borderRadius: number;        // 0-50, for square/rounded shapes
+  showBorder: boolean;
+  borderColor: string;
+  borderWidth: number;         // 1-4
+}
+
+// Streaming/typing settings
+export interface ChatboxStreamingSettings {
+  animationStyle: StreamingAnimationStyle;
+  animationSpeed: number;      // 10-200, characters per second
+  streamingTextColor: string;
+  cursorStyle: StreamingCursorStyle;
+  cursorColor: string;
+  cursorBlinkRate: number;     // 200-1000, blink rate in ms
+  showCursor: boolean;
+}
+
+// Input box settings
+export interface ChatboxInputSettings {
+  backgroundColor: string;
+  textColor: string;
+  placeholderColor: string;
+  borderColor: string;
+  borderRadius: number;
+  focusBorderColor: string;
+  fontSize: 'sm' | 'base' | 'lg';
+}
+
+// Complete chatbox appearance settings
+export interface ChatboxAppearanceSettings {
+  // Theme
+  theme: ChatboxTheme;
+  customThemeColors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+  };
+  
+  // Components
+  background: ChatboxBackgroundSettings;
+  font: ChatboxFontSettings;
+  textFormatting: ChatboxTextFormatting;
+  textColors: ChatboxTextColors;
+  bubbles: MessageBubbleSettings;
+  avatars: ChatboxAvatarSettings;
+  streaming: ChatboxStreamingSettings;
+  input: ChatboxInputSettings;
+  
+  // Spacing
+  messageSpacing: 'compact' | 'normal' | 'spacious';
+  groupMessages: boolean;      // Group consecutive messages from same sender
+  showTimestamps: boolean;
+  showTokens: boolean;
+  
+  // Animations
+  animateEntry: boolean;
+  entryAnimation: 'fade' | 'slide' | 'scale' | 'none';
+  animationDurationMs: number;
+}
+
+// Default chatbox appearance settings
+export const DEFAULT_CHATBOX_APPEARANCE: ChatboxAppearanceSettings = {
+  theme: 'default',
+  
+  background: {
+    transparency: 0.95,
+    blur: 8,
+    useGlassEffect: true,
+  },
+  
+  font: {
+    fontFamily: 'system',
+    fontSize: 'base',
+    fontWeight: 'normal',
+    lineHeight: 'relaxed',
+    letterSpacing: 'normal',
+  },
+  
+  textFormatting: {
+    enableMarkdown: true,
+    enableCodeHighlight: true,
+    enableQuotes: true,
+    codeBlockTheme: 'auto',
+  },
+  
+  textColors: {
+    userMessage: '#3b82f6',
+    characterMessage: '#f59e0b',
+    narratorMessage: '#8b5cf6',
+    systemMessage: '#6b7280',
+    linkColor: '#3b82f6',
+    codeColor: '#10b981',
+  },
+  
+  bubbles: {
+    style: 'modern',
+    transparency: 1,
+    borderRadius: 16,
+    shadowEnabled: true,
+    shadowIntensity: 'soft',
+    maxWidth: 85,
+    userBubbleColor: '#3b82f6',
+    userBubbleTextColor: '#ffffff',
+    characterBubbleColor: '#27272a',
+    characterBubbleTextColor: '#fafafa',
+    narratorBubbleColor: '#7c3aed',
+    narratorBubbleTextColor: '#ffffff',
+    systemBubbleColor: '#3f3f46',
+    systemBubbleTextColor: '#a1a1aa',
+  },
+  
+  avatars: {
+    show: true,
+    shape: 'circle',
+    size: 'md',
+    borderRadius: 8,
+    showBorder: true,
+    borderColor: '#3b82f6',
+    borderWidth: 2,
+  },
+  
+  streaming: {
+    animationStyle: 'typing-cursor',
+    animationSpeed: 50,
+    streamingTextColor: '#fbbf24',
+    cursorStyle: 'block',
+    cursorColor: '#fbbf24',
+    cursorBlinkRate: 530,
+    showCursor: true,
+  },
+  
+  input: {
+    backgroundColor: '#18181b',
+    textColor: '#fafafa',
+    placeholderColor: '#71717a',
+    borderColor: '#3f3f46',
+    borderRadius: 12,
+    focusBorderColor: '#3b82f6',
+    fontSize: 'base',
+  },
+  
+  messageSpacing: 'normal',
+  groupMessages: false,
+  showTimestamps: true,
+  showTokens: true,
+  
+  animateEntry: true,
+  entryAnimation: 'fade',
+  animationDurationMs: 200,
+};
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   fontSize: number;
@@ -1043,6 +1286,7 @@ export interface AppSettings {
   backgroundTriggers: BackgroundTriggerSettings;
   chatLayout: ChatLayoutSettings;
   context: ContextSettings;
+  chatboxAppearance: ChatboxAppearanceSettings;
 }
 
 // ============ API Types ============
