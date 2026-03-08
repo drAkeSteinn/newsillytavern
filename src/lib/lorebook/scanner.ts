@@ -35,6 +35,73 @@ export const DEFAULT_SCAN_OPTIONS: ScanOptions = {
   includeConstants: true,
 };
 
+// ============================================
+// REGEX SUPPORT
+// ============================================
+
+/**
+ * Check if a key is a regex pattern
+ * Regex keys start with '/' and end with '/' optionally followed by flags
+ * Examples: /pattern/, /pattern/i, /pattern/gi
+ */
+export function isRegexKey(key: string): boolean {
+  // Must start with / and have at least /x/ format
+  if (!key.startsWith('/')) return false;
+  
+  // Find the closing /
+  // The pattern is: /body/flags
+  // We need to find the last / that's followed only by valid flags
+  const lastSlashIndex = key.lastIndexOf('/');
+  
+  // Must have at least one character between slashes: /x/
+  if (lastSlashIndex <= 1) return false;
+  
+  // Everything after the last / should be valid flags (only g, i, m, s, u, etc.)
+  const flags = key.slice(lastSlashIndex + 1);
+  const validFlags = /^[gimsuvy]*$/;
+  
+  return validFlags.test(flags);
+}
+
+/**
+ * Parse a regex key into RegExp object
+ * @param key - The regex key string (e.g., "/pattern/i")
+ * @returns RegExp object or null if invalid
+ */
+export function parseRegexKey(key: string): RegExp | null {
+  if (!isRegexKey(key)) return null;
+  
+  try {
+    // Extract pattern and flags
+    const lastSlashIndex = key.lastIndexOf('/');
+    const pattern = key.slice(1, lastSlashIndex);
+    const flags = key.slice(lastSlashIndex + 1);
+    
+    return new RegExp(pattern, flags);
+  } catch {
+    // Invalid regex pattern
+    console.warn(`Invalid regex key: ${key}`);
+    return null;
+  }
+}
+
+/**
+ * Check if a regex key matches content
+ */
+function checkRegexMatch(regex: RegExp, content: string): boolean {
+  try {
+    // Reset regex state (for global flag)
+    regex.lastIndex = 0;
+    return regex.test(content);
+  } catch {
+    return false;
+  }
+}
+
+// ============================================
+// SCANNING FUNCTIONS
+// ============================================
+
 /**
  * Scan messages for lorebook entries
  * @param messages Chat messages to scan
@@ -147,6 +214,7 @@ export function scanForLorebookEntries(
 
 /**
  * Check if keys match in content
+ * Supports both plain text and regex keys
  */
 function checkKeyMatch(
   keys: string[],
@@ -163,6 +231,23 @@ function checkKeyMatch(
   for (const key of keys) {
     if (!key.trim()) continue;
 
+    // Check if this is a regex key
+    if (isRegexKey(key)) {
+      const regex = parseRegexKey(key);
+      if (regex) {
+        // For regex, we test against both content and user message
+        // Note: regex handles its own case sensitivity via flags
+        const inContent = checkRegexMatch(regex, content);
+        const inUserMsg = checkRegexMatch(regex, lastUserMessage);
+        
+        if (inContent || inUserMsg) {
+          matchedKeys.push(key);
+        }
+      }
+      continue;
+    }
+
+    // Standard plaintext matching
     const keyToCheck = caseSensitive ? key : key.toLowerCase();
     
     // Check in combined content and last user message
@@ -230,6 +315,40 @@ export function getEntriesByPosition(
   position: number
 ): LorebookScanResult[] {
   return results.filter(r => r.entry.position === position);
+}
+
+/**
+ * Get entries by outlet name
+ */
+export function getEntriesByOutlet(
+  results: LorebookScanResult[],
+  outletName: string
+): LorebookScanResult[] {
+  return results.filter(r => 
+    r.entry.position === 7 && 
+    r.entry.outletName === outletName
+  );
+}
+
+/**
+ * Group entries by their outlet name (for position 7)
+ */
+export function groupByOutlet(
+  results: LorebookScanResult[]
+): Map<string, LorebookScanResult[]> {
+  const outlets = new Map<string, LorebookScanResult[]>();
+  
+  for (const result of results) {
+    if (result.entry.position === 7 && result.entry.outletName) {
+      const name = result.entry.outletName;
+      if (!outlets.has(name)) {
+        outlets.set(name, []);
+      }
+      outlets.get(name)!.push(result);
+    }
+  }
+  
+  return outlets;
 }
 
 /**

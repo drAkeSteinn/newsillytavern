@@ -41,19 +41,28 @@ import {
   Save,
   Sparkles,
   Clock,
-  Info
+  Info,
+  Database
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_SUMMARY_SETTINGS } from '@/types';
 
 export function MemorySettingsPanel() {
-  const { summarySettings, setSummarySettings } = useTavernStore();
+  const { summarySettings, setSummarySettings, settings, updateSettings } = useTavernStore();
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
   
   // Ensure promptTemplate exists with default fallback
   const promptTemplate = summarySettings.promptTemplate ?? DEFAULT_SUMMARY_SETTINGS.promptTemplate ?? '';
   const [localPrompt, setLocalPrompt] = useState(promptTemplate);
+  
+  // Context settings with defaults
+  const contextSettings = settings.context ?? {
+    maxMessages: 50,
+    maxTokens: 4096,
+    keepFirstN: 1,
+    keepLastN: 20,
+  };
 
   // Update local prompt when settings change
   const handlePromptSave = useCallback(() => {
@@ -68,8 +77,105 @@ export function MemorySettingsPanel() {
     setSummarySettings({ promptTemplate: defaultPrompt });
   }, [setSummarySettings]);
 
+  // Update context settings helper
+  const updateContextSettings = useCallback((updates: Partial<typeof contextSettings>) => {
+    updateSettings({
+      context: { ...contextSettings, ...updates }
+    });
+  }, [contextSettings, updateSettings]);
+
   return (
     <div className="space-y-6">
+      {/* Context Limits Card - Moved from Contexto tab */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="w-4 h-4 text-cyan-500" />
+            Límites de Contexto
+          </CardTitle>
+          <CardDescription>
+            Controla cuántos mensajes se envían al LLM. Un contexto más pequeño ahorra tokens,
+            mientras que un contexto más grande mantiene más historial.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Max Messages Slider */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <Label>Máximo de Mensajes</Label>
+              <span className="text-muted-foreground">{contextSettings.maxMessages}</span>
+            </div>
+            <Slider
+              value={[contextSettings.maxMessages]}
+              min={10}
+              max={200}
+              step={5}
+              onValueChange={([maxMessages]) => updateContextSettings({ maxMessages })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Ventana deslizante de mensajes. Los mensajes más antiguos se excluyen.
+            </p>
+          </div>
+
+          {/* Max Tokens Slider */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <Label>Límite de Tokens</Label>
+              <span className="text-muted-foreground">{contextSettings.maxTokens}</span>
+            </div>
+            <Slider
+              value={[contextSettings.maxTokens]}
+              min={1024}
+              max={128000}
+              step={512}
+              onValueChange={([maxTokens]) => updateContextSettings({ maxTokens })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Presupuesto de tokens para el historial. Se ajusta según el proveedor.
+            </p>
+          </div>
+
+          {/* Keep First/Last N */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Conservar Primeros N</Label>
+              <Input
+                type="number"
+                value={contextSettings.keepFirstN}
+                onChange={(e) => updateContextSettings({ keepFirstN: parseInt(e.target.value) || 1 })}
+                min={0}
+                max={10}
+                className="h-9"
+              />
+              <p className="text-xs text-muted-foreground">Mensaje de saludo</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Conservar Últimos N</Label>
+              <Input
+                type="number"
+                value={contextSettings.keepLastN}
+                onChange={(e) => updateContextSettings({ keepLastN: parseInt(e.target.value) || 20 })}
+                min={5}
+                max={50}
+                className="h-9"
+              />
+              <p className="text-xs text-muted-foreground">Mensajes recientes</p>
+            </div>
+          </div>
+
+          {/* Info box */}
+          <div className="p-3 rounded-lg bg-muted/30 text-xs space-y-1">
+            <p className="font-medium">¿Cómo funciona la ventana deslizante?</p>
+            <ul className="text-muted-foreground space-y-1">
+              <li>• Los mensajes se excluyen del centro cuando exceden el límite.</li>
+              <li>• El mensaje de saludo siempre se conserva.</li>
+              <li>• Los últimos N mensajes recientes siempre se incluyen.</li>
+              <li>• El límite de tokens tiene prioridad sobre el conteo de mensajes.</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main Enable/Disable */}
       <Card className="border-2">
         <CardHeader className="pb-3">

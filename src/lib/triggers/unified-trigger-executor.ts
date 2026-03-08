@@ -43,6 +43,7 @@ export interface TriggerExecutionContext {
   characterId: string;              // Quién completó el objetivo/misión
   character: CharacterCard;         // Personaje que recibe el trigger
   allCharacters?: CharacterCard[];  // Para grupos - todos los personajes
+  targetCharacterId?: string;       // ID del personaje objetivo cuando targetMode es 'target'
   source: 'objective' | 'quest_completion' | 'manual';
   timestamp: number;
   
@@ -1166,8 +1167,16 @@ function getTargetCharacters(
       return context.character ? [context.character] : [];
       
     case 'target':
-      // Specific target - for now, same as self
-      // Could be extended with a targetId parameter
+      // Specific target character
+      if (context.targetCharacterId && context.allCharacters) {
+        const targetChar = context.allCharacters.find(
+          (c: CharacterCard) => c.id === context.targetCharacterId
+        );
+        if (targetChar) {
+          return [targetChar];
+        }
+      }
+      // Fallback to self if target not found
       return context.character ? [context.character] : [];
       
     default:

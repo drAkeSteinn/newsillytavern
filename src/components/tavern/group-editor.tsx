@@ -45,7 +45,9 @@ import {
   Settings,
   Layers,
   BookOpen,
-  ScrollText
+  ScrollText,
+  Package,
+  Palette
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import type { GroupMember, GroupActivationStrategy } from '@/types';
@@ -62,37 +64,43 @@ const strategyInfo: Record<GroupActivationStrategy, {
   name: string; 
   description: string; 
   icon: React.ReactNode;
-  tip: string 
+  tip: string;
+  color: string;
 }> = {
   all: { 
     name: 'Todos Responden', 
     description: 'Todos los miembros activos responden',
     icon: <Users className="w-3.5 h-3.5" />,
-    tip: 'Ideal para conversaciones grupales animadas.'
+    tip: 'Ideal para conversaciones grupales animadas.',
+    color: 'emerald'
   },
   round_robin: { 
     name: 'Por Turno', 
     description: 'Los miembros responden en orden',
     icon: <RefreshCw className="w-3.5 h-3.5" />,
-    tip: 'Útil para mantener un flujo ordenado.'
+    tip: 'Útil para mantener un flujo ordenado.',
+    color: 'blue'
   },
   random: { 
     name: 'Aleatorio', 
     description: 'Miembro(s) aleatorio(s) responden',
     icon: <Shuffle className="w-3.5 h-3.5" />,
-    tip: 'Crea dinamismo y sorpresa.'
+    tip: 'Crea dinamismo y sorpresa.',
+    color: 'purple'
   },
   reactive: { 
     name: 'Reactivo', 
     description: 'Solo los mencionados responden',
     icon: <Zap className="w-3.5 h-3.5" />,
-    tip: 'Los personajes responden al ser mencionados.'
+    tip: 'Los personajes responden al ser mencionados.',
+    color: 'amber'
   },
   smart: { 
     name: 'Inteligente', 
     description: 'La IA decide quién responde',
     icon: <Brain className="w-3.5 h-3.5" />,
-    tip: 'El modelo elige el personaje más apropiado.'
+    tip: 'El modelo elige el personaje más apropiado.',
+    color: 'cyan'
   }
 };
 
@@ -297,305 +305,446 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       <div className="flex flex-col h-full overflow-hidden">
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-[1fr_1fr] gap-6 p-6">
-            {/* Left Column: Basic Info & Members */}
-            <div className="space-y-4">
-              {/* Basic Info */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="name" className="text-xs">Nombre del Grupo *</Label>
-                    <Input
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Nombre..."
-                      className="mt-1 h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Estilo de Conversación</Label>
-                    <Select
-                      value={conversationStyle}
-                      onValueChange={(v) => setConversationStyle(v as 'sequential' | 'parallel')}
-                    >
-                      <SelectTrigger className="mt-1 h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sequential">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <RefreshCw className="w-3 h-3" />
-                            Secuencial
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="parallel">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <Sparkles className="w-3 h-3" />
-                            Paralelo
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <div className="space-y-4 p-4">
+            {/* Banner informativo */}
+            <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-lg p-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                  <Users className="w-5 h-5 text-indigo-500" />
                 </div>
-
-                <div>
-                  <Label htmlFor="description" className="text-xs">Descripción / Escenario</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe el escenario..."
-                    rows={2}
-                    className="mt-1 text-sm"
-                  />
-                </div>
-
-                {/* HUD Selector */}
-                <div className="pt-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Layers className="w-3.5 h-3.5 text-muted-foreground" />
-                    <Label className="text-xs">Plantilla HUD</Label>
-                  </div>
-                  <HUDSelector
-                    value={hudTemplateId}
-                    onChange={setHudTemplateId}
-                    placeholder="Sin HUD asignado"
-                  />
-                </div>
-
-                {/* Lorebook Selector */}
-                <div className="pt-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
-                    <Label className="text-xs">Lorebooks</Label>
-                  </div>
-                  <LorebookSelector
-                    value={lorebookIds}
-                    onChange={setLorebookIds}
-                    placeholder="Sin lorebooks asignados"
-                  />
-                </div>
-
-                {/* Quest Templates Selector */}
-                <div className="pt-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ScrollText className="w-3.5 h-3.5 text-muted-foreground" />
-                    <Label className="text-xs">Misiones</Label>
-                  </div>
-                  <QuestSelector
-                    value={questTemplateIds}
-                    onChange={setQuestTemplateIds}
-                    placeholder="Sin misiones asignadas"
-                  />
-                </div>
-              </div>
-
-              {/* Members */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium text-sm flex items-center gap-1.5">
-                    <Users className="w-4 h-4" />
-                    Miembros ({memberCharacters.length})
-                  </h3>
-                </div>
-
-                {/* Add Member */}
-                <div className="flex gap-2">
-                  <Select value={selectedCharacterId} onValueChange={setSelectedCharacterId}>
-                    <SelectTrigger className="flex-1 h-8">
-                      <SelectValue placeholder="Seleccionar personaje..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCharacters.length === 0 ? (
-                        <div className="px-2 py-3 text-center text-xs text-muted-foreground">
-                          No hay personajes disponibles
-                        </div>
-                      ) : (
-                        availableCharacters.map((char) => (
-                          <SelectItem key={char.id} value={char.id}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-full overflow-hidden bg-muted flex-shrink-0">
-                                {char.avatar ? (
-                                  <img src={char.avatar} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-600">
-                                    <span className="text-white text-[10px] font-bold">{char.name[0]}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <span className="text-sm">{char.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    onClick={handleAddMember} 
-                    disabled={!selectedCharacterId}
-                    size="sm"
-                    className="h-8"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Member List */}
-                <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1">
-                  {memberCharacters.map((member, index) => (
-                    <div
-                      key={member.characterId}
-                      className="flex items-center gap-3 p-2 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
-                    >
-                      {/* Avatar */}
-                      <div className="w-9 h-9 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        {member.character?.avatar ? (
-                          <img 
-                            src={member.character.avatar} 
-                            alt={member.character.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-600">
-                            <span className="text-white font-bold text-sm">
-                              {member.character?.name?.[0]?.toUpperCase() || '?'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{member.character?.name}</p>
-                        
-                        {/* Status */}
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <Badge 
-                            variant={member.isActive ? 'default' : 'secondary'}
-                            className="text-[10px] cursor-pointer py-0 px-1"
-                            onClick={() => handleToggleActive(member.characterId)}
-                          >
-                            {member.isActive ? 'Activo' : 'Inactivo'}
-                          </Badge>
-                          <Badge 
-                            variant={member.isPresent ? 'outline' : 'secondary'}
-                            className="text-[10px] cursor-pointer py-0 px-1"
-                            onClick={() => handleTogglePresent(member.characterId)}
-                          >
-                            {member.isPresent ? 'Presente' : 'Ausente'}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {/* Remove */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveMember(member.characterId)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-
-                  {memberCharacters.length === 0 && (
-                    <div className="text-xs text-muted-foreground text-center py-6 border-2 border-dashed rounded-lg">
-                      <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                      <p>Sin miembros aún</p>
-                    </div>
-                  )}
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-indigo-600">
+                    {isNewGroup ? 'Crear Nuevo Grupo' : 'Editar Grupo'}
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Los grupos permiten que <strong>múltiples personajes</strong> interactúen en una misma conversación.
+                    Configura la <strong>estrategia de respuesta</strong> y los <strong>miembros</strong> del grupo.
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Strategy & Settings */}
-            <div className="space-y-4">
-              {/* Strategy Settings */}
-              <div className="space-y-3">
-                <h3 className="font-medium text-sm flex items-center gap-1.5">
-                  <MessageSquare className="w-4 h-4" />
-                  Estrategia de Respuesta
-                </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Left Column: Basic Info & Members */}
+              <div className="space-y-4">
+                {/* Sección: Información Básica */}
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                    <Palette className="w-3.5 h-3.5" />
+                    <span className="font-medium">Información Básica</span>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(strategyInfo).map(([key, info]) => (
-                    <button
-                      key={key}
-                      onClick={() => setActivationStrategy(key as GroupActivationStrategy)}
-                      className={cn(
-                        "p-2.5 rounded-lg border text-left transition-colors",
-                        activationStrategy === key 
-                          ? "border-primary bg-primary/10" 
-                          : "hover:bg-muted/50"
-                      )}
-                    >
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <div className="flex items-center gap-1.5 mb-1">
-                        {info.icon}
-                        <span className="text-xs font-medium">{info.name}</span>
+                        <Label htmlFor="name" className="text-xs">Nombre del Grupo *</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Un nombre descriptivo para identificar el grupo.</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{info.description}</p>
-                    </button>
-                  ))}
-                </div>
+                      <Input
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Nombre..."
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Label className="text-xs">Estilo de Conversación</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p><strong>Secuencial:</strong> Un personaje a la vez. <strong>Paralelo:</strong> Todos responden simultáneamente.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Select
+                        value={conversationStyle}
+                        onValueChange={(v) => setConversationStyle(v as 'sequential' | 'parallel')}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sequential">
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <RefreshCw className="w-3 h-3 text-blue-500" />
+                              Secuencial
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="parallel">
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Sparkles className="w-3 h-3 text-purple-500" />
+                              Paralelo
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-                <div className="p-2.5 rounded-lg bg-muted/50 border">
-                  <p className="text-xs text-primary">
-                    💡 {strategyInfo[activationStrategy].tip}
-                  </p>
-                </div>
-
-                {activationStrategy !== 'all' && (
                   <div>
-                    <Label htmlFor="maxResponses" className="text-xs">Máx. Respuestas por Turno</Label>
-                    <Input
-                      id="maxResponses"
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={maxResponsesPerTurn}
-                      onChange={(e) => setMaxResponsesPerTurn(parseInt(e.target.value) || 1)}
-                      className="mt-1 w-20 h-8"
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Label htmlFor="description" className="text-xs">Descripción / Escenario</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Describe el escenario o contexto del grupo.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe el escenario del grupo..."
+                      rows={2}
+                      className="text-sm"
                     />
                   </div>
-                )}
+                </div>
+
+                {/* Sección: Asignaciones */}
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    <Package className="w-3.5 h-3.5" />
+                    <span className="font-medium">Asignaciones</span>
+                  </div>
+
+                  {/* HUD Selector */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                      <Label className="text-xs">Plantilla HUD</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Plantilla HUD para mostrar estadísticas del grupo.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <HUDSelector
+                      value={hudTemplateId}
+                      onChange={setHudTemplateId}
+                      placeholder="Sin HUD asignado"
+                    />
+                  </div>
+
+                  {/* Lorebook Selector */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                      <Label className="text-xs">Lorebooks</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Lorebooks compartidos por todos los miembros del grupo.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <LorebookSelector
+                      value={lorebookIds}
+                      onChange={setLorebookIds}
+                      placeholder="Sin lorebooks asignados"
+                    />
+                  </div>
+
+                  {/* Quest Templates Selector */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <ScrollText className="w-3.5 h-3.5 text-purple-500" />
+                      <Label className="text-xs">Misiones</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Misiones disponibles para el grupo.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <QuestSelector
+                      value={questTemplateIds}
+                      onChange={setQuestTemplateIds}
+                      placeholder="Sin misiones asignadas"
+                    />
+                  </div>
+                </div>
+
+                {/* Sección: Miembros */}
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Users className="w-3.5 h-3.5" />
+                      <span className="font-medium">Miembros</span>
+                      <Badge variant="secondary" className="text-xs">{memberCharacters.length}</Badge>
+                    </div>
+                  </div>
+
+                  {/* Add Member */}
+                  <div className="flex gap-2">
+                    <Select value={selectedCharacterId} onValueChange={setSelectedCharacterId}>
+                      <SelectTrigger className="flex-1 h-8">
+                        <SelectValue placeholder="Seleccionar personaje..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCharacters.length === 0 ? (
+                          <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            No hay personajes disponibles
+                          </div>
+                        ) : (
+                          availableCharacters.map((char) => (
+                            <SelectItem key={char.id} value={char.id}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                  {char.avatar ? (
+                                    <img src={char.avatar} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-600">
+                                      <span className="text-white text-[10px] font-bold">{char.name[0]}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="text-sm">{char.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      onClick={handleAddMember} 
+                      disabled={!selectedCharacterId}
+                      size="sm"
+                      className="h-8"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Member List */}
+                  <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
+                    {memberCharacters.map((member, index) => (
+                      <div
+                        key={member.characterId}
+                        className="flex items-center gap-3 p-2 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+                      >
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                          {member.character?.avatar ? (
+                            <img 
+                              src={member.character.avatar} 
+                              alt={member.character.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-600">
+                              <span className="text-white font-bold text-sm">
+                                {member.character?.name?.[0]?.toUpperCase() || '?'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{member.character?.name}</p>
+                          
+                          {/* Status */}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Badge 
+                              variant={member.isActive ? 'default' : 'secondary'}
+                              className={cn(
+                                "text-[10px] cursor-pointer py-0 px-1",
+                                member.isActive && "bg-emerald-500/20 text-emerald-600 hover:bg-emerald-500/30"
+                              )}
+                              onClick={() => handleToggleActive(member.characterId)}
+                            >
+                              {member.isActive ? 'Activo' : 'Inactivo'}
+                            </Badge>
+                            <Badge 
+                              variant={member.isPresent ? 'outline' : 'secondary'}
+                              className={cn(
+                                "text-[10px] cursor-pointer py-0 px-1",
+                                member.isPresent && "border-blue-500/30 text-blue-600"
+                              )}
+                              onClick={() => handleTogglePresent(member.characterId)}
+                            >
+                              {member.isPresent ? 'Presente' : 'Ausente'}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Remove */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveMember(member.characterId)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    {memberCharacters.length === 0 && (
+                      <div className="text-xs text-muted-foreground text-center py-6 border-2 border-dashed rounded-lg">
+                        <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p>Sin miembros aún</p>
+                        <p className="text-[10px] mt-1">Agrega personajes al grupo</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Mentions */}
-              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50">
-                <div>
-                  <Label className="text-sm">Detección de Menciones</Label>
-                  <p className="text-xs text-muted-foreground">Detectar nombres en mensajes</p>
-                </div>
-                <Switch
-                  checked={allowMentions}
-                  onCheckedChange={setAllowMentions}
-                />
-              </label>
+              {/* Right Column: Strategy & Settings */}
+              <div className="space-y-4">
+                {/* Sección: Estrategia de Respuesta */}
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span className="font-medium">Estrategia de Respuesta</span>
+                  </div>
 
-              {/* Custom System Prompt */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Label htmlFor="systemPrompt" className="text-xs">Prompt de Sistema Personalizado</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Instrucciones adicionales para todos los personajes del grupo.</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(strategyInfo).map(([key, info]) => (
+                      <button
+                        key={key}
+                        onClick={() => setActivationStrategy(key as GroupActivationStrategy)}
+                        className={cn(
+                          "p-2.5 rounded-lg border text-left transition-colors",
+                          activationStrategy === key 
+                            ? "border-primary bg-primary/10" 
+                            : "hover:bg-muted/50 border-border/40"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={cn(
+                            activationStrategy === key && key === 'all' && "text-emerald-500",
+                            activationStrategy === key && key === 'round_robin' && "text-blue-500",
+                            activationStrategy === key && key === 'random' && "text-purple-500",
+                            activationStrategy === key && key === 'reactive' && "text-amber-500",
+                            activationStrategy === key && key === 'smart' && "text-cyan-500",
+                          )}>
+                            {info.icon}
+                          </span>
+                          <span className="text-xs font-medium">{info.name}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">{info.description}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className={cn(
+                    "p-2.5 rounded-lg border",
+                    strategyInfo[activationStrategy].color === 'emerald' && "bg-emerald-500/10 border-emerald-500/20",
+                    strategyInfo[activationStrategy].color === 'blue' && "bg-blue-500/10 border-blue-500/20",
+                    strategyInfo[activationStrategy].color === 'purple' && "bg-purple-500/10 border-purple-500/20",
+                    strategyInfo[activationStrategy].color === 'amber' && "bg-amber-500/10 border-amber-500/20",
+                    strategyInfo[activationStrategy].color === 'cyan' && "bg-cyan-500/10 border-cyan-500/20"
+                  )}>
+                    <p className={cn(
+                      "text-xs",
+                      strategyInfo[activationStrategy].color === 'emerald' && "text-emerald-600",
+                      strategyInfo[activationStrategy].color === 'blue' && "text-blue-600",
+                      strategyInfo[activationStrategy].color === 'purple' && "text-purple-600",
+                      strategyInfo[activationStrategy].color === 'amber' && "text-amber-600",
+                      strategyInfo[activationStrategy].color === 'cyan' && "text-cyan-600"
+                    )}>
+                      💡 {strategyInfo[activationStrategy].tip}
+                    </p>
+                  </div>
+
+                  {activationStrategy !== 'all' && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Label htmlFor="maxResponses" className="text-xs">Máx. Respuestas por Turno</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Número máximo de personajes que responderán por turno.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="maxResponses"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={maxResponsesPerTurn}
+                        onChange={(e) => setMaxResponsesPerTurn(parseInt(e.target.value) || 1)}
+                        className="w-20 h-8"
+                      />
+                    </div>
+                  )}
                 </div>
-                <Textarea
-                  id="systemPrompt"
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  placeholder="Instrucciones adicionales para el grupo..."
-                  rows={4}
-                  className="text-sm"
-                />
+
+                {/* Mentions */}
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/40">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium">Detección de Menciones</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Cuando está activo, los personajes responderán cuando sean mencionados por nombre.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">Detectar nombres en mensajes</p>
+                  </div>
+                  <Switch
+                    checked={allowMentions}
+                    onCheckedChange={setAllowMentions}
+                  />
+                </div>
+
+                {/* Custom System Prompt */}
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs font-medium">Prompt de Sistema Personalizado</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Instrucciones adicionales para todos los personajes del grupo.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Textarea
+                    id="systemPrompt"
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    placeholder="Instrucciones adicionales para el grupo..."
+                    rows={4}
+                    className="text-sm font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Este prompt se añadirá a las instrucciones de cada personaje del grupo.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

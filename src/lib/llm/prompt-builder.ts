@@ -51,6 +51,7 @@ export const SECTION_COLORS = {
   example_dialogue: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:bg-cyan-300',
   character_note: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
   lorebook: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  author_note: 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300',
   post_history: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
   chat_history: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   instructions: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
@@ -405,8 +406,20 @@ export function buildSystemPrompt(
     });
   }
 
+  // Add character's note (user-defined instructions for this character)
+  // NOTE: According to SillyTavern docs, Character Notes comes BEFORE Example Dialogue
+  if (character.characterNote) {
+    sections.push({
+      type: 'character_note',
+      label: "Character's Note",
+      content: character.characterNote,
+      color: SECTION_COLORS.character_note
+    });
+  }
+
   // Add example messages (important for few-shot learning)
   // Format them with SillyTavern-style <START> blocks
+  // NOTE: According to SillyTavern docs, Example Dialogue comes AFTER Character Notes
   if (character.mesExample) {
     const formattedExamples = processExampleDialogue(
       character.mesExample,
@@ -418,16 +431,6 @@ export function buildSystemPrompt(
       label: 'Example Dialogue',
       content: formattedExamples,
       color: SECTION_COLORS.example_dialogue
-    });
-  }
-
-  // Add character's note (user-defined instructions for this character)
-  if (character.characterNote) {
-    sections.push({
-      type: 'character_note',
-      label: "Character's Note",
-      content: character.characterNote,
-      color: SECTION_COLORS.character_note
     });
   }
 
@@ -467,6 +470,39 @@ export function buildLorebookSectionForPrompt(
   return {
     section: result.lorebookSection,
     result
+  };
+}
+
+/**
+ * Build author's note section
+ * This section is injected AFTER the chat history, BEFORE post-history instructions
+ * 
+ * According to SillyTavern docs, the order is:
+ * 1. Chat History
+ * 2. Author's Note (this)
+ * 3. Post-History Instructions
+ * 
+ * @param authorNote - Raw author's note text (may contain {{keys}})
+ * @param keyContext - Key resolution context (optional, for resolving keys)
+ */
+export function buildAuthorNoteSection(
+  authorNote: string | undefined,
+  keyContext?: KeyResolutionContext
+): PromptSection | null {
+  if (!authorNote?.trim()) {
+    return null;
+  }
+
+  // Resolve all keys if keyContext is provided
+  const resolvedContent = keyContext 
+    ? resolveAllKeys(authorNote, keyContext)
+    : authorNote;
+
+  return {
+    type: 'author_note',
+    label: "Author's Note",
+    content: resolvedContent,
+    color: SECTION_COLORS.author_note
   };
 }
 
@@ -533,7 +569,8 @@ export function buildChatHistorySections(
  * Order (SillyTavern style):
  * 1. System message (system prompt)
  * 2. Chat history
- * 3. Post-History Instructions (injected AFTER chat, as system message)
+ * 3. Author's Note (injected AFTER chat history, as system message)
+ * 4. Post-History Instructions (injected AFTER Author's Note, as system message)
  */
 export function buildChatMessages(
   systemPrompt: string,
@@ -541,6 +578,7 @@ export function buildChatMessages(
   character: CharacterCard,
   userName: string = 'User',
   postHistoryInstructions?: string,
+  authorNote?: string,
   useSystemRole: boolean = false
 ): ChatApiMessage[] {
   const chatMessages: ChatApiMessage[] = [];
@@ -562,7 +600,16 @@ export function buildChatMessages(
     }
   }
 
-  // 3. Post-History Instructions - injected AFTER chat history
+  // 3. Author's Note - injected AFTER chat history, BEFORE post-history instructions
+  // This is the correct SillyTavern behavior
+  if (authorNote?.trim()) {
+    chatMessages.push({
+      role: 'system',
+      content: authorNote
+    });
+  }
+
+  // 4. Post-History Instructions - injected AFTER Author's Note
   // This is the correct SillyTavern behavior
   if (postHistoryInstructions?.trim()) {
     chatMessages.push({
@@ -576,9 +623,16 @@ export function buildChatMessages(
 
 /**
  * Build prompt for completion-style APIs (Ollama, KoboldCPP, etc.)
+ * 
+ * Order (SillyTavern style):
+ * 1. System prompt
+ * 2. Chat history
+ * 3. Author's Note
+ * 4. Post-History Instructions
+ * 5. Assistant prefix
  */
 export function buildCompletionPrompt(config: CompletionPromptConfig): string {
-  const { systemPrompt, messages, character, userName, postHistoryInstructions } = config;
+  const { systemPrompt, messages, character, userName, postHistoryInstructions, authorNote } = config;
   const parts: string[] = [];
 
   parts.push(systemPrompt);
@@ -594,6 +648,12 @@ export function buildCompletionPrompt(config: CompletionPromptConfig): string {
     }
   }
 
+  // Author's Note - injected AFTER chat history, BEFORE post-history instructions
+  if (authorNote?.trim()) {
+    parts.push(`\n[Author's Note]\n${authorNote}`);
+  }
+
+  // Post-History Instructions - injected AFTER Author's Note
   if (postHistoryInstructions) {
     parts.push(`\n${postHistoryInstructions}`);
   }
@@ -704,7 +764,19 @@ export function buildGroupSystemPrompt(
     });
   }
 
+  // Add character's note
+  // NOTE: According to SillyTavern docs, Character Notes comes BEFORE Example Dialogue
+  if (character.characterNote) {
+    sections.push({
+      type: 'character_note',
+      label: `${character.name}'s Note`,
+      content: character.characterNote,
+      color: SECTION_COLORS.character_note
+    });
+  }
+
   // Add example messages (formatted with SillyTavern-style <START> blocks)
+  // NOTE: According to SillyTavern docs, Example Dialogue comes AFTER Character Notes
   if (character.mesExample) {
     const formattedExamples = processExampleDialogue(
       character.mesExample,
@@ -716,16 +788,6 @@ export function buildGroupSystemPrompt(
       label: `Example Dialogue for ${character.name}`,
       content: formattedExamples,
       color: SECTION_COLORS.example_dialogue
-    });
-  }
-
-  // Add character's note
-  if (character.characterNote) {
-    sections.push({
-      type: 'character_note',
-      label: `${character.name}'s Note`,
-      content: character.characterNote,
-      color: SECTION_COLORS.character_note
     });
   }
 
@@ -755,7 +817,8 @@ export function buildGroupSystemPrompt(
  * 1. System message (system prompt)
  * 2. Chat history (all visible messages)
  * 3. Previous responses from this turn
- * 4. Post-History Instructions (injected AFTER chat, as system message)
+ * 4. Author's Note (injected AFTER chat history, as system message)
+ * 5. Post-History Instructions (injected AFTER Author's Note, as system message)
  */
 export function buildGroupChatMessages(
   systemPrompt: string,
@@ -764,7 +827,8 @@ export function buildGroupChatMessages(
   allCharacters: CharacterCard[],
   userName: string = 'User',
   previousResponses?: Array<{ characterName: string; content: string }>,
-  postHistoryInstructions?: string
+  postHistoryInstructions?: string,
+  authorNote?: string
 ): GroupPromptBuildResult {
   const chatMessages: ChatApiMessage[] = [];
 
@@ -799,7 +863,16 @@ export function buildGroupChatMessages(
     }
   }
 
-  // 4. Post-History Instructions - injected AFTER chat history
+  // 4. Author's Note - injected AFTER chat history, BEFORE post-history instructions
+  // This is the correct SillyTavern behavior
+  if (authorNote?.trim()) {
+    chatMessages.push({
+      role: 'system',
+      content: authorNote
+    });
+  }
+
+  // 5. Post-History Instructions - injected AFTER Author's Note
   // This is the correct SillyTavern behavior
   if (postHistoryInstructions?.trim()) {
     chatMessages.push({
@@ -862,6 +935,7 @@ export function processCharacter(
     systemPrompt: resolveAllKeys(character.systemPrompt, keyContext),
     postHistoryInstructions: resolveAllKeys(character.postHistoryInstructions, keyContext),
     characterNote: resolveAllKeys(character.characterNote, keyContext),
+    authorNote: resolveAllKeys(character.authorNote, keyContext),
     alternateGreetings: character.alternateGreetings.map(greeting =>
       resolveAllKeys(greeting, keyContext)
     )

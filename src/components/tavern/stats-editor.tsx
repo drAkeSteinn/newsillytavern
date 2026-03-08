@@ -44,6 +44,8 @@ import {
   CaseSensitive,
   Minus,
   Coins,
+  Gift,
+  X,
 } from 'lucide-react';
 import type {
   CharacterStatsConfig,
@@ -56,8 +58,16 @@ import type {
   RequirementOperator,
   ActivationCost,
   CostOperator,
+  QuestReward,
+  TriggerCategory,
+  TriggerTargetMode,
 } from '@/types';
 import { DEFAULT_STATS_BLOCK_HEADERS, DEFAULT_STATS_CONFIG } from '@/types';
+import {
+  createTriggerReward,
+  describeReward,
+  normalizeReward,
+} from '@/lib/quest/quest-reward-utils';
 
 interface StatsEditorProps {
   statsConfig: CharacterStatsConfig | undefined;
@@ -1176,6 +1186,193 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
               ))}
               {(skill.activationCosts || []).length === 0 && (
                 <p className="text-xs text-muted-foreground italic">Sin costos - activación gratuita</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Activation Rewards Section - Trigger Type Only */}
+          <div className="space-y-2 pt-2 border-t border-green-500/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Gift className="w-3.5 h-3.5 text-green-400" />
+                <Label className="text-xs font-medium text-green-400">Recompensas por Activación</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Triggers que se ejecutan cuando se activa la habilidad.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Sprites, sonidos, fondos o secuencias de sonido.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs border-green-500/30 hover:bg-green-500/10"
+                onClick={() => {
+                  const newReward = createTriggerReward('sprite', '', 'self', { id: `skill-reward-${Date.now().toString(36)}` });
+                  onChange(index, { activationRewards: [...(skill.activationRewards || []), newReward] });
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1" /> Agregar Trigger
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {(skill.activationRewards || []).map((reward, rewardIdx) => {
+                const normalized = normalizeReward(reward);
+                const isTrig = normalized.type === 'trigger';
+                
+                return (
+                  <div key={reward.id} className="p-2 rounded bg-green-500/5 border border-green-500/10 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] text-green-400 border-green-500/30">
+                        ⚡ Trigger
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {describeReward(normalized)}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
+                        onClick={() => {
+                          onChange(index, { 
+                            activationRewards: (skill.activationRewards || []).filter((_, i) => i !== rewardIdx) 
+                          });
+                        }}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    
+                    {isTrig && normalized.trigger && (
+                      <>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Select 
+                            value={normalized.trigger.category} 
+                            onValueChange={(v) => {
+                              const updatedRewards = [...(skill.activationRewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                trigger: { ...normalized.trigger!, category: v as TriggerCategory }
+                              };
+                              onChange(index, { activationRewards: updatedRewards });
+                            }}
+                          >
+                            <SelectTrigger className="bg-background h-6 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                              <SelectItem value="sound">🔊 Sonido</SelectItem>
+                              <SelectItem value="background">🌄 Fondo</SelectItem>
+                              <SelectItem value="soundSequence">🎵 Secuencia</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={normalized.trigger.key}
+                            onChange={(e) => {
+                              const updatedRewards = [...(skill.activationRewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                trigger: { ...normalized.trigger!, key: e.target.value }
+                              };
+                              onChange(index, { activationRewards: updatedRewards });
+                            }}
+                            placeholder="Key del trigger"
+                            className="bg-background h-6 text-xs"
+                          />
+                          <Select 
+                            value={normalized.trigger.targetMode} 
+                            onValueChange={(v) => {
+                              const updatedRewards = [...(skill.activationRewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
+                              };
+                              onChange(index, { activationRewards: updatedRewards });
+                            }}
+                          >
+                            <SelectTrigger className="bg-background h-6 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="self">👤 Self</SelectItem>
+                              <SelectItem value="all">👥 Todos</SelectItem>
+                              <SelectItem value="target">🎯 Target</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Extra options based on category */}
+                        {normalized.trigger.category === 'sprite' && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-[10px] text-muted-foreground">Volver a idle (ms):</Label>
+                            <Input
+                              type="number"
+                              value={normalized.trigger.returnToIdleMs || 0}
+                              onChange={(e) => {
+                                const updatedRewards = [...(skill.activationRewards || [])];
+                                updatedRewards[rewardIdx] = {
+                                  ...reward,
+                                  trigger: { ...normalized.trigger!, returnToIdleMs: Number(e.target.value) }
+                                };
+                                onChange(index, { activationRewards: updatedRewards });
+                              }}
+                              placeholder="0 = no volver"
+                              className="bg-background h-6 w-24 text-xs"
+                            />
+                          </div>
+                        )}
+                        
+                        {normalized.trigger.category === 'sound' && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-[10px] text-muted-foreground">Volumen:</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={normalized.trigger.volume ?? 1}
+                              onChange={(e) => {
+                                const updatedRewards = [...(skill.activationRewards || [])];
+                                updatedRewards[rewardIdx] = {
+                                  ...reward,
+                                  trigger: { ...normalized.trigger!, volume: Number(e.target.value) }
+                                };
+                                onChange(index, { activationRewards: updatedRewards });
+                              }}
+                              className="bg-background h-6 w-20 text-xs"
+                            />
+                          </div>
+                        )}
+                        
+                        {normalized.trigger.category === 'background' && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-[10px] text-muted-foreground">Transición (ms):</Label>
+                            <Input
+                              type="number"
+                              value={normalized.trigger.transitionDuration || 500}
+                              onChange={(e) => {
+                                const updatedRewards = [...(skill.activationRewards || [])];
+                                updatedRewards[rewardIdx] = {
+                                  ...reward,
+                                  trigger: { ...normalized.trigger!, transitionDuration: Number(e.target.value) }
+                                };
+                                onChange(index, { activationRewards: updatedRewards });
+                              }}
+                              className="bg-background h-6 w-24 text-xs"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+              {(skill.activationRewards || []).length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Sin recompensas - solo aplica costos</p>
               )}
             </div>
           </div>

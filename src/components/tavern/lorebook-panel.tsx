@@ -606,9 +606,12 @@ function LorebookEntryEditor({
         <Input
           value={formatKeywords(entry.key)}
           onChange={(e) => onUpdate({ key: parseKeywords(e.target.value) })}
-          placeholder="palabra1, palabra2, palabra3..."
+          placeholder="palabra1, palabra2... o /regex/i"
           className="h-7 text-sm"
         />
+        <p className="text-[10px] text-muted-foreground">
+          Soporta regex: /patrón/flags (ej: /(?:clima|lluvia)/i)
+        </p>
       </div>
 
       {/* Row 3: Secondary Keys */}
@@ -722,6 +725,24 @@ function LorebookEntryEditor({
           />
         </div>
       </div>
+
+      {/* Outlet Name - Only show when position is 7 (Outlet) */}
+      {entry.position === 7 && (
+        <div className="space-y-1.5 p-2 bg-muted/50 rounded border">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs font-medium">Nombre del Outlet</Label>
+          </div>
+          <Input
+            value={entry.outletName || ''}
+            onChange={(e) => onUpdate({ outletName: e.target.value })}
+            placeholder="miOutlet"
+            className="h-7 text-sm"
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Usa {'{{outlet::nombre}}'} en el prompt para insertar este contenido manualmente.
+          </p>
+        </div>
+      )}
 
       {/* Row 6: Toggles in a row */}
       <div className="grid grid-cols-4 gap-1.5">

@@ -100,6 +100,9 @@ import {
   GripHorizontal,
   ChevronDown as ChevronDownIcon,
   Music,
+  FileText,
+  Star,
+  HelpCircle,
 } from 'lucide-react';
 import {
   DndContext,
@@ -1029,62 +1032,95 @@ function SortableObjectiveItem({
                       )}
                       
                       {isTrig && normalized.trigger && (
-                        <div className="grid grid-cols-3 gap-2">
-                          <Select 
-                            value={normalized.trigger.category} 
-                            onValueChange={(v) => {
-                              const updatedRewards = [...(objective.rewards || [])];
-                              updatedRewards[rewardIdx] = {
-                                ...reward,
-                                trigger: { ...normalized.trigger!, category: v as TriggerCategory }
-                              };
-                              onUpdate({ rewards: updatedRewards });
-                            }}
-                          >
-                            <SelectTrigger className="bg-background h-6 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="sprite">🖼️ Sprite</SelectItem>
-                              <SelectItem value="sound">🔊 Sonido</SelectItem>
-                              <SelectItem value="background">🌄 Fondo</SelectItem>
-                              <SelectItem value="soundSequence">🎵 Secuencia</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            value={normalized.trigger.key}
-                            onChange={(e) => {
-                              const updatedRewards = [...(objective.rewards || [])];
-                              updatedRewards[rewardIdx] = {
-                                ...reward,
-                                trigger: { ...normalized.trigger!, key: e.target.value }
-                              };
-                              onUpdate({ rewards: updatedRewards });
-                            }}
-                            placeholder="Key"
-                            className="bg-background h-6 text-xs"
-                          />
-                          <Select 
-                            value={normalized.trigger.targetMode} 
-                            onValueChange={(v) => {
-                              const updatedRewards = [...(objective.rewards || [])];
-                              updatedRewards[rewardIdx] = {
-                                ...reward,
-                                trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
-                              };
-                              onUpdate({ rewards: updatedRewards });
-                            }}
-                          >
-                            <SelectTrigger className="bg-background h-6 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="self">👤 Self</SelectItem>
-                              <SelectItem value="all">👥 Todos</SelectItem>
-                              <SelectItem value="target">🎯 Target</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <>
+                          <div className="grid grid-cols-3 gap-2">
+                            <Select 
+                              value={normalized.trigger.category} 
+                              onValueChange={(v) => {
+                                const updatedRewards = [...(objective.rewards || [])];
+                                updatedRewards[rewardIdx] = {
+                                  ...reward,
+                                  trigger: { ...normalized.trigger!, category: v as TriggerCategory }
+                                };
+                                onUpdate({ rewards: updatedRewards });
+                              }}
+                            >
+                              <SelectTrigger className="bg-background h-6 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                                <SelectItem value="sound">🔊 Sonido</SelectItem>
+                                <SelectItem value="background">🌄 Fondo</SelectItem>
+                                <SelectItem value="soundSequence">🎵 Secuencia</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              value={normalized.trigger.key}
+                              onChange={(e) => {
+                                const updatedRewards = [...(objective.rewards || [])];
+                                updatedRewards[rewardIdx] = {
+                                  ...reward,
+                                  trigger: { ...normalized.trigger!, key: e.target.value }
+                                };
+                                onUpdate({ rewards: updatedRewards });
+                              }}
+                              placeholder="Key"
+                              className="bg-background h-6 text-xs"
+                            />
+                            <Select 
+                              value={normalized.trigger.targetMode} 
+                              onValueChange={(v) => {
+                                const updatedRewards = [...(objective.rewards || [])];
+                                updatedRewards[rewardIdx] = {
+                                  ...reward,
+                                  trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
+                                };
+                                onUpdate({ rewards: updatedRewards });
+                              }}
+                            >
+                              <SelectTrigger className="bg-background h-6 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="self">👤 Self</SelectItem>
+                                <SelectItem value="all">👥 Todos</SelectItem>
+                                <SelectItem value="target">🎯 Target</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {/* Character selector when targetMode is 'target' */}
+                          {normalized.trigger.targetMode === 'target' && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <Select 
+                                value={normalized.trigger.targetCharacterId || ''} 
+                                onValueChange={(v) => {
+                                  const updatedRewards = [...(objective.rewards || [])];
+                                  updatedRewards[rewardIdx] = {
+                                    ...reward,
+                                    trigger: { ...normalized.trigger!, targetCharacterId: v }
+                                  };
+                                  onUpdate({ rewards: updatedRewards });
+                                }}
+                              >
+                                <SelectTrigger className="bg-background h-6 text-xs">
+                                  <SelectValue placeholder="Seleccionar personaje..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allCharacters.map((char) => (
+                                    <SelectItem key={char.id} value={char.id}>
+                                      {char.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <div className="flex items-center text-[10px] text-muted-foreground">
+                                Personaje que recibirá el trigger
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   );
@@ -1385,14 +1421,22 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
     setRewards(rewards.filter((_, i) => i !== index));
   };
 
-  // Section navigation buttons
+  // Section navigation buttons with themed colors
   const sections = [
-    { id: 'basic', label: 'Info Básica', icon: <Settings2 className="w-4 h-4" /> },
-    { id: 'activation', label: 'Activación', icon: <Zap className="w-4 h-4" /> },
-    { id: 'objectives', label: 'Objetivos', icon: <Target className="w-4 h-4" /> },
-    { id: 'completion', label: 'Completado', icon: <Check className="w-4 h-4" /> },
-    { id: 'rewards', label: 'Recompensas', icon: <Gift className="w-4 h-4" /> },
+    { id: 'basic', label: 'Info Básica', icon: <Settings2 className="w-4 h-4" />, color: 'slate' },
+    { id: 'activation', label: 'Activación', icon: <Zap className="w-4 h-4" />, color: 'amber' },
+    { id: 'objectives', label: 'Objetivos', icon: <Target className="w-4 h-4" />, color: 'purple' },
+    { id: 'completion', label: 'Completado', icon: <Check className="w-4 h-4" />, color: 'green' },
+    { id: 'rewards', label: 'Recompensas', icon: <Gift className="w-4 h-4" />, color: 'pink' },
   ] as const;
+
+  const sectionColors: Record<string, { bg: string; text: string; border: string; activeBg: string }> = {
+    slate: { bg: 'bg-slate-500/10', text: 'text-slate-600 dark:text-slate-400', border: 'border-slate-500/30', activeBg: 'bg-slate-500/20' },
+    amber: { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/30', activeBg: 'bg-amber-500/20' },
+    purple: { bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/30', activeBg: 'bg-purple-500/20' },
+    green: { bg: 'bg-green-500/10', text: 'text-green-600 dark:text-green-400', border: 'border-green-500/30', activeBg: 'bg-green-500/20' },
+    pink: { bg: 'bg-pink-500/10', text: 'text-pink-600 dark:text-pink-400', border: 'border-pink-500/30', activeBg: 'bg-pink-500/20' },
+  };
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -1402,28 +1446,34 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
             <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
               {isNew ? <Plus className="w-5 h-5 text-amber-500" /> : <Pencil className="w-5 h-5 text-amber-500" />}
             </div>
-            {isNew ? 'Crear Nuevo Template' : 'Editar Template'}
+            <div>
+              <span>{isNew ? 'Crear Nuevo Template' : 'Editar Template'}</span>
+              {name && <p className="text-sm font-normal text-muted-foreground mt-0.5">{name}</p>}
+            </div>
           </DialogTitle>
         </DialogHeader>
 
-        {/* Section Tabs */}
-        <div className="flex gap-1 py-2 overflow-x-auto">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => setActiveSection(section.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
-                activeSection === section.id
-                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              {section.icon}
-              {section.label}
-            </button>
-          ))}
+        {/* Section Tabs with themed colors */}
+        <div className="flex gap-2 py-2 overflow-x-auto border-b border-border/50 px-1">
+          {sections.map((section) => {
+            const colors = sectionColors[section.color];
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border",
+                  activeSection === section.id
+                    ? `${colors.activeBg} ${colors.text} ${colors.border}`
+                    : "bg-transparent text-muted-foreground hover:bg-muted/50 border-transparent hover:border-border/50"
+                )}
+              >
+                <span className={activeSection === section.id ? colors.text : ''}>{section.icon}</span>
+                {section.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Error Messages */}
@@ -1444,106 +1494,174 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
           {/* Basic Info Section */}
           {activeSection === 'basic' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="template-id" className="text-xs text-muted-foreground">ID del Template</Label>
-                  <Input
-                    id="template-id"
-                    value={id}
-                    onChange={(e) => setId(e.target.value.replace(/\s+/g, '-').toLowerCase())}
-                    placeholder="ejemplo-mision"
-                    disabled={!isNew}
-                    className="bg-background font-mono"
-                  />
-                  <p className="text-[10px] text-muted-foreground">Identificador único, sin espacios</p>
+              {/* Banner */}
+              <div className="rounded-xl bg-gradient-to-r from-slate-500/10 via-slate-500/5 to-slate-500/10 border border-slate-500/20 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-slate-500/20">
+                    <Settings2 className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Información Básica
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Define el identificador, nombre y propiedades generales de la misión.
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="template-name" className="text-xs text-muted-foreground">Nombre</Label>
-                  <Input
-                    id="template-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Misión de Ejemplo"
-                    className="bg-background"
+              </div>
+
+              {/* Identificación */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-slate-500/10">
+                    <Hash className="w-4 h-4 text-slate-500" />
+                  </div>
+                  Identificación
+                </div>
+                <div className="grid grid-cols-2 gap-4 pl-8">
+                  <div className="space-y-2">
+                    <Label htmlFor="template-id" className="text-xs text-muted-foreground">ID del Template</Label>
+                    <Input
+                      id="template-id"
+                      value={id}
+                      onChange={(e) => setId(e.target.value.replace(/\s+/g, '-').toLowerCase())}
+                      placeholder="ejemplo-mision"
+                      disabled={!isNew}
+                      className="bg-background font-mono"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Identificador único, sin espacios</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="template-name" className="text-xs text-muted-foreground">Nombre</Label>
+                    <Input
+                      id="template-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Misión de Ejemplo"
+                      className="bg-background"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="bg-border/50" />
+
+              {/* Descripción */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-slate-500/10">
+                    <FileText className="w-4 h-4 text-slate-500" />
+                  </div>
+                  Descripción
+                </div>
+                <div className="pl-8 space-y-2">
+                  <Textarea
+                    id="template-desc"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe la misión..."
+                    className="bg-background min-h-[80px]"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="template-desc" className="text-xs text-muted-foreground">Descripción</Label>
-                <Textarea
-                  id="template-desc"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe la misión..."
-                  className="bg-background min-h-[80px]"
-                />
-              </div>
+              <Separator className="bg-border/50" />
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Prioridad</Label>
-                  <Select value={priority} onValueChange={(v) => setPriority(v as QuestPriority)}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="main">Principal</SelectItem>
-                      <SelectItem value="side">Secundaria</SelectItem>
-                      <SelectItem value="hidden">Oculta</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Propiedades */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-amber-500/10">
+                    <Star className="w-4 h-4 text-amber-500" />
+                  </div>
+                  Propiedades
                 </div>
+                <div className="grid grid-cols-3 gap-4 pl-8">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Prioridad</Label>
+                    <Select value={priority} onValueChange={(v) => setPriority(v as QuestPriority)}>
+                      <SelectTrigger className="bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="main">
+                          <div className="flex items-center gap-2">
+                            <Star className="w-3.5 h-3.5 text-amber-500" />
+                            Principal
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="side">
+                          <div className="flex items-center gap-2">
+                            <Target className="w-3.5 h-3.5 text-blue-500" />
+                            Secundaria
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="hidden">
+                          <div className="flex items-center gap-2">
+                            <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                            Oculta
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="template-icon" className="text-xs text-muted-foreground">Icono (emoji)</Label>
-                  <Input
-                    id="template-icon"
-                    value={icon}
-                    onChange={(e) => setIcon(e.target.value)}
-                    placeholder="📜"
-                    className="bg-background text-center text-xl"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="template-icon" className="text-xs text-muted-foreground">Icono (emoji)</Label>
+                    <Input
+                      id="template-icon"
+                      value={icon}
+                      onChange={(e) => setIcon(e.target.value)}
+                      placeholder="📜"
+                      className="bg-background text-center text-xl"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Comportamiento</Label>
-                  <div className="flex flex-col gap-2 pt-1">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={isRepeatable}
-                        onCheckedChange={setIsRepeatable}
-                      />
-                      <span className="text-sm">Repetible</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={isHidden}
-                        onCheckedChange={setIsHidden}
-                      />
-                      <span className="text-sm">Oculta</span>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Comportamiento</Label>
+                    <div className="flex flex-col gap-2 pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Switch
+                          checked={isRepeatable}
+                          onCheckedChange={setIsRepeatable}
+                        />
+                        <span className="text-sm">Repetible</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Switch
+                          checked={isHidden}
+                          onCheckedChange={setIsHidden}
+                        />
+                        <span className="text-sm">Oculta</span>
+                      </label>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/50" />
 
-              <div className="space-y-2">
-                <Label htmlFor="prerequisites" className="text-xs text-muted-foreground">
-                  Prerrequisitos (IDs de misiones requeridas, separadas por coma)
-                </Label>
-                <Input
-                  id="prerequisites"
-                  value={prerequisites.join(', ')}
-                  onChange={(e) => setPrerequisites(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="mision-anterior, otra-mision"
-                  className="bg-background font-mono"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Esta misión no estará disponible hasta que se completen las misiones listadas
-                </p>
+              {/* Prerrequisitos */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-cyan-500/10">
+                    <Link2 className="w-4 h-4 text-cyan-500" />
+                  </div>
+                  Prerrequisitos
+                </div>
+                <div className="pl-8 space-y-2">
+                  <Input
+                    id="prerequisites"
+                    value={prerequisites.join(', ')}
+                    onChange={(e) => setPrerequisites(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                    placeholder="mision-anterior, otra-mision"
+                    className="bg-background font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Esta misión no estará disponible hasta que se completen las misiones listadas (IDs separadas por coma)
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1551,98 +1669,200 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
           {/* Activation Section */}
           {activeSection === 'activation' && (
             <div className="space-y-6">
-              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
-                    La key de activación detecta cuándo la misión debe comenzar. El LLM puede generar esta key en su respuesta.
-                  </p>
+              {/* Banner */}
+              <div className="rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 border border-amber-500/20 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                      Activación de la Misión
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Define cómo y cuándo la misión se activa. La key detecta cuándo debe comenzar.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="activation-key" className="text-xs text-muted-foreground">Key Principal de Activación</Label>
-                <Input
-                  id="activation-key"
-                  value={activationKey}
-                  onChange={(e) => setActivationKey(e.target.value)}
-                  placeholder="mision:rescate"
-                  className="bg-background font-mono"
-                />
+              {/* Keys de Activación */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-amber-500/10">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                  </div>
+                  Keys de Activación
+                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground ml-1" title="El LLM puede generar estas keys en su respuesta" />
+                </div>
+                <div className="pl-8 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="activation-key" className="text-xs text-muted-foreground">Key Principal</Label>
+                    <Input
+                      id="activation-key"
+                      value={activationKey}
+                      onChange={(e) => setActivationKey(e.target.value)}
+                      placeholder="mision:rescate"
+                      className="bg-background font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="activation-keys" className="text-xs text-muted-foreground">Keys Alternativas</Label>
+                    <Input
+                      id="activation-keys"
+                      value={activationKeys.join(', ')}
+                      onChange={(e) => setActivationKeys(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      placeholder="mission:rescue, quest:rescate"
+                      className="bg-background font-mono"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Separadas por coma. Se detectará cualquiera de estas keys.</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="activation-keys" className="text-xs text-muted-foreground">Keys Alternativas (separadas por coma)</Label>
-                <Input
-                  id="activation-keys"
-                  value={activationKeys.join(', ')}
-                  onChange={(e) => setActivationKeys(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="mission:rescue, quest:rescate"
-                  className="bg-background font-mono"
-                />
-              </div>
+              <Separator className="bg-border/50" />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Método de Activación</Label>
+              {/* Método de Activación */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-orange-500/10">
+                    <ToggleRight className="w-4 h-4 text-orange-500" />
+                  </div>
+                  Método de Activación
+                </div>
+                <div className="pl-8 space-y-4">
                   <Select value={activationMethod} onValueChange={(v) => setActivationMethod(v as QuestActivationMethod)}>
                     <SelectTrigger className="bg-background">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="keyword">Por Keyword</SelectItem>
-                      <SelectItem value="turn">Por Turnos</SelectItem>
-                      <SelectItem value="manual">Manual</SelectItem>
-                      <SelectItem value="chain">En Cadena</SelectItem>
+                      <SelectItem value="keyword">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-amber-500" />
+                          <div>
+                            <span className="font-medium">Por Keyword</span>
+                            <span className="text-xs text-muted-foreground ml-2">Detecta la key en el chat</span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="turn">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-blue-500" />
+                          <div>
+                            <span className="font-medium">Por Turnos</span>
+                            <span className="text-xs text-muted-foreground ml-2">Se activa cada N turnos</span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="manual">
+                        <div className="flex items-center gap-2">
+                          <ToggleLeft className="w-4 h-4 text-slate-500" />
+                          <div>
+                            <span className="font-medium">Manual</span>
+                            <span className="text-xs text-muted-foreground ml-2">Solo se activa manualmente</span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="chain">
+                        <div className="flex items-center gap-2">
+                          <Link2 className="w-4 h-4 text-purple-500" />
+                          <div>
+                            <span className="font-medium">En Cadena</span>
+                            <span className="text-xs text-muted-foreground ml-2">Se activa al completar otra misión</span>
+                          </div>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
 
-                {activationMethod === 'turn' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="turn-interval" className="text-xs text-muted-foreground">Cada cuántos turnos</Label>
-                    <Input
-                      id="turn-interval"
-                      type="number"
-                      min={1}
-                      value={turnInterval}
-                      onChange={(e) => setTurnInterval(Number(e.target.value))}
-                      className="bg-background"
-                    />
-                  </div>
-                )}
+                  {activationMethod === 'turn' && (
+                    <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-blue-500/20">
+                          <Clock className="w-4 h-4 text-blue-500" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <Label htmlFor="turn-interval" className="text-xs text-muted-foreground">Cada cuántos turnos</Label>
+                          <Input
+                            id="turn-interval"
+                            type="number"
+                            min={1}
+                            value={turnInterval}
+                            onChange={(e) => setTurnInterval(Number(e.target.value))}
+                            className="bg-background w-32"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={activationCaseSensitive}
-                  onCheckedChange={setActivationCaseSensitive}
-                />
-                <span className="text-sm">Distinguir mayúsculas/minúsculas</span>
+              <Separator className="bg-border/50" />
+
+              {/* Opciones Adicionales */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-cyan-500/10">
+                    <Settings2 className="w-4 h-4 text-cyan-500" />
+                  </div>
+                  Opciones Adicionales
+                </div>
+                <div className="pl-8">
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30 cursor-pointer hover:border-cyan-500/30 transition-colors">
+                    <Switch
+                      checked={activationCaseSensitive}
+                      onCheckedChange={setActivationCaseSensitive}
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Distinguir mayúsculas/minúsculas</span>
+                      <p className="text-xs text-muted-foreground">La key debe coincidir exactamente en casing</p>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           )}
 
           {/* Objectives Section */}
           {activeSection === 'objectives' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium">Objetivos de la Misión</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Arrastra los objetivos para reordenarlos • Haz clic para expandir/colapsar
-                  </p>
+            <div className="space-y-6">
+              {/* Banner */}
+              <div className="rounded-xl bg-gradient-to-r from-purple-500/10 via-violet-500/5 to-purple-500/10 border border-purple-500/20 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <Target className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                      Objetivos de la Misión
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Define los objetivos que deben completarse. Arrastra para reordenar • Clic para expandir/colapsar
+                    </p>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={addObjective}>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
+                  <Target className="w-3 h-3 mr-1" />
+                  {objectives.length} objetivo{objectives.length !== 1 ? 's' : ''}
+                </Badge>
+                <Button variant="outline" size="sm" onClick={addObjective} className="hover:border-purple-500/30 hover:bg-purple-500/5">
                   <Plus className="w-4 h-4 mr-1.5" />
                   Agregar Objetivo
                 </Button>
               </div>
 
               {objectives.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/20">
-                  <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm">No hay objetivos definidos</p>
+                <div className="text-center py-12 border-2 border-dashed rounded-xl bg-gradient-to-br from-muted/50 to-muted/30">
+                  <div className="p-3 rounded-full bg-purple-500/10 w-fit mx-auto mb-3">
+                    <Target className="w-8 h-8 text-purple-400" />
+                  </div>
+                  <p className="text-muted-foreground text-sm mb-1">No hay objetivos definidos</p>
+                  <p className="text-muted-foreground/60 text-xs">Agrega objetivos para que los jugadores puedan completar la misión</p>
                 </div>
               ) : (
                 <DndContext
@@ -1678,166 +1898,223 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
           {/* Completion Section */}
           {activeSection === 'completion' && (
             <div className="space-y-6">
-              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    La key de completado detecta cuándo la misión termina exitosamente. Se ejecutan las recompensas automáticamente.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="completion-key" className="text-xs text-muted-foreground">Key Principal de Completado</Label>
-                <Input
-                  id="completion-key"
-                  value={completionKey}
-                  onChange={(e) => setCompletionKey(e.target.value)}
-                  placeholder="mision:completada"
-                  className="bg-background font-mono"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="completion-keys" className="text-xs text-muted-foreground">Keys Alternativas (separadas por coma)</Label>
-                <Input
-                  id="completion-keys"
-                  value={completionKeys.join(', ')}
-                  onChange={(e) => setCompletionKeys(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="mission:complete, quest:done"
-                  className="bg-background font-mono"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={completionCaseSensitive}
-                  onCheckedChange={setCompletionCaseSensitive}
-                />
-                <span className="text-sm">Distinguir mayúsculas/minúsculas</span>
-              </div>
-
-              {/* Value Condition for Completion */}
-              <div className="space-y-3 p-4 rounded-lg border border-border/50 bg-muted/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Condición de Valor</Label>
-                    <p className="text-xs text-muted-foreground">Detectar y comparar valores después de la key</p>
+              {/* Banner */}
+              <div className="rounded-xl bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-green-500/10 border border-green-500/20 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-green-500/20">
+                    <Check className="w-4 h-4 text-green-500" />
                   </div>
-                  <Switch
-                    checked={!!completionValueCondition}
-                    onCheckedChange={(v) => setCompletionValueCondition(v ? { valueType: 'presence' } : undefined)}
-                  />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                      Completado de la Misión
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Define las keys y condiciones para completar exitosamente la misión. Se ejecutan las recompensas automáticamente.
+                    </p>
+                  </div>
                 </div>
-                
-                {completionValueCondition && (
-                  <div className="grid grid-cols-3 gap-3 mt-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Tipo de Valor</Label>
-                      <Select 
-                        value={completionValueCondition.valueType} 
-                        onValueChange={(v) => setCompletionValueCondition({ 
-                          ...completionValueCondition, 
-                          valueType: v as QuestValueType 
-                        })}
-                      >
-                        <SelectTrigger className="bg-background">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="presence">Presencia</SelectItem>
-                          <SelectItem value="number">Número</SelectItem>
-                          <SelectItem value="text">Texto</SelectItem>
-                        </SelectContent>
-                      </Select>
+              </div>
+
+              {/* Keys de Completado */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-green-500/10">
+                    <Check className="w-4 h-4 text-green-500" />
+                  </div>
+                  Keys de Completado
+                </div>
+                <div className="pl-8 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="completion-key" className="text-xs text-muted-foreground">Key Principal</Label>
+                    <Input
+                      id="completion-key"
+                      value={completionKey}
+                      onChange={(e) => setCompletionKey(e.target.value)}
+                      placeholder="mision:completada"
+                      className="bg-background font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="completion-keys" className="text-xs text-muted-foreground">Keys Alternativas</Label>
+                    <Input
+                      id="completion-keys"
+                      value={completionKeys.join(', ')}
+                      onChange={(e) => setCompletionKeys(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      placeholder="mission:complete, quest:done"
+                      className="bg-background font-mono"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Separadas por coma. Se detectará cualquiera de estas keys.</p>
+                  </div>
+
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30 cursor-pointer hover:border-green-500/30 transition-colors">
+                    <Switch
+                      checked={completionCaseSensitive}
+                      onCheckedChange={setCompletionCaseSensitive}
+                    />
+                    <div>
+                      <span className="text-sm font-medium">Distinguir mayúsculas/minúsculas</span>
+                      <p className="text-xs text-muted-foreground">La key debe coincidir exactamente en casing</p>
                     </div>
+                  </label>
+                </div>
+              </div>
 
-                    {completionValueCondition.valueType !== 'presence' && (
-                      <>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Operador</Label>
-                          <Select 
-                            value={completionValueCondition.operator || (completionValueCondition.valueType === 'number' ? '==' : 'equals')} 
-                            onValueChange={(v) => setCompletionValueCondition({ 
-                              ...completionValueCondition, 
-                              operator: v as any 
-                            })}
-                          >
-                            <SelectTrigger className="bg-background">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {completionValueCondition.valueType === 'number' ? (
-                                <>
-                                  <SelectItem value=">">&gt; Mayor que</SelectItem>
-                                  <SelectItem value="<">&lt; Menor que</SelectItem>
-                                  <SelectItem value=">=">≥ Mayor o igual</SelectItem>
-                                  <SelectItem value="<=">≤ Menor o igual</SelectItem>
-                                  <SelectItem value="==">= Igual</SelectItem>
-                                  <SelectItem value="!=">≠ Diferente</SelectItem>
-                                </>
-                              ) : (
-                                <>
-                                  <SelectItem value="equals">Igual a</SelectItem>
-                                  <SelectItem value="contains">Contiene</SelectItem>
-                                  <SelectItem value="startsWith">Empieza con</SelectItem>
-                                  <SelectItem value="endsWith">Termina con</SelectItem>
-                                  <SelectItem value="notEquals">Diferente de</SelectItem>
-                                </>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Valor Objetivo</Label>
-                          <Input
-                            value={String(completionValueCondition.targetValue || '')}
-                            onChange={(e) => setCompletionValueCondition({ 
-                              ...completionValueCondition, 
-                              targetValue: completionValueCondition.valueType === 'number' 
-                                ? Number(e.target.value) 
-                                : e.target.value 
-                            })}
-                            placeholder={completionValueCondition.valueType === 'number' ? '50' : 'texto'}
-                            className="bg-background"
-                          />
-                        </div>
-                      </>
-                    )}
+              <Separator className="bg-border/50" />
 
-                    {completionValueCondition.valueType === 'presence' && (
-                      <div className="col-span-2 flex items-center text-sm text-muted-foreground">
-                        <Info className="w-4 h-4 mr-2" />
-                        Detecta si la key existe en el texto (comportamiento por defecto)
+              {/* Condición de Valor */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-emerald-500/10">
+                    <Hash className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  Condición de Valor
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 ml-auto">
+                    Avanzado
+                  </Badge>
+                </div>
+                <div className="pl-8">
+                  <div className="p-4 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <Label className="text-sm font-medium">Activar condición</Label>
+                        <p className="text-xs text-muted-foreground">Detectar y comparar valores después de la key</p>
+                      </div>
+                      <Switch
+                        checked={!!completionValueCondition}
+                        onCheckedChange={(v) => setCompletionValueCondition(v ? { valueType: 'presence' } : undefined)}
+                      />
+                    </div>
+                    
+                    {completionValueCondition && (
+                      <div className="space-y-3 pt-3 border-t border-border/50">
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Tipo de Valor</Label>
+                            <Select 
+                              value={completionValueCondition.valueType} 
+                              onValueChange={(v) => setCompletionValueCondition({ 
+                                ...completionValueCondition, 
+                                valueType: v as QuestValueType 
+                              })}
+                            >
+                              <SelectTrigger className="bg-background h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="presence">Presencia</SelectItem>
+                                <SelectItem value="number">Número</SelectItem>
+                                <SelectItem value="text">Texto</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {completionValueCondition.valueType !== 'presence' && (
+                            <>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Operador</Label>
+                                <Select 
+                                  value={completionValueCondition.operator || (completionValueCondition.valueType === 'number' ? '==' : 'equals')} 
+                                  onValueChange={(v) => setCompletionValueCondition({ 
+                                    ...completionValueCondition, 
+                                    operator: v as any 
+                                  })}
+                                >
+                                  <SelectTrigger className="bg-background h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {completionValueCondition.valueType === 'number' ? (
+                                      <>
+                                        <SelectItem value=">">&gt; Mayor que</SelectItem>
+                                        <SelectItem value="<">&lt; Menor que</SelectItem>
+                                        <SelectItem value=">=">≥ Mayor o igual</SelectItem>
+                                        <SelectItem value="<=">≤ Menor o igual</SelectItem>
+                                        <SelectItem value="==">= Igual</SelectItem>
+                                        <SelectItem value="!=">≠ Diferente</SelectItem>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <SelectItem value="equals">Igual a</SelectItem>
+                                        <SelectItem value="contains">Contiene</SelectItem>
+                                        <SelectItem value="startsWith">Empieza con</SelectItem>
+                                        <SelectItem value="endsWith">Termina con</SelectItem>
+                                        <SelectItem value="notEquals">Diferente de</SelectItem>
+                                      </>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Valor Objetivo</Label>
+                                <Input
+                                  value={String(completionValueCondition.targetValue || '')}
+                                  onChange={(e) => setCompletionValueCondition({ 
+                                    ...completionValueCondition, 
+                                    targetValue: completionValueCondition.valueType === 'number' 
+                                      ? Number(e.target.value) 
+                                      : e.target.value 
+                                  })}
+                                  placeholder={completionValueCondition.valueType === 'number' ? '50' : 'texto'}
+                                  className="bg-background h-8"
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {completionValueCondition.valueType === 'presence' && (
+                            <div className="col-span-2 flex items-center text-xs text-muted-foreground p-2 rounded bg-muted/30">
+                              <Info className="w-3.5 h-3.5 mr-2 shrink-0" />
+                              Detecta si la key existe en el texto (comportamiento por defecto)
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
-                )}
+                </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/50" />
 
+              {/* Configuración de Cadena */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium">Configuración de Cadena</h3>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Tipo de Cadena</Label>
-                    <Select value={chainType} onValueChange={(v) => setChainType(v as 'none' | 'specific' | 'random')}>
-                      <SelectTrigger className="bg-background">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin cadena</SelectItem>
-                        <SelectItem value="specific">Siguiente específico</SelectItem>
-                        <SelectItem value="random">Pool aleatorio</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="p-1.5 rounded-md bg-violet-500/10">
+                    <Link2 className="w-4 h-4 text-violet-500" />
                   </div>
+                  Cadena de Misiones
+                </div>
+                <div className="pl-8 space-y-4">
+                  <Select value={chainType} onValueChange={(v) => setChainType(v as 'none' | 'specific' | 'random')}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <div className="flex items-center gap-2">
+                          <X className="w-4 h-4 text-slate-500" />
+                          <span>Sin cadena</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="specific">
+                        <div className="flex items-center gap-2">
+                          <Link2 className="w-4 h-4 text-violet-500" />
+                          <span>Siguiente específico</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="random">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-amber-500" />
+                          <span>Pool aleatorio</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
 
                   {chainType === 'specific' && (
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">ID de la Siguiente Misión</Label>
+                    <div className="p-4 rounded-lg border border-violet-500/20 bg-violet-500/5">
+                      <Label className="text-xs text-muted-foreground mb-2 block">ID de la Siguiente Misión</Label>
                       <Input
                         value={chainNextQuestId}
                         onChange={(e) => setChainNextQuestId(e.target.value)}
@@ -1846,26 +2123,32 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                       />
                     </div>
                   )}
-                </div>
 
-                {chainType === 'random' && (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Pool de Misiones (IDs separados por coma)</Label>
-                    <Input
-                      value={chainRandomPool.join(', ')}
-                      onChange={(e) => setChainRandomPool(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                      placeholder="mision-1, mision-2, mision-3"
-                      className="bg-background font-mono"
-                    />
-                  </div>
-                )}
+                  {chainType === 'random' && (
+                    <div className="p-4 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                      <Label className="text-xs text-muted-foreground mb-2 block">Pool de Misiones</Label>
+                      <Input
+                        value={chainRandomPool.join(', ')}
+                        onChange={(e) => setChainRandomPool(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        placeholder="mision-1, mision-2, mision-3"
+                        className="bg-background font-mono"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-2">IDs separados por coma. Se seleccionará una aleatoriamente.</p>
+                    </div>
+                  )}
 
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={chainAutoStart}
-                    onCheckedChange={setChainAutoStart}
-                  />
-                  <span className="text-sm">Iniciar automáticamente la siguiente misión</span>
+                  {chainType !== 'none' && (
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30 cursor-pointer hover:border-violet-500/30 transition-colors">
+                      <Switch
+                        checked={chainAutoStart}
+                        onCheckedChange={setChainAutoStart}
+                      />
+                      <div>
+                        <span className="text-sm font-medium">Iniciar automáticamente</span>
+                        <p className="text-xs text-muted-foreground">La siguiente misión se activará sin intervención manual</p>
+                      </div>
+                    </label>
+                  )}
                 </div>
               </div>
             </div>
@@ -1873,330 +2156,294 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
 
           {/* Rewards Section */}
           {activeSection === 'rewards' && (
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Banner */}
+              <div className="rounded-xl bg-gradient-to-r from-pink-500/10 via-rose-500/5 to-pink-500/10 border border-pink-500/20 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-pink-500/20">
+                    <Gift className="w-4 h-4 text-pink-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-pink-600 dark:text-pink-400">
+                      Recompensas de la Misión
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Define las recompensas que se otorgan al completar la misión. Pueden modificar atributos o ejecutar triggers.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Recompensas al Completar</h3>
-                <Button variant="outline" size="sm" onClick={addReward}>
+                <Badge variant="outline" className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20">
+                  <Gift className="w-3 h-3 mr-1" />
+                  {rewards.length} recompensa{rewards.length !== 1 ? 's' : ''}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addReward}
+                  className="hover:border-pink-500/30 hover:bg-pink-500/5"
+                >
                   <Plus className="w-4 h-4 mr-1.5" />
                   Agregar Recompensa
                 </Button>
               </div>
 
               {rewards.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/20">
-                  <Gift className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm">No hay recompensas definidas</p>
+                <div className="text-center py-12 border-2 border-dashed rounded-xl bg-gradient-to-br from-muted/50 to-muted/30">
+                  <div className="p-3 rounded-full bg-pink-500/10 w-fit mx-auto mb-3">
+                    <Gift className="w-8 h-8 text-pink-400" />
+                  </div>
+                  <p className="text-muted-foreground text-sm mb-1">No hay recompensas definidas</p>
+                  <p className="text-muted-foreground/60 text-xs">Agrega recompensas que se otorgarán al completar la misión</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {rewards.map((reward, index) => {
-                    // Normalizar para obtener valores actuales
                     const normalized = normalizeReward(reward);
-                    const isAttribute = normalized.type === 'attribute';
-                    const isTrigger = normalized.type === 'trigger';
-                    
+                    const isAttr = normalized.type === 'attribute';
+                    const isTrig = normalized.type === 'trigger';
+
                     return (
-                      <Card key={reward.id} className="border-border/60">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 space-y-3">
-                              {/* Type selector and preview */}
-                              <div className="flex items-center gap-3">
-                                <div className="flex-1">
-                                  <Label className="text-[10px] text-muted-foreground mb-1 block">Tipo de Recompensa</Label>
+                      <div key={reward.id} className="p-4 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/20 space-y-3">
+                        {/* Tipo y preview */}
+                        <div className="flex items-center gap-2">
+                          <Select 
+                            value={normalized.type} 
+                            onValueChange={(v) => updateReward(index, { type: v as QuestRewardType })}
+                          >
+                            <SelectTrigger className="bg-background h-8 text-xs w-28">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="attribute">
+                                <div className="flex items-center gap-2">
+                                  <Hash className="w-3.5 h-3.5 text-blue-500" />
+                                  Atributo
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="trigger">
+                                <div className="flex items-center gap-2">
+                                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                                  Trigger
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge variant="outline" className="text-xs bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20">
+                            {describeReward(normalized)}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
+                            onClick={() => removeReward(index)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        
+                        {/* Config según tipo */}
+                        {isAttr && normalized.attribute && (
+                          <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">Key del Atributo</Label>
+                              <Input
+                                value={normalized.attribute.key}
+                                onChange={(e) => updateReward(index, { 
+                                  attribute: { ...normalized.attribute!, key: e.target.value } 
+                                })}
+                                placeholder="oro, xp, vida..."
+                                className="bg-background h-8 text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">Valor</Label>
+                              <Input
+                                type="number"
+                                value={normalized.attribute.value}
+                                onChange={(e) => updateReward(index, { 
+                                  attribute: { ...normalized.attribute!, value: Number(e.target.value) } 
+                                })}
+                                placeholder="100"
+                                className="bg-background h-8 text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">Acción</Label>
+                              <Select 
+                                value={normalized.attribute.action} 
+                                onValueChange={(v) => updateReward(index, { 
+                                  attribute: { ...normalized.attribute!, action: v as AttributeAction } 
+                                })}
+                              >
+                                <SelectTrigger className="bg-background h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="add">+ Sumar</SelectItem>
+                                  <SelectItem value="subtract">- Restar</SelectItem>
+                                  <SelectItem value="set">= Establecer</SelectItem>
+                                  <SelectItem value="multiply">× Multiplicar</SelectItem>
+                                  <SelectItem value="divide">÷ Dividir</SelectItem>
+                                  <SelectItem value="percent">% Porcentaje</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+
+                        {isTrig && normalized.trigger && (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Categoría</Label>
+                                <Select 
+                                  value={normalized.trigger.category} 
+                                  onValueChange={(v) => updateReward(index, { 
+                                    trigger: { ...normalized.trigger!, category: v as TriggerCategory } 
+                                  })}
+                                >
+                                  <SelectTrigger className="bg-background h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                                    <SelectItem value="sound">🔊 Sonido</SelectItem>
+                                    <SelectItem value="background">🌄 Fondo</SelectItem>
+                                    <SelectItem value="soundSequence">🎵 Secuencia</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Key</Label>
+                                <Input
+                                  value={normalized.trigger.key}
+                                  onChange={(e) => updateReward(index, { 
+                                    trigger: { ...normalized.trigger!, key: e.target.value } 
+                                  })}
+                                  placeholder="nombre-archivo"
+                                  className="bg-background h-8 text-xs"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Objetivo</Label>
+                                <Select 
+                                  value={normalized.trigger.targetMode} 
+                                  onValueChange={(v) => updateReward(index, { 
+                                    trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode } 
+                                  })}
+                                >
+                                  <SelectTrigger className="bg-background h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="self">👤 Self</SelectItem>
+                                    <SelectItem value="all">👥 Todos</SelectItem>
+                                    <SelectItem value="target">🎯 Target</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {/* Category-specific options */}
+                            {normalized.trigger.category === 'sprite' && (
+                              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-violet-500/5 border border-violet-500/20">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">Volver a Idle (ms)</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={normalized.trigger.returnToIdleMs || 0}
+                                    onChange={(e) => updateReward(index, { 
+                                      trigger: { ...normalized.trigger!, returnToIdleMs: Number(e.target.value) } 
+                                    })}
+                                    placeholder="0 = mantener"
+                                    className="bg-background h-8 text-xs"
+                                  />
+                                </div>
+                                <div className="flex items-end text-xs text-muted-foreground pb-2">
+                                  0 = mantener sprite indefinidamente
+                                </div>
+                              </div>
+                            )}
+
+                            {normalized.trigger.category === 'sound' && (
+                              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">Volumen (0-1)</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={1}
+                                    step={0.1}
+                                    value={normalized.trigger.volume ?? 0.8}
+                                    onChange={(e) => updateReward(index, { 
+                                      trigger: { ...normalized.trigger!, volume: Number(e.target.value) } 
+                                    })}
+                                    placeholder="0.8"
+                                    className="bg-background h-8 text-xs"
+                                  />
+                                </div>
+                                <div className="flex items-end text-xs text-muted-foreground pb-2">
+                                  Key formato: "coleccion/archivo"
+                                </div>
+                              </div>
+                            )}
+
+                            {normalized.trigger.category === 'background' && (
+                              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">Transición (ms)</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={normalized.trigger.transitionDuration ?? 500}
+                                    onChange={(e) => updateReward(index, { 
+                                      trigger: { ...normalized.trigger!, transitionDuration: Number(e.target.value) } 
+                                    })}
+                                    placeholder="500"
+                                    className="bg-background h-8 text-xs"
+                                  />
+                                </div>
+                                <div className="flex items-end text-xs text-muted-foreground pb-2">
+                                  Key puede ser URL o nombre
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Character selector when targetMode is 'target' */}
+                            {normalized.trigger.targetMode === 'target' && (
+                              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-rose-500/5 border border-rose-500/20">
+                                <div className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">Personaje Objetivo</Label>
                                   <Select 
-                                    value={normalized.type} 
-                                    onValueChange={(v) => updateReward(index, { type: v as QuestRewardType })}
+                                    value={normalized.trigger.targetCharacterId || ''} 
+                                    onValueChange={(v) => updateReward(index, { 
+                                      trigger: { ...normalized.trigger!, targetCharacterId: v } 
+                                    })}
                                   >
-                                    <SelectTrigger className="bg-background h-9">
-                                      <SelectValue />
+                                    <SelectTrigger className="bg-background h-8 text-xs">
+                                      <SelectValue placeholder="Seleccionar..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="attribute">
-                                        <div className="flex items-center gap-2">
-                                          <Hash className="w-4 h-4" />
-                                          Atributo
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="trigger">
-                                        <div className="flex items-center gap-2">
-                                          <Zap className="w-4 h-4" />
-                                          Trigger
-                                        </div>
-                                      </SelectItem>
+                                      {allCharacters.map((char) => (
+                                        <SelectItem key={char.id} value={char.id}>
+                                          {char.name}
+                                        </SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
-                                
-                                {/* Preview badge */}
-                                <div className="pt-5">
-                                  <Badge variant="outline" className="text-xs">
-                                    {describeReward(normalized)}
-                                  </Badge>
+                                <div className="flex items-end text-xs text-muted-foreground pb-2">
+                                  Personaje que recibirá el trigger
                                 </div>
                               </div>
-
-                              {/* ATTRIBUTE CONFIG */}
-                              {isAttribute && normalized.attribute && (
-                                <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-muted/30">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] text-muted-foreground">Key del Atributo</Label>
-                                    <Input
-                                      value={normalized.attribute.key}
-                                      onChange={(e) => updateReward(index, { 
-                                        attribute: { ...normalized.attribute!, key: e.target.value } 
-                                      })}
-                                      placeholder="HP, oro, exp..."
-                                      className="bg-background font-mono text-xs h-8"
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] text-muted-foreground">Valor</Label>
-                                    <Input
-                                      type="number"
-                                      value={normalized.attribute.value}
-                                      onChange={(e) => updateReward(index, { 
-                                        attribute: { ...normalized.attribute!, value: Number(e.target.value) } 
-                                      })}
-                                      className="bg-background h-8"
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px] text-muted-foreground">Acción</Label>
-                                    <Select 
-                                      value={normalized.attribute.action} 
-                                      onValueChange={(v) => updateReward(index, { 
-                                        attribute: { ...normalized.attribute!, action: v as AttributeAction } 
-                                      })}
-                                    >
-                                      <SelectTrigger className="bg-background h-8">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="set">= Establecer</SelectItem>
-                                        <SelectItem value="add">+ Sumar</SelectItem>
-                                        <SelectItem value="subtract">- Restar</SelectItem>
-                                        <SelectItem value="multiply">× Multiplicar</SelectItem>
-                                        <SelectItem value="divide">÷ Dividir</SelectItem>
-                                        <SelectItem value="percent">% Porcentaje</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* TRIGGER CONFIG */}
-                              {isTrigger && normalized.trigger && (
-                                <div className="space-y-3 p-3 rounded-lg bg-muted/30">
-                                  <div className="grid grid-cols-3 gap-3">
-                                    <div className="space-y-1">
-                                      <Label className="text-[10px] text-muted-foreground">Categoría</Label>
-                                      <Select 
-                                        value={normalized.trigger.category} 
-                                        onValueChange={(v) => updateReward(index, { 
-                                          trigger: { ...normalized.trigger!, category: v as TriggerCategory } 
-                                        })}
-                                      >
-                                        <SelectTrigger className="bg-background h-8">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="sprite">
-                                            <div className="flex items-center gap-2">
-                                              <ImageIcon className="w-3.5 h-3.5" />
-                                              Sprite
-                                            </div>
-                                          </SelectItem>
-                                          <SelectItem value="sound">
-                                            <div className="flex items-center gap-2">
-                                              <Volume2 className="w-3.5 h-3.5" />
-                                              Sonido
-                                            </div>
-                                          </SelectItem>
-                                          <SelectItem value="background">
-                                            <div className="flex items-center gap-2">
-                                              <Wallpaper className="w-3.5 h-3.5" />
-                                              Fondo
-                                            </div>
-                                          </SelectItem>
-                                          <SelectItem value="soundSequence">
-                                            <div className="flex items-center gap-2">
-                                              <Music className="w-3.5 h-3.5" />
-                                              Secuencia
-                                            </div>
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label className="text-[10px] text-muted-foreground">Key del Trigger</Label>
-                                      <Input
-                                        value={normalized.trigger.key}
-                                        onChange={(e) => updateReward(index, { 
-                                          trigger: { ...normalized.trigger!, key: e.target.value } 
-                                        })}
-                                        placeholder="feliz, victory, forest..."
-                                        className="bg-background font-mono text-xs h-8"
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label className="text-[10px] text-muted-foreground">Objetivo</Label>
-                                      <Select 
-                                        value={normalized.trigger.targetMode} 
-                                        onValueChange={(v) => updateReward(index, { 
-                                          trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode } 
-                                        })}
-                                      >
-                                        <SelectTrigger className="bg-background h-8">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="self">
-                                            <div className="flex items-center gap-2">
-                                              <User className="w-3.5 h-3.5" />
-                                              Mismo personaje
-                                            </div>
-                                          </SelectItem>
-                                          <SelectItem value="all">
-                                            <div className="flex items-center gap-2">
-                                              <Users className="w-3.5 h-3.5" />
-                                              Todos
-                                            </div>
-                                          </SelectItem>
-                                          <SelectItem value="target">
-                                            <div className="flex items-center gap-2">
-                                              <Crosshair className="w-3.5 h-3.5" />
-                                              Objetivo específico
-                                            </div>
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-
-                                  {/* Category-specific options */}
-                                  {normalized.trigger.category === 'sprite' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">Volver a Idle (ms)</Label>
-                                        <Input
-                                          type="number"
-                                          min={0}
-                                          value={normalized.trigger.returnToIdleMs || 0}
-                                          onChange={(e) => updateReward(index, { 
-                                            trigger: { ...normalized.trigger!, returnToIdleMs: Number(e.target.value) } 
-                                          })}
-                                          placeholder="0 = no volver"
-                                          className="bg-background h-8"
-                                        />
-                                      </div>
-                                      <div className="flex items-end pb-1">
-                                        <p className="text-[10px] text-muted-foreground">
-                                          0 = mantener sprite indefinidamente
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {normalized.trigger.category === 'sound' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">Volumen (0-1)</Label>
-                                        <Input
-                                          type="number"
-                                          min={0}
-                                          max={1}
-                                          step={0.1}
-                                          value={normalized.trigger.volume ?? 0.8}
-                                          onChange={(e) => updateReward(index, { 
-                                            trigger: { ...normalized.trigger!, volume: Number(e.target.value) } 
-                                          })}
-                                          className="bg-background h-8"
-                                        />
-                                      </div>
-                                      <div className="flex items-end pb-1">
-                                        <p className="text-[10px] text-muted-foreground">
-                                          Formato key: "coleccion/archivo"
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {normalized.trigger.category === 'soundSequence' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">Volumen (0-1)</Label>
-                                        <Input
-                                          type="number"
-                                          min={0}
-                                          max={1}
-                                          step={0.1}
-                                          value={normalized.trigger.volume ?? 0.8}
-                                          onChange={(e) => updateReward(index, { 
-                                            trigger: { ...normalized.trigger!, volume: Number(e.target.value) } 
-                                          })}
-                                          className="bg-background h-8"
-                                        />
-                                      </div>
-                                      <div className="flex items-end pb-1">
-                                        <p className="text-[10px] text-muted-foreground">
-                                          Key: activationKey de la secuencia
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {normalized.trigger.category === 'background' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">Duración Transición (ms)</Label>
-                                        <Input
-                                          type="number"
-                                          min={0}
-                                          value={normalized.trigger.transitionDuration ?? 500}
-                                          onChange={(e) => updateReward(index, { 
-                                            trigger: { ...normalized.trigger!, transitionDuration: Number(e.target.value) } 
-                                          })}
-                                          className="bg-background h-8"
-                                        />
-                                      </div>
-                                      <div className="flex items-end pb-1">
-                                        <p className="text-[10px] text-muted-foreground">
-                                          Key puede ser URL o nombre
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* ID field (collapsed by default) */}
-                              <details className="group">
-                                <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
-                                  <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
-                                  ID: {reward.id}
-                                </summary>
-                                <div className="mt-2">
-                                  <Input
-                                    value={reward.id}
-                                    onChange={(e) => updateReward(index, { id: e.target.value })}
-                                    className="bg-background font-mono text-xs h-7"
-                                  />
-                                </div>
-                              </details>
-                            </div>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
-                              onClick={() => removeReward(index)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
+                            )}
                           </div>
-                        </CardContent>
-                      </Card>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

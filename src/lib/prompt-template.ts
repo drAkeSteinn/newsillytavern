@@ -242,6 +242,7 @@ export function processCharacterTemplate(
     systemPrompt: replaceTemplateVariables(character.systemPrompt, context),
     postHistoryInstructions: replaceTemplateVariables(character.postHistoryInstructions, context),
     characterNote: replaceTemplateVariables(character.characterNote, context),
+    authorNote: replaceTemplateVariables(character.authorNote, context),
     // Process alternate greetings
     alternateGreetings: character.alternateGreetings.map(greeting => 
       replaceTemplateVariables(greeting, context)

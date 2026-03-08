@@ -121,6 +121,7 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       characterNote: v2Data.data.character_note || '',
       systemPrompt: v2Data.data.system_prompt || '',
       postHistoryInstructions: v2Data.data.post_history_instructions || '',
+      authorNote: (v2Data.data as Record<string, unknown>).author_note as string || '',
       alternateGreetings: v2Data.data.alternate_greetings || [],
       tags: v2Data.data.tags || [],
       // TavernFlow extended fields from extensions
@@ -161,6 +162,7 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       characterNote: (v1Data.character_note as string) || '',
       systemPrompt: (v1Data.system_prompt as string) || '',
       postHistoryInstructions: (v1Data.post_history_instructions as string) || '',
+      authorNote: (v1Data.author_note as string) || '',
       alternateGreetings: (v1Data.alternate_greetings as string[]) || [],
       tags: (v1Data.tags as string[]) || [],
       // Extended fields
@@ -331,7 +333,8 @@ export async function exportCharacterCardAsPng(
       character_note: character.characterNote,
       system_prompt: character.systemPrompt,
       post_history_instructions: character.postHistoryInstructions,
-      alternateGreetings: character.alternateGreetings,
+      author_note: character.authorNote,
+      alternate_greetings: character.alternateGreetings,
       tags: character.tags,
       creator: '',
       character_version: '1.0',
@@ -579,6 +582,7 @@ export function exportCharacterCardAsJson(character: CharacterCard): string {
       character_note: character.characterNote,
       system_prompt: character.systemPrompt,
       post_history_instructions: character.postHistoryInstructions,
+      author_note: character.authorNote,
       alternate_greetings: character.alternateGreetings,
       tags: character.tags,
       creator: '',

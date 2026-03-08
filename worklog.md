@@ -655,3 +655,114 @@ Stage Summary:
 - API endpoint available at /api/background-triggers
 - Auto-sync hook available for components
 - Survives browser clear, server restart, and cross-session
+
+---
+Task ID: prompt-structure-alignment
+Agent: Main Agent
+Task: Align prompt structure with SillyTavern documentation and implement Author's Note
+
+Work Log:
+- Analyzed SillyTavern prompt structure order:
+  1. System Prompt
+  2. Persona Description
+  3. Character Description
+  4. Character Personality
+  5. Scenario
+  6. Character Notes
+  7. Example Dialogue
+  8. Chat History
+  9. Author's Note
+  10. Post-History Instructions
+  11. User Message
+  12. Assistant Prefix
+
+Changes Made:
+1. **Fixed Character Note / Example Dialogue order** (prompt-builder.ts):
+   - In buildSystemPrompt(): Moved Character Note BEFORE Example Dialogue
+   - In buildGroupSystemPrompt(): Same reordering applied
+   - According to SillyTavern docs, Character Notes comes BEFORE Example Dialogue
+
+2. **Added authorNote field to types**:
+   - types/index.ts: Added authorNote: string to CharacterCard interface
+   - types/index.ts: Added 'author_note' to PromptSection type union
+   - types/index.ts: Added author_note to CharacterCardV2 data interface
+   - lib/llm/types.ts: Added authorNote to PromptBuildConfig, CompletionPromptConfig, DEFAULT_CHARACTER
+
+3. **Implemented Author's Note in prompt builder** (prompt-builder.ts):
+   - Added SECTION_COLORS.author_note with lime color
+   - Created buildAuthorNoteSection() function
+   - Updated buildChatMessages() to inject Author's Note after chat history, before post-history
+   - Updated buildCompletionPrompt() with same order
+   - Updated buildGroupChatMessages() with same order
+   - Updated processCharacter() to resolve keys in authorNote
+
+4. **Updated character card import/export** (character-card.ts):
+   - V2 format: Parse author_note from imported data
+   - V1 format: Parse author_note from imported data
+   - Export: Include author_note in PNG and JSON exports
+
+5. **Updated template processing** (prompt-template.ts):
+   - Added authorNote to processCharacterTemplate()
+
+Stage Summary:
+- Prompt structure now matches SillyTavern official documentation
+- Character Note correctly placed before Example Dialogue
+- Author's Note feature implemented:
+  - Stored in CharacterCard.authorNote
+  - Injected after chat history, before post-history instructions
+  - Supports {{key}} resolution like other prompt sections
+  - Included in import/export for character cards
+- Linter passed without errors
+- Dev server running correctly
+
+---
+Task ID: lorebook-enhancements
+Agent: Main Agent
+Task: Lorebook enhancements - Documentation, Regex support, and OutletName UI
+
+Work Log:
+- Analyzed SillyTavern official lorebook documentation from docs.sillytavern.app
+- Compared project's lorebook implementation with SillyTavern standard
+- Identified key differences and missing features
+- Made the following enhancements:
+
+Changes Made:
+1. **Documented Position Differences** (types/index.ts):
+   - Added comprehensive JSDoc comment explaining position differences
+   - SillyTavern uses named positions (Before/After Char Defs, @ Depth, etc.)
+   - Project uses numeric positions (0-7) with different semantics
+   - Documented regex support for keys
+
+2. **Added Regex Support for Keys** (lib/lorebook/scanner.ts):
+   - Added isRegexKey() function to detect regex patterns
+   - Added parseRegexKey() function to parse /pattern/flags format
+   - Updated checkKeyMatch() to handle both plaintext and regex keys
+   - Regex keys are detected by starting with '/' and ending with '/'
+   - Supports all JavaScript regex flags (g, i, m, s, u, v, y)
+
+3. **Added outletName Field** (types/index.ts):
+   - Added outletName?: string to LorebookEntry interface
+   - Used when position = 7 (Outlet)
+   - Allows grouping outlet entries by name
+
+4. **Added Outlet Helper Functions** (lib/lorebook/scanner.ts):
+   - Added getEntriesByOutlet() to filter entries by outlet name
+   - Added groupByOutlet() to group entries by their outlet name
+   - Updated index.ts exports to include new functions
+
+5. **Updated UI for Outlet Name** (components/tavern/lorebook-panel.tsx):
+   - Added conditional field "Nombre del Outlet" when position = 7
+   - Added help text explaining {{outlet::name}} macro usage
+   - Added regex hint in primary keys placeholder
+
+6. **Updated Exports** (lib/lorebook/index.ts):
+   - Added isRegexKey, parseRegexKey exports
+   - Added getEntriesByOutlet, groupByOutlet exports
+
+Stage Summary:
+- Lorebook system documented with SillyTavern differences
+- Regex support implemented for keys (e.g., /(?:weather|rain)/i)
+- outletName field exposed in UI when position is Outlet (7)
+- Linter passed without errors
+- Dev server running correctly
+

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,6 +16,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { 
   Camera, 
@@ -212,7 +218,7 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
   return (
     <TooltipProvider>
       <div className="space-y-4 h-full flex flex-col">
-        {/* Header: Avatar + Name + Tags */}
+        {/* Header: Avatar + Name + Tags - Diseño mejorado */}
         <div className="flex gap-4 flex-shrink-0">
           {/* Avatar */}
           <div className="relative group flex-shrink-0">
@@ -220,8 +226,8 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
               <TooltipTrigger asChild>
                 <div 
                   className={cn(
-                    "w-24 h-24 rounded-lg overflow-hidden bg-muted border-2 border-dashed border-muted-foreground/25 flex items-center justify-center transition-colors",
-                    !uploading && "cursor-pointer hover:border-primary/50"
+                    "w-28 h-28 rounded-lg overflow-hidden bg-muted border-2 border-dashed border-muted-foreground/25 flex items-center justify-center transition-colors",
+                    !uploading && "cursor-pointer hover:border-primary/50 hover:bg-muted/50"
                   )}
                   onClick={() => !uploading && fileInputRef.current?.click()}
                 >
@@ -238,8 +244,8 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                     />
                   ) : (
                     <div className="text-center text-muted-foreground">
-                      <Camera className="w-6 h-6 mx-auto mb-1" />
-                      <span className="text-xs">Avatar</span>
+                      <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
+                      <span className="text-[10px]">Avatar</span>
                     </div>
                   )}
                 </div>
@@ -258,86 +264,145 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
             />
           </div>
 
-          {/* Name & Tags */}
+          {/* Name & Tags - Diseño mejorado con secciones */}
           <div className="flex-1 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="name" className="text-xs">Nombre *</Label>
-                <Input
-                  id="name"
-                  value={character.name}
-                  onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Nombre del personaje"
-                  className="mt-1 h-8"
-                />
+            {/* Sección: Información básica */}
+            <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                <Palette className="w-3.5 h-3.5" />
+                <span className="font-medium">Información Básica</span>
               </div>
-              <div>
-                <Label className="text-xs">Etiquetas</Label>
-                <div className="flex gap-1.5 mt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Label htmlFor="name" className="text-xs">Nombre *</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>El nombre del personaje que se mostrará en el chat.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder="Agregar..."
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                    className="h-8 flex-1"
+                    id="name"
+                    value={character.name}
+                    onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Nombre del personaje"
+                    className="h-8"
                   />
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleAddTag}>
-                    <Plus className="w-3.5 h-3.5" />
-                  </Button>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Label className="text-xs">Etiquetas</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Tags para organizar y buscar personajes.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      placeholder="Agregar..."
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                      className="h-8 flex-1"
+                    />
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleAddTag}>
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-            {character.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {character.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1 text-xs py-0">
-                    {tag}
-                    <X 
-                      className="w-2.5 h-2.5 cursor-pointer" 
-                      onClick={() => handleRemoveTag(tag)}
-                    />
-                  </Badge>
-                ))}
-              </div>
-            )}
-            
-            {/* HUD Selector */}
-            <div className="pt-1">
-              <div className="flex items-center gap-2 mb-1">
-                <Layers className="w-3.5 h-3.5 text-muted-foreground" />
-                <Label className="text-xs">Plantilla HUD</Label>
-              </div>
-              <HUDSelector
-                value={character.hudTemplateId}
-                onChange={(hudTemplateId) => setCharacter(prev => ({ ...prev, hudTemplateId }))}
-                placeholder="Sin HUD asignado"
-              />
+              {character.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {character.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="gap-1 text-xs py-0.5 px-2">
+                      {tag}
+                      <X 
+                        className="w-3 h-3 cursor-pointer opacity-60 hover:opacity-100" 
+                        onClick={() => handleRemoveTag(tag)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Lorebook Selector */}
-            <div className="pt-2">
-              <div className="flex items-center gap-2 mb-1">
-                <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
-                <Label className="text-xs">Lorebooks</Label>
+            {/* Sección: Asignaciones */}
+            <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                <Package className="w-3.5 h-3.5" />
+                <span className="font-medium">Asignaciones</span>
               </div>
-              <LorebookSelector
-                value={character.lorebookIds}
-                onChange={(lorebookIds) => setCharacter(prev => ({ ...prev, lorebookIds }))}
-                placeholder="Sin lorebooks asignados"
-              />
-            </div>
+              
+              {/* HUD Selector */}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                  <Label className="text-xs">Plantilla HUD</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Selecciona una plantilla HUD para mostrar estadísticas del personaje.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <HUDSelector
+                  value={character.hudTemplateId}
+                  onChange={(hudTemplateId) => setCharacter(prev => ({ ...prev, hudTemplateId }))}
+                  placeholder="Sin HUD asignado"
+                />
+              </div>
 
-            {/* Quest Templates Selector */}
-            <div className="pt-2">
-              <div className="flex items-center gap-2 mb-1">
-                <ScrollText className="w-3.5 h-3.5 text-muted-foreground" />
-                <Label className="text-xs">Misiones</Label>
+              {/* Lorebook Selector */}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                  <Label className="text-xs">Lorebooks</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Lorebooks asociados con información adicional del personaje.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <LorebookSelector
+                  value={character.lorebookIds}
+                  onChange={(lorebookIds) => setCharacter(prev => ({ ...prev, lorebookIds }))}
+                  placeholder="Sin lorebooks asignados"
+                />
               </div>
-              <QuestSelector
-                value={character.questTemplateIds}
-                onChange={(questTemplateIds) => setCharacter(prev => ({ ...prev, questTemplateIds }))}
-                placeholder="Sin misiones asignadas"
-              />
+
+              {/* Quest Templates Selector */}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <ScrollText className="w-3.5 h-3.5 text-purple-500" />
+                  <Label className="text-xs">Misiones</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Templates de misiones disponibles para este personaje.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <QuestSelector
+                  value={character.questTemplateIds}
+                  onChange={(questTemplateIds) => setCharacter(prev => ({ ...prev, questTemplateIds }))}
+                  placeholder="Sin misiones asignadas"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -411,195 +476,301 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
           </TabsList>
 
           <ScrollArea className="flex-1 mt-3">
-            {/* Description Tab - 2 columns */}
+            {/* Description Tab - Diseño mejorado con secciones */}
             <TabsContent value="description" className="mt-0">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Label htmlFor="description" className="text-xs">Descripción</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Descripción detallada del personaje: su historia, apariencia y rasgos principales.</p>
-                      </TooltipContent>
-                    </Tooltip>
+              <div className="space-y-4">
+                {/* Banner informativo */}
+                <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg">
+                      <FileText className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-emerald-600">Información del Personaje</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Define la <strong>historia</strong>, <strong>personalidad</strong> y <strong>escenario</strong> del personaje. 
+                        Esta información ayuda a la IA a entender y interpretar correctamente al personaje.
+                      </p>
+                    </div>
                   </div>
-                  <Textarea
-                    id="description"
-                    value={character.description}
-                    onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe tu personaje en detalle..."
-                    className="min-h-[200px] text-sm"
-                  />
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Label htmlFor="personality" className="text-xs">Personalidad</Label>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Descripción Principal */}
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 text-emerald-500" />
+                      <span className="text-xs font-medium">Descripción</span>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
-                          <p>Rasgos de carácter, manerismos y patrones de comportamiento.</p>
+                          <p>Descripción detallada del personaje: su historia, apariencia y rasgos principales.</p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
                     <Textarea
-                      id="personality"
-                      value={character.personality}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, personality: e.target.value }))}
-                      placeholder="Describe la personalidad..."
-                      className="min-h-[90px] text-sm"
+                      id="description"
+                      value={character.description}
+                      onChange={(e) => setCharacter(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe tu personaje en detalle..."
+                      className="min-h-[200px] text-sm"
                     />
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Label htmlFor="scenario" className="text-xs">Escenario</Label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p>El entorno o escenario donde existe el personaje.</p>
-                        </TooltipContent>
-                      </Tooltip>
+                  {/* Columna derecha */}
+                  <div className="space-y-3">
+                    {/* Personalidad */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-purple-500" />
+                        <span className="text-xs font-medium">Personalidad</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Rasgos de carácter, manerismos y patrones de comportamiento.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="personality"
+                        value={character.personality}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, personality: e.target.value }))}
+                        placeholder="Describe la personalidad..."
+                        className="min-h-[90px] text-sm"
+                      />
                     </div>
-                    <Textarea
-                      id="scenario"
-                      value={character.scenario}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, scenario: e.target.value }))}
-                      placeholder="Describe el escenario..."
-                      className="min-h-[90px] text-sm"
-                    />
+
+                    {/* Escenario */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Layers className="w-4 h-4 text-cyan-500" />
+                        <span className="text-xs font-medium">Escenario</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>El entorno o escenario donde existe el personaje.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="scenario"
+                        value={character.scenario}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, scenario: e.target.value }))}
+                        placeholder="Describe el escenario..."
+                        className="min-h-[90px] text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </TabsContent>
 
-            {/* Dialogue Tab - 2 columns */}
+            {/* Dialogue Tab - Diseño mejorado con secciones */}
             <TabsContent value="dialogue" className="mt-0">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Label htmlFor="firstMes" className="text-xs">Primer Mensaje</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>El primer mensaje que el personaje enviará para iniciar la conversación.</p>
-                      </TooltipContent>
-                    </Tooltip>
+              <div className="space-y-4">
+                {/* Banner informativo */}
+                <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <MessageSquare className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-blue-600">Configuración de Diálogo</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Define el <strong>primer mensaje</strong> y <strong>ejemplos de diálogo</strong> para guiar a la IA 
+                        sobre cómo debe hablar e interactuar el personaje.
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <Badge variant="outline" className="text-xs bg-blue-500/10">
+                          <MessageSquare className="w-3 h-3 mr-1 text-blue-500" />
+                          Primer Mensaje
+                        </Badge>
+                        <Badge variant="outline" className="text-xs bg-purple-500/10">
+                          <Sparkles className="w-3 h-3 mr-1 text-purple-500" />
+                          Ejemplos
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
-                  <Textarea
-                    id="firstMes"
-                    value={character.firstMes}
-                    onChange={(e) => setCharacter(prev => ({ ...prev, firstMes: e.target.value }))}
-                    placeholder="Mensaje de apertura del personaje..."
-                    className="min-h-[200px] text-sm"
-                  />
                 </div>
-
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Label htmlFor="mesExample" className="text-xs">Ejemplo de Diálogo</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Ejemplos de conversación para ayudar a la IA a entender cómo habla el personaje.</p>
-                      </TooltipContent>
-                    </Tooltip>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Primer Mensaje */}
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-4 h-4 text-blue-500" />
+                      <span className="text-xs font-medium">Primer Mensaje</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>El primer mensaje que el personaje enviará para iniciar la conversación.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Textarea
+                      id="firstMes"
+                      value={character.firstMes}
+                      onChange={(e) => setCharacter(prev => ({ ...prev, firstMes: e.target.value }))}
+                      placeholder="Mensaje de apertura del personaje..."
+                      className="min-h-[200px] text-sm"
+                    />
                   </div>
-                  <Textarea
-                    id="mesExample"
-                    value={character.mesExample}
-                    onChange={(e) => setCharacter(prev => ({ ...prev, mesExample: e.target.value }))}
-                    placeholder={`<START>\n{{user}}: ¡Hola!\n{{char}}: *sonríe* ¡Hola!`}
-                    className="min-h-[200px] font-mono text-xs"
-                  />
+
+                  {/* Ejemplo de Diálogo */}
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <span className="text-xs font-medium">Ejemplo de Diálogo</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Ejemplos de conversación para ayudar a la IA a entender cómo habla el personaje.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Textarea
+                      id="mesExample"
+                      value={character.mesExample}
+                      onChange={(e) => setCharacter(prev => ({ ...prev, mesExample: e.target.value }))}
+                      placeholder={`<START>
+{{user}}: ¡Hola!
+{{char}}: *sonríe* ¡Hola!`}
+                      className="min-h-[200px] font-mono text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Usa {'<START>'} para separar ejemplos y {'{{user}}'}/{'{{char}}'} para los hablantes.
+                    </p>
+                  </div>
                 </div>
               </div>
             </TabsContent>
 
-            {/* Prompts Tab - 2 columns */}
+            {/* Prompts Tab - Diseño mejorado con secciones */}
             <TabsContent value="prompt" className="mt-0">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Label htmlFor="systemPrompt" className="text-xs">Prompt de Sistema</Label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p>Sobrescribe el prompt de sistema predeterminado. Déjalo vacío para usar el default.</p>
-                        </TooltipContent>
-                      </Tooltip>
+              <div className="space-y-4">
+                {/* Banner informativo */}
+                <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-500/20 rounded-lg">
+                      <Sparkles className="w-5 h-5 text-amber-500" />
                     </div>
-                    <Textarea
-                      id="systemPrompt"
-                      value={character.systemPrompt}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, systemPrompt: e.target.value }))}
-                      placeholder="Prompt de sistema personalizado..."
-                      className="min-h-[120px] font-mono text-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Label htmlFor="postHistoryInstructions" className="text-xs">Instrucciones Post-Historia</Label>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-amber-600">Configuración de Prompts</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Personaliza los <strong>prompts de sistema</strong> y <strong>notas</strong> que guían el comportamiento de la IA.
+                        Estos ajustes permiten un control más fino sobre cómo responde el personaje.
+                      </p>
                     </div>
-                    <Textarea
-                      id="postHistoryInstructions"
-                      value={character.postHistoryInstructions}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, postHistoryInstructions: e.target.value }))}
-                      placeholder="Instrucciones después del historial..."
-                      className="min-h-[80px] font-mono text-xs"
-                    />
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Label htmlFor="characterNote" className="text-xs">Nota del Personaje</Label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p>Una nota que se envía a la IA con cada mensaje para influir en el comportamiento.</p>
-                        </TooltipContent>
-                      </Tooltip>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Columna izquierda */}
+                  <div className="space-y-3">
+                    {/* Prompt de Sistema */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-medium">Prompt de Sistema</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Sobrescribe el prompt de sistema predeterminado. Déjalo vacío para usar el default.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="systemPrompt"
+                        value={character.systemPrompt}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                        placeholder="Prompt de sistema personalizado..."
+                        className="min-h-[120px] font-mono text-xs"
+                      />
                     </div>
-                    <Textarea
-                      id="characterNote"
-                      value={character.characterNote}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, characterNote: e.target.value }))}
-                      placeholder="Nota que se enviará con cada mensaje..."
-                      className="min-h-[120px] font-mono text-xs"
-                    />
+
+                    {/* Instrucciones Post-Historia */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="w-4 h-4 text-cyan-500" />
+                        <span className="text-xs font-medium">Instrucciones Post-Historia</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Instrucciones que se añaden después del historial de conversación.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="postHistoryInstructions"
+                        value={character.postHistoryInstructions}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, postHistoryInstructions: e.target.value }))}
+                        placeholder="Instrucciones después del historial..."
+                        className="min-h-[80px] font-mono text-xs"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Label htmlFor="creatorNotes" className="text-xs">Notas del Creador</Label>
+                  {/* Columna derecha */}
+                  <div className="space-y-3">
+                    {/* Nota del Personaje */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-purple-500" />
+                        <span className="text-xs font-medium">Nota del Personaje</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Una nota que se envía a la IA con cada mensaje para influir en el comportamiento.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="characterNote"
+                        value={character.characterNote}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, characterNote: e.target.value }))}
+                        placeholder="Nota que se enviará con cada mensaje..."
+                        className="min-h-[120px] font-mono text-xs"
+                      />
                     </div>
-                    <Textarea
-                      id="creatorNotes"
-                      value={character.creatorNotes}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, creatorNotes: e.target.value }))}
-                      placeholder="Tus notas sobre este personaje..."
-                      className="min-h-[80px] text-sm"
-                    />
+
+                    {/* Notas del Creador */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">Notas del Creador</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Notas personales sobre el personaje. No se envían a la IA.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Textarea
+                        id="creatorNotes"
+                        value={character.creatorNotes}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, creatorNotes: e.target.value }))}
+                        placeholder="Tus notas sobre este personaje..."
+                        className="min-h-[80px] text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -770,31 +941,74 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
               />
             </TabsContent>
 
-            {/* Voice Tab */}
+            {/* Voice Tab - Diseño mejorado */}
             <TabsContent value="voice" className="mt-0">
               <div className="space-y-4">
+                {/* Banner informativo */}
+                <div className="bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-pink-500/20 rounded-lg">
+                      <Mic className="w-5 h-5 text-pink-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-pink-600">Sistema de Voz (TTS)</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Configura la <strong>texto-a-voz</strong> del personaje para que responda con audio.
+                        Usa el proveedor TTS activo en la configuración global.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Voice Toggle Section */}
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/40">
+                  <div className="flex items-center gap-2">
+                    <Mic className="w-4 h-4 text-pink-500" />
+                    <span className="text-sm font-medium">Activar Voz</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Cuando está activado, las respuestas del personaje se reproducirán como audio.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Switch
+                    checked={character.voice?.enabled || false}
+                    onCheckedChange={(checked) => setCharacter(prev => ({
+                      ...prev,
+                      voice: checked 
+                        ? { enabled: true, voiceId: 'default', speed: 1, pitch: 1, emotionMapping: {} }
+                        : { enabled: false, voiceId: '', speed: 1, pitch: 1, emotionMapping: {} }
+                    }))}
+                  />
+                </div>
+                
                 {character.voice?.enabled ? (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Mic className="w-4 h-4 text-green-500" />
-                        <span className="text-sm font-medium">Voz Activada</span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => setCharacter(prev => ({
-                          ...prev,
-                          voice: { ...prev.voice, enabled: false, voiceId: '', speed: 1, pitch: 1, emotionMapping: {} }
-                        }))}
-                      >
-                        Desactivar
-                      </Button>
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-xs text-green-600 font-medium">Voz activada para este personaje</span>
                     </div>
+                    
+                    {/* Voice Settings */}
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs">Velocidad</Label>
+                      <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Zap className="w-4 h-4 text-amber-500" />
+                          <span className="text-xs font-medium">Velocidad</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Velocidad de reproducción de la voz (0.5 - 2.0)</p>
+                              <p className="text-xs text-muted-foreground mt-1">1.0 = velocidad normal</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                         <Input
                           type="number"
                           step="0.1"
@@ -805,11 +1019,26 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                             ...prev,
                             voice: { ...prev.voice!, speed: parseFloat(e.target.value) || 1 }
                           }))}
-                          className="mt-1 h-8"
+                          className="h-8"
                         />
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Actual: {character.voice.speed || 1}x
+                        </p>
                       </div>
-                      <div>
-                        <Label className="text-xs">Tono</Label>
+                      <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Activity className="w-4 h-4 text-purple-500" />
+                          <span className="text-xs font-medium">Tono</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Tono de la voz (0.5 - 2.0)</p>
+                              <p className="text-xs text-muted-foreground mt-1">1.0 = tono normal</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                         <Input
                           type="number"
                           step="0.1"
@@ -820,39 +1049,32 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
                             ...prev,
                             voice: { ...prev.voice!, pitch: parseFloat(e.target.value) || 1 }
                           }))}
-                          className="mt-1 h-8"
+                          className="h-8"
                         />
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Actual: {character.voice.pitch || 1}x
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Info Note */}
+                    <div className="text-xs bg-cyan-500/5 border border-cyan-500/20 p-3 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <HelpCircle className="w-4 h-4 text-cyan-500 mt-0.5" />
+                        <div>
+                          <p>El proveedor TTS se configura en <strong>Ajustes → TTS</strong>.</p>
+                          <p className="mt-1 text-muted-foreground">Puedes mapear emociones a voces específicas en la configuración avanzada.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-muted-foreground border rounded-lg">
-                    <Mic className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Configura texto-a-voz para este personaje.</p>
-                    <p className="text-xs mt-1 mb-3">El personaje hablará con la voz configurada.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCharacter(prev => ({
-                        ...prev,
-                        voice: {
-                          enabled: true,
-                          voiceId: 'default',
-                          speed: 1,
-                          pitch: 1,
-                          emotionMapping: {}
-                        }
-                      }))}
-                    >
-                      Activar Voz
-                    </Button>
+                  <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg border border-border/40">
+                    <Mic className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm font-medium">Voz desactivada</p>
+                    <p className="text-xs mt-1">Activa el sistema para configurar texto-a-voz.</p>
                   </div>
                 )}
-                
-                <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                  <p>💡 La configuración de voz usará el proveedor TTS activo en configuración.</p>
-                  <p className="mt-1">💡 Puedes mapear emociones a voces específicas en la configuración avanzada.</p>
-                </div>
               </div>
             </TabsContent>
           </ScrollArea>

@@ -1,7 +1,7 @@
 {
   "summaries": [],
   "summarySettings": {
-    "enabled": false,
+    "enabled": true,
     "autoSummarize": true,
     "normalChatInterval": 20,
     "groupChatInterval": 15,
@@ -35,6 +35,12 @@
     },
     "0c1c1324-4c5d-4c0f-b87e-f60c057031b5": {
       "sessionId": "0c1c1324-4c5d-4c0f-b87e-f60c057031b5",
+      "messagesSinceLastSummary": 1,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
+    },
+    "9a687020-88a2-404f-8bb2-c6d2fea5ced3": {
+      "sessionId": "9a687020-88a2-404f-8bb2-c6d2fea5ced3",
       "messagesSinceLastSummary": 1,
       "lastSummaryMessageIndex": 0,
       "isGroupChat": false

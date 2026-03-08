@@ -7,9 +7,13 @@ export {
   scanForLorebookEntries,
   filterByProbability,
   getEntriesByPosition,
+  getEntriesByOutlet,
   groupEntries,
+  groupByOutlet,
   estimateTokens,
   applyTokenBudget,
+  isRegexKey,
+  parseRegexKey,
   DEFAULT_SCAN_OPTIONS,
   type LorebookScanResult,
   type ScanOptions

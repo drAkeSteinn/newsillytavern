@@ -14,6 +14,24 @@
     {
       "questId": "asd",
       "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1772918892682-z96b2cbat",
+      "timestamp": "2026-03-07T21:28:12.682Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1772918892667-d5fzfcp7q",
+      "timestamp": "2026-03-07T21:28:12.667Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
       "type": "objective_complete",
       "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sprite \"goth\" applied to Dra. Moon (fallback in 6000ms), Sound sequence \"test\" queued (6 sounds)",
       "rewards": [
@@ -54,7 +72,7 @@
       ],
       "id": "notif-1772908571697-tcok3qg04",
       "timestamp": "2026-03-07T18:36:11.697Z",
-      "read": false
+      "read": true
     },
     {
       "questId": "asd",
@@ -63,7 +81,7 @@
       "message": "Objetivo completado: Objetivo tenebroso y medico",
       "id": "notif-1772908571584-gecx2ildg",
       "timestamp": "2026-03-07T18:36:11.584Z",
-      "read": false
+      "read": true
     },
     {
       "questId": "asd",
@@ -837,24 +855,6 @@
       "message": "Objetivo completado: Objetivo tenebroso y medico",
       "id": "notif-1772808207892-9k6wnibsn",
       "timestamp": "2026-03-06T14:43:27.892Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772808088727-a6em25svo",
-      "timestamp": "2026-03-06T14:41:28.727Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1772808088706-yvgp2fpfs",
-      "timestamp": "2026-03-06T14:41:28.706Z",
       "read": true
     }
   ]

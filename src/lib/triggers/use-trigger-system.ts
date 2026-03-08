@@ -86,6 +86,7 @@ import {
 import {
   executeQuestCompletionRewards,
   executeObjectiveRewards,
+  executeTriggerRewardFromQuest,
   type RewardStoreActions,
 } from '@/lib/quest/quest-reward-executor';
 import {
@@ -999,8 +1000,32 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
               updateCharacterStat: store.updateCharacterStat.bind(store),
             });
 
-            if (activationResults.length > 0) {
-              console.log(`[TriggerSystem] Skills activated for ${character.name}: ${activationResults.map(r => `${r.skillName} (${r.changes.length} changes)`).join(', ')}`);
+            if (activationResults.skillResults.length > 0) {
+              console.log(`[TriggerSystem] Skills activated for ${character.name}: ${activationResults.skillResults.map(r => `${r.skillName} (${r.changes.length} changes)`).join(', ')}`);
+            }
+            
+            // Execute skill activation rewards (triggers)
+            if (activationResults.allRewards.length > 0) {
+              console.log(`[TriggerSystem] Executing ${activationResults.allRewards.length} skill activation rewards for ${character.name}`);
+              for (const reward of activationResults.allRewards) {
+                executeTriggerRewardFromQuest(reward, {
+                  character,
+                  allCharacters: characters || [],
+                  spriteTriggers: store.spriteTriggers,
+                  soundTriggers: store.soundTriggers,
+                  backgroundTriggers: store.backgroundTriggers,
+                  soundSequenceTriggers: store.soundSequenceTriggers,
+                  applySprite: store.setActiveSprite.bind(store),
+                  playSound: audioPlayerRef.current?.playSound.bind(audioPlayerRef.current),
+                  setBackground: store.setBackground.bind(store),
+                  executeSoundSequence: (sequenceId: string) => {
+                    const sequence = store.soundSequenceTriggers.find(s => s.id === sequenceId || s.activationKey === sequenceId);
+                    if (sequence && audioPlayerRef.current) {
+                      audioPlayerRef.current.playSoundSequence(sequence, store.soundTriggers);
+                    }
+                  },
+                });
+              }
             }
           }
         }

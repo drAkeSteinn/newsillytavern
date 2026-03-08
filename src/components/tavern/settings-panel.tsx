@@ -34,7 +34,13 @@ import {
   FileJson,
   Settings2,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Info,
+  HelpCircle,
+  Cpu,
+  Sliders,
+  Zap,
+  Sparkles
 } from 'lucide-react';
 import {
   Dialog,
@@ -42,6 +48,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { LLMProvider, AppSettings } from '@/types';
@@ -512,14 +524,6 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                 <BookOpen className="w-4 h-4" />
                 Lorebooks
               </TabsTrigger>
-              <TabsTrigger value="chat" className="gap-1.5 text-xs">
-                <MessageSquare className="w-4 h-4" />
-                Chat
-              </TabsTrigger>
-              <TabsTrigger value="context" className="gap-1.5 text-xs">
-                <Database className="w-4 h-4" />
-                Contexto
-              </TabsTrigger>
               <TabsTrigger value="appearance" className="gap-1.5 text-xs">
                 <Palette className="w-4 h-4" />
                 Apariencia
@@ -571,24 +575,50 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           <div className="flex-1 overflow-hidden">
             {/* LLM Settings */}
             <TabsContent value="llm" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-[1fr_1fr] gap-6 h-full">
-                {/* Left: LLM Connections List */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Conexiones LLM</h3>
-                    <Button size="sm" onClick={() => setNewConfigOpen(true)}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Agregar
-                    </Button>
+              <TooltipProvider>
+              <div className="space-y-4">
+                {/* Info Banner */}
+                <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Bot className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-blue-600 dark:text-blue-400">Configuración de LLM</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Gestiona tus conexiones a modelos de lenguaje. Soporta proveedores locales como <strong>Ollama</strong>, <strong>KoboldCPP</strong> y APIs remotas.
+                      </p>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_1fr] gap-6">
+                  {/* Left: LLM Connections List */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                      <Cpu className="w-4 h-4" />
+                      <span className="font-medium">Conexiones LLM</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3.5 h-3.5 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Las conexiones LLM definen cómo TavernFlow se comunica con los modelos de lenguaje.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Button size="sm" className="ml-auto h-6 text-xs" onClick={() => setNewConfigOpen(true)}>
+                        <Plus className="w-3 h-3 mr-1" />
+                        Agregar
+                      </Button>
+                    </div>
+
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
                     {llmConfigs.map((config) => (
                       <div 
                         key={config.id} 
                         className={cn(
                           'p-3 rounded-lg border transition-colors cursor-pointer',
-                          config.isActive ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                          config.isActive ? 'border-primary bg-primary/5' : 'border-border/40 hover:bg-muted/50'
                         )}
                         onClick={() => !config.isActive && setActiveLLMConfig(config.id)}
                       >
@@ -643,25 +673,37 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                 </div>
 
                 {/* Right: Active Config Parameters */}
-                <div className="border-l pl-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                    <Sliders className="w-4 h-4" />
+                    <span className="font-medium">Parámetros</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Ajusta los parámetros de generación como temperatura, top-p, y límites de tokens.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   {llmConfigs.find(c => c.isActive) ? (
                     (() => {
                       const config = llmConfigs.find(c => c.isActive)!;
                       const providerInfo = LLM_PROVIDERS.find(p => p.value === config.provider);
                       return (
-                        <div className="space-y-4">
-                          <h3 className="font-medium">Parámetros de {config.name}</h3>
+                        <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{config.name}</span>
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                              {providerInfo?.label || config.provider}
+                            </span>
+                          </div>
                           
                           {/* Connection Settings - Show endpoint/model/apiKey */}
-                          <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
-                            <h4 className="text-sm font-medium text-muted-foreground">Configuración de Conexión</h4>
-                            
-                            {/* Provider badge */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Proveedor:</span>
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
-                                {providerInfo?.label || config.provider}
-                              </span>
+                          <div className="space-y-3 p-3 rounded-lg border border-border/40 bg-background/50">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Zap className="w-3.5 h-3.5" />
+                              <span className="font-medium">Configuración de Conexión</span>
                             </div>
                             
                             {/* Endpoint field - for providers that need it */}
@@ -869,13 +911,15 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                       );
                     })()
                   ) : (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Bot className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>Selecciona una conexión para ver sus parámetros</p>
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40 text-center py-8 text-muted-foreground">
+                      <Bot className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Selecciona una conexión para ver sus parámetros</p>
                     </div>
                   )}
                 </div>
               </div>
+              </div>
+              </TooltipProvider>
             </TabsContent>
 
             {/* Persona Settings */}
@@ -888,260 +932,9 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               <LorebookPanel />
             </TabsContent>
 
-            {/* Chat Settings */}
-            <TabsContent value="chat" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
-              <ChatSettingsContent settings={settings} updateSettings={updateSettings} />
-            </TabsContent>
-
-            {/* Context Settings */}
-            <TabsContent value="context" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Message Limits */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-medium">Límites de Contexto</h3>
-                    <p className="text-xs text-muted-foreground">Controla cuántos mensajes se envían al LLM</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-lg border space-y-2">
-                      <div className="flex justify-between">
-                        <Label>Máximo de Mensajes</Label>
-                        <span className="text-sm text-muted-foreground">{settings.context?.maxMessages ?? 50}</span>
-                      </div>
-                      <Slider
-                        value={[settings.context?.maxMessages ?? 50]}
-                        min={10}
-                        max={200}
-                        step={5}
-                        onValueChange={([maxMessages]) => 
-                          updateSettings({ 
-                            context: { ...(settings.context ?? {}), maxMessages } 
-                          })
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Ventana deslizante de mensajes. Los mensajes más antiguos se excluyen.
-                      </p>
-                    </div>
-
-                    <div className="p-4 rounded-lg border space-y-2">
-                      <div className="flex justify-between">
-                        <Label>Límite de Tokens</Label>
-                        <span className="text-sm text-muted-foreground">{settings.context?.maxTokens ?? 4096}</span>
-                      </div>
-                      <Slider
-                        value={[settings.context?.maxTokens ?? 4096]}
-                        min={1024}
-                        max={128000}
-                        step={512}
-                        onValueChange={([maxTokens]) => 
-                          updateSettings({ 
-                            context: { ...(settings.context ?? {}), maxTokens } 
-                          })
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Presupuesto de tokens para el historial. Se ajusta según el proveedor.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 rounded-lg border">
-                        <Label className="text-xs">Conservar Primeros N</Label>
-                        <Input
-                          type="number"
-                          value={settings.context?.keepFirstN ?? 1}
-                          onChange={(e) => 
-                            updateSettings({ 
-                              context: { ...(settings.context ?? {}), keepFirstN: parseInt(e.target.value) || 1 } 
-                            })
-                          }
-                          min={0}
-                          max={10}
-                          className="mt-1 h-8"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">Mensaje de saludo</p>
-                      </div>
-                      <div className="p-3 rounded-lg border">
-                        <Label className="text-xs">Conservar Últimos N</Label>
-                        <Input
-                          type="number"
-                          value={settings.context?.keepLastN ?? 20}
-                          onChange={(e) => 
-                            updateSettings({ 
-                              context: { ...(settings.context ?? {}), keepLastN: parseInt(e.target.value) || 20 } 
-                            })
-                          }
-                          min={5}
-                          max={50}
-                          className="mt-1 h-8"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">Mensajes recientes</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Future Summary Feature */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-medium">Resúmenes (Próximamente)</h3>
-                    <p className="text-xs text-muted-foreground">Compresión inteligente del historial</p>
-                  </div>
-
-                  <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <div>
-                        <Label className="text-sm">Activar Resúmenes</Label>
-                        <p className="text-xs text-muted-foreground">Resumir conversaciones largas automáticamente</p>
-                      </div>
-                      <Switch
-                        checked={settings.context?.enableSummaries ?? false}
-                        disabled={true}
-                        onCheckedChange={(enableSummaries) => 
-                          updateSettings({ 
-                            context: { ...(settings.context ?? {}), enableSummaries } 
-                          })
-                        }
-                      />
-                    </label>
-                    
-                    <div className="pt-2 border-t">
-                      <p className="text-xs text-muted-foreground">
-                        <span className="text-amber-500">⚠️</span> Esta función estará disponible en una futura actualización.
-                        Permitirá resumir automáticamente el historial cuando exceda el límite configurado.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-lg border space-y-2">
-                    <div className="flex justify-between">
-                      <Label>Umbral de Resumen</Label>
-                      <span className="text-sm text-muted-foreground">{settings.context?.summaryThreshold ?? 40}</span>
-                    </div>
-                    <Slider
-                      value={[settings.context?.summaryThreshold ?? 40]}
-                      min={20}
-                      max={100}
-                      step={5}
-                      disabled={true}
-                      onValueChange={([summaryThreshold]) => 
-                        updateSettings({ 
-                          context: { ...(settings.context ?? {}), summaryThreshold } 
-                        })
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Número de mensajes para considerar resumen automático.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-lg bg-muted/30 text-sm text-muted-foreground">
-                    <h4 className="font-medium text-foreground mb-2">¿Cómo funciona la ventana deslizante?</h4>
-                    <ul className="space-y-2">
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>Los mensajes se excluyen del centro cuando exceden el límite.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>El mensaje de saludo siempre se conserva.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>Los últimos N mensajes recientes siempre se incluyen.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>El límite de tokens tiene prioridad sobre el conteo de mensajes.</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
             {/* Appearance Settings */}
-            <TabsContent value="appearance" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Theme Settings */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <Label className="font-medium">Tema</Label>
-                      <p className="text-xs text-muted-foreground">Elige tu tema preferido</p>
-                    </div>
-                    <div className="flex gap-2">
-                      {(['light', 'dark', 'system'] as const).map((theme) => (
-                        <Button
-                          key={theme}
-                          variant={settings.theme === theme ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => updateSettings({ theme })}
-                        >
-                          {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Oscuro' : 'Sistema'}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-lg border space-y-2">
-                    <div className="flex justify-between">
-                      <Label>Tamaño de Fuente</Label>
-                      <span className="text-sm text-muted-foreground">{settings.fontSize}px</span>
-                    </div>
-                    <Slider
-                      value={[settings.fontSize]}
-                      min={12}
-                      max={24}
-                      step={1}
-                      onValueChange={([fontSize]) => updateSettings({ fontSize })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-lg border">
-                    <div>
-                      <Label className="font-medium">Visualización</Label>
-                      <p className="text-xs text-muted-foreground">Estilo de mensajes</p>
-                    </div>
-                    <div className="flex gap-2">
-                      {(['bubble', 'compact', 'full'] as const).map((mode) => (
-                        <Button
-                          key={mode}
-                          variant={settings.messageDisplay === mode ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => updateSettings({ messageDisplay: mode })}
-                        >
-                          {mode === 'bubble' ? 'Burbuja' : mode === 'compact' ? 'Compacto' : 'Completo'}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Toggle Settings */}
-                <div className="space-y-3">
-                  <h3 className="font-medium">Opciones de Visualización</h3>
-                  
-                  {[
-                    { key: 'showTimestamps', label: 'Marcas de Tiempo', desc: 'Mostrar hora en mensajes' },
-                    { key: 'showTokens', label: 'Conteo de Tokens', desc: 'Mostrar uso de tokens' },
-                    { key: 'autoScroll', label: 'Auto-desplazamiento', desc: 'Scroll automático a nuevos mensajes' },
-                  ].map(({ key, label, desc }) => (
-                    <label key={key} className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50">
-                      <div>
-                        <Label className="text-sm">{label}</Label>
-                        <p className="text-xs text-muted-foreground">{desc}</p>
-                      </div>
-                      <Switch
-                        checked={settings[key as keyof typeof settings] as boolean}
-                        onCheckedChange={(checked) => updateSettings({ [key]: checked })}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
+            <TabsContent value="appearance" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
+              <AppearanceSettingsContent settings={settings} updateSettings={updateSettings} />
             </TabsContent>
 
             {/* Sound Triggers Settings */}
@@ -1156,37 +949,81 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
 
             {/* Voice Settings */}
             <TabsContent value="voice" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Proveedores TTS</h3>
-                    <Button size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Agregar
-                    </Button>
-                  </div>
-                  <div className="text-center py-8 text-muted-foreground border rounded-lg">
-                    <Volume2 className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Sin proveedores TTS configurados</p>
-                    <p className="text-xs mt-1">Agrega un proveedor para activar la síntesis de voz</p>
+              <div className="space-y-4">
+                {/* Banner Informativo */}
+                <div className="bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-pink-500/20 rounded-lg">
+                      <Volume2 className="w-5 h-5 text-pink-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-pink-600">Sistema de Voz (TTS)</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        La síntesis de voz permite que el personaje hable sus mensajes.
+                        Configura un proveedor TTS como ElevenLabs, Azure, o el SDK integrado.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
-                  <h4 className="font-medium text-foreground mb-2">Acerca de TTS</h4>
-                  <p>
-                    La síntesis de voz (TTS) permite que el personaje hable sus mensajes.
-                    Configura un proveedor TTS como ElevenLabs, Azure, o el SDK integrado.
-                  </p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span className="font-medium">Proveedores TTS</span>
+                      </div>
+                      <Button size="sm" className="h-7 text-xs">
+                        <Plus className="w-3 h-3 mr-1" />
+                        Agregar
+                      </Button>
+                    </div>
+                    <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                      <Volume2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Sin proveedores TTS configurados</p>
+                      <p className="text-xs mt-1">Agrega un proveedor para activar la síntesis de voz</p>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span className="font-medium">Acerca de TTS</span>
+                    </div>
+                    <p>
+                      La síntesis de voz (TTS) permite que el personaje hable sus mensajes.
+                      Configura un proveedor TTS como ElevenLabs, Azure, o el SDK integrado.
+                    </p>
+                    <div className="mt-3 p-2 bg-pink-500/10 rounded border border-pink-500/20">
+                      <p className="text-xs text-pink-600">💡 El SDK integrado de Z.ai no requiere configuración adicional.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </TabsContent>
 
             {/* Hotkeys Settings */}
             <TabsContent value="hotkeys" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="grid grid-cols-2 gap-6" ref={hotkeyContainerRef}>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Atajos de Teclado</h3>
+              <div className="space-y-4">
+                {/* Banner Informativo */}
+                <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-500/20 rounded-lg">
+                      <Keyboard className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-amber-600">Atajos de Teclado</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Personaliza los atajos de teclado para acciones rápidas. 
+                        Haz clic en un atajo para editarlo y presiona la nueva combinación.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6" ref={hotkeyContainerRef}>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">Atajos de Teclado</h3>
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -1275,7 +1112,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   </div>
                 </div>
               </div>
-            </TabsContent>
+            </div>
+          </TabsContent>
 
             {/* Data Settings */}
             <TabsContent value="data" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
@@ -1547,26 +1385,30 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
 }
 
 // ============================================
-// Chat Settings Content Component
+// Appearance Settings Content Component
 // ============================================
 
-interface ChatSettingsContentProps {
+interface AppearanceSettingsContentProps {
   settings: AppSettings;
   updateSettings: (settings: Partial<AppSettings>) => void;
 }
 
-function ChatSettingsContent({ settings, updateSettings }: ChatSettingsContentProps) {
+function AppearanceSettingsContent({ settings, updateSettings }: AppearanceSettingsContentProps) {
   return (
-    <Tabs defaultValue="dialogue" className="h-full flex flex-col">
+    <Tabs defaultValue="theme" className="h-full flex flex-col">
       <div className="border-b px-4 flex-shrink-0 bg-muted/30">
         <TabsList className="h-10">
-          <TabsTrigger value="dialogue" className="gap-1.5 text-xs">
-            <MessageSquare className="w-3.5 h-3.5" />
-            Diálogos
+          <TabsTrigger value="theme" className="gap-1.5 text-xs">
+            <Palette className="w-3.5 h-3.5" />
+            Tema
           </TabsTrigger>
           <TabsTrigger value="layout" className="gap-1.5 text-xs">
             <Layers className="w-3.5 h-3.5" />
             Diseño
+          </TabsTrigger>
+          <TabsTrigger value="dialogue" className="gap-1.5 text-xs">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Diálogos
           </TabsTrigger>
           <TabsTrigger value="quick" className="gap-1.5 text-xs">
             <GripVertical className="w-3.5 h-3.5" />
@@ -1576,15 +1418,112 @@ function ChatSettingsContent({ settings, updateSettings }: ChatSettingsContentPr
       </div>
       
       <div className="flex-1 overflow-y-auto">
-        {/* Dialogue Settings */}
-        <TabsContent value="dialogue" className="p-4 m-0" forceMount hidden={false}>
+        {/* Theme Settings */}
+        <TabsContent value="theme" className="p-4 m-0" forceMount hidden={false}>
           <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-sm">
-              <p className="text-purple-600 dark:text-purple-400">
-                💬 <strong>Sistema de Diálogos</strong> detecta automáticamente diálogos, acciones y pensamientos en los mensajes y los formatea visualmente con speech bubbles y efecto typewriter.
-              </p>
+            {/* Banner */}
+            <div className="bg-gradient-to-r from-violet-500/10 to-pink-500/10 border border-violet-500/20 rounded-lg p-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-violet-500/20 rounded-lg">
+                  <Palette className="w-5 h-5 text-violet-500" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-violet-600">Personalización Visual</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Configura el tema, tamaño de fuente y estilo de mensajes.
+                  </p>
+                </div>
+              </div>
             </div>
-            <DialogueSettingsPanel />
+
+            <div className="grid grid-cols-2 gap-6">
+              {/* Theme Settings */}
+              <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Palette className="w-3.5 h-3.5" />
+                  <span className="font-medium">Tema</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/50">
+                  <div>
+                    <Label className="text-xs font-medium">Modo de Color</Label>
+                    <p className="text-xs text-muted-foreground">Elige tu tema preferido</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {(['light', 'dark', 'system'] as const).map((theme) => (
+                      <Button
+                        key={theme}
+                        variant={settings.theme === theme ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => updateSettings({ theme })}
+                      >
+                        {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Oscuro' : 'Sistema'}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg border border-border/40 bg-background/50 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <Label className="text-xs">Tamaño de Fuente</Label>
+                    <span className="text-muted-foreground">{settings.fontSize}px</span>
+                  </div>
+                  <Slider
+                    value={[settings.fontSize]}
+                    min={12}
+                    max={24}
+                    step={1}
+                    onValueChange={([fontSize]) => updateSettings({ fontSize })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/50">
+                  <div>
+                    <Label className="text-xs font-medium">Visualización</Label>
+                    <p className="text-xs text-muted-foreground">Estilo de mensajes</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {(['bubble', 'compact', 'full'] as const).map((mode) => (
+                      <Button
+                        key={mode}
+                        variant={settings.messageDisplay === mode ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => updateSettings({ messageDisplay: mode })}
+                      >
+                        {mode === 'bubble' ? 'Burbuja' : mode === 'compact' ? 'Compacto' : 'Completo'}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Toggle Settings */}
+              <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span className="font-medium">Opciones de Visualización</span>
+                </div>
+                
+                {[
+                  { key: 'showTimestamps', label: 'Marcas de Tiempo', desc: 'Mostrar hora en mensajes' },
+                  { key: 'showTokens', label: 'Conteo de Tokens', desc: 'Mostrar uso de tokens' },
+                  { key: 'autoScroll', label: 'Auto-desplazamiento', desc: 'Scroll automático a nuevos mensajes' },
+                ].map(({ key, label, desc }) => (
+                  <label key={key} className="flex items-center justify-between p-3 rounded-lg border border-border/40 bg-background/50 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div>
+                      <Label className="text-xs font-medium">{label}</Label>
+                      <p className="text-[10px] text-muted-foreground">{desc}</p>
+                    </div>
+                    <Switch
+                      checked={settings[key as keyof typeof settings] as boolean}
+                      onCheckedChange={(checked) => updateSettings({ [key]: checked })}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         </TabsContent>
         
@@ -1688,6 +1627,18 @@ function ChatSettingsContent({ settings, updateSettings }: ChatSettingsContentPr
                 <li>• <strong>Sprite</strong>: Arrastra y redimensiona con el mouse</li>
               </ul>
             </div>
+          </div>
+        </TabsContent>
+        
+        {/* Dialogue Settings */}
+        <TabsContent value="dialogue" className="p-4 m-0" forceMount hidden>
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-sm">
+              <p className="text-purple-600 dark:text-purple-400">
+                💬 <strong>Sistema de Diálogos</strong> detecta automáticamente diálogos, acciones y pensamientos en los mensajes y los formatea visualmente con speech bubbles y efecto typewriter.
+              </p>
+            </div>
+            <DialogueSettingsPanel />
           </div>
         </TabsContent>
         

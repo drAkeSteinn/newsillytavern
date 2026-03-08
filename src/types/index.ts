@@ -401,6 +401,7 @@ export interface CharacterCard {
   characterNote: string;  // Character's Note - sent to AI to influence behavior
   systemPrompt: string;
   postHistoryInstructions: string;
+  authorNote: string;     // Author's Note - injected after chat history, before post-history instructions
   alternateGreetings: string[];
   tags: string[];
   avatar: string;
@@ -516,7 +517,7 @@ export interface MessageMetadata {
 
 // Prompt section for displaying in prompt viewer
 export interface PromptSection {
-  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'post_history' | 'chat_history' | 'instructions' | 'quest';
+  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'author_note' | 'post_history' | 'chat_history' | 'instructions' | 'quest';
   label: string;
   content: string;
   color: string;  // Tailwind color class for the section header
@@ -1073,6 +1074,7 @@ export interface CharacterCardV2 {
     character_note?: string;  // Character's Note - sent to AI to influence behavior
     system_prompt: string;
     post_history_instructions: string;
+    author_note?: string;     // Author's Note - injected after chat history
     alternate_greetings: string[];
     tags: string[];
     creator: string;
@@ -1087,6 +1089,35 @@ export type TavernCardImage = Blob;
 
 // ============ Lorebook Types (SillyTavern Compatible) ============
 
+/**
+ * POSITION DIFFERENCES FROM SILLYTAVERN:
+ * ========================================
+ * SillyTavern uses named positions:
+ * - Before Char Defs
+ * - After Char Defs
+ * - Before Example Messages
+ * - After Example Messages
+ * - Top of Author's Note
+ * - Bottom of Author's Note
+ * - @ Depth (with role selection)
+ * - Outlet (uses {{outlet::Name}} macro)
+ *
+ * This project uses numeric positions (simpler model):
+ * - 0: After system prompt (~equivalent to After Char Defs)
+ * - 1: After last user message
+ * - 2: Before last user message
+ * - 3: After last assistant message
+ * - 4: Before last assistant message
+ * - 5: At top of chat (before history)
+ * - 6: At bottom of chat (after all messages)
+ * - 7: Outlet (manual placement via {{outlet::name}})
+ *
+ * REGEX SUPPORT:
+ * ==============
+ * Keys can be regex patterns. If a key starts with '/' and ends with '/',
+ * it will be treated as a JavaScript regex pattern.
+ * Example: /(?:weather|rain|sunny)/i
+ */
 export type LorebookPosition = 
   | 0   // After system prompt
   | 1   // After user message
@@ -1095,7 +1126,7 @@ export type LorebookPosition =
   | 4   // Before assistant message
   | 5   // At top of chat
   | 6   // At bottom of chat (newest messages)
-  | 7;  // Outlet (custom position)
+  | 7;  // Outlet (custom position, use outletName field)
 
 export type LorebookLogic = 
   | 'AND_ANY'    // Match ANY primary key AND ANY secondary key
@@ -1105,14 +1136,15 @@ export type LorebookLogic =
 
 export interface LorebookEntry {
   uid: number;                    // Unique identifier
-  key: string[];                  // Primary keywords
-  keysecondary: string[];         // Secondary keywords (optional)
+  key: string[];                  // Primary keywords (supports regex with /pattern/flags)
+  keysecondary: string[];         // Secondary keywords (optional, supports regex)
   comment: string;                // Entry title/description
   content: string;                // Content to inject
   constant: boolean;              // Always active
   selective: boolean;             // Use secondary keys
   order: number;                  // Insertion order (higher = later)
   position: LorebookPosition;     // Where to inject
+  outletName?: string;            // Outlet name (used when position = 7)
   disable: boolean;               // Entry disabled
   excludeRecursion: boolean;      // Exclude from recursive scanning
   preventRecursion: boolean;      // Prevent this entry from triggering others
@@ -1547,6 +1579,7 @@ export interface QuestRewardTrigger {
   category: TriggerCategory;  // 'sprite' | 'sound' | 'background'
   key: string;                // Keyword del trigger: "feliz", "victory", "forest"
   targetMode: TriggerTargetMode; // 'self' | 'all' | 'target' - quién recibe el trigger
+  targetCharacterId?: string; // ID del personaje objetivo cuando targetMode es 'target'
   
   // Para sprites: tiempo antes de volver a idle (ms, 0 = no volver)
   returnToIdleMs?: number;
@@ -2426,6 +2459,10 @@ export interface SkillDefinition {
   
   // Activation costs - modify attributes when skill is used
   activationCosts?: ActivationCost[];
+  
+  // Activation rewards - triggers to execute when skill is activated
+  // Only trigger type rewards are used (attributes are handled by activationCosts)
+  activationRewards?: QuestReward[];
   
   // Activation key - detected by post-LLM system to trigger skill execution
   // When detected in LLM response, applies activationCosts automatically

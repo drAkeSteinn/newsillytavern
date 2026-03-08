@@ -27,6 +27,7 @@ import type {
   StatRequirement,
   RequirementOperator,
   AttributeDefinition,
+  QuestReward,
 } from '@/types';
 import { getTokenDetector, normalizeToken } from '../token-detector';
 
@@ -53,6 +54,7 @@ export interface SkillActivationMatch {
   matchedKey: string;          // The key that was matched
   matchedToken: string;         // The full token that matched
   activationCosts: ActivationCost[];
+  activationRewards: QuestReward[];  // Trigger rewards to execute on activation
   characterId: string;
   requirementsMet: boolean;     // Whether all requirements are met
   requirementCheck?: RequirementCheckResult; // Details of requirement check
@@ -403,6 +405,7 @@ export function detectSkillActivations(
         matchedKey,
         matchedToken: token.original,
         activationCosts: skill.activationCosts || [],
+        activationRewards: skill.activationRewards || [],
         characterId,
         requirementsMet: requirementCheck.met,
         requirementCheck: requirementCheck.failedRequirements.length > 0 ? requirementCheck : undefined,
@@ -491,6 +494,7 @@ export function detectSkillActivationsIncremental(
         matchedKey,
         matchedToken: token.original,
         activationCosts: skill.activationCosts || [],
+        activationRewards: skill.activationRewards || [],
         characterId,
         requirementsMet: requirementCheck.met,
         requirementCheck: requirementCheck.failedRequirements.length > 0 ? requirementCheck : undefined,
@@ -557,6 +561,7 @@ export function applyActivationCost(
 /**
  * Execute skill activation - apply costs to stats
  * Only applies costs if requirements are met
+ * Returns changes and rewards to execute
  */
 export function executeSkillActivation(
   match: SkillActivationMatch,
@@ -575,8 +580,14 @@ export function executeSkillActivation(
       reason?: 'llm_detection' | 'manual' | 'trigger'
     ) => void;
   }
-): Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }> {
-  const changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }> = [];
+): { 
+  changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }>;
+  rewards: QuestReward[];
+} {
+  const result: { 
+    changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }>;
+    rewards: QuestReward[];
+  } = { changes: [], rewards: [] };
   
   // Check if requirements are met
   if (!match.requirementsMet) {
@@ -586,52 +597,54 @@ export function executeSkillActivation(
         `${r.attributeName} ${r.operator} ${r.requiredValue} (current: ${r.currentValue})`
       ).join(', ')
     );
-    return changes;
+    return result;
   }
   
-  if (!storeActions || !context.statsConfig || match.activationCosts.length === 0) {
-    return changes;
-  }
-  
-  const charStats = context.sessionStats?.characterStats?.[context.characterId];
-  const currentValues = charStats?.attributeValues || {};
-  
-  for (const cost of match.activationCosts) {
-    if (!cost.attributeKey) continue;
+  // Apply activation costs if store actions provided
+  if (storeActions && context.statsConfig && match.activationCosts.length > 0) {
+    const charStats = context.sessionStats?.characterStats?.[context.characterId];
+    const currentValues = charStats?.attributeValues || {};
     
-    const attribute = context.statsConfig.attributes.find(a => a.key === cost.attributeKey);
-    if (!attribute) continue;
-    
-    const oldValue = currentValues[cost.attributeKey] ?? attribute.defaultValue ?? 0;
-    const newValue = applyActivationCost(oldValue, cost);
-    
-    // Apply min/max constraints if defined
-    let finalValue = newValue;
-    if (typeof newValue === 'number') {
-      if (attribute.min !== undefined) {
-        finalValue = Math.max(finalValue, attribute.min);
+    for (const cost of match.activationCosts) {
+      if (!cost.attributeKey) continue;
+      
+      const attribute = context.statsConfig.attributes.find(a => a.key === cost.attributeKey);
+      if (!attribute) continue;
+      
+      const oldValue = currentValues[cost.attributeKey] ?? attribute.defaultValue ?? 0;
+      const newValue = applyActivationCost(oldValue, cost);
+      
+      // Apply min/max constraints if defined
+      let finalValue = newValue;
+      if (typeof newValue === 'number') {
+        if (attribute.min !== undefined) {
+          finalValue = Math.max(finalValue, attribute.min);
+        }
+        if (attribute.max !== undefined) {
+          finalValue = Math.min(finalValue, attribute.max);
+        }
       }
-      if (attribute.max !== undefined) {
-        finalValue = Math.min(finalValue, attribute.max);
-      }
+      
+      storeActions.updateCharacterStat(
+        context.sessionId,
+        context.characterId,
+        cost.attributeKey,
+        finalValue,
+        'trigger' // Mark as trigger-initiated
+      );
+      
+      result.changes.push({
+        attributeKey: cost.attributeKey,
+        oldValue,
+        newValue: finalValue,
+      });
     }
-    
-    storeActions.updateCharacterStat(
-      context.sessionId,
-      context.characterId,
-      cost.attributeKey,
-      finalValue,
-      'trigger' // Mark as trigger-initiated
-    );
-    
-    changes.push({
-      attributeKey: cost.attributeKey,
-      oldValue,
-      newValue: finalValue,
-    });
   }
   
-  return changes;
+  // Return rewards to execute (will be processed by trigger executor)
+  result.rewards = match.activationRewards || [];
+  
+  return result;
 }
 
 /**
@@ -654,21 +667,26 @@ export function executeAllSkillActivations(
       reason?: 'llm_detection' | 'manual' | 'trigger'
     ) => void;
   }
-): Array<{ skillId: string; skillName: string; changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }> }> {
-  const results: Array<{ skillId: string; skillName: string; changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }> }> = [];
+): { 
+  skillResults: Array<{ skillId: string; skillName: string; changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }> }>;
+  allRewards: QuestReward[];
+} {
+  const skillResults: Array<{ skillId: string; skillName: string; changes: Array<{ attributeKey: string; oldValue: number | string; newValue: number | string }> }> = [];
+  const allRewards: QuestReward[] = [];
   
   for (const match of result.matches) {
-    const changes = executeSkillActivation(match, context, storeActions);
-    if (changes.length > 0) {
-      results.push({
+    const executionResult = executeSkillActivation(match, context, storeActions);
+    if (executionResult.changes.length > 0 || executionResult.rewards.length > 0) {
+      skillResults.push({
         skillId: match.skillId,
         skillName: match.skillName,
-        changes,
+        changes: executionResult.changes,
       });
+      allRewards.push(...executionResult.rewards);
     }
   }
   
-  return results;
+  return { skillResults, allRewards };
 }
 
 // ============================================

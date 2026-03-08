@@ -64,6 +64,7 @@ export interface PromptBuildConfig {
   persona?: Persona;
   messages: ChatMessage[];
   postHistoryInstructions?: string;
+  authorNote?: string;
   includeSections?: boolean;
 }
 
@@ -97,6 +98,7 @@ export interface CompletionPromptConfig {
   character: CharacterCard;
   userName: string;
   postHistoryInstructions?: string;
+  authorNote?: string;
 }
 
 // Prompt build result for group chats
@@ -150,6 +152,7 @@ export const DEFAULT_CHARACTER: CharacterCard = {
   characterNote: '',
   systemPrompt: '',
   postHistoryInstructions: '',
+  authorNote: '',
   alternateGreetings: [],
   tags: [],
   avatar: '',

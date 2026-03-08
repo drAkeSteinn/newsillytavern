@@ -43,6 +43,7 @@ export interface RewardExecutionContext {
   character?: CharacterCard | null;
   sessionStats?: SessionStats;
   allCharacters?: CharacterCard[];  // Para group chats
+  targetCharacterId?: string;       // ID del personaje objetivo cuando targetMode es 'target'
   timestamp: number;
   
   // Resources for trigger lookup
@@ -321,6 +322,7 @@ export function executeTriggerRewardFromQuest(
       characterId,
       character,
       allCharacters,
+      targetCharacterId: trig.targetCharacterId, // Pass target character ID for 'target' mode
       source: 'quest_completion',
       timestamp: Date.now(),
       storeActions: {

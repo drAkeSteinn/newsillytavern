@@ -19,5 +19,26 @@
     },
     "isActive": true,
     "id": "960e8af8-9196-4108-8eb7-221fb69010a8"
+  },
+  {
+    "name": "Text Generation WebUI",
+    "provider": "text-generation-webui",
+    "endpoint": "http://localhost:5000",
+    "apiKey": "",
+    "model": "",
+    "parameters": {
+      "temperature": 0.7,
+      "topP": 0.9,
+      "topK": 40,
+      "maxTokens": 512,
+      "contextSize": 4096,
+      "repetitionPenalty": 1.1,
+      "frequencyPenalty": 0,
+      "presencePenalty": 0,
+      "stopStrings": [],
+      "stream": true
+    },
+    "isActive": false,
+    "id": "505a0acf-6e68-4c3b-a404-3de46efa7a46"
   }
 ]
