@@ -654,6 +654,8 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
    * Activate a peticion for the user
    * Creates a SolicitudInstance for the target character directly
    * (No chat message injection)
+   * 
+   * Returns null if a pending solicitud with the same key already exists for this target.
    */
   activateUserPeticion: (
     sessionId: string,
@@ -696,6 +698,17 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
           lastModified: Date.now(),
         },
       };
+    }
+    
+    // Check for duplicate pending solicitud with same key for same target
+    const existingSolicitudes = sessionStats.solicitudes.characterSolicitudes[targetCharacterId] || [];
+    const duplicateExists = existingSolicitudes.some(
+      s => s.key === solicitudKey && s.status === 'pending' && s.fromCharacterId === '__user__'
+    );
+    
+    if (duplicateExists) {
+      console.log(`[UserPeticion] Duplicate solicitud "${solicitudKey}" already exists for character ${targetCharacterId}`);
+      return null;
     }
     
     // Create the new solicitud instance

@@ -1040,6 +1040,13 @@ export function NovelChatBox({
             onActivatePeticion={handleActivatePeticion}
           />
 
+          {/* User Solicitudes Panel - Incoming requests for user */}
+          {pendingUserSolicitudes.length > 0 && (
+            <div className="px-2 py-1 border-t bg-background/30 flex-shrink-0">
+              <UserSolicitudesPanel />
+            </div>
+          )}
+
           {/* Input Area - Always visible */}
           <div 
             className="p-2 border-t flex-shrink-0"

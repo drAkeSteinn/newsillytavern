@@ -5,8 +5,8 @@ import { useTavernStore } from '@/store/tavern-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Mail, Send, Inbox } from 'lucide-react';
-import type { Persona, CharacterCard, SolicitudDefinition, InvitationDefinition } from '@/types';
+import { Mail, Send, Inbox, Check } from 'lucide-react';
+import type { Persona, CharacterCard, SolicitudDefinition, InvitationDefinition, SolicitudInstance } from '@/types';
 import { resolveInvitations } from '@/lib/stats/stats-resolver';
 
 interface QuickPetitionsProps {
@@ -43,6 +43,24 @@ export function QuickPetitions({
   // Get persona's stats config (user's peticiones)
   const userStatsConfig = activePersona?.statsConfig;
   const userInvitations = userStatsConfig?.invitations || [];
+  const userName = activePersona?.name || 'User';
+  
+  // Get all active (pending) solicitudes from user to check for duplicates
+  const activeUserPetitions = useMemo(() => {
+    const pending: Map<string, SolicitudInstance> = new Map();
+    if (!sessionStats?.solicitudes?.characterSolicitudes) return pending;
+    
+    // Check all characters for pending solicitudes from user
+    for (const [charId, solicitudes] of Object.entries(sessionStats.solicitudes.characterSolicitudes)) {
+      for (const s of solicitudes) {
+        if (s.fromCharacterId === '__user__' && s.status === 'pending') {
+          // Key format: targetCharacterId:solicitudKey
+          pending.set(`${charId}:${s.key}`, s);
+        }
+      }
+    }
+    return pending;
+  }, [sessionStats]);
   
   // Resolve available petitions
   const availablePetitions = useMemo(() => {
@@ -55,15 +73,18 @@ export function QuickPetitions({
     // Note: User stats would be stored under '__user__' if we want to support user attributes
     
     // Resolve invitations to get actual keys and descriptions
+    // Pass userName to resolve {{user}} in descriptions
     const resolved = resolveInvitations(
       userInvitations,
       userAttributeValues,
       characters,
-      sessionStats
+      sessionStats,
+      userName,
+      activeCharacter?.name
     );
     
     return resolved;
-  }, [userStatsConfig, userInvitations, characters, sessionStats]);
+  }, [userStatsConfig, userInvitations, characters, sessionStats, userName, activeCharacter]);
   
   if (availablePetitions.length === 0) {
     return null;
@@ -78,16 +99,21 @@ export function QuickPetitions({
       
       {availablePetitions.map((petition) => {
         const targetChar = characters.find(c => c.id === petition.targetCharacterId);
+        // Check if this petition is already active
+        const petitionKey = `${petition.targetCharacterId}:${petition.peticionKey}`;
+        const isAlreadyActive = activeUserPetitions.has(petitionKey);
         
         return (
           <Button
             key={petition.id}
             variant="outline"
             size="sm"
+            disabled={isAlreadyActive}
             className={cn(
               "h-6 px-2 text-xs flex-shrink-0 gap-1",
-              "bg-blue-500/10 border-blue-500/30 text-blue-400",
-              "hover:bg-blue-500/20 hover:border-blue-500/50"
+              isAlreadyActive
+                ? "bg-green-500/10 border-green-500/30 text-green-400 cursor-default"
+                : "bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/50"
             )}
             onClick={() => onActivatePeticion(
               petition.targetCharacterId,
@@ -95,12 +121,21 @@ export function QuickPetitions({
               petition.peticionDescription
             )}
           >
-            <Mail className="w-3 h-3" />
+            {isAlreadyActive ? (
+              <Check className="w-3 h-3" />
+            ) : (
+              <Mail className="w-3 h-3" />
+            )}
             <span className="truncate max-w-[100px]">
               {petition.name}
             </span>
             {targetChar && (
-              <Badge className="bg-blue-500/20 text-blue-300 text-[8px] px-1 h-4">
+              <Badge className={cn(
+                "text-[8px] px-1 h-4",
+                isAlreadyActive
+                  ? "bg-green-500/20 text-green-300"
+                  : "bg-blue-500/20 text-blue-300"
+              )}>
                 → {targetChar.name}
               </Badge>
             )}

@@ -140,6 +140,8 @@ export interface TriggerSystemConfig {
   statsEnabled?: boolean;
   debug?: boolean;
   maxSoundsPerMessage?: number;
+  // Persona for peticiones/solicitudes system
+  activePersona?: { id: string; name: string; statsConfig?: any } | null;
 }
 
 // ============================================
@@ -1055,6 +1057,16 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
           ?.some(s => s.status === 'pending');
 
         if (hasPeticiones || hasPendingSolicitudes) {
+          // Include persona as pseudo-character for peticiones targeting __user__
+          const allCharactersWithPersona = [
+            ...(characters || []),
+            ...(config.activePersona?.statsConfig?.enabled ? [{
+              id: '__user__',
+              name: config.activePersona.name || 'User',
+              statsConfig: config.activePersona.statsConfig,
+            }] as CharacterCard[] : []),
+          ];
+          
           const solicitudContext: SolicitudTriggerContext = {
             ...context,
             characterId: character.id,
@@ -1062,7 +1074,8 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
             statsConfig: character.statsConfig,
             sessionStats: activeSession?.sessionStats,
             sessionId,
-            allCharacters: characters || [],
+            allCharacters: allCharactersWithPersona,
+            activePersona: config.activePersona,
           };
 
           const solicitudResult = checkSolicitudTriggersInText(

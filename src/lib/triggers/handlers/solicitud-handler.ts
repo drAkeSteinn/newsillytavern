@@ -45,6 +45,8 @@ export interface SolicitudTriggerContext extends TriggerContext {
   sessionStats: SessionStats | undefined;
   sessionId: string;
   allCharacters: CharacterCard[];
+  // Active persona for targeting __user__ in peticiones
+  activePersona?: { id: string; name: string; statsConfig?: any } | null;
 }
 
 export interface SolicitudHandlerResult {
@@ -131,6 +133,7 @@ export function checkSolicitudTriggersInText(
     statsConfig,
     sessionStats,
     allCharacters,
+    activePersona: context.activePersona,
   }, storeActions);
 
   return {

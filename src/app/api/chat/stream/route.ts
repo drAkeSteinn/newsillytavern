@@ -141,6 +141,8 @@ export async function POST(request: NextRequest) {
       statsConfig: effectiveCharacter.statsConfig,
       sessionStats: typedSessionStats,
       allCharacters,
+      userName: effectiveUserName,
+      characterName: effectiveCharacter.name,
     });
     const keyContext = buildKeyResolutionContext(
       effectiveCharacter,

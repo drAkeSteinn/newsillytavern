@@ -247,8 +247,9 @@ export function buildPeticionKeyPattern(
   
   if (keys.length === 0) return null;
   
-  // Match: [key], key:, key=, or just key as a word
-  const patternStr = `(?:\\[(${keys.join('|')})\\]|\\b(${keys.join('|')})\\b)`;
+  // Match: [key], key after = or :, or key as a word
+  // This handles formats like: [pedir_madera], Peticion=pedir_madera, pedir_madera:
+  const patternStr = `(?:\\[(${keys.join('|')})\\]|[=:]\\s*(${keys.join('|')})\\b|\\b(${keys.join('|')})\\b)`;
   
   try {
     return new RegExp(patternStr, caseSensitive ? 'g' : 'gi');
@@ -295,7 +296,7 @@ export function detectPeticionActivations(
   let match;
   
   while ((match = pattern.exec(text)) !== null) {
-    const key = match[1] || match[2]; // Either [key] or bare key
+    const key = match[1] || match[2] || match[3]; // [key], key after =/:, or bare key
     if (key && !detectedKeys.has(key.toLowerCase())) {
       detectedKeys.add(key.toLowerCase());
     }
@@ -428,8 +429,9 @@ export function buildSolicitudKeyPattern(
   
   if (keys.length === 0) return null;
   
-  // Match: [key], key:, key=, or just key as a word
-  const patternStr = `(?:\\[(${keys.join('|')})\\]|\\b(${keys.join('|')})\\b)`;
+  // Match: [key], key after = or :, or key as a word
+  // This handles formats like: [pedir_madera], Peticion=pedir_madera, pedir_madera:
+  const patternStr = `(?:\\[(${keys.join('|')})\\]|[=:]\\s*(${keys.join('|')})\\b|\\b(${keys.join('|')})\\b)`;
   
   try {
     return new RegExp(patternStr, caseSensitive ? 'g' : 'gi');
@@ -464,7 +466,7 @@ export function detectSolicitudCompletions(
   let match;
   
   while ((match = pattern.exec(text)) !== null) {
-    const key = match[1] || match[2];
+    const key = match[1] || match[2] || match[3];
     if (key && !detectedKeys.has(key.toLowerCase())) {
       detectedKeys.add(key.toLowerCase());
     }
@@ -607,7 +609,7 @@ export class SolicitudDetectionState {
     if (pattern) {
       let match;
       while ((match = pattern.exec(newContent)) !== null) {
-        const key = (match[1] || match[2]).toLowerCase();
+        const key = (match[1] || match[2] || match[3]).toLowerCase();
         if (!this.processedActivations.has(key)) {
           this.processedActivations.add(key);
           
@@ -645,7 +647,7 @@ export class SolicitudDetectionState {
     if (completionPattern) {
       let match;
       while ((match = completionPattern.exec(newContent)) !== null) {
-        const key = (match[1] || match[2]).toLowerCase();
+        const key = (match[1] || match[2] || match[3]).toLowerCase();
         if (!this.processedCompletions.has(key)) {
           this.processedCompletions.add(key);
           

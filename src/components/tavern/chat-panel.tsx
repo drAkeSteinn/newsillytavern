@@ -147,6 +147,7 @@ export function ChatPanel() {
     soundEnabled: settings.sound?.enabled ?? true,
     spriteEnabled: settings.chatLayout.showCharacterSprite,
     maxSoundsPerMessage: settings.sound?.maxSoundsPerMessage ?? 10,
+    activePersona: activePersona,
   });
   
   // Background triggers hook (separate for now, will be integrated later)

@@ -350,6 +350,8 @@ export function buildSystemPrompt(
     statsConfig: character.statsConfig,
     sessionStats,
     allCharacters,
+    userName,
+    characterName: character.name,
   });
 
   // Build unified key resolution context
@@ -696,6 +698,8 @@ export function buildGroupSystemPrompt(
     statsConfig: character.statsConfig,
     sessionStats,
     allCharacters,
+    userName,
+    characterName: character.name,
   });
 
   // Build unified key resolution context
@@ -936,6 +940,8 @@ export function processCharacter(
     statsConfig: character.statsConfig,
     sessionStats,
     allCharacters,
+    userName,
+    characterName: character.name,
   });
 
   // Build key resolution context

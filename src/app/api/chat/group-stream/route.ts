@@ -386,6 +386,8 @@ export async function POST(request: NextRequest) {
               statsConfig: responder.statsConfig,
               sessionStats: typedSessionStats,
               allCharacters: characters,
+              userName: effectiveUserName,
+              characterName: responder.name,
             });
             const keyContext = buildKeyResolutionContext(
               responder,

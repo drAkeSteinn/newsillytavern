@@ -42,6 +42,9 @@ export interface StatsResolutionContext {
   sessionStats: SessionStats | undefined;
   // For resolving invitations - need access to other characters' solicitudDefinitions
   allCharacters?: CharacterCard[];
+  // For resolving {{user}} and {{char}} in descriptions
+  userName?: string;
+  characterName?: string;
 }
 
 export interface ResolvedAttribute {
@@ -161,6 +164,22 @@ export function resolveAllAttributes(
       formatted: formatAttributeValue(attribute, value),
     };
   });
+}
+
+/**
+ * Resolve template keys in text ({{user}}, {{char}})
+ * Used to resolve placeholders in descriptions before storing or displaying
+ */
+function resolveTemplateKeys(text: string, userName?: string, characterName?: string): string {
+  if (!text) return text;
+  let result = text;
+  if (userName) {
+    result = result.replace(/\{\{user\}\}/gi, userName);
+  }
+  if (characterName) {
+    result = result.replace(/\{\{char\}\}/gi, characterName);
+  }
+  return result;
 }
 
 /**
@@ -284,7 +303,9 @@ export function buildInvitationsBlock(
   attributeValues: Record<string, number | string>,
   header: string,
   allCharacters?: CharacterCard[],
-  sessionStats?: SessionStats
+  sessionStats?: SessionStats,
+  userName?: string,
+  characterName?: string
 ): string {
   const availableInvitations = filterInvitationsByRequirements(invitations, attributeValues);
 
@@ -324,19 +345,22 @@ export function buildInvitationsBlock(
       return;
     }
 
+    // Resolve {{user}} and {{char}} in description
+    const resolvedDescription = resolveTemplateKeys(solicitud.peticionDescription, userName, characterName);
+
     // Use custom inject format if available
     if (invitation.injectFormat) {
       const formatted = invitation.injectFormat
         .replace('{name}', invitation.name)
         .replace('{key}', solicitud.peticionKey)
-        .replace('{descripcion}', solicitud.peticionDescription)
+        .replace('{descripcion}', resolvedDescription)
         .replace('{objetivo}', targetCharacter.name);
       lines.push(formatted);
     } else {
       // New YAML-like format
       lines.push(`- key: ${solicitud.peticionKey}`);
       lines.push(`  dirigido_a: ${targetCharacter.name}`);
-      lines.push(`  descripcion: ${solicitud.peticionDescription}`);
+      lines.push(`  descripcion: ${resolvedDescription}`);
     }
   });
 
@@ -350,13 +374,15 @@ export function buildInvitationsBlock(
 
 /**
  * Resolve invitations to get their actual keys and descriptions
- * (for use in detection system)
+ * (for use in detection system and UI components)
  */
 export function resolveInvitations(
   invitations: InvitationDefinition[],
   attributeValues: Record<string, number | string>,
   allCharacters?: CharacterCard[],
-  sessionStats?: SessionStats
+  sessionStats?: SessionStats,
+  userName?: string,
+  characterName?: string
 ): ResolvedInvitation[] {
   const availableInvitations = filterInvitationsByRequirements(invitations, attributeValues);
   const resolved: ResolvedInvitation[] = [];
@@ -386,11 +412,14 @@ export function resolveInvitations(
       return;
     }
 
+    // Resolve {{user}} and {{char}} in description
+    const resolvedDescription = resolveTemplateKeys(solicitud.peticionDescription, userName, characterName);
+
     resolved.push({
       id: invitation.id,
       name: invitation.name,
       peticionKey: solicitud.peticionKey,
-      peticionDescription: solicitud.peticionDescription,
+      peticionDescription: resolvedDescription,
       targetCharacterId: targetCharacter.id,
       targetCharacterName: targetCharacter.name,
       solicitudId: solicitud.id,
@@ -413,7 +442,9 @@ export function resolveInvitations(
  */
 export function buildSolicitudesBlock(
   solicitudes: SolicitudInstance[],
-  header: string
+  header: string,
+  userName?: string,
+  characterName?: string
 ): string {
   // Filter only pending solicitudes
   const pendingSolicitudes = solicitudes.filter(s => s.status === 'pending');
@@ -425,9 +456,11 @@ export function buildSolicitudesBlock(
   const lines: string[] = [header];
 
   pendingSolicitudes.forEach((solicitud) => {
+    // Resolve {{user}} and {{char}} in description
+    const resolvedDescription = resolveTemplateKeys(solicitud.description, userName, characterName);
     lines.push(`- key: ${solicitud.key}`);
     lines.push(`  de: ${solicitud.fromCharacterName}`);
-    lines.push(`  descripcion: ${solicitud.description}`);
+    lines.push(`  descripcion: ${resolvedDescription}`);
   });
 
   return lines.join('\n');
@@ -478,14 +511,18 @@ export function resolveStats(
     attributeValues,
     statsConfig.blockHeaders.invitations,
     context.allCharacters,
-    sessionStats
+    sessionStats,
+    context.userName,
+    context.characterName
   );
 
   // Build solicitudes block (requests received from other characters)
   const solicitudes = sessionStats?.solicitudes?.characterSolicitudes?.[characterId] || [];
   const solicitudesBlock = buildSolicitudesBlock(
     solicitudes,
-    statsConfig.blockHeaders?.solicitudesRecibidas || '[SOLICITUDES RECIBIDAS]'
+    statsConfig.blockHeaders?.solicitudesRecibidas || '[SOLICITUDES RECIBIDAS]',
+    context.userName,
+    context.characterName
   );
 
   // Filter available items
