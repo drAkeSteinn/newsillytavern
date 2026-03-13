@@ -6,6 +6,40 @@
     "avatar": "",
     "isActive": true,
     "createdAt": "2026-03-01T21:37:31.485Z",
-    "updatedAt": "2026-03-07T20:20:04.466Z"
+    "updatedAt": "2026-03-13T11:26:39.376Z",
+    "statsConfig": {
+      "enabled": true,
+      "attributes": [],
+      "skills": [],
+      "intentions": [],
+      "invitations": [
+        {
+          "id": "invitation-1773401043535",
+          "name": "Nueva Peticion",
+          "requirements": [],
+          "objetivo": {
+            "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
+            "solicitudId": ""
+          }
+        }
+      ],
+      "solicitudDefinitions": [
+        {
+          "id": "solicitud-1773401167519",
+          "name": "Nueva Solicitud",
+          "peticionKey": "",
+          "solicitudKey": "",
+          "peticionDescription": "",
+          "solicitudDescription": "",
+          "requirements": []
+        }
+      ],
+      "blockHeaders": {
+        "skills": "[ACCIONES DISPONIBLES]",
+        "intentions": "Intenciones disponibles:",
+        "invitations": "[PETICIONES POSIBLES]",
+        "solicitudesRecibidas": "[SOLICITUDES RECIBIDAS]"
+      }
+    }
   }
 ]

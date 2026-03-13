@@ -2,16 +2,18 @@
 // Stats Slice - Character stats management
 // ============================================
 
-import type { 
-  SessionStats, 
-  CharacterSessionStats, 
+import type {
+  SessionStats,
+  CharacterSessionStats,
   StatChangeLogEntry,
   CharacterStatsConfig,
   AttributeDefinition,
   SkillDefinition,
   IntentionDefinition,
   InvitationDefinition,
-  StatRequirement
+  StatRequirement,
+  SolicitudInstance,
+  SessionSolicitudes,
 } from '@/types';
 
 // ============================================
@@ -54,6 +56,48 @@ export interface StatsSlice {
   // Getters
   getCharacterStats: (sessionId: string, characterId: string) => CharacterSessionStats | null;
   getAttributeValue: (sessionId: string, characterId: string, attributeKey: string) => number | string | null;
+
+  // Solicitud Management (Peticiones/Solicitudes system)
+  createSolicitud: (
+    sessionId: string,
+    targetCharacterId: string,
+    solicitud: Omit<SolicitudInstance, 'id' | 'createdAt' | 'status'>
+  ) => SolicitudInstance | null;
+  
+  completeSolicitud: (
+    sessionId: string,
+    characterId: string,
+    solicitudKey: string
+  ) => SolicitudInstance | null;
+  
+  getPendingSolicitudes: (
+    sessionId: string,
+    characterId: string
+  ) => SolicitudInstance[];
+
+  // User Peticiones/Solicitudes Actions (for {{user}})
+  // These work without injecting anything into the chat
+  activateUserPeticion: (
+    sessionId: string,
+    targetCharacterId: string,
+    solicitudKey: string,
+    description: string,
+    userName: string
+  ) => SolicitudInstance | null;
+  
+  acceptUserSolicitud: (
+    sessionId: string,
+    solicitudId: string
+  ) => SolicitudInstance | null;
+  
+  rejectUserSolicitud: (
+    sessionId: string,
+    solicitudId: string
+  ) => boolean;
+  
+  getPendingUserSolicitudes: (
+    sessionId: string
+  ) => SolicitudInstance[];
 }
 
 // ============================================
@@ -435,6 +479,415 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
     if (!stats) return null;
     
     return stats.attributeValues[attributeKey] ?? null;
+  },
+
+  // ============================================
+  // Solicitud Management (Peticiones/Solicitudes)
+  // ============================================
+
+  createSolicitud: (sessionId, targetCharacterId, solicitudData) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+    
+    if (sessionIndex === -1) return null;
+    
+    const session = sessions[sessionIndex];
+    let sessionStats = session.sessionStats;
+    
+    // Auto-initialize sessionStats if missing
+    if (!sessionStats) {
+      sessionStats = {
+        characterStats: {},
+        solicitudes: {
+          characterSolicitudes: {},
+          lastModified: Date.now(),
+        },
+        initialized: true,
+        lastModified: Date.now(),
+      };
+    }
+    
+    // Auto-initialize solicitudes if missing
+    if (!sessionStats.solicitudes) {
+      sessionStats = {
+        ...sessionStats,
+        solicitudes: {
+          characterSolicitudes: {},
+          lastModified: Date.now(),
+        },
+      };
+    }
+    
+    // Create the new solicitud instance
+    const newSolicitud: SolicitudInstance = {
+      ...solicitudData,
+      id: `solicitud-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+    
+    // Add to target character's solicitudes
+    const currentSolicitudes = sessionStats.solicitudes.characterSolicitudes[targetCharacterId] || [];
+    const updatedSolicitudes = [...currentSolicitudes, newSolicitud];
+    
+    const newSessionStats: SessionStats = {
+      ...sessionStats,
+      solicitudes: {
+        characterSolicitudes: {
+          ...sessionStats.solicitudes.characterSolicitudes,
+          [targetCharacterId]: updatedSolicitudes,
+        },
+        lastModified: Date.now(),
+      },
+      lastModified: Date.now(),
+    };
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: any) =>
+        s.id === sessionId
+          ? { 
+              ...s, 
+              sessionStats: newSessionStats,
+              updatedAt: new Date().toISOString() 
+            }
+          : s
+      ),
+    }));
+    
+    console.log(`[Solicitud] Created solicitud "${solicitudData.key}" for character ${targetCharacterId} from ${solicitudData.fromCharacterName}`);
+    return newSolicitud;
+  },
+
+  completeSolicitud: (sessionId, characterId, solicitudKey) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+    
+    if (sessionIndex === -1) return null;
+    
+    const session = sessions[sessionIndex];
+    const sessionStats = session.sessionStats;
+    
+    if (!sessionStats?.solicitudes?.characterSolicitudes?.[characterId]) {
+      return null;
+    }
+    
+    const solicitudes = sessionStats.solicitudes.characterSolicitudes[characterId];
+    const solicitudIndex = solicitudes.findIndex(
+      s => s.key === solicitudKey && s.status === 'pending'
+    );
+    
+    if (solicitudIndex === -1) {
+      console.log(`[Solicitud] No pending solicitud found with key "${solicitudKey}" for character ${characterId}`);
+      return null;
+    }
+    
+    // Mark as completed
+    const updatedSolicitudes = [...solicitudes];
+    const completedSolicitud = {
+      ...updatedSolicitudes[solicitudIndex],
+      status: 'completed' as const,
+      completedAt: Date.now(),
+    };
+    updatedSolicitudes[solicitudIndex] = completedSolicitud;
+    
+    const newSessionStats: SessionStats = {
+      ...sessionStats,
+      solicitudes: {
+        characterSolicitudes: {
+          ...sessionStats.solicitudes.characterSolicitudes,
+          [characterId]: updatedSolicitudes,
+        },
+        lastModified: Date.now(),
+      },
+      lastModified: Date.now(),
+    };
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: any) =>
+        s.id === sessionId
+          ? { 
+              ...s, 
+              sessionStats: newSessionStats,
+              updatedAt: new Date().toISOString() 
+            }
+          : s
+      ),
+    }));
+    
+    console.log(`[Solicitud] Completed solicitud "${solicitudKey}" for character ${characterId}`);
+    return completedSolicitud;
+  },
+
+  getPendingSolicitudes: (sessionId, characterId) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const session = sessions.find(s => s.id === sessionId);
+    
+    if (!session?.sessionStats?.solicitudes?.characterSolicitudes?.[characterId]) {
+      return [];
+    }
+    
+    return session.sessionStats.solicitudes.characterSolicitudes[characterId].filter(
+      s => s.status === 'pending'
+    );
+  },
+
+  // ============================================
+  // User Peticiones/Solicitudes Actions ({{user}})
+  // ============================================
+  // These actions allow the user to make peticiones and accept/reject solicitudes
+  // without injecting anything into the chat history.
+  // User ID is stored as '__user__' in the session stats.
+
+  /**
+   * Activate a peticion for the user
+   * Creates a SolicitudInstance for the target character directly
+   * (No chat message injection)
+   */
+  activateUserPeticion: (
+    sessionId: string,
+    targetCharacterId: string,
+    solicitudKey: string,
+    description: string,
+    userName: string
+  ) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+    
+    if (sessionIndex === -1) return null;
+    
+    const session = sessions[sessionIndex];
+    let sessionStats = session.sessionStats;
+    
+    // Auto-initialize sessionStats if missing
+    if (!sessionStats) {
+      sessionStats = {
+        characterStats: {},
+        solicitudes: {
+          characterSolicitudes: {},
+          lastModified: Date.now(),
+        },
+        initialized: true,
+        lastModified: Date.now(),
+      };
+    }
+    
+    // Auto-initialize solicitudes if missing
+    if (!sessionStats.solicitudes) {
+      sessionStats = {
+        ...sessionStats,
+        solicitudes: {
+          characterSolicitudes: {},
+          lastModified: Date.now(),
+        },
+      };
+    }
+    
+    // Create the new solicitud instance
+    const newSolicitud: SolicitudInstance = {
+      id: `solicitud-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      key: solicitudKey,
+      fromCharacterId: '__user__',
+      fromCharacterName: userName || 'Usuario',
+      description,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+    
+    // Add to target character's solicitudes
+    const currentSolicitudes = sessionStats.solicitudes.characterSolicitudes[targetCharacterId] || [];
+    const updatedSolicitudes = [...currentSolicitudes, newSolicitud];
+    
+    const newSessionStats: SessionStats = {
+      ...sessionStats,
+      solicitudes: {
+        characterSolicitudes: {
+          ...sessionStats.solicitudes.characterSolicitudes,
+          [targetCharacterId]: updatedSolicitudes,
+        },
+        lastModified: Date.now(),
+      },
+      lastModified: Date.now(),
+    };
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: any) =>
+        s.id === sessionId
+          ? { 
+              ...s, 
+              sessionStats: newSessionStats,
+              updatedAt: new Date().toISOString() 
+            }
+          : s
+      ),
+    }));
+    
+    console.log(`[UserPeticion] Created solicitud "${solicitudKey}" for character ${targetCharacterId}`);
+    return newSolicitud;
+  },
+
+  /**
+   * Accept a solicitud received by the user
+   * Marks the solicitud as completed directly (no chat injection)
+   */
+  acceptUserSolicitud: (sessionId, solicitudId) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+    
+    if (sessionIndex === -1) return null;
+    
+    const session = sessions[sessionIndex];
+    const sessionStats = session.sessionStats;
+    
+    // User's solicitudes are stored under '__user__'
+    if (!sessionStats?.solicitudes?.characterSolicitudes?.['__user__']) {
+      return null;
+    }
+    
+    const solicitudes = sessionStats.solicitudes.characterSolicitudes['__user__'];
+    const solicitudIndex = solicitudes.findIndex(
+      s => s.id === solicitudId && s.status === 'pending'
+    );
+    
+    if (solicitudIndex === -1) {
+      console.log(`[UserSolicitud] No pending solicitud found with id "${solicitudId}"`);
+      return null;
+    }
+    
+    // Mark as completed
+    const updatedSolicitudes = [...solicitudes];
+    const completedSolicitud = {
+      ...updatedSolicitudes[solicitudIndex],
+      status: 'completed' as const,
+      completedAt: Date.now(),
+    };
+    updatedSolicitudes[solicitudIndex] = completedSolicitud;
+    
+    const newSessionStats: SessionStats = {
+      ...sessionStats,
+      solicitudes: {
+        characterSolicitudes: {
+          ...sessionStats.solicitudes.characterSolicitudes,
+          ['__user__']: updatedSolicitudes,
+        },
+        lastModified: Date.now(),
+      },
+      lastModified: Date.now(),
+    };
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: any) =>
+        s.id === sessionId
+          ? { 
+              ...s, 
+              sessionStats: newSessionStats,
+              updatedAt: new Date().toISOString() 
+            }
+          : s
+      ),
+    }));
+    
+    console.log(`[UserSolicitud] Accepted solicitud "${completedSolicitud.key}"`);
+    return completedSolicitud;
+  },
+
+  /**
+   * Reject a solicitud received by the user
+   * Removes it from the list
+   */
+  rejectUserSolicitud: (sessionId, solicitudId) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+    
+    if (sessionIndex === -1) return false;
+    
+    const session = sessions[sessionIndex];
+    const sessionStats = session.sessionStats;
+    
+    // User's solicitudes are stored under '__user__'
+    if (!sessionStats?.solicitudes?.characterSolicitudes?.['__user__']) {
+      return false;
+    }
+    
+    const solicitudes = sessionStats.solicitudes.characterSolicitudes['__user__'];
+    const solicitud = solicitudes.find(s => s.id === solicitudId);
+    
+    if (!solicitud) {
+      return false;
+    }
+    
+    // Remove from list (mark as rejected by filtering out)
+    const updatedSolicitudes = solicitudes.filter(s => s.id !== solicitudId);
+    
+    const newSessionStats: SessionStats = {
+      ...sessionStats,
+      solicitudes: {
+        characterSolicitudes: {
+          ...sessionStats.solicitudes.characterSolicitudes,
+          ['__user__']: updatedSolicitudes,
+        },
+        lastModified: Date.now(),
+      },
+      lastModified: Date.now(),
+    };
+    
+    set((state: any) => ({
+      sessions: state.sessions.map((s: any) =>
+        s.id === sessionId
+          ? { 
+              ...s, 
+              sessionStats: newSessionStats,
+              updatedAt: new Date().toISOString() 
+            }
+          : s
+      ),
+    }));
+    
+    console.log(`[UserSolicitud] Rejected solicitud "${solicitud.key}"`);
+    return true;
+  },
+
+  /**
+   * Get pending solicitudes for the user
+   */
+  getPendingUserSolicitudes: (sessionId) => {
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+    }>;
+    const session = sessions.find(s => s.id === sessionId);
+    
+    if (!session?.sessionStats?.solicitudes?.characterSolicitudes?.['__user__']) {
+      return [];
+    }
+    
+    return session.sessionStats.solicitudes.characterSolicitudes['__user__'].filter(
+      s => s.status === 'pending'
+    );
   },
 });
 

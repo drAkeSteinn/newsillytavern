@@ -34,6 +34,8 @@ import {
   getActionSymbol,
   normalizeReward,
 } from '@/lib/quest/quest-reward-utils';
+import { getExampleKey } from '@/lib/quest';
+import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,6 +85,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Check,
+  CheckCircle,
   AlertCircle,
   Info,
   Settings2,
@@ -132,10 +135,14 @@ export function QuestTemplateManager() {
   const [isLoading, setIsLoading] = useState(false);
   
   const questTemplates = useTavernStore((state) => state.questTemplates);
+  const questSettings = useTavernStore((state) => state.questSettings);
   const loadTemplates = useTavernStore((state) => state.loadTemplates);
   const saveTemplate = useTavernStore((state) => state.saveTemplate);
   const deleteTemplate = useTavernStore((state) => state.deleteTemplate);
   const duplicateTemplate = useTavernStore((state) => state.duplicateTemplate);
+  
+  // Get the objective prefix if configured
+  const objectivePrefix = questSettings?.objectiveCompletionPrefix || DEFAULT_QUEST_SETTINGS.objectiveCompletionPrefix;
 
   // Load templates on mount
   useEffect(() => {
@@ -394,6 +401,7 @@ export function QuestTemplateManager() {
           onSave={handleSave}
           onClose={handleClose}
           existingIds={questTemplates.map(t => t.id)}
+          objectivePrefix={objectivePrefix}
         />
       )}
     </div>
@@ -413,6 +421,7 @@ interface SortableObjectiveItemProps {
   onUpdate: (updates: Partial<QuestObjectiveTemplate>) => void;
   onRemove: () => void;
   allCharacters: Array<{ id: string; name: string }>;
+  objectivePrefix: string;
 }
 
 function SortableObjectiveItem({
@@ -424,6 +433,7 @@ function SortableObjectiveItem({
   onUpdate,
   onRemove,
   allCharacters,
+  objectivePrefix,
 }: SortableObjectiveItemProps) {
   const {
     attributes,
@@ -514,6 +524,12 @@ function SortableObjectiveItem({
                 Opcional
               </Badge>
             )}
+            {objective.completionDescription && (
+              <Badge variant="secondary" className="text-[10px] h-5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Info
+              </Badge>
+            )}
             {objective.characterFilter?.enabled && objective.characterFilter.characterIds.length > 0 && (
               <Badge variant="secondary" className="text-[10px] h-5 gap-1">
                 <Users className="w-3 h-3" />
@@ -595,10 +611,36 @@ function SortableObjectiveItem({
             />
           </div>
 
+          {/* Completion Description */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Descripción de Completado
+              <span className="text-[9px] text-muted-foreground/60">(se_completa_cuando)</span>
+            </Label>
+            <Textarea
+              value={objective.completionDescription || ''}
+              onChange={(e) => onUpdate({ completionDescription: e.target.value })}
+              placeholder="Instrucciones claras para el LLM sobre cuándo considerar este objetivo completado. Ej: El personaje confirma claramente que ya entregó los materiales..."
+              className="bg-background text-xs min-h-[60px] resize-none"
+              rows={2}
+            />
+            <p className="text-[9px] text-muted-foreground">
+              Esta descripción se mostrará al LLM como instrucción de cuándo marcar el objetivo como completado.
+            </p>
+          </div>
+
           {/* Completion Keys */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Key de Completado</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Key de Completado</Label>
+                {objectivePrefix && objectivePrefix.trim() !== '' && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                    +{objectivePrefix}
+                  </Badge>
+                )}
+              </div>
               <Input
                 value={objective.completion.key}
                 onChange={(e) => onUpdate({ 
@@ -607,6 +649,14 @@ function SortableObjectiveItem({
                 placeholder="resistencia"
                 className="bg-background font-mono text-xs h-8"
               />
+              {objectivePrefix && objectivePrefix.trim() !== '' && objective.completion.key && (
+                <div className="text-[9px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Zap className="w-2.5 h-2.5 text-amber-500" />
+                  <span className="text-amber-600 dark:text-amber-400 font-mono">
+                    {getExampleKey(objectivePrefix, objective.completion.key)}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-[10px] text-muted-foreground">Keys Alternativas</Label>
@@ -1150,9 +1200,10 @@ interface QuestTemplateEditorDialogProps {
   onSave: (template: QuestTemplate) => void;
   onClose: () => void;
   existingIds: string[];
+  objectivePrefix: string;
 }
 
-function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingIds }: QuestTemplateEditorDialogProps) {
+function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingIds, objectivePrefix }: QuestTemplateEditorDialogProps) {
   // Basic info
   const [id, setId] = useState(template?.id || '');
   const [name, setName] = useState(template?.name || '');
@@ -1886,6 +1937,7 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                           onUpdate={(updates) => updateObjective(index, updates)}
                           onRemove={() => removeObjective(index)}
                           allCharacters={allCharacters}
+                          objectivePrefix={objectivePrefix}
                         />
                       ))}
                     </div>

@@ -766,3 +766,219 @@ Stage Summary:
 - Linter passed without errors
 - Dev server running correctly
 
+---
+Task ID: peticiones-solicitudes-system
+Agent: Main Agent
+Task: Implementar sistema de Peticiones y Solicitudes - renombrar Invitaciones a Peticiones, agregar nuevo sistema de Solicitudes
+
+Work Log:
+- Renombrada seccion "Invitaciones" a "Peticiones" en la UI
+- Agregado nuevo campo `objetivo` a InvitationDefinition para especificar personaje objetivo
+- Creado nuevo tipo SolicitudInstance para solicitudes recibidas de otros personajes
+- Creado tipo SessionSolicitudes para almacenar solicitudes activas por sesion
+- Actualizado StatsBlockHeaders con solicitudes header
+- Actualizado ResolvedStats con availableSolicitudes y solicitudesBlock
+- Actualizado DEFAULT_STATS_BLOCK_HEADERS con nuevos valores
+
+Changes Made:
+1. **Types updated** (types/index.ts):
+   - Added `objetivo` field to InvitationDefinition:
+     ```typescript
+     objetivo?: {
+       characterId: string;
+       solicitudKey?: string;
+     }
+     ```
+   - Added SolicitudInstance interface:
+     ```typescript
+     interface SolicitudInstance {
+       id: string;
+       key: string;
+       fromCharacterId: string;
+       fromCharacterName: string;
+       description: string;
+       status: 'pending' | 'completed';
+       createdAt: number;
+       completedAt?: number;
+     }
+     ```
+   - Added SessionSolicitudes interface for session state
+   - Added solicitudes to SessionStats interface
+   - Updated StatsBlockHeaders with solicitudes field
+   - Updated ResolvedStats with solicitudes support
+
+2. **UI updated** (stats-editor.tsx):
+   - Renamed "Invitaciones" to "Peticiones"
+   - Updated help text to explain peticiones are requests to other characters
+   - Updated usage help section:
+     - `{{acciones}}` -> Lista de acciones disponibles
+     - `{{peticiones}}` -> Peticiones que puede hacer este personaje
+     - `{{solicitudes}}` -> Solicitudes recibidas de otros personajes
+
+3. **Resolver updated** (stats-resolver.ts):
+   - Added buildSolicitudesBlock() function with YAML-like format:
+     ```
+     [SOLICITUDES RECIBIDAS]
+     - key: preparar_troncos
+       de: Aitana
+       descripcion: Aitana necesita que dejes listos los troncos.
+     ```
+   - Updated buildInvitationsBlock() for peticiones with objetivo field
+   - Updated resolveStatsInText() to support:
+     - {{peticiones}} and {{invitaciones}} (backward compatible)
+     - {{solicitudes}} for received requests
+   - Updated resolveStats() to return solicitudesBlock
+
+4. **Block Headers defaults updated**:
+   - invitations: '[PETICIONES DISPONIBLES]'
+   - solicitudes: '[SOLICITUDES RECIBIDAS]'
+
+Stage Summary:
+- Sistema de Peticiones y Solicitudes implementado
+- UI actualizada con nuevos nombres y keys
+- Formato YAML-like para ambos tipos:
+  - Peticiones: key, descripcion, objetivo
+  - Solicitudes: key, de (sender), descripcion
+- Backward compatibility mantenida con {{invitaciones}}
+- Linter passed without errors
+- Dev server running correctly
+
+
+---
+Task ID: peticiones-solicitudes-activation
+Agent: Main Agent
+Task: Implementar logica de activacion y completado de Peticiones/Solicitudes
+
+Work Log:
+- Agregadas acciones de gestion de solicitudes a statsSlice:
+  - createSolicitud(): Crea una nueva solicitud para un personaje objetivo
+  - completeSolicitud(): Marca una solicitud como completada
+  - getPendingSolicitudes(): Obtiene solicitudes pendientes para un personaje
+- Creado solicitud-executor.ts con logica de activacion/completado:
+  - SolicitudActivationContext: Contexto para activacion de peticiones
+  - SolicitudCompletionContext: Contexto para completado de solicitudes
+  - detectPeticionActivations(): Detecta cuando una key de peticion se activa
+  - executePeticionActivation(): Crea solicitud para el personaje objetivo
+  - detectSolicitudCompletions(): Detecta cuando una key de solicitud se completa
+  - executeSolicitudCompletion(): Marca la solicitud como completada
+  - SolicitudDetectionState: Estado para streaming incremental
+- Actualizado stats-detector.ts para integrar solicitud processing:
+  - StatsTriggerContext actualizado con characterName, sessionId, allCharacters
+  - StatsHandlerResult actualizado con solicitudResult
+  - checkStatsTriggers() ahora procesa peticiones y solicitudes
+  - Agregado solicitudStates al handler state
+
+Changes Made:
+1. **statsSlice.ts** - Agregadas acciones de solicitud:
+   - createSolicitud(), completeSolicitud(), getPendingSolicitudes()
+
+2. **solicitud-executor.ts** - Nueva logica de activacion/completado:
+   - getAvailablePeticiones(), buildPeticionKeyPattern()
+   - detectPeticionActivations(), executePeticionActivation()
+   - buildSolicitudKeyPattern(), detectSolicitudCompletions()
+   - executeSolicitudCompletion(), processSolicitudes()
+   - SolicitudDetectionState class for streaming
+
+3. **stats-detector.ts** - Integracion con sistema de triggers:
+   - StatsTriggerContext expandido con campos necesarios
+   - checkStatsTriggers() ahora procesa solicitudes
+   - Creado solicitudStates para tracking por personaje
+
+4. **stats-editor.tsx** - UI para campo objetivo:
+   - Creado InvitationEditor component con selector de personaje objetivo
+   - Actualizada seccion Peticiones para usar InvitationEditor
+   - Pasado allCharacters prop desde componente padre
+
+Stage Summary:
+- Sistema de activacion de Peticiones implementado
+- Sistema de completado de Solicitudes implementado
+- Integracion con streaming para deteccion en tiempo real
+- UI actualizada con selector de personaje objetivo
+- Linter passed without errors
+- Dev server running correctly
+
+---
+Task ID: persona-peticiones-solicitudes
+Agent: Main Agent
+Task: Implementar Peticiones y Solicitudes para Persona ({{user}})
+
+Work Log:
+- Analizado el sistema existente de Peticiones/Solicitudes para personajes
+- Actualizado PersonaPanel.tsx para incluir editor de peticiones y solicitudes:
+  - Seccion colapsable "Peticiones y Solicitudes" 
+  - Switch para habilitar/deshabilitar el sistema
+  - Peticiones (enviar): Invitaciones que el usuario puede hacer a personajes
+  - Solicitudes (recibir): Solicitudes que los personajes pueden hacer al usuario
+- Creados componentes de edicion para Persona:
+  - PersonaInvitationEditor: Editor de peticiones con selector de personaje objetivo
+  - PersonaSolicitudEditor: Editor de solicitudes con keys de peticion y solicitud
+- Actualizado chat-panel.tsx para pasar `allCharacters` con persona incluida:
+  - Creado allCharactersWithPersona array que incluye persona como pseudo-personaje con id '__user__'
+  - Pasado a API endpoints (stream y group-stream)
+  - Permite que personajes hagan peticiones al usuario
+
+Changes Made:
+1. **persona-panel.tsx** - Editor completo de peticiones/solicitudes:
+   - Agregada seccion "Peticiones y Solicitudes" colapsable
+   - Switch para habilitar statsConfig.enabled
+   - PersonaInvitationEditor: Seleccion de personaje objetivo y su solicitud
+   - PersonaSolicitudEditor: Configuracion de keys y descripciones
+   - Badges indicando cantidad de peticiones y solicitudes configuradas
+
+2. **chat-panel.tsx** - Pasar persona en allCharacters:
+   - Creado allCharactersWithPersona antes del fetch
+   - Incluye persona con id '__user__' si tiene statsConfig.enabled
+   - Pasado a /api/chat/stream y /api/chat/group-stream
+
+3. **Store** - Funciones ya existentes utilizadas:
+   - activateUserPeticion(): Crea solicitud para personaje objetivo
+   - acceptUserSolicitud(): Acepta solicitud recibida (silenciosamente)
+   - rejectUserSolicitud(): Rechaza solicitud recibida
+   - getPendingUserSolicitudes(): Obtiene solicitudes pendientes del usuario
+
+Stage Summary:
+- Persona ahora puede configurar Peticiones (enviar) y Solicitudes (recibir)
+- UI completa con editores para ambos tipos
+- Integracion con sistema existente de QuickPetitions y UserSolicitudesPanel
+- Los personajes pueden hacer peticiones al usuario usando '__user__' como target
+- Actualizacion silenciosa de estado (sin keys en chat history)
+- Linter passed without errors
+- Dev server running correctly
+
+---
+Task ID: persona-peticiones-ui-fixes
+Agent: Main Agent
+Task: Corregir errores de UI en el editor de Persona
+
+Work Log:
+- Corregido error de runtime en PersonaPanel: Cannot read properties of undefined (reading 'length')
+  - Agregado optional chaining en el filtro de charactersWithSolicitudes
+  - Cambiado: c.statsConfig.solicitudDefinitions.length > 0
+  - A: (c.statsConfig.solicitudDefinitions?.length || 0) > 0
+- Agregado scrollbar a las secciones de Peticiones y Solicitudes en PersonaPanel
+  - max-h-48 (192px) para limitar altura
+  - overflow-y-auto para mostrar scrollbar cuando sea necesario
+  - pr-1 y custom-scrollbar para mejor apariencia
+- Actualizado character-editor.tsx para incluir Persona en el selector de personajes
+  - El selector de objetivos en "Peticiones" ahora muestra la Persona activa
+  - Se muestra con nombre de la persona o "Usuario" si tiene solicitudes configuradas
+  - ID especial '__user__' para identificar a la persona en el sistema
+
+Changes Made:
+1. **persona-panel.tsx**:
+   - Fix: Optional chaining en filtro de charactersWithSolicitudes
+   - Fix: Scrollbar en secciones de peticiones/solicitudes
+
+2. **character-editor.tsx**:
+   - Agregado `personas` y `activePersonaId` del store
+   - Creado `activePersona` derivado
+   - Actualizado `allCharacters` para incluir persona activa con `__user__` ID
+
+Stage Summary:
+- Error de runtime corregido en PersonaPanel
+- Scrollbar funcional en secciones de peticiones/solicitudes
+- Selector de personajes en editor de peticiones ahora incluye la Persona activa
+- Los personajes pueden hacer peticiones dirigidas a la Persona ({{user}})
+- Linter passed without errors
+- Dev server running correctly
+

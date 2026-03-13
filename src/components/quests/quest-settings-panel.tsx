@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -42,6 +43,7 @@ import {
   Eye,
   FileText,
   HelpCircle,
+  Key,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -274,6 +276,113 @@ export function QuestSettingsPanel() {
                     disabled={!questSettings.enabled}
                   />
                 </label>
+              </div>
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            {/* Key Prefixes Settings */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <div className="p-1.5 rounded-md bg-emerald-500/10">
+                  <Key className="w-4 h-4 text-emerald-500" />
+                </div>
+                Prefijos de Keys
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 ml-auto">
+                  Opcional
+                </Badge>
+              </div>
+              
+              <div className="pl-8 space-y-3">
+                <div className="p-4 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="p-2 rounded-lg bg-emerald-500/10">
+                      <Info className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div className="text-xs space-y-1">
+                      <p className="font-medium text-emerald-600 dark:text-emerald-400">
+                        ¿Qué son los prefijos?
+                      </p>
+                      <p className="text-muted-foreground">
+                        Los prefijos se combinan con las keys de detección para mayor flexibilidad.
+                        El sistema detecta automáticamente múltiples variantes.
+                      </p>
+                      <div className="mt-2 p-2 rounded bg-muted/50 font-mono text-[10px]">
+                        <span className="text-muted-foreground">Ejemplo:</span>
+                        <br />
+                        <span className="text-emerald-500">Prefijo:</span> "Objetivo" + <span className="text-amber-500">Key:</span> "conseguir_madera"
+                        <br />
+                        <span className="text-muted-foreground">= Detecta:</span> "Objetivo:conseguir_madera", "Objetivo: conseguir madera", "Objetivo=conseguir_madera", etc.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quest Activation Prefix */}
+                <div className="p-4 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-lg bg-amber-500/10">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-sm font-medium">Prefijo de Activación</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Para activar misiones. Ej: "Misión:rescate"
+                      </p>
+                    </div>
+                  </div>
+                  <Input
+                    value={questSettings.questActivationPrefix || ''}
+                    onChange={(e) => setQuestSettings({ questActivationPrefix: e.target.value })}
+                    disabled={!questSettings.enabled}
+                    placeholder="Misión (opcional)"
+                    className="font-mono text-sm"
+                  />
+                </div>
+
+                {/* Quest Completion Prefix */}
+                <div className="p-4 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-lg bg-green-500/10">
+                      <Target className="w-4 h-4 text-green-500" />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-sm font-medium">Prefijo de Completado</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Para completar misiones enteras. Ej: "Completado:rescate"
+                      </p>
+                    </div>
+                  </div>
+                  <Input
+                    value={questSettings.questCompletionPrefix || ''}
+                    onChange={(e) => setQuestSettings({ questCompletionPrefix: e.target.value })}
+                    disabled={!questSettings.enabled}
+                    placeholder="Completado (opcional)"
+                    className="font-mono text-sm"
+                  />
+                </div>
+
+                {/* Objective Completion Prefix */}
+                <div className="p-4 rounded-lg border border-border/60 bg-gradient-to-r from-background to-muted/30">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-lg bg-blue-500/10">
+                      <List className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-sm font-medium">Prefijo de Objetivos</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Para completar objetivos. Ej: "Objetivo:conseguir_madera"
+                      </p>
+                    </div>
+                  </div>
+                  <Input
+                    value={questSettings.objectiveCompletionPrefix || ''}
+                    onChange={(e) => setQuestSettings({ objectiveCompletionPrefix: e.target.value })}
+                    disabled={!questSettings.enabled}
+                    placeholder="Objetivo (opcional)"
+                    className="font-mono text-sm"
+                  />
+                </div>
               </div>
             </div>
 

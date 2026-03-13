@@ -71,7 +71,8 @@ function validateRegenerateRequest(data: unknown) {
       contextConfig: obj.contextConfig as Record<string, unknown> | undefined,
       lorebooks: Array.isArray(obj.lorebooks) ? obj.lorebooks : [],
       sessionStats: obj.sessionStats,
-      hudContext: obj.hudContext as HUDContextConfig | undefined
+      hudContext: obj.hudContext as HUDContextConfig | undefined,
+      allCharacters: Array.isArray(obj.allCharacters) ? obj.allCharacters : []
     }
   } as const;
 }
@@ -97,7 +98,8 @@ export async function POST(request: NextRequest) {
       contextConfig,
       lorebooks = [],
       sessionStats,
-      hudContext
+      hudContext,
+      allCharacters = []
     } = validation.data;
 
     // Extract lorebooks for processing
@@ -128,7 +130,7 @@ export async function POST(request: NextRequest) {
     const effectiveUserName = getEffectiveUserName(persona, userName);
 
     // Process character template variables ({{user}}, {{char}}, etc.)
-    const processedCharacter = processCharacter(effectiveCharacter, effectiveUserName, persona);
+    const processedCharacter = processCharacter(effectiveCharacter, effectiveUserName, persona, typedSessionStats, allCharacters);
 
     // Get messages before the one to regenerate
     const messageIndex = messages.findIndex((m: { id: string }) => m.id === messageId);
@@ -156,7 +158,8 @@ export async function POST(request: NextRequest) {
       effectiveUserName,
       persona,
       lorebookSection,
-      typedSessionStats  // Pass session stats for attribute values
+      typedSessionStats,  // Pass session stats for attribute values
+      allCharacters       // Pass all characters for peticiones/solicitudes resolution
     );
 
     // Build HUD context section if enabled

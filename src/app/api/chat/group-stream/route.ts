@@ -375,8 +375,9 @@ export async function POST(request: NextRequest) {
               effectiveUserName,
               persona,
               lorebookSectionForCharacter,
-              typedSessionStats
-              // Note: postHistoryInstructions is included internally
+              typedSessionStats,
+              undefined, // postHistoryInstructions
+              characters // allCharacters - needed for peticiones/solicitudes resolution
             );
 
             // Build key resolution context for this character
@@ -384,6 +385,7 @@ export async function POST(request: NextRequest) {
               characterId: responder.id,
               statsConfig: responder.statsConfig,
               sessionStats: typedSessionStats,
+              allCharacters: characters,
             });
             const keyContext = buildKeyResolutionContext(
               responder,

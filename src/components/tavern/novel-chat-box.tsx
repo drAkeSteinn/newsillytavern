@@ -30,6 +30,7 @@ import {
   Check,
   Circle,
   Target,
+  Inbox,
 } from 'lucide-react';
 import {
   Popover,
@@ -40,6 +41,7 @@ import { cn } from '@/lib/utils';
 import type { ChatLayoutSettings, CharacterCard, CharacterGroup, Persona, ChatboxAppearanceSettings } from '@/types';
 import { DEFAULT_CHATBOX_APPEARANCE } from '@/types';
 import { t } from '@/lib/i18n';
+import { QuickPetitions, UserSolicitudesPanel } from './user-solicitudes';
 
 interface NovelChatBoxProps {
   onSendMessage: (message: string) => void;
@@ -82,6 +84,7 @@ export function NovelChatBox({
   const [showSettings, setShowSettings] = useState(false);
   const [showVariables, setShowVariables] = useState(false);
   const [showQuests, setShowQuests] = useState(false);
+  const [showSolicitudes, setShowSolicitudes] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -102,6 +105,10 @@ export function NovelChatBox({
     characters: allCharacters,
     questTemplates,
     questSettings,
+    activateUserPeticion,
+    getPendingUserSolicitudes,
+    acceptUserSolicitud,
+    rejectUserSolicitud,
   } = useTavernStore();
 
   const activeSession = getActiveSession();
@@ -307,6 +314,28 @@ export function NovelChatBox({
   const handleQuickReply = (reply: string) => {
     setInput(reply);
     textareaRef.current?.focus();
+  };
+
+  // Get pending user solicitudes
+  const pendingUserSolicitudes = activeSessionId 
+    ? getPendingUserSolicitudes(activeSessionId)
+    : [];
+
+  // Handle user activating a peticion
+  const handleActivatePeticion = (
+    targetCharacterId: string,
+    solicitudKey: string,
+    description: string
+  ) => {
+    if (!activeSessionId) return;
+    
+    activateUserPeticion(
+      activeSessionId,
+      targetCharacterId,
+      solicitudKey,
+      description,
+      activePersona?.name || 'Usuario'
+    );
   };
 
   if (!activeSession) return null;
@@ -587,6 +616,86 @@ export function NovelChatBox({
                         })}
                       </>
                     )}
+                  </div>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* User Solicitudes Popover */}
+          <Popover open={showSolicitudes} onOpenChange={setShowSolicitudes}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 relative">
+                <Inbox className="w-4 h-4" />
+                {pendingUserSolicitudes.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full flex items-center justify-center text-[8px] font-bold text-white">
+                    {pendingUserSolicitudes.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 max-h-96 overflow-y-auto" align="end">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-amber-500" />
+                  Solicitudes Recibidas
+                </h4>
+                
+                {pendingUserSolicitudes.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    <Inbox className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    No tienes solicitudes pendientes
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingUserSolicitudes.map((solicitud) => (
+                      <div
+                        key={solicitud.id}
+                        className="p-2 rounded-lg border bg-amber-500/10 border-amber-500/30"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-medium text-amber-400">
+                                De: {solicitud.fromCharacterName}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mb-1">
+                              {solicitud.description}
+                            </p>
+                            <code className="text-[9px] bg-black/20 px-1 py-0.5 rounded font-mono">
+                              {solicitud.key}
+                            </code>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-[10px] bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20 flex-1"
+                            onClick={() => {
+                              if (activeSessionId) {
+                                acceptUserSolicitud(activeSessionId, solicitud.id);
+                              }
+                            }}
+                          >
+                            ✓ Aceptar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-[10px] bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 flex-1"
+                            onClick={() => {
+                              if (activeSessionId) {
+                                rejectUserSolicitud(activeSessionId, solicitud.id);
+                              }
+                            }}
+                          >
+                            ✗ Rechazar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -922,6 +1031,14 @@ export function NovelChatBox({
               ))}
             </div>
           )}
+
+          {/* User Peticiones - Quick Tags */}
+          <QuickPetitions
+            activePersona={activePersona}
+            activeCharacter={activeCharacter}
+            characters={isGroupMode ? (characters.length > 0 ? characters : allCharacters) : (activeCharacter ? [activeCharacter] : [])}
+            onActivatePeticion={handleActivatePeticion}
+          />
 
           {/* Input Area - Always visible */}
           <div 

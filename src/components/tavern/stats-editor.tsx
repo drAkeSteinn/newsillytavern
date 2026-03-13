@@ -46,6 +46,7 @@ import {
   Coins,
   Gift,
   X,
+  Inbox,
 } from 'lucide-react';
 import type {
   CharacterStatsConfig,
@@ -53,6 +54,7 @@ import type {
   SkillDefinition,
   IntentionDefinition,
   InvitationDefinition,
+  SolicitudDefinition,
   StatRequirement,
   AttributeType,
   RequirementOperator,
@@ -61,10 +63,12 @@ import type {
   QuestReward,
   TriggerCategory,
   TriggerTargetMode,
+  ActionType,
 } from '@/types';
 import { DEFAULT_STATS_BLOCK_HEADERS, DEFAULT_STATS_CONFIG } from '@/types';
 import {
   createTriggerReward,
+  createObjectiveReward,
   describeReward,
   normalizeReward,
 } from '@/lib/quest/quest-reward-utils';
@@ -72,6 +76,7 @@ import {
 interface StatsEditorProps {
   statsConfig: CharacterStatsConfig | undefined;
   onChange: (statsConfig: CharacterStatsConfig) => void;
+  allCharacters?: { id: string; name: string; solicitudDefinitions: SolicitudDefinition[] }[];
 }
 
 // ============================================
@@ -893,18 +898,23 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
   
   return (
     <div className="border rounded-lg bg-muted/30">
-      <div 
+      <div
         className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-2">
           <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
           <Sword className="w-4 h-4 text-amber-500" />
-          <span className="font-medium text-sm">{skill.name || `Habilidad #${index + 1}`}</span>
+          <span className="font-medium text-sm">{skill.name || `Acción #${index + 1}`}</span>
           {skill.key && (
             <code className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
               {'{{' + skill.key + '}}'}
             </code>
+          )}
+          {skill.type && (
+            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+              {skill.type === 'preparacion' ? '📋 Prep' : '⚔️ Ejec'}
+            </Badge>
           )}
           {skill.requirements.length > 0 && (
             <Badge variant="outline" className="text-xs">
@@ -924,16 +934,16 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
           {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </div>
       </div>
-      
+
       {expanded && (
         <div className="px-4 pb-4 space-y-3 border-t">
-          <div className="pt-3 grid grid-cols-2 gap-3">
+          <div className="pt-3 grid grid-cols-3 gap-3">
             <div>
               <Label className="text-xs mb-1 block">Nombre *</Label>
               <Input
                 value={skill.name}
                 onChange={(e) => onChange(index, { name: e.target.value })}
-                placeholder="Golpe furioso"
+                placeholder="Afilar hacha"
                 className="h-8"
               />
             </div>
@@ -946,19 +956,34 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <p>Identificador para usar en templates.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Uso: {'{{' + (skill.key || 'habilidad') + '}}'} → Lista de habilidades</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Uso: {'{{' + (skill.key || 'accion') + '}}'} → Lista de acciones</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
               <Input
                 value={skill.key}
                 onChange={(e) => onChange(index, { key: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                placeholder="golpe_furioso"
+                placeholder="afilar_hacha"
                 className="h-8 font-mono text-xs"
               />
             </div>
+            <div>
+              <Label className="text-xs mb-1 block">Tipo</Label>
+              <Select
+                value={skill.type || ''}
+                onValueChange={(v) => onChange(index, { type: (v || undefined) as ActionType | undefined })}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="preparacion">📋 Preparación</SelectItem>
+                  <SelectItem value="ejecucion">⚔️ Ejecución</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
+
           <div>
             <Label className="text-xs mb-1 block">Descripción</Label>
             <Textarea
@@ -1190,7 +1215,7 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
             </div>
           </div>
           
-          {/* Activation Rewards Section - Trigger Type Only */}
+          {/* Activation Rewards Section - Trigger & Objective Types */}
           <div className="space-y-2 pt-2 border-t border-green-500/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -1201,33 +1226,48 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
                     <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    <p>Triggers que se ejecutan cuando se activa la habilidad.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Sprites, sonidos, fondos o secuencias de sonido.</p>
+                    <p>Efectos que se ejecutan cuando se activa la acción.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">• Trigger: Sprites, sonidos, fondos</p>
+                    <p className="text-xs text-muted-foreground">• Objetivo: Completa un objetivo de misión</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-xs border-green-500/30 hover:bg-green-500/10"
-                onClick={() => {
-                  const newReward = createTriggerReward('sprite', '', 'self', { id: `skill-reward-${Date.now().toString(36)}` });
-                  onChange(index, { activationRewards: [...(skill.activationRewards || []), newReward] });
-                }}
-              >
-                <Plus className="w-3 h-3 mr-1" /> Agregar Trigger
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs border-green-500/30 hover:bg-green-500/10"
+                  onClick={() => {
+                    const newReward = createTriggerReward('sprite', '', 'self', { id: `skill-reward-${Date.now().toString(36)}` });
+                    onChange(index, { activationRewards: [...(skill.activationRewards || []), newReward] });
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Trigger
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs border-amber-500/30 hover:bg-amber-500/10"
+                  onClick={() => {
+                    const newReward = createObjectiveReward('', undefined, { id: `skill-reward-${Date.now().toString(36)}` });
+                    onChange(index, { activationRewards: [...(skill.activationRewards || []), newReward] });
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Objetivo
+                </Button>
+              </div>
             </div>
             <div className="space-y-1">
               {(skill.activationRewards || []).map((reward, rewardIdx) => {
                 const normalized = normalizeReward(reward);
                 const isTrig = normalized.type === 'trigger';
-                
+                const isObj = normalized.type === 'objective';
+
                 return (
-                  <div key={reward.id} className="p-2 rounded bg-green-500/5 border border-green-500/10 space-y-2">
+                  <div key={reward.id} className={`p-2 rounded border space-y-2 ${isObj ? 'bg-amber-500/5 border-amber-500/10' : 'bg-green-500/5 border-green-500/10'}`}>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px] text-green-400 border-green-500/30">
-                        ⚡ Trigger
+                      <Badge variant="outline" className={`text-[10px] ${isObj ? 'text-amber-400 border-amber-500/30' : 'text-green-400 border-green-500/30'}`}>
+                        {isObj ? '🎯 Objetivo' : '⚡ Trigger'}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">
                         {describeReward(normalized)}
@@ -1368,6 +1408,44 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
                         )}
                       </>
                     )}
+
+                    {/* Objective Reward Editor */}
+                    {isObj && normalized.objective && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground mb-1 block">Key del Objetivo *</Label>
+                          <Input
+                            value={normalized.objective.objectiveKey}
+                            onChange={(e) => {
+                              const updatedRewards = [...(skill.activationRewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                objective: { ...normalized.objective!, objectiveKey: e.target.value }
+                              };
+                              onChange(index, { activationRewards: updatedRewards });
+                            }}
+                            placeholder="troncos_abedul"
+                            className="bg-background h-6 text-xs font-mono"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground mb-1 block">ID Misión (opcional)</Label>
+                          <Input
+                            value={normalized.objective.questId || ''}
+                            onChange={(e) => {
+                              const updatedRewards = [...(skill.activationRewards || [])];
+                              updatedRewards[rewardIdx] = {
+                                ...reward,
+                                objective: { ...normalized.objective!, questId: e.target.value || undefined }
+                              };
+                              onChange(index, { activationRewards: updatedRewards });
+                            }}
+                            placeholder="mision_rescate"
+                            className="bg-background h-6 text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1383,10 +1461,415 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
 }
 
 // ============================================
+// Invitation/Peticion Editor Component
+// ============================================
+
+// ============================================
+// Solicitud Definition Editor Component
+// ============================================
+
+interface SolicitudDefinitionEditorProps {
+  solicitud: SolicitudDefinition;
+  index: number;
+  availableAttributes: AttributeDefinition[];
+  onChange: (index: number, updates: Partial<SolicitudDefinition>) => void;
+  onDelete: (index: number) => void;
+}
+
+function SolicitudDefinitionEditor({ solicitud, index, availableAttributes, onChange, onDelete }: SolicitudDefinitionEditorProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="border rounded-lg bg-muted/30">
+      <div
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+          <Inbox className="w-4 h-4 text-cyan-500" />
+          <span className="font-medium text-sm">{solicitud.name || `Solicitud #${index + 1}`}</span>
+          {solicitud.peticionKey && (
+            <code className="text-xs bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded">
+              pet: {solicitud.peticionKey}
+            </code>
+          )}
+          {solicitud.solicitudKey && (
+            <code className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
+              sol: {solicitud.solicitudKey}
+            </code>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => { e.stopPropagation(); onDelete(index); }}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+          </Button>
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t">
+          <div className="pt-3">
+            <Label className="text-xs mb-1 block">Nombre *</Label>
+            <Input
+              value={solicitud.name}
+              onChange={(e) => onChange(index, { name: e.target.value })}
+              placeholder="Proporcionar madera"
+              className="h-8"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Label className="text-xs">Key de Petición *</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Key que OTROS personajes escribirán para solicitarte esto.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Aparecerá en [PETICIONES POSIBLES] de otros personajes.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                value={solicitud.peticionKey}
+                onChange={(e) => onChange(index, { peticionKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                placeholder="pedir_madera"
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Label className="text-xs">Key de Solicitud *</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Key que ESTE personaje escribirá para completar la solicitud.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Aparecerá en [SOLICITUDES RECIBIDAS] cuando alguien te solicite esto.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                value={solicitud.solicitudKey}
+                onChange={(e) => onChange(index, { solicitudKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                placeholder="dar_madera"
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Label className="text-xs">Descripción de Petición</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Lo que verá el personaje que hace la petición.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Describe qué están solicitando.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Textarea
+              value={solicitud.peticionDescription}
+              onChange={(e) => onChange(index, { peticionDescription: e.target.value })}
+              placeholder="Solicitar madera para construcción..."
+              className="min-h-[50px] text-sm"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Label className="text-xs">Descripción de Solicitud</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Lo que verá este personaje cuando reciba la solicitud.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Describe qué te están pidiendo.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Textarea
+              value={solicitud.solicitudDescription}
+              onChange={(e) => onChange(index, { solicitudDescription: e.target.value })}
+              placeholder="Entregar madera al solicitante..."
+              className="min-h-[50px] text-sm"
+            />
+          </div>
+
+          {/* Requirements Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs">Requisitos</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Condiciones que ESTE personaje debe cumplir para que la solicitud esté disponible.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Si no se cumplen, otros no podrán hacerte esta petición.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => {
+                  const newReq: StatRequirement = { attributeKey: '', operator: '>=', value: 0 };
+                  onChange(index, { requirements: [...solicitud.requirements, newReq] });
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1" /> Agregar
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {solicitud.requirements.map((req, reqIndex) => (
+                <RequirementEditor
+                  key={reqIndex}
+                  requirement={req}
+                  availableAttributes={availableAttributes}
+                  onChange={(updates) => {
+                    const newReqs = [...solicitud.requirements];
+                    newReqs[reqIndex] = { ...newReqs[reqIndex], ...updates };
+                    onChange(index, { requirements: newReqs });
+                  }}
+                  onDelete={() => {
+                    onChange(index, {
+                      requirements: solicitud.requirements.filter((_, i) => i !== reqIndex)
+                    });
+                  }}
+                />
+              ))}
+              {solicitud.requirements.length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Sin requisitos - siempre disponible para otros</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Invitation Editor Component (Updated)
+// ============================================
+
+interface InvitationEditorProps {
+  invitation: InvitationDefinition;
+  index: number;
+  availableAttributes: AttributeDefinition[];
+  allCharacters?: { id: string; name: string; solicitudDefinitions: SolicitudDefinition[] }[];
+  onChange: (index: number, updates: Partial<InvitationDefinition>) => void;
+  onDelete: (index: number) => void;
+}
+
+function InvitationEditor({ invitation, index, availableAttributes, allCharacters = [], onChange, onDelete }: InvitationEditorProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Get selected character's solicitudes
+  const selectedCharacter = allCharacters.find(c => c.id === invitation.objetivo?.characterId);
+  const selectedSolicitud = selectedCharacter?.solicitudDefinitions.find(
+    s => s.id === invitation.objetivo?.solicitudId
+  );
+
+  return (
+    <div className="border rounded-lg bg-muted/30">
+      <div
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+          <Mail className="w-4 h-4 text-rose-500" />
+          <span className="font-medium text-sm">{invitation.name || `Peticion #${index + 1}`}</span>
+          {selectedSolicitud && (
+            <code className="text-xs bg-rose-500/10 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded">
+              {selectedSolicitud.peticionKey}
+            </code>
+          )}
+          {selectedCharacter && (
+            <Badge variant="outline" className="text-xs bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+              → {selectedCharacter.name}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => { e.stopPropagation(); onDelete(index); }}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+          </Button>
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t">
+          <div className="pt-3">
+            <Label className="text-xs mb-1 block">Nombre *</Label>
+            <Input
+              value={invitation.name}
+              onChange={(e) => onChange(index, { name: e.target.value })}
+              placeholder="Petición de madera"
+              className="h-8"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Nombre interno para identificar esta petición en la configuración.
+            </p>
+          </div>
+
+          {/* Objetivo Section */}
+          <div className="space-y-2 p-3 bg-rose-500/10 rounded-lg border border-rose-500/20">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-rose-400" />
+              <Label className="text-xs font-medium text-rose-400">Personaje Objetivo</Label>
+            </div>
+
+            <Select
+              value={invitation.objetivo?.characterId || ''}
+              onValueChange={(v) => {
+                // Reset solicitud when character changes
+                onChange(index, {
+                  objetivo: v ? { characterId: v, solicitudId: '' } : undefined
+                });
+              }}
+            >
+              <SelectTrigger className="h-8 bg-background">
+                <SelectValue placeholder="Seleccionar personaje..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allCharacters.filter(c => c.solicitudDefinitions.length > 0).map(char => (
+                  <SelectItem key={char.id} value={char.id}>
+                    {char.name} ({char.solicitudDefinitions.length} solicitudes)
+                  </SelectItem>
+                ))}
+                {allCharacters.filter(c => c.solicitudDefinitions.length > 0).length === 0 && (
+                  <SelectItem value="_none" disabled>No hay personajes con solicitudes configuradas</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+
+            {/* Solicitud Selector - appears when character is selected */}
+            {selectedCharacter && (
+              <div className="mt-2 space-y-1.5">
+                <Label className="text-xs text-rose-300">Solicitud a solicitar:</Label>
+                <Select
+                  value={invitation.objetivo?.solicitudId || ''}
+                  onValueChange={(v) => onChange(index, {
+                    objetivo: { ...invitation.objetivo!, solicitudId: v }
+                  })}
+                >
+                  <SelectTrigger className="h-8 bg-background">
+                    <SelectValue placeholder="Seleccionar solicitud..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedCharacter.solicitudDefinitions.map(sol => (
+                      <SelectItem key={sol.id} value={sol.id}>
+                        {sol.name} ({sol.peticionKey})
+                      </SelectItem>
+                    ))}
+                    {selectedCharacter.solicitudDefinitions.length === 0 && (
+                      <SelectItem value="_none" disabled>Este personaje no tiene solicitudes configuradas</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {/* Show selected solicitud details */}
+                {selectedSolicitud && (
+                  <div className="mt-2 p-2 bg-background/50 rounded border text-xs space-y-1">
+                    <p><strong>Key de activación:</strong> <code className="bg-muted px-1 rounded">{selectedSolicitud.peticionKey}</code></p>
+                    <p><strong>Descripción:</strong> {selectedSolicitud.peticionDescription || '(sin descripción)'}</p>
+                    {selectedSolicitud.requirements.length > 0 && (
+                      <p className="text-amber-600 dark:text-amber-400">
+                        ⚠️ Esta solicitud tiene requisitos que el objetivo debe cumplir
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Requirements Section - Requisitos del que HACE la petición */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs">Requisitos (para hacer la petición)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Condiciones que ESTE personaje debe cumplir para poder hacer la petición.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Si no se cumplen, la petición no aparecerá en tu lista.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => {
+                  const newReq: StatRequirement = { attributeKey: '', operator: '>=', value: 0 };
+                  onChange(index, { requirements: [...invitation.requirements, newReq] });
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1" /> Agregar
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {invitation.requirements.map((req, reqIndex) => (
+                <RequirementEditor
+                  key={reqIndex}
+                  requirement={req}
+                  availableAttributes={availableAttributes}
+                  onChange={(updates) => {
+                    const newReqs = [...invitation.requirements];
+                    newReqs[reqIndex] = { ...newReqs[reqIndex], ...updates };
+                    onChange(index, { requirements: newReqs });
+                  }}
+                  onDelete={() => {
+                    onChange(index, {
+                      requirements: invitation.requirements.filter((_, i) => i !== reqIndex)
+                    });
+                  }}
+                />
+              ))}
+              {invitation.requirements.length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Sin requisitos - siempre disponible</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // Main Stats Editor Component
 // ============================================
 
-export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
+export function StatsEditor({ statsConfig, onChange, allCharacters = [] }: StatsEditorProps) {
   const config: CharacterStatsConfig = statsConfig || DEFAULT_STATS_CONFIG;
   
   const updateConfig = (updates: Partial<CharacterStatsConfig>) => {
@@ -1461,13 +1944,11 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
     updateConfig({ intentions: config.intentions.filter((_, i) => i !== index) });
   };
   
-  // Invitations
+  // Invitations (Peticiones)
   const addInvitation = () => {
     const newInvitation: InvitationDefinition = {
       id: `inv-${Date.now()}`,
       name: '',
-      description: '',
-      key: '',
       requirements: [],
     };
     updateConfig({ invitations: [...config.invitations, newInvitation] });
@@ -1481,6 +1962,30 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
   
   const deleteInvitation = (index: number) => {
     updateConfig({ invitations: config.invitations.filter((_, i) => i !== index) });
+  };
+
+  // SolicitudDefinitions (Solicitudes que este personaje puede recibir)
+  const addSolicitudDefinition = () => {
+    const newSolicitud: SolicitudDefinition = {
+      id: `sol-${Date.now()}`,
+      name: '',
+      peticionKey: '',
+      solicitudKey: '',
+      peticionDescription: '',
+      solicitudDescription: '',
+      requirements: [],
+    };
+    updateConfig({ solicitudDefinitions: [...(config.solicitudDefinitions || []), newSolicitud] });
+  };
+
+  const updateSolicitudDefinition = (index: number, updates: Partial<SolicitudDefinition>) => {
+    const newSolicitudes = [...(config.solicitudDefinitions || [])];
+    newSolicitudes[index] = { ...newSolicitudes[index], ...updates };
+    updateConfig({ solicitudDefinitions: newSolicitudes });
+  };
+
+  const deleteSolicitudDefinition = (index: number) => {
+    updateConfig({ solicitudDefinitions: (config.solicitudDefinitions || []).filter((_, i) => i !== index) });
   };
   
   return (
@@ -1579,19 +2084,19 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
               </AccordionContent>
             </AccordionItem>
             
-            {/* Skills Section */}
+            {/* Skills/Actions Section */}
             <AccordionItem value="skills" className="border rounded-lg">
               <div className="flex items-center px-4">
                 <AccordionTrigger className="px-0 hover:no-underline flex-1">
                   <div className="flex items-center gap-2">
                     <Sword className="w-4 h-4 text-amber-500" />
-                    <span>Habilidades</span>
+                    <span>Acciones</span>
                     <Badge variant="secondary" className="ml-2">{config.skills.length}</Badge>
                   </div>
                 </AccordionTrigger>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <button 
+                    <button
                       type="button"
                       className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
                       onClick={(e) => e.stopPropagation()}
@@ -1601,12 +2106,12 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                   </PopoverTrigger>
                   <PopoverContent className="w-72">
                     <div className="space-y-2">
-                      <h4 className="font-medium text-sm">Habilidades</h4>
+                      <h4 className="font-medium text-sm">Acciones</h4>
                       <p className="text-xs text-muted-foreground">
-                        Acciones especiales que el personaje puede realizar. Pueden tener requisitos basados en atributos.
+                        Acciones que el personaje puede realizar. Pueden ser de preparación o ejecución.
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Solo las habilidades que cumplan los requisitos se mostrarán en el prompt.
+                        Solo las acciones que cumplan los requisitos se mostrarán en el prompt.
                       </p>
                     </div>
                   </PopoverContent>
@@ -1621,7 +2126,7 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                         <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        <p>Título que aparece antes de la lista de habilidades en el prompt.</p>
+                        <p>Título que aparece antes de la lista de acciones en el prompt.</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -1630,7 +2135,7 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                     onChange={(e) => updateConfig({
                       blockHeaders: { ...config.blockHeaders, skills: e.target.value }
                     })}
-                    placeholder="Habilidades disponibles:"
+                    placeholder="[ACCIONES DISPONIBLES]"
                     className="h-8"
                   />
                 </div>
@@ -1646,7 +2151,7 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                     />
                   ))}
                   <Button variant="outline" size="sm" onClick={addSkill} className="w-full">
-                    <Plus className="w-4 h-4 mr-2" /> Agregar Habilidad
+                    <Plus className="w-4 h-4 mr-2" /> Agregar Acción
                   </Button>
                 </div>
               </AccordionContent>
@@ -1725,13 +2230,86 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
               </AccordionContent>
             </AccordionItem>
             
+            {/* SolicitudDefinitions Section - Solicitudes que este personaje puede recibir */}
+            <AccordionItem value="solicitudes" className="border rounded-lg">
+              <div className="flex items-center px-4">
+                <AccordionTrigger className="px-0 hover:no-underline flex-1">
+                  <div className="flex items-center gap-2">
+                    <Inbox className="w-4 h-4 text-cyan-500" />
+                    <span>Solicitudes</span>
+                    <Badge variant="secondary" className="ml-2">{(config.solicitudDefinitions || []).length}</Badge>
+                  </div>
+                </AccordionTrigger>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Solicitudes</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Solicitudes que otros personajes pueden hacerte.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Configura qué te pueden pedir y qué requisitos deben cumplirse.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs">Header del bloque (recibidas)</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Titulo que aparece antes de la lista de solicitudes recibidas en el prompt.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input
+                    value={config.blockHeaders.solicitudesRecibidas || '[SOLICITUDES RECIBIDAS]'}
+                    onChange={(e) => updateConfig({
+                      blockHeaders: { ...config.blockHeaders, solicitudesRecibidas: e.target.value }
+                    })}
+                    placeholder="[SOLICITUDES RECIBIDAS]"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-2">
+                  {(config.solicitudDefinitions || []).map((solicitud, index) => (
+                    <SolicitudDefinitionEditor
+                      key={solicitud.id}
+                      solicitud={solicitud}
+                      index={index}
+                      availableAttributes={config.attributes}
+                      onChange={updateSolicitudDefinition}
+                      onDelete={deleteSolicitudDefinition}
+                    />
+                  ))}
+                  <Button variant="outline" size="sm" onClick={addSolicitudDefinition} className="w-full">
+                    <Plus className="w-4 h-4 mr-2" /> Agregar Solicitud
+                  </Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             {/* Invitations Section */}
             <AccordionItem value="invitations" className="border rounded-lg">
               <div className="flex items-center px-4">
                 <AccordionTrigger className="px-0 hover:no-underline flex-1">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-rose-500" />
-                    <span>Invitaciones</span>
+                    <span>Peticiones</span>
                     <Badge variant="secondary" className="ml-2">{config.invitations.length}</Badge>
                   </div>
                 </AccordionTrigger>
@@ -1747,12 +2325,12 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                   </PopoverTrigger>
                   <PopoverContent className="w-72">
                     <div className="space-y-2">
-                      <h4 className="font-medium text-sm">Invitaciones</h4>
+                      <h4 className="font-medium text-sm">Peticiones</h4>
                       <p className="text-xs text-muted-foreground">
-                        Formas en que el personaje puede invitar al usuario a participar en la narrativa.
+                        Solicitudes que este personaje puede hacer a otros personajes.
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Ejemplos: "Invitar a acercarse", "Pedir ayuda", "Ofrecer algo"
+                        Al activarse, se envia la solicitud al personaje objetivo.
                       </p>
                     </div>
                   </PopoverContent>
@@ -1767,7 +2345,7 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                         <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        <p>Título que aparece antes de la lista de invitaciones en el prompt.</p>
+                        <p>Titulo que aparece antes de la lista de peticiones en el prompt.</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -1776,23 +2354,24 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
                     onChange={(e) => updateConfig({
                       blockHeaders: { ...config.blockHeaders, invitations: e.target.value }
                     })}
-                    placeholder="Invitaciones disponibles:"
+                    placeholder="[PETICIONES DISPONIBLES]"
                     className="h-8"
                   />
                 </div>
                 <div className="space-y-2">
                   {config.invitations.map((invitation, index) => (
-                    <SkillEditor
+                    <InvitationEditor
                       key={invitation.id}
-                      skill={invitation as unknown as SkillDefinition}
+                      invitation={invitation}
                       index={index}
                       availableAttributes={config.attributes}
-                      onChange={(i, updates) => updateInvitation(i, updates as unknown as Partial<InvitationDefinition>)}
+                      allCharacters={allCharacters}
+                      onChange={updateInvitation}
                       onDelete={deleteInvitation}
                     />
                   ))}
                   <Button variant="outline" size="sm" onClick={addInvitation} className="w-full">
-                    <Plus className="w-4 h-4 mr-2" /> Agregar Invitación
+                    <Plus className="w-4 h-4 mr-2" /> Agregar Peticion
                   </Button>
                 </div>
               </AccordionContent>
@@ -1805,9 +2384,10 @@ export function StatsEditor({ statsConfig, onChange }: StatsEditorProps) {
           <p className="font-medium">Uso de keys en el personaje:</p>
           <div className="space-y-1 pl-2">
             <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{vida}}'}</code> → Muestra el valor del atributo</p>
-            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{habilidades}}'}</code> → Lista de habilidades disponibles</p>
+            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{acciones}}'}</code> → Lista de acciones disponibles</p>
             <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{intenciones}}'}</code> → Lista de intenciones disponibles</p>
-            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{invitaciones}}'}</code> → Lista de invitaciones disponibles</p>
+            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{peticiones}}'}</code> → Peticiones que puede hacer este personaje</p>
+            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{solicitudes}}'}</code> → Solicitudes recibidas de otros personajes</p>
           </div>
           <p className="text-xs opacity-75 mt-2">
             Funcionan igual que <code className="bg-muted px-1 rounded">{'{{char}}'}</code> y <code className="bg-muted px-1 rounded">{'{{user}}'}</code> de SillyTavern.

@@ -1,21 +1,10 @@
 // ============================================
 // Quest Module Index
 // ============================================
-
-// Storage functions
-export {
-  getQuestTemplateFiles,
-  loadAllQuestTemplates,
-  loadQuestTemplateById,
-  saveQuestTemplate,
-  deleteQuestTemplate,
-  createNewQuestTemplate,
-  validateQuestTemplate,
-  duplicateQuestTemplate,
-  getQuestTemplatesByPriority,
-  getQuestTemplatesWithPrerequisites,
-  createDefaultQuestTemplate,
-} from './quest-storage';
+//
+// NOTE: Storage functions (quest-storage.ts) are NOT exported here because
+// they use Node.js 'fs' module and can only run on the server.
+// Use the API routes (/api/quest-templates) or the store (questTemplateSlice) instead.
 
 // Detection functions
 export {
@@ -23,6 +12,14 @@ export {
   getActivationKeys,
   getCompletionKeys,
   getObjectiveKeys,
+  
+  // Prefix key helpers
+  generatePrefixKeyVariants,
+  applyPrefixToKeys,
+  getActivationKeysWithPrefix,
+  getCompletionKeysWithPrefix,
+  getObjectiveKeysWithPrefix,
+  getExampleKey,
   
   // Detection
   detectQuestActivations,
@@ -79,10 +76,6 @@ export {
   // Batch execution
   executeAllRewards,
   executeQuestCompletionRewards,
-  
-  // Reward descriptions
-  describeReward,
-  describeRewards,
   
   // Types
   type RewardExecutionContext,

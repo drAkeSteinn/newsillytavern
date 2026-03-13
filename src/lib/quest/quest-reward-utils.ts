@@ -9,6 +9,7 @@ import type {
   QuestReward,
   QuestRewardAttribute,
   QuestRewardTrigger,
+  QuestRewardObjective,
   QuestRewardCondition,
   AttributeAction,
   TriggerCategory,
@@ -82,6 +83,28 @@ export function createTriggerReward(
   }
 
   return reward;
+}
+
+/**
+ * Crea una recompensa de objetivo (completa un objetivo de misión)
+ */
+export function createObjectiveReward(
+  objectiveKey: string,
+  questId?: string,
+  options?: {
+    id?: string;
+    condition?: QuestRewardCondition;
+  }
+): QuestReward {
+  return {
+    id: options?.id || generateId(),
+    type: 'objective',
+    objective: {
+      objectiveKey,
+      questId,
+    },
+    condition: options?.condition,
+  };
 }
 
 // ============================================
@@ -241,6 +264,16 @@ export function validateReward(reward: QuestReward): { valid: boolean; errors: s
     }
   }
 
+  if (reward.type === 'objective') {
+    if (!reward.objective) {
+      errors.push('Objective reward must have objective config');
+    } else {
+      if (!reward.objective.objectiveKey) {
+        errors.push('Objective reward must have objective.objectiveKey');
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -329,6 +362,12 @@ export function describeReward(reward: QuestReward): string {
     return `${icon} ${trig.key} (${getTargetModeLabel(trig.targetMode)})`;
   }
 
+  if (reward.type === 'objective') {
+    const obj = reward.objective;
+    if (!obj) return 'Objetivo inválido';
+    return `🎯 Objetivo: ${obj.objectiveKey}${obj.questId ? ` (${obj.questId})` : ''}`;
+  }
+
   return 'Recompensa desconocida';
 }
 
@@ -353,6 +392,9 @@ export function normalizeReward(reward: QuestReward): QuestReward {
     return reward;
   }
   if (reward.type === 'trigger' && reward.trigger) {
+    return reward;
+  }
+  if (reward.type === 'objective' && reward.objective) {
     return reward;
   }
 
@@ -389,6 +431,17 @@ export function normalizeReward(reward: QuestReward): QuestReward {
         returnToIdleMs: reward.returnToIdleMs || reward.trigger?.returnToIdleMs,
         volume: reward.trigger?.volume,
         transitionDuration: reward.trigger?.transitionDuration,
+      },
+    };
+  }
+
+  // Handle objective type
+  if (reward.type === 'objective') {
+    return {
+      ...reward,
+      objective: {
+        objectiveKey: reward.objective?.objectiveKey || '',
+        questId: reward.objective?.questId,
       },
     };
   }

@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
       llmConfig,
       userName = 'User',
       persona,
-      sessionStats
+      sessionStats,
+      allCharacters, // All characters for peticiones/solicitudes resolution
     } = validation.data;
 
     // Extract lorebooks from body (not validated by validation.ts)
@@ -130,7 +131,8 @@ export async function POST(request: NextRequest) {
       effectiveUserName,
       persona,
       lorebookSection,
-      typedSessionStats
+      typedSessionStats,
+      allCharacters // Pass all characters for peticiones/solicitudes resolution
     );
 
     // Build key resolution context for HUD context and quest sections
@@ -138,6 +140,7 @@ export async function POST(request: NextRequest) {
       characterId: effectiveCharacter.id,
       statsConfig: effectiveCharacter.statsConfig,
       sessionStats: typedSessionStats,
+      allCharacters,
     });
     const keyContext = buildKeyResolutionContext(
       effectiveCharacter,

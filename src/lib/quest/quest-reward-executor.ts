@@ -59,7 +59,7 @@ export interface RewardExecutionContext {
 
 export interface RewardExecutionResult {
   rewardId: string;
-  type: 'attribute' | 'trigger';
+  type: 'attribute' | 'trigger' | 'objective';
   success: boolean;
   key: string;
   value?: string | number;
@@ -67,6 +67,9 @@ export interface RewardExecutionResult {
   error?: string;
   // Para triggers, información adicional
   triggerResults?: TriggerExecutionResult[];
+  // Para objectives, información del objetivo completado
+  objectiveKey?: string;
+  questId?: string;
 }
 
 export interface RewardBatchResult {
@@ -94,7 +97,15 @@ export interface RewardStoreActions {
     value: number | string,
     reason?: 'llm_detection' | 'manual' | 'trigger' | 'initialization'
   ) => void;
-  
+
+  // Quest objective completion (for objective rewards)
+  completeQuestObjective?: (
+    sessionId: string,
+    questId: string,
+    objectiveKey: string,
+    characterId?: string
+  ) => boolean;
+
   // Trigger actions (delegated to unified-trigger-executor)
   applyTriggerForCharacter: (
     characterId: string,
@@ -395,6 +406,87 @@ export function executeTriggerRewardFromQuest(
 }
 
 // ============================================
+// Objective Reward Execution (Action → Quest Objective)
+// ============================================
+
+/**
+ * Execute an objective reward from an Action
+ *
+ * This completes a quest objective when an action is activated.
+ * The objectiveKey should match the completion key of an objective in an active quest.
+ */
+export function executeObjectiveRewardFromAction(
+  reward: QuestReward,
+  context: RewardExecutionContext,
+  storeActions: RewardStoreActions
+): RewardExecutionResult {
+  const { sessionId, characterId } = context;
+
+  try {
+    // Normalize to get objective config
+    const normalized = normalizeReward(reward);
+    const obj = normalized.objective;
+
+    if (!obj || !obj.objectiveKey) {
+      return {
+        rewardId: reward.id,
+        type: 'objective',
+        key: reward.key || 'unknown',
+        success: false,
+        error: 'Invalid objective reward structure - missing objectiveKey',
+      };
+    }
+
+    // Check if the store action is available
+    if (!storeActions.completeQuestObjective) {
+      return {
+        rewardId: reward.id,
+        type: 'objective',
+        key: obj.objectiveKey,
+        success: false,
+        error: 'Quest objective completion not available in this context',
+      };
+    }
+
+    // Execute the objective completion
+    const completed = storeActions.completeQuestObjective(
+      sessionId,
+      obj.questId || '',  // May be empty - will search all active quests
+      obj.objectiveKey,
+      characterId
+    );
+
+    if (completed) {
+      return {
+        rewardId: reward.id,
+        type: 'objective',
+        key: obj.objectiveKey,
+        success: true,
+        message: `Objetivo completado: ${obj.objectiveKey}`,
+        objectiveKey: obj.objectiveKey,
+        questId: obj.questId,
+      };
+    } else {
+      return {
+        rewardId: reward.id,
+        type: 'objective',
+        key: obj.objectiveKey,
+        success: false,
+        message: `No se encontró un objetivo activo con la key: ${obj.objectiveKey}`,
+      };
+    }
+  } catch (error) {
+    return {
+      rewardId: reward.id,
+      type: 'objective',
+      key: reward.key || 'unknown',
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// ============================================
 // Main Execution Functions
 // ============================================
 
@@ -439,10 +531,13 @@ export function executeReward(
   switch (normalized.type) {
     case 'attribute':
       return executeAttributeReward(normalized, context, storeActions);
-      
+
     case 'trigger':
       return executeTriggerRewardFromQuest(normalized, context, storeActions);
-      
+
+    case 'objective':
+      return executeObjectiveRewardFromAction(normalized, context, storeActions);
+
     default:
       return {
         rewardId: reward.id,

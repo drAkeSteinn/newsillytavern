@@ -386,6 +386,16 @@ export function ChatPanel() {
         // Get session stats for attribute values
         const sessionStats = currentSession?.sessionStats;
 
+        // Build allCharacters array including persona as pseudo-character for peticiones/solicitudes
+        const allCharactersWithPersona = [
+          ...characters,
+          ...(activePersona?.statsConfig?.enabled ? [{
+            id: '__user__',
+            name: activePersona.name || 'User',
+            statsConfig: activePersona.statsConfig,
+          }] as CharacterCard[] : []),
+        ];
+
         // Use group streaming endpoint
         const response = await fetch('/api/chat/group-stream', {
           method: 'POST',
@@ -408,7 +418,8 @@ export function ChatPanel() {
             sessionQuests: currentSession?.sessionQuests,  // Pass session quests
             questTemplates,  // Pass quest templates
             questSettings,  // Pass quest settings
-            hudContext: activeHUDContext  // Pass HUD context for prompt injection
+            hudContext: activeHUDContext,  // Pass HUD context for prompt injection
+            allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
           })
         });
 
@@ -523,6 +534,16 @@ export function ChatPanel() {
       const sessionStats = currentSession?.sessionStats;
 
       if (useStreaming) {
+        // Build allCharacters array including persona as pseudo-character for peticiones/solicitudes
+        const allCharactersWithPersona = [
+          ...characters,
+          ...(activePersona?.statsConfig?.enabled ? [{
+            id: '__user__',
+            name: activePersona.name || 'User',
+            statsConfig: activePersona.statsConfig,
+          }] as CharacterCard[] : []),
+        ];
+
         const response = await fetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -542,7 +563,8 @@ export function ChatPanel() {
             questTemplates,  // Pass quest templates
             questSettings,  // Pass quest settings
             hudContext: activeHUDContext,  // Pass HUD context for prompt injection
-            summary: activeSession?.summary  // Pass session summary (single, not array)
+            summary: activeSession?.summary,  // Pass session summary (single, not array)
+            allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
           })
         });
 

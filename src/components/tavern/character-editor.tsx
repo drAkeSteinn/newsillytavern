@@ -88,7 +88,34 @@ const defaultCharacter: Omit<CharacterCard, 'id' | 'createdAt' | 'updatedAt'> = 
 };
 
 export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) {
-  const { addCharacter, updateCharacter, getCharacterById } = useTavernStore();
+  const { addCharacter, updateCharacter, getCharacterById, characters, personas, activePersonaId } = useTavernStore();
+
+  // Get active persona
+  const activePersona = personas.find(p => p.id === activePersonaId);
+
+  // Get all characters except the one being edited (for target selection in invitations)
+  // Also include the active persona if it has solicitudes configured
+  const allCharacters = useMemo(() => {
+    const result = characters
+      .filter(c => c.id !== characterId)
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        solicitudDefinitions: c.statsConfig?.solicitudDefinitions || []
+      }));
+    
+    // Add active persona if it has solicitudes configured
+    if (activePersona?.statsConfig?.enabled && 
+        (activePersona.statsConfig.solicitudDefinitions?.length || 0) > 0) {
+      result.push({
+        id: '__user__',
+        name: activePersona.name || 'Usuario',
+        solicitudDefinitions: activePersona.statsConfig.solicitudDefinitions || []
+      });
+    }
+    
+    return result;
+  }, [characters, characterId, activePersona]);
 
   // Initialize character data based on characterId
   const getInitialCharacter = () => {
@@ -938,6 +965,7 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
               <StatsEditor
                 statsConfig={character.statsConfig}
                 onChange={(statsConfig) => setCharacter(prev => ({ ...prev, statsConfig }))}
+                allCharacters={allCharacters}
               />
             </TabsContent>
 

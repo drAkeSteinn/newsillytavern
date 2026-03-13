@@ -27,6 +27,7 @@ import type {
   QuestValueCondition,
   QuestNumberOperator,
   QuestTextOperator,
+  QuestSettings,
 } from '@/types';
 
 // ============================================
@@ -140,6 +141,152 @@ export function getObjectiveKeys(objective: QuestObjectiveTemplate): string[] {
   }
   
   return allKeys;
+}
+
+// ============================================
+// Prefix + Key Variant Generation
+// ============================================
+
+/**
+ * Genera todas las variantes de combinación prefijo + key
+ * 
+ * El sistema detecta múltiples formatos automáticamente:
+ * - "Prefijo:key" (dos puntos sin espacio)
+ * - "Prefijo: key" (dos puntos con espacio)
+ * - "Prefijo=key" (igual sin espacio)
+ * - "Prefijo = key" (igual con espacio)
+ * - "Prefijo key" (solo espacio)
+ * - "Prefijo_key" (guión bajo)
+ * 
+ * Ejemplo:
+ * prefix: "Objetivo", key: "conseguir_madera"
+ * Genera: ["Objetivo:conseguir_madera", "Objetivo: conseguir_madera", 
+ *          "Objetivo=conseguir_madera", "Objetivo = conseguir_madera",
+ *          "Objetivo conseguir_madera", "Objetivo_conseguir_madera"]
+ */
+export function generatePrefixKeyVariants(prefix: string, key: string): string[] {
+  if (!prefix || prefix.trim() === '') {
+    // Sin prefijo, retornar solo la key
+    return [key];
+  }
+  
+  const normalizedPrefix = prefix.trim();
+  const normalizedKey = key.trim();
+  
+  const variants: string[] = [];
+  
+  // Separadores a probar (con y sin espacios)
+  const separators = [
+    ':',      // Dos puntos
+    ': ',     // Dos puntos + espacio
+    '=',      // Igual
+    ' = ',    // Igual con espacios
+    ' ',      // Solo espacio
+    '_',      // Guión bajo
+  ];
+  
+  for (const sep of separators) {
+    variants.push(`${normalizedPrefix}${sep}${normalizedKey}`);
+  }
+  
+  // También agregar variantes con key con espacios (guiones bajos -> espacios)
+  if (normalizedKey.includes('_')) {
+    const keyWithSpaces = normalizedKey.replace(/_/g, ' ');
+    for (const sep of separators) {
+      if (sep !== ' ' && sep !== '_') { // Evitar duplicados
+        variants.push(`${normalizedPrefix}${sep}${keyWithSpaces}`);
+      }
+    }
+    // Variante solo con espacio
+    variants.push(`${normalizedPrefix} ${keyWithSpaces}`);
+  }
+  
+  return variants;
+}
+
+/**
+ * Aplica prefijo a todas las keys de una lista
+ * Retorna una lista expandida con todas las variantes
+ */
+export function applyPrefixToKeys(
+  keys: string[],
+  prefix?: string
+): string[] {
+  if (!prefix || prefix.trim() === '') {
+    return keys;
+  }
+  
+  const expandedKeys: string[] = [];
+  
+  for (const key of keys) {
+    const variants = generatePrefixKeyVariants(prefix, key);
+    expandedKeys.push(...variants);
+  }
+  
+  return expandedKeys;
+}
+
+/**
+ * Obtiene las keys de activación con prefijo aplicado
+ */
+export function getActivationKeysWithPrefix(
+  activation: QuestActivationConfig,
+  questSettings?: QuestSettings
+): string[] {
+  // Obtener keys base
+  const baseKeys = getActivationKeys(activation);
+  
+  // Aplicar prefijo si está configurado
+  const prefix = questSettings?.questActivationPrefix;
+  if (prefix && prefix.trim() !== '') {
+    return applyPrefixToKeys(baseKeys, prefix);
+  }
+  
+  return baseKeys;
+}
+
+/**
+ * Obtiene las keys de completado de quest con prefijo aplicado
+ */
+export function getCompletionKeysWithPrefix(
+  completion: QuestCompletionConfig,
+  questSettings?: QuestSettings
+): string[] {
+  const baseKeys = getCompletionKeys(completion);
+  
+  const prefix = questSettings?.questCompletionPrefix;
+  if (prefix && prefix.trim() !== '') {
+    return applyPrefixToKeys(baseKeys, prefix);
+  }
+  
+  return baseKeys;
+}
+
+/**
+ * Obtiene las keys de completado de objetivo con prefijo aplicado
+ */
+export function getObjectiveKeysWithPrefix(
+  objective: QuestObjectiveTemplate,
+  questSettings?: QuestSettings
+): string[] {
+  const baseKeys = getObjectiveKeys(objective);
+  
+  const prefix = questSettings?.objectiveCompletionPrefix;
+  if (prefix && prefix.trim() !== '') {
+    return applyPrefixToKeys(baseKeys, prefix);
+  }
+  
+  return baseKeys;
+}
+
+/**
+ * Genera una key de ejemplo para mostrar en UI
+ * Retorna la primera variante (la más común: prefix:key)
+ */
+export function getExampleKey(prefix?: string, key?: string): string {
+  if (!key) return '';
+  if (!prefix || prefix.trim() === '') return key;
+  return `${prefix.trim()}:${key.trim()}`;
 }
 
 // ============================================
@@ -378,11 +525,13 @@ export function checkValueCondition(
  * Detect quest activations in text
  * 
  * Checks if any 'available' quest's activation keys are present
+ * Supports prefix-based key detection
  */
 export function detectQuestActivations(
   text: string,
   templates: QuestTemplate[],
-  sessionQuests: SessionQuestInstance[]
+  sessionQuests: SessionQuestInstance[],
+  questSettings?: QuestSettings
 ): QuestActivationDetection[] {
   const detections: QuestActivationDetection[] = [];
   
@@ -395,6 +544,7 @@ export function detectQuestActivations(
     textPreview: text.substring(0, 100) + '...',
     availableQuestTemplateIds,
     templatesCount: templates.length,
+    hasPrefix: !!questSettings?.questActivationPrefix,
   });
   
   for (const template of templates) {
@@ -410,7 +560,8 @@ export function detectQuestActivations(
       continue;
     }
     
-    const keys = getActivationKeys(template.activation);
+    // Usar función con soporte de prefijo
+    const keys = getActivationKeysWithPrefix(template.activation, questSettings);
     if (keys.length === 0) {
       console.log(`[QuestDetector] Template "${template.name}" has no activation keys, skipping`);
       continue;
@@ -447,11 +598,13 @@ export function detectQuestActivations(
  * 
  * Checks if any 'active' quest's objective keys are present
  * Now supports value condition checking (number/text comparison)
+ * Supports prefix-based key detection
  */
 export function detectObjectiveProgress(
   text: string,
   templates: QuestTemplate[],
-  sessionQuests: SessionQuestInstance[]
+  sessionQuests: SessionQuestInstance[],
+  questSettings?: QuestSettings
 ): QuestObjectiveDetection[] {
   const detections: QuestObjectiveDetection[] = [];
   
@@ -461,6 +614,7 @@ export function detectObjectiveProgress(
   console.log('[QuestDetector] detectObjectiveProgress:', {
     textPreview: text.substring(0, 100) + '...',
     activeQuestsCount: activeQuests.length,
+    hasPrefix: !!questSettings?.objectiveCompletionPrefix,
   });
   
   for (const sessionQuest of activeQuests) {
@@ -475,7 +629,8 @@ export function detectObjectiveProgress(
       // Skip if already completed
       if (sessionObj?.isCompleted) continue;
       
-      const keys = getObjectiveKeys(objective);
+      // Usar función con soporte de prefijo
+      const keys = getObjectiveKeysWithPrefix(objective, questSettings);
       if (keys.length === 0) continue;
       
       // Check value condition if specified
@@ -521,22 +676,31 @@ export function detectObjectiveProgress(
  * 
  * Checks if any 'active' quest's completion keys are present
  * Now supports value condition checking (number/text comparison)
+ * Supports prefix-based key detection
  */
 export function detectQuestCompletions(
   text: string,
   templates: QuestTemplate[],
-  sessionQuests: SessionQuestInstance[]
+  sessionQuests: SessionQuestInstance[],
+  questSettings?: QuestSettings
 ): QuestCompletionDetection[] {
   const detections: QuestCompletionDetection[] = [];
   
   // Get active quests
   const activeQuests = sessionQuests.filter(q => q.status === 'active');
   
+  console.log('[QuestDetector] detectQuestCompletions:', {
+    textPreview: text.substring(0, 100) + '...',
+    activeQuestsCount: activeQuests.length,
+    hasPrefix: !!questSettings?.questCompletionPrefix,
+  });
+  
   for (const sessionQuest of activeQuests) {
     const template = templates.find(t => t.id === sessionQuest.templateId);
     if (!template) continue;
     
-    const keys = getCompletionKeys(template.completion);
+    // Usar función con soporte de prefijo
+    const keys = getCompletionKeysWithPrefix(template.completion, questSettings);
     if (keys.length === 0) continue;
     
     // Check if valueCondition is specified
@@ -574,15 +738,17 @@ export function detectQuestCompletions(
 
 /**
  * Main detection function - detects all quest events
+ * Supports prefix-based key detection
  */
 export function detectQuestEvents(
   text: string,
   templates: QuestTemplate[],
-  sessionQuests: SessionQuestInstance[]
+  sessionQuests: SessionQuestInstance[],
+  questSettings?: QuestSettings
 ): QuestDetectionResult {
-  const activations = detectQuestActivations(text, templates, sessionQuests);
-  const objectiveProgress = detectObjectiveProgress(text, templates, sessionQuests);
-  const completions = detectQuestCompletions(text, templates, sessionQuests);
+  const activations = detectQuestActivations(text, templates, sessionQuests, questSettings);
+  const objectiveProgress = detectObjectiveProgress(text, templates, sessionQuests, questSettings);
+  const completions = detectQuestCompletions(text, templates, sessionQuests, questSettings);
   
   return {
     activations,

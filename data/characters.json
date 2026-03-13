@@ -23,7 +23,7 @@
     "voice": null,
     "id": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
     "createdAt": "2026-03-01T21:41:38.289Z",
-    "updatedAt": "2026-03-07T17:27:41.871Z",
+    "updatedAt": "2026-03-13T10:31:21.003Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -115,12 +115,34 @@
           "category": "..."
         }
       ],
-      "invitations": [],
+      "invitations": [
+        {
+          "id": "inv-1773386718986",
+          "name": "",
+          "description": "",
+          "key": "",
+          "requirements": [],
+          "objetivo": {
+            "characterId": "611876f7-399e-49a3-a32f-aa847e8f28da"
+          }
+        }
+      ],
       "blockHeaders": {
         "skills": "Habilidades disponibles:",
         "intentions": "Intenciones disponibles:",
         "invitations": "Invitaciones disponibles:"
-      }
+      },
+      "solicitudDefinitions": [
+        {
+          "id": "sol-1773397776153",
+          "name": "Analisis medico",
+          "peticionKey": "analisis_medico",
+          "solicitudKey": "pedir_analisis",
+          "peticionDescription": "Solicitar a {{char}} un analisis médico",
+          "solicitudDescription": "Te solicitó un analisis medico",
+          "requirements": []
+        }
+      ]
     },
     "hudTemplateId": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da",
     "questTemplateIds": [
@@ -320,7 +342,7 @@
     "voice": null,
     "id": "611876f7-399e-49a3-a32f-aa847e8f28da",
     "createdAt": "2026-03-01T21:41:47.188Z",
-    "updatedAt": "2026-03-06T19:35:55.438Z",
+    "updatedAt": "2026-03-13T07:31:56.223Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -349,7 +371,18 @@
       ],
       "skills": [],
       "intentions": [],
-      "invitations": [],
+      "invitations": [
+        {
+          "id": "inv-1773387107741",
+          "name": "",
+          "description": "",
+          "key": "",
+          "requirements": [],
+          "objetivo": {
+            "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a"
+          }
+        }
+      ],
       "blockHeaders": {
         "skills": "Habilidades disponibles:",
         "intentions": "Intenciones disponibles:",

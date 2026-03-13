@@ -339,7 +339,8 @@ export function buildSystemPrompt(
   userName: string = 'User',
   persona?: Persona,
   lorebookSection?: PromptSection | null,
-  sessionStats?: SessionStats
+  sessionStats?: SessionStats,
+  allCharacters?: CharacterCard[]
 ): { prompt: string; sections: PromptSection[] } {
   const sections: PromptSection[] = [];
 
@@ -348,6 +349,7 @@ export function buildSystemPrompt(
     characterId: character.id,
     statsConfig: character.statsConfig,
     sessionStats,
+    allCharacters,
   });
 
   // Build unified key resolution context
@@ -683,7 +685,8 @@ export function buildGroupSystemPrompt(
   persona?: Persona,
   lorebookSection?: PromptSection | null,
   sessionStats?: SessionStats,
-  postHistoryInstructions?: string
+  postHistoryInstructions?: string,
+  allCharacters?: CharacterCard[]
 ): { prompt: string; sections: PromptSection[] } {
   const sections: PromptSection[] = [];
 
@@ -692,6 +695,7 @@ export function buildGroupSystemPrompt(
     characterId: character.id,
     statsConfig: character.statsConfig,
     sessionStats,
+    allCharacters,
   });
 
   // Build unified key resolution context
@@ -923,13 +927,15 @@ export function processCharacter(
   character: CharacterCard,
   userName: string,
   persona?: Persona,
-  sessionStats?: SessionStats
+  sessionStats?: SessionStats,
+  allCharacters?: CharacterCard[]
 ): CharacterCard {
   // Resolve stats for this character
   const resolvedStats = resolveStats({
     characterId: character.id,
     statsConfig: character.statsConfig,
     sessionStats,
+    allCharacters,
   });
 
   // Build key resolution context

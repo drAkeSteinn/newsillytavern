@@ -20,6 +20,7 @@ export interface ValidatedStreamRequest {
   contextConfig?: unknown;
   sessionStats?: unknown;  // Session stats for attribute values
   hudContext?: unknown;     // HUD context for prompt injection
+  allCharacters?: unknown[]; // All characters for peticiones/solicitudes resolution
 }
 
 export interface ValidatedGroupStreamRequest {
@@ -120,6 +121,7 @@ export function validateStreamRequest(data: unknown): ValidationResult<Validated
     if (data.contextConfig) result.contextConfig = data.contextConfig;
     if (data.sessionStats) result.sessionStats = data.sessionStats;
     if (data.hudContext) result.hudContext = data.hudContext;
+    if (isArray(data.allCharacters)) result.allCharacters = data.allCharacters;
 
     return { success: true, data: result };
   } catch (error) {

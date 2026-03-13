@@ -728,6 +728,8 @@ export interface Persona {
   description: string;  // The user's personality/description
   avatar: string;       // User's avatar image
   isActive: boolean;    // Currently selected persona
+  // Stats system for user (peticiones/solicitudes)
+  statsConfig?: CharacterStatsConfig;
   createdAt: string;
   updatedAt: string;
 }
@@ -1778,31 +1780,35 @@ export interface QuestObjectiveTemplate {
   id: string;
   description: string;
   type: QuestObjectiveType;
-  
+
   // Keys para detectar completado (sistema unificado como HUD)
   completion: {
     key: string;              // Key principal: "resistencia", "HP", etc.
     keys?: string[];          // Keys alternativas: ["Resistance", "hp"]
     caseSensitive: boolean;
-    
+
     // Condición de valor (opcional)
     // Si se especifica, detecta el valor DESPUÉS de la key
     // Formatos detectados: "key: valor", "key=valor", "key valor"
     valueCondition?: QuestValueCondition;
   };
-  
+
+  // Descripción de completado - instrucciones claras para el LLM
+  // sobre cuándo considerar este objetivo como completado
+  completionDescription?: string;
+
   // Objetivo (legacy - para conteo simple)
   target?: string;            // Qué buscar/contar
   targetCount: number;        // Cuántos necesita (default: 1)
   isOptional: boolean;        // Si es opcional, no impide completar la misión
-  
+
   // Recompensas al completar este objetivo (se ejecutan para el personaje que responde)
   rewards?: QuestReward[];
-  
+
   // Filtro de personajes (opcional)
   // Si se especifica, solo los personajes que coinciden ven este objetivo
   characterFilter?: QuestCharacterFilter;
-  
+
   // Metadata opcional
   metadata?: Record<string, unknown>;
 }
@@ -1818,7 +1824,7 @@ export interface QuestObjectiveTemplate {
 // Los triggers se ejecutan a través del UnifiedTriggerExecutor,
 // que simula que el TokenDetector encontró la key.
 
-export type QuestRewardType = 'attribute' | 'trigger';
+export type QuestRewardType = 'attribute' | 'trigger' | 'objective';
 
 // Target mode para grupos
 export type TriggerTargetMode = 'self' | 'all' | 'target';
@@ -1849,29 +1855,38 @@ export interface QuestRewardTrigger {
   key: string;                // Keyword del trigger: "feliz", "victory", "forest"
   targetMode: TriggerTargetMode; // 'self' | 'all' | 'target' - quién recibe el trigger
   targetCharacterId?: string; // ID del personaje objetivo cuando targetMode es 'target'
-  
+
   // Para sprites: tiempo antes de volver a idle (ms, 0 = no volver)
   returnToIdleMs?: number;
-  
+
   // Para sonidos: volumen (0-1)
   volume?: number;
-  
+
   // Para backgrounds: transición
   transitionDuration?: number;
 }
 
+// Configuración de objetivo para recompensa (completa un objetivo de misión)
+export interface QuestRewardObjective {
+  objectiveKey: string;       // Key del objetivo a completar: "troncos_abedul"
+  questId?: string;          // ID de la misión (opcional, para validar)
+}
+
 export interface QuestReward {
   id: string;
-  
-  // Tipo de recompensa: attribute o trigger
+
+  // Tipo de recompensa: attribute, trigger u objective
   type: QuestRewardType;
-  
+
   // Para type: 'attribute' - modificación de atributos
   attribute?: QuestRewardAttribute;
-  
+
   // Para type: 'trigger' - activación de triggers
   trigger?: QuestRewardTrigger;
-  
+
+  // Para type: 'objective' - completa un objetivo de misión
+  objective?: QuestRewardObjective;
+
   // Condiciones opcionales para ejecutar el reward
   condition?: QuestRewardCondition;
   
@@ -2041,6 +2056,14 @@ export interface QuestSettings {
   autoQuestEnabled: boolean;      // Enable auto quest activation
   autoQuestInterval: number;      // Activate quest every X turns/messages
   autoQuestMode: 'random' | 'list'; // Selection mode: random or by list order
+  
+  // Key Prefixes System
+  // Los prefijos se combinan con las keys para mayor flexibilidad
+  // Ejemplo: prefix "Misión" + key "rescate" = detecta "Misión:rescate", "Misión: rescate", etc.
+  // El sistema genera variantes automáticamente (con :, =, espacio, etc.)
+  questActivationPrefix?: string;      // Prefijo para activar misiones (ej: "Misión")
+  questCompletionPrefix?: string;      // Prefijo para completar misiones (ej: "Completado")
+  objectiveCompletionPrefix?: string;  // Prefijo para completar objetivos (ej: "Objetivo")
 }
 
 export const DEFAULT_QUEST_SETTINGS: QuestSettings = {
@@ -2059,6 +2082,10 @@ Instrucciones: Usa la información de las misiones activas para contextualizar t
   autoQuestEnabled: false,
   autoQuestInterval: 5,
   autoQuestMode: 'random',
+  // Key Prefixes defaults (vacío = sin prefijo, comportamiento actual)
+  questActivationPrefix: '',
+  questCompletionPrefix: '',
+  objectiveCompletionPrefix: '',
 };
 
 // ============================================
@@ -2732,22 +2759,26 @@ export interface AttributeDefinition {
   hudUnit?: string;          // Unit to show after value: "%", "pts", etc.
 }
 
-// Skill definition (stored in CharacterCard)
+// Skill/Action type - determines when the action can be used
+export type ActionType = 'preparacion' | 'ejecucion';
+
+// Skill definition (stored in CharacterCard) - also called "Acciones" in UI
 export interface SkillDefinition {
   id: string;
   name: string;              // "Golpe furioso"
   description: string;       // "Golpe con gran velocidad..."
   key: string;               // Template key: "golpe_furioso" → {{golpe_furioso}}
+  type?: ActionType;         // "preparacion" | "ejecucion" - determines action type
   requirements: StatRequirement[];
   category?: string;         // "combate", "magia", "social"
-  
+
   // Activation costs - modify attributes when skill is used
   activationCosts?: ActivationCost[];
-  
+
   // Activation rewards - triggers to execute when skill is activated
   // Only trigger type rewards are used (attributes are handled by activationCosts)
   activationRewards?: QuestReward[];
-  
+
   // Activation key - detected by post-LLM system to trigger skill execution
   // When detected in LLM response, applies activationCosts automatically
   activationKey?: string;    // Primary activation key: "golpe", "hab1"
@@ -2758,7 +2789,7 @@ export interface SkillDefinition {
   // - key=value  (golpe=activo, hab=1)
   // - key_suffix (golpe_1, habilidad_x)
   // - |key|      (pipe delimiters)
-  
+
   // Formato de inyección personalizado
   injectFormat?: string;     // Default: "- {name}: {description}"
 }
@@ -2776,36 +2807,75 @@ export interface IntentionDefinition {
   injectFormat?: string;     // Default: numbered format with name, description, and key
 }
 
-// Invitation definition (stored in CharacterCard)
+// SolicitudDefinition - Solicitudes que este personaje puede recibir (configurables)
+// Se configuran en la pestaña Stats → Solicitudes
+export interface SolicitudDefinition {
+  id: string;
+  name: string;                    // "Proporcionar madera"
+  peticionKey: string;             // Key que activa esta solicitud (quien la solicita escribe esto)
+  solicitudKey: string;            // Key para completar la solicitud (quien la recibe escribe esto)
+  peticionDescription: string;     // Descripción que ve quien hace la petición
+  solicitudDescription: string;    // Descripción que ve quien recibe la solicitud
+  requirements: StatRequirement[]; // Requisitos para que la solicitud esté disponible
+}
+
+// Invitation/Peticion definition (stored in CharacterCard)
+// Renamed in UI to "Peticiones" - requests this character sends to others
+// La key y descripción se obtienen de la SolicitudDefinition del objetivo
 export interface InvitationDefinition {
   id: string;
-  name: string;              // "Invitar a acercarse"
-  description: string;
-  key: string;               // Template key
-  requirements: StatRequirement[];
-  triggers?: string[];       // Contexts where this invitation is appropriate
+  name: string;              // Nombre interno para identificar esta petición
+  requirements: StatRequirement[];  // Requisitos para que esta petición esté disponible
+
+  // Objetivo - which character to send the petition to
+  objetivo?: {
+    characterId: string;     // Target character ID
+    solicitudId: string;     // ID de la SolicitudDefinition del personaje objetivo
+  };
 
   // Formato de inyección personalizado
   injectFormat?: string;     // Default: numbered format with name, description, and key
 }
 
+// Solicitud definition - requests received from other characters
+// Stored in session state, not in character config
+export interface SolicitudInstance {
+  id: string;                // Unique instance ID
+  key: string;               // Activation key for this solicitud
+  fromCharacterId: string;   // Character who sent the petition
+  fromCharacterName: string; // Display name of sender
+  description: string;       // What is being requested
+  status: 'pending' | 'completed';  // Current status
+  createdAt: number;         // Timestamp when created
+  completedAt?: number;      // Timestamp when completed
+}
+
+// Session state for active solicitudes
+export interface SessionSolicitudes {
+  // Active solicitudes for each character (requests they received)
+  characterSolicitudes: Record<string, SolicitudInstance[]>;
+  lastModified: number;
+}
+
 // Block headers configuration (customizable headers for injected content)
 export interface StatsBlockHeaders {
-  skills: string;            // Default: "Habilidades disponibles:"
+  skills: string;            // Default: "[ACCIONES DISPONIBLES]" - renamed from Habilidades
   intentions: string;        // Default: "Intenciones disponibles:"
-  invitations: string;       // Default: "Invitaciones disponibles:"
+  invitations: string;       // Default: "[PETICIONES DISPONIBLES]" - renamed from Invitaciones
+  solicitudesRecibidas: string;  // Default: "[SOLICITUDES RECIBIDAS]" - solicitudes recibidas de otros
 }
 
 // Character stats configuration (stored in CharacterCard.statsConfig)
 export interface CharacterStatsConfig {
   enabled: boolean;          // Stats system active for this character
-  
+
   // Definitions
   attributes: AttributeDefinition[];
   skills: SkillDefinition[];
   intentions: IntentionDefinition[];
-  invitations: InvitationDefinition[];
-  
+  invitations: InvitationDefinition[];  // Peticiones - requests this character sends
+  solicitudDefinitions: SolicitudDefinition[];  // Solicitudes - requests this character can receive
+
   // Customizable block headers
   blockHeaders: StatsBlockHeaders;
 }
@@ -2837,7 +2907,10 @@ export interface CharacterSessionStats {
 export interface SessionStats {
   // Stats per character (supports group chats)
   characterStats: Record<string, CharacterSessionStats>;
-  
+
+  // Active solicitudes (requests received from other characters)
+  solicitudes: SessionSolicitudes;
+
   // Metadata
   initialized: boolean;      // Whether stats were initialized from defaults
   lastModified: number;      // Global timestamp of last change
@@ -2859,23 +2932,26 @@ export interface StatsTriggerHit {
 export interface ResolvedStats {
   // Resolved attribute values (key → formatted string)
   attributes: Record<string, string>;
-  
+
   // Available items after requirement evaluation
   availableSkills: SkillDefinition[];
   availableIntentions: IntentionDefinition[];
-  availableInvitations: InvitationDefinition[];
-  
+  availableInvitations: InvitationDefinition[];  // Peticiones - outgoing requests (con datos de la solicitud del objetivo)
+  availableSolicitudes: SolicitudInstance[];      // Solicitudes - incoming requests
+
   // Formatted block strings (empty string if no items available)
   skillsBlock: string;
   intentionsBlock: string;
-  invitationsBlock: string;
+  invitationsBlock: string;  // Peticiones block (PETICIONES POSIBLES)
+  solicitudesBlock: string;  // Solicitudes block (SOLICITUDES RECIBIDAS)
 }
 
 // Default stats block headers
 export const DEFAULT_STATS_BLOCK_HEADERS: StatsBlockHeaders = {
-  skills: 'Habilidades disponibles:',
+  skills: '[ACCIONES DISPONIBLES]',
   intentions: 'Intenciones disponibles:',
-  invitations: 'Invitaciones disponibles:',
+  invitations: '[PETICIONES POSIBLES]',
+  solicitudesRecibidas: '[SOLICITUDES RECIBIDAS]',
 };
 
 // Default empty stats config
@@ -2885,6 +2961,7 @@ export const DEFAULT_STATS_CONFIG: CharacterStatsConfig = {
   skills: [],
   intentions: [],
   invitations: [],
+  solicitudDefinitions: [],
   blockHeaders: DEFAULT_STATS_BLOCK_HEADERS,
 };
 

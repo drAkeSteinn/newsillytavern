@@ -25,7 +25,14 @@ import type {
   AttributeDefinition,
   SessionStats,
   StatsTriggerHit,
+  CharacterCard,
 } from '@/types';
+import {
+  processSolicitudes,
+  createSolicitudDetectionState,
+  type SolicitudProcessingResult,
+  type SolicitudStoreActions,
+} from './solicitud-executor';
 
 // ============================================
 // Types
@@ -398,12 +405,16 @@ export function createStatsDetectionState(): StatsDetectionState {
  */
 export interface StatsTriggerContext {
   characterId: string;
+  characterName: string;
   fullText: string;
   isStreaming: boolean;
   messageKey: string;
   timestamp: number;
   statsConfig: CharacterStatsConfig | undefined;
   sessionStats: SessionStats | undefined;
+  // For solicitud processing
+  sessionId: string;
+  allCharacters: CharacterCard[];
 }
 
 /**
@@ -413,6 +424,8 @@ export interface StatsHandlerResult {
   matched: boolean;
   hits: StatsTriggerHit[];
   detections: AttributeDetection[];
+  // Solicitud processing results
+  solicitudResult?: SolicitudProcessingResult;
 }
 
 /**
@@ -421,6 +434,7 @@ export interface StatsHandlerResult {
 export function createStatsHandlerState() {
   return {
     detectionStates: new Map<string, StatsDetectionState>(),
+    solicitudStates: new Map<string, ReturnType<typeof createSolicitudDetectionState>>(),
   };
 }
 
@@ -429,9 +443,13 @@ export function createStatsHandlerState() {
  */
 export function checkStatsTriggers(
   context: StatsTriggerContext,
-  handlerState: { detectionStates: Map<string, StatsDetectionState> }
+  handlerState: { 
+    detectionStates: Map<string, StatsDetectionState>;
+    solicitudStates: Map<string, ReturnType<typeof createSolicitudDetectionState>>;
+  },
+  storeActions?: SolicitudStoreActions
 ): StatsHandlerResult {
-  const { characterId, fullText, statsConfig, sessionStats } = context;
+  const { characterId, characterName, fullText, statsConfig, sessionStats } = context;
   
   if (!statsConfig?.enabled) {
     return { matched: false, hits: [], detections: [] };
@@ -447,7 +465,7 @@ export function checkStatsTriggers(
   const charStats = sessionStats?.characterStats?.[characterId];
   const currentValues = charStats?.attributeValues;
   
-  // Process new text
+  // Process new text for attribute changes
   const newDetections = state.processNewText(
     fullText,
     fullText,
@@ -455,17 +473,46 @@ export function checkStatsTriggers(
     currentValues
   );
   
-  if (newDetections.length === 0) {
-    return { matched: false, hits: [], detections: [] };
+  // Process solicitudes (peticiones activations and solicitud completions)
+  let solicitudResult: SolicitudProcessingResult | undefined;
+  
+  if (storeActions && context.sessionId) {
+    // Get or create solicitud state for this character
+    let solState = handlerState.solicitudStates.get(characterId);
+    if (!solState) {
+      solState = createSolicitudDetectionState();
+      handlerState.solicitudStates.set(characterId, solState);
+    }
+    
+    solicitudResult = solState.processNewText(
+      fullText,
+      {
+        sessionId: context.sessionId,
+        characterId,
+        characterName,
+        statsConfig,
+        sessionStats,
+        allCharacters: context.allCharacters,
+      },
+      storeActions
+    );
+  }
+  
+  const hasDetections = newDetections.length > 0;
+  const hasSolicitudChanges = solicitudResult?.hasChanges || false;
+  
+  if (!hasDetections && !hasSolicitudChanges) {
+    return { matched: false, hits: [], detections: [], solicitudResult };
   }
   
   // Convert to trigger hits
   const hits = detectionsToTriggerHits(newDetections, characterId);
   
   return {
-    matched: true,
+    matched: hasDetections || hasSolicitudChanges,
     hits,
     detections: newDetections,
+    solicitudResult,
   };
 }
 
@@ -473,11 +520,19 @@ export function checkStatsTriggers(
  * Reset stats handler state for new message
  */
 export function resetStatsHandlerState(
-  handlerState: { detectionStates: Map<string, StatsDetectionState> },
+  handlerState: { 
+    detectionStates: Map<string, StatsDetectionState>;
+    solicitudStates: Map<string, ReturnType<typeof createSolicitudDetectionState>>;
+  },
   characterId: string
 ): void {
   const state = handlerState.detectionStates.get(characterId);
   if (state) {
     state.reset();
+  }
+  
+  const solState = handlerState.solicitudStates.get(characterId);
+  if (solState) {
+    solState.reset();
   }
 }

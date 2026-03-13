@@ -19,6 +19,7 @@ import {
   checkQuestTriggersInText,
   createQuestDetectionState,
   resetQuestDetectorState,
+  getExampleKey,
   type QuestDetectionResult,
   type QuestDetectionState,
 } from '@/lib/quest/quest-detector';
@@ -402,7 +403,8 @@ export function filterObjectivesForCharacter(
 function buildNarratorQuestSection(
   templates: QuestTemplate[],
   sessionQuests: SessionQuestInstance[],
-  templateStr: string
+  templateStr: string,
+  questSettings?: QuestSettings
 ): string {
   // Get active and available quests
   const activeQuests = sessionQuests.filter(q => q.status === 'active');
@@ -436,11 +438,11 @@ function buildNarratorQuestSection(
       availableLines.push(`  ${index + 1}) ${questTemplate.name}`);
       availableLines.push(`     - descripción: ${questTemplate.description}`);
 
-      // Add activation key for available quests
+      // Add activation key for available quests with prefix
       const activation = questTemplate.activation || {};
-      const activationKey = activation.key ||
-        (activation.keys && activation.keys[0]);
-      if (activationKey) {
+      const baseKey = activation.key || (activation.keys && activation.keys[0]);
+      if (baseKey) {
+        const activationKey = getExampleKey(questSettings?.questActivationPrefix, baseKey);
         availableLines.push(`     - key de activación: ${activationKey}`);
       }
     });
@@ -465,18 +467,14 @@ function buildNarratorQuestSection(
 /**
  * Build quest section for prompt
  *
- * REGULAR CHARACTER FORMAT:
- * MISIONES ACTIVAS
- * - Misión: nombre
- *   Descripción: descripción
- *   OBJETIVOS PRINCIPALES (pendientes):
- *   1) descripción del objetivo
- *      - key de activación: objective_key
- *   2) otro objetivo
- *      - key de activación: another_key
- *   OBJETIVOS OPCIONALES (pendientes):
- *   1) objetivo opcional
- *      - key de activación: optional_key
+ * NEW YAML-LIKE FORMAT:
+ * [MISIONES ACTIVAS]
+ * - key: madera_de_calidad
+ *   descripcion: Se requiere conseguir madera de abedul para reconstruir la aldea.
+ *   objetivos_principales_pendientes:
+ *     - key: troncos_abedul
+ *       descripcion: Conseguir, cortar o entregar troncos de abedul utilizables.
+ *       se_completa_cuando: Leny confirma claramente que ya obtuvo, cortó o entregó troncos de abedul.
  *
  * NARRATOR FORMAT:
  * [MISIONES ACTIVAS]
@@ -499,13 +497,14 @@ export function buildQuestPromptSection(
   sessionQuests: SessionQuestInstance[],
   templateStr: string,
   characterId?: string,
-  isForNarrator: boolean = false
+  isForNarrator: boolean = false,
+  questSettings?: QuestSettings
 ): string {
-  console.log(`[QuestHandler] buildQuestPromptSection called with characterId: ${characterId}, isForNarrator: ${isForNarrator}`);
+  console.log(`[QuestHandler] buildQuestPromptSection called with characterId: ${characterId}, isForNarrator: ${isForNarrator}, hasPrefix: ${!!questSettings?.objectiveCompletionPrefix}`);
 
   // For narrator, show different format with both active and available quests
   if (isForNarrator) {
-    return buildNarratorQuestSection(templates, sessionQuests, templateStr);
+    return buildNarratorQuestSection(templates, sessionQuests, templateStr, questSettings);
   }
 
   // Regular character format - only active quests
@@ -518,87 +517,117 @@ export function buildQuestPromptSection(
   const questList = activeQuests.map(q => {
     const questTemplate = templates.find(t => t.id === q.templateId);
     if (!questTemplate) return '';
-    
+
     const objectives = questTemplate.objectives || [];
     console.log(`[QuestHandler] Processing quest "${questTemplate.name}" with ${objectives.length} objectives`);
-    
+
     // Filter objectives for this character first
     const visibleObjectives = filterObjectivesForCharacter(
       objectives,
       characterId
     );
-    
+
     console.log(`[QuestHandler] Quest "${questTemplate.name}" - visible objectives: ${visibleObjectives.length} of ${objectives.length}`);
-    
+
     // If no objectives are visible for this character, don't show the quest
     if (visibleObjectives.length === 0) return '';
-    
+
     // Separate objectives: pending (not completed) vs optional
-    // Store as objects with key and text
-    const pendingObjectives: { key: string; text: string }[] = [];
-    const optionalObjectives: { key: string; text: string }[] = [];
-    
+    // Store as objects with all needed info
+    const pendingObjectives: {
+      key: string;
+      description: string;
+      completionDescription?: string;
+      progress?: string;
+    }[] = [];
+    const optionalObjectives: {
+      key: string;
+      description: string;
+      completionDescription?: string;
+      progress?: string;
+    }[] = [];
+
     for (const obj of visibleObjectives) {
       const sessionObj = q.objectives?.find(o => o.templateId === obj.id);
       const isCompleted = sessionObj?.isCompleted || false;
-      
+
       // Skip completed objectives - they should not appear
       if (isCompleted) continue;
-      
+
       const currentCount = sessionObj?.currentCount || 0;
-      const progress = obj.targetCount > 1 
-        ? ` (${currentCount}/${obj.targetCount})` 
-        : '';
-      
+      const progress = obj.targetCount > 1
+        ? ` (${currentCount}/${obj.targetCount})`
+        : undefined;
+
       // Get the completion key for this objective
-      const objectiveKey = obj.completion?.key || '';
-      const objectiveText = `${obj.description}${progress}`;
-      
+      // Apply prefix if configured
+      const baseKey = obj.completion?.key || '';
+      const objectiveKey = getExampleKey(questSettings?.objectiveCompletionPrefix, baseKey);
+
+      const objectiveData = {
+        key: objectiveKey,
+        description: obj.description,
+        completionDescription: obj.completionDescription,
+        progress,
+      };
+
       if (obj.isOptional) {
-        optionalObjectives.push({ key: objectiveKey, text: objectiveText });
+        optionalObjectives.push(objectiveData);
       } else {
-        pendingObjectives.push({ key: objectiveKey, text: objectiveText });
+        pendingObjectives.push(objectiveData);
       }
     }
-    
+
     // If all visible objectives are completed, don't show the quest for this character
     if (pendingObjectives.length === 0 && optionalObjectives.length === 0) return '';
-    
-    // Build the quest block
+
+    // Build the quest block in new YAML-like format
+    // Show mission name instead of key for better readability
     let questBlock = `- Misión: ${questTemplate.name}
-  Descripción: ${questTemplate.description}`;
-    
-    // Add pending objectives section (always show if there are any)
-    // Format: numbered list with description and activation key
+  descripcion: ${questTemplate.description}`;
+
+    // Add pending objectives section
+    // Format: YAML-like list with key, descripcion, se_completa_cuando
     if (pendingObjectives.length > 0) {
-      const objectiveLines = pendingObjectives.map((obj, index) => 
-        `  ${index + 1}) ${obj.text}\n     - key de activación: ${obj.key}`
-      ).join('\n');
+      const objectiveLines = pendingObjectives.map(obj => {
+        let line = `    - key: ${obj.key}
+      descripcion: ${obj.description}${obj.progress || ''}`;
+        if (obj.completionDescription) {
+          line += `
+      se_completa_cuando: ${obj.completionDescription}`;
+        }
+        return line;
+      }).join('\n');
       questBlock += `
-  OBJETIVOS PRINCIPALES (pendientes):
+  objetivos_principales_pendientes:
 ${objectiveLines}`;
     }
 
-    // Add optional objectives section only if there are pending optional objectives
-    // Format: numbered list with description and activation key
+    // Add optional objectives section
     if (optionalObjectives.length > 0) {
-      const objectiveLines = optionalObjectives.map((obj, index) => 
-        `  ${index + 1}) ${obj.text}\n     - key de activación: ${obj.key}`
-      ).join('\n');
+      const objectiveLines = optionalObjectives.map(obj => {
+        let line = `    - key: ${obj.key}
+      descripcion: ${obj.description}${obj.progress || ''}`;
+        if (obj.completionDescription) {
+          line += `
+      se_completa_cuando: ${obj.completionDescription}`;
+        }
+        return line;
+      }).join('\n');
       questBlock += `
-  OBJETIVOS OPCIONALES (pendientes):
+  objetivos_opcionales_pendientes:
 ${objectiveLines}`;
     }
-    
+
     return questBlock;
   }).filter(q => q).join('\n\n');
-  
+
   if (!questList) return '';
-  
+
   // Add header and replace placeholder
-  const fullQuestSection = `MISIONES ACTIVAS
+  const fullQuestSection = `[MISIONES ACTIVAS]
 ${questList}`;
-  
+
   return templateStr.replace('{{activeQuests}}', fullQuestSection);
 }
 

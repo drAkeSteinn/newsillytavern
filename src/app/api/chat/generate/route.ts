@@ -57,6 +57,9 @@ export async function POST(request: NextRequest) {
     // Extract lorebooks from body (not validated by validation.ts)
     const lorebooks: Lorebook[] = body.lorebooks || [];
 
+    // Extract all characters for peticiones/solicitudes resolution
+    const allCharacters: CharacterCard[] = body.allCharacters || [];
+
     // Extract HUD context from body
     const hudContext: HUDContextConfig | undefined = body.hudContext;
 
@@ -80,7 +83,7 @@ export async function POST(request: NextRequest) {
     const effectiveUserName = getEffectiveUserName(persona, userName);
 
     // Process character template variables ({{user}}, {{char}}, etc.)
-    const processedCharacter = processCharacter(effectiveCharacter, effectiveUserName, persona);
+    const processedCharacter = processCharacter(effectiveCharacter, effectiveUserName, persona, typedSessionStats, allCharacters);
 
     // Build context configuration from request or use defaults
     const contextConfig: Partial<ContextConfig> = body.contextConfig || {};
@@ -104,7 +107,8 @@ export async function POST(request: NextRequest) {
       effectiveUserName,
       persona,
       lorebookSection,
-      typedSessionStats  // Pass session stats for attribute values
+      typedSessionStats,  // Pass session stats for attribute values
+      allCharacters       // Pass all characters for peticiones/solicitudes resolution
     );
 
     // Build HUD context section if enabled

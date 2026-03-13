@@ -7,9 +7,10 @@
 //
 // Keys resolved:
 // - {{attributeKey}} → "AttributeName: value" (e.g., {{vida}} → "Vida: 50")
-// - {{habilidades}} → Block of available skills
+// - {{acciones}} → Block of available skills
 // - {{intenciones}} → Block of available intentions
-// - {{invitaciones}} → Block of available invitations
+// - {{peticiones}} → Block of available invitations (from target's solicitudes)
+// - {{solicitudes}} → Block of received requests
 
 import type {
   CharacterStatsConfig,
@@ -19,7 +20,10 @@ import type {
   SkillDefinition,
   IntentionDefinition,
   InvitationDefinition,
+  SolicitudDefinition,
   ResolvedStats,
+  SolicitudInstance,
+  CharacterCard,
 } from '@/types';
 import {
   evaluateRequirements,
@@ -36,6 +40,8 @@ export interface StatsResolutionContext {
   characterId: string;
   statsConfig: CharacterStatsConfig | undefined;
   sessionStats: SessionStats | undefined;
+  // For resolving invitations - need access to other characters' solicitudDefinitions
+  allCharacters?: CharacterCard[];
 }
 
 export interface ResolvedAttribute {
@@ -43,6 +49,17 @@ export interface ResolvedAttribute {
   name: string;
   value: number | string;
   formatted: string;
+}
+
+// Extended invitation for display (includes data from target's solicitudDefinition)
+export interface ResolvedInvitation {
+  id: string;
+  name: string;
+  peticionKey: string;
+  peticionDescription: string;
+  targetCharacterId: string;
+  targetCharacterName: string;
+  solicitudId: string;
 }
 
 // ============================================
@@ -147,14 +164,14 @@ export function resolveAllAttributes(
 }
 
 /**
- * Build skills block for injection
- * 
- * Format:
- * 1) Skill Name
- *    - Descripción: description text
- *    - key de activación: activation_key
- * 
- * Numbers are dynamic based on available skills count.
+ * Build skills/actions block for injection
+ *
+ * NEW YAML-LIKE FORMAT:
+ * [ACCIONES DISPONIBLES]
+ * - key: afilar_hacha
+ *   tipo: preparacion
+ *   descripcion: Afila el hacha con furia para mejorar el siguiente corte.
+ *   completa_objetivo: NONE/key del objetivo
  */
 export function buildSkillsBlock(
   skills: SkillDefinition[],
@@ -162,36 +179,43 @@ export function buildSkillsBlock(
   header: string
 ): string {
   const availableSkills = filterSkillsByRequirements(skills, attributeValues);
-  
+
   if (availableSkills.length === 0) {
     return '';
   }
-  
+
   const lines: string[] = [header];
-  
-  availableSkills.forEach((skill, index) => {
-    const skillNumber = index + 1;
-    
+
+  availableSkills.forEach((skill) => {
     // Check for custom inject format first
     if (skill.injectFormat) {
       const formatted = skill.injectFormat
         .replace('{name}', skill.name)
         .replace('{description}', skill.description)
         .replace('{key}', skill.activationKey || skill.key || '');
-      lines.push(`${skillNumber}) ${formatted}`);
+      lines.push(formatted);
     } else {
-      // Default format with description and activation key
-      lines.push(`${skillNumber}) ${skill.name}`);
-      lines.push(`   - Descripción: ${skill.description}`);
-      
-      // Show activation key if available
+      // New YAML-like format
       const activationKey = skill.activationKey || (skill.activationKeys && skill.activationKeys[0]) || skill.key;
-      if (activationKey) {
-        lines.push(`   - key de activación: ${activationKey}`);
+      lines.push(`- key: ${activationKey || 'sin_key'}`);
+
+      // Type (preparacion/ejecucion)
+      if (skill.type) {
+        lines.push(`  tipo: ${skill.type}`);
+      }
+
+      lines.push(`  descripcion: ${skill.description}`);
+
+      // completa_objetivo: check if there's an objective reward
+      const objectiveReward = (skill.activationRewards || []).find(r => r.type === 'objective' && r.objective?.objectiveKey);
+      if (objectiveReward && objectiveReward.objective) {
+        lines.push(`  completa_objetivo: ${objectiveReward.objective.objectiveKey}`);
+      } else {
+        lines.push(`  completa_objetivo: NONE`);
       }
     }
   });
-  
+
   return lines.join('\n');
 }
 
@@ -244,19 +268,23 @@ export function buildIntentionsBlock(
 }
 
 /**
- * Build invitations block for injection
+ * Build invitations/peticiones block for injection
  *
- * Format (same as skills):
- * 1) Invitation Name
- *    - Descripción: description text
- *    - key de activación: activation_key (only if key exists)
+ * NEW FORMAT - Gets key and description from target's solicitudDefinition:
+ * [PETICIONES POSIBLES]
+ * - key: pedir_madera
+ *   dirigido_a: Carpintero
+ *   descripcion: Solicitar madera para construcción
  *
- * Numbers are dynamic based on available invitations count.
+ * The invitation must reference a solicitud from another character.
+ * Only shows if the target character meets the requirements of their own solicitud.
  */
 export function buildInvitationsBlock(
   invitations: InvitationDefinition[],
   attributeValues: Record<string, number | string>,
-  header: string
+  header: string,
+  allCharacters?: CharacterCard[],
+  sessionStats?: SessionStats
 ): string {
   const availableInvitations = filterInvitationsByRequirements(invitations, attributeValues);
 
@@ -266,26 +294,140 @@ export function buildInvitationsBlock(
 
   const lines: string[] = [header];
 
-  availableInvitations.forEach((invitation, index) => {
-    const invitationNumber = index + 1;
+  availableInvitations.forEach((invitation) => {
+    // Skip if no target configured
+    if (!invitation.objetivo?.characterId || !invitation.objetivo?.solicitudId) {
+      return;
+    }
 
-    // Check for custom inject format first
+    // Find target character
+    const targetCharacter = allCharacters?.find(c => c.id === invitation.objetivo!.characterId);
+    if (!targetCharacter) {
+      return;
+    }
+
+    // Find the specific solicitud on the target
+    const solicitud = targetCharacter.statsConfig?.solicitudDefinitions?.find(
+      s => s.id === invitation.objetivo!.solicitudId
+    );
+    if (!solicitud) {
+      return;
+    }
+
+    // Check if target character meets the solicitud's requirements
+    // (the target needs to have the required attributes to fulfill the request)
+    const targetAttributeValues = sessionStats?.characterStats?.[targetCharacter.id]?.attributeValues || {};
+    const targetMeetsRequirements = evaluateRequirements(solicitud.requirements, targetAttributeValues);
+
+    if (!targetMeetsRequirements) {
+      // Target doesn't meet requirements - don't show this invitation
+      return;
+    }
+
+    // Use custom inject format if available
     if (invitation.injectFormat) {
       const formatted = invitation.injectFormat
         .replace('{name}', invitation.name)
-        .replace('{description}', invitation.description)
-        .replace('{key}', invitation.key || '');
-      lines.push(`${invitationNumber}) ${formatted}`);
+        .replace('{key}', solicitud.peticionKey)
+        .replace('{descripcion}', solicitud.peticionDescription)
+        .replace('{objetivo}', targetCharacter.name);
+      lines.push(formatted);
     } else {
-      // Default format with description and activation key
-      lines.push(`${invitationNumber}) ${invitation.name}`);
-      lines.push(`   - Descripción: ${invitation.description}`);
-
-      // Show activation key only if it exists
-      if (invitation.key) {
-        lines.push(`   - key de activación: ${invitation.key}`);
-      }
+      // New YAML-like format
+      lines.push(`- key: ${solicitud.peticionKey}`);
+      lines.push(`  dirigido_a: ${targetCharacter.name}`);
+      lines.push(`  descripcion: ${solicitud.peticionDescription}`);
     }
+  });
+
+  // Return empty if no valid invitations after filtering
+  if (lines.length === 1) {
+    return '';
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Resolve invitations to get their actual keys and descriptions
+ * (for use in detection system)
+ */
+export function resolveInvitations(
+  invitations: InvitationDefinition[],
+  attributeValues: Record<string, number | string>,
+  allCharacters?: CharacterCard[],
+  sessionStats?: SessionStats
+): ResolvedInvitation[] {
+  const availableInvitations = filterInvitationsByRequirements(invitations, attributeValues);
+  const resolved: ResolvedInvitation[] = [];
+
+  availableInvitations.forEach((invitation) => {
+    if (!invitation.objetivo?.characterId || !invitation.objetivo?.solicitudId) {
+      return;
+    }
+
+    const targetCharacter = allCharacters?.find(c => c.id === invitation.objetivo!.characterId);
+    if (!targetCharacter) {
+      return;
+    }
+
+    const solicitud = targetCharacter.statsConfig?.solicitudDefinitions?.find(
+      s => s.id === invitation.objetivo!.solicitudId
+    );
+    if (!solicitud) {
+      return;
+    }
+
+    // Check if target meets solicitud requirements
+    const targetAttributeValues = sessionStats?.characterStats?.[targetCharacter.id]?.attributeValues || {};
+    const targetMeetsRequirements = evaluateRequirements(solicitud.requirements, targetAttributeValues);
+
+    if (!targetMeetsRequirements) {
+      return;
+    }
+
+    resolved.push({
+      id: invitation.id,
+      name: invitation.name,
+      peticionKey: solicitud.peticionKey,
+      peticionDescription: solicitud.peticionDescription,
+      targetCharacterId: targetCharacter.id,
+      targetCharacterName: targetCharacter.name,
+      solicitudId: solicitud.id,
+    });
+  });
+
+  return resolved;
+}
+
+/**
+ * Build solicitudes block for injection
+ *
+ * Shows requests received from other characters
+ *
+ * FORMAT:
+ * [SOLICITUDES RECIBIDAS]
+ * - key: preparar_troncos
+ *   de: Aitana
+ *   descripcion: Aitana necesita que dejes listos los troncos de abedul.
+ */
+export function buildSolicitudesBlock(
+  solicitudes: SolicitudInstance[],
+  header: string
+): string {
+  // Filter only pending solicitudes
+  const pendingSolicitudes = solicitudes.filter(s => s.status === 'pending');
+
+  if (pendingSolicitudes.length === 0) {
+    return '';
+  }
+
+  const lines: string[] = [header];
+
+  pendingSolicitudes.forEach((solicitud) => {
+    lines.push(`- key: ${solicitud.key}`);
+    lines.push(`  de: ${solicitud.fromCharacterName}`);
+    lines.push(`  descripcion: ${solicitud.description}`);
   });
 
   return lines.join('\n');
@@ -334,22 +476,33 @@ export function resolveStats(
   const invitationsBlock = buildInvitationsBlock(
     statsConfig.invitations,
     attributeValues,
-    statsConfig.blockHeaders.invitations
+    statsConfig.blockHeaders.invitations,
+    context.allCharacters,
+    sessionStats
   );
-  
+
+  // Build solicitudes block (requests received from other characters)
+  const solicitudes = sessionStats?.solicitudes?.characterSolicitudes?.[characterId] || [];
+  const solicitudesBlock = buildSolicitudesBlock(
+    solicitudes,
+    statsConfig.blockHeaders?.solicitudesRecibidas || '[SOLICITUDES RECIBIDAS]'
+  );
+
   // Filter available items
   const availableSkills = filterSkillsByRequirements(statsConfig.skills, attributeValues);
   const availableIntentions = filterIntentionsByRequirements(statsConfig.intentions, attributeValues);
   const availableInvitations = filterInvitationsByRequirements(statsConfig.invitations, attributeValues);
-  
+
   return {
     attributes: attributesMap,
     availableSkills,
     availableIntentions,
     availableInvitations,
+    availableSolicitudes: solicitudes.filter(s => s.status === 'pending'),
     skillsBlock,
     intentionsBlock,
     invitationsBlock,
+    solicitudesBlock,
   };
 }
 
@@ -364,11 +517,14 @@ export function resolveStats(
 const STATS_KEY_PATTERN = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
 
 /**
- * Check if a key is a block key (habilidades, intenciones, invitaciones)
- * Also accepts alternate spellings (intensiones) for backward compatibility
+ * Check if a key is a block key (acciones, habilidades, intenciones, invitaciones, peticiones, solicitudes)
+ * Also accepts alternate spellings for backward compatibility
  */
 export function isBlockKey(key: string): boolean {
-  return key === 'habilidades' || key === 'intenciones' || key === 'intensiones' || key === 'invitaciones';
+  return key === 'acciones' || key === 'habilidades' || 
+         key === 'intenciones' || key === 'intensiones' || 
+         key === 'invitaciones' || key === 'peticiones' || 
+         key === 'solicitudes';
 }
 
 /**
@@ -379,25 +535,31 @@ export function resolveStatsInText(
   resolvedStats: ResolvedStats | null
 ): string {
   return text.replace(STATS_KEY_PATTERN, (match, key) => {
-    // Block keys (habilidades, intenciones, invitaciones) - always handle these
+    // Block keys (acciones, habilidades, intenciones, invitaciones, peticiones, solicitudes)
     // Return empty string if stats disabled, empty, or no items available
-    if (key === 'habilidades') {
+    // Support both {{acciones}} (new) and {{habilidades}} (legacy)
+    if (key === 'acciones' || key === 'habilidades') {
       return resolvedStats?.skillsBlock ?? '';
     }
     // Accept both "intenciones" (correct Spanish) and "intensiones" (typo, for backward compatibility)
     if (key === 'intenciones' || key === 'intensiones') {
       return resolvedStats?.intentionsBlock ?? '';
     }
-    if (key === 'invitaciones') {
+    // Support both {{peticiones}} (new) and {{invitaciones}} (legacy)
+    if (key === 'peticiones' || key === 'invitaciones') {
       return resolvedStats?.invitationsBlock ?? '';
     }
-    
+    // New {{solicitudes}} key - requests received from other characters
+    if (key === 'solicitudes') {
+      return resolvedStats?.solicitudesBlock ?? '';
+    }
+
     // Attribute keys - only replace if defined in stats config
     // If stats are disabled or attribute not defined, leave the key alone
     if (resolvedStats?.attributes && key in resolvedStats.attributes) {
       return resolvedStats.attributes[key];
     }
-    
+
     // Unknown key - leave it alone (might be handled by other template systems)
     return match;
   });

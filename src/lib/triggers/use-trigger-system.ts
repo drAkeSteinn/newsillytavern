@@ -115,6 +115,14 @@ import {
   type SkillActivationHandlerState,
   type SkillActivationTriggerContext,
 } from './handlers/skill-activation-handler';
+import {
+  createSolicitudHandlerState,
+  checkSolicitudTriggersInText,
+  resetSolicitudHandlerState,
+  clearSolicitudHandlerState,
+  type SolicitudHandlerState,
+  type SolicitudTriggerContext,
+} from './handlers/solicitud-handler';
 import type { BackgroundOverlay, BackgroundTransitionType } from '@/types';
 
 // ============================================
@@ -178,6 +186,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   const itemHandlerState = useMemo(() => createItemHandlerState(), []);
   const statsHandlerState = useMemo(() => createStatsHandlerState(), []);
   const skillActivationHandlerState = useMemo(() => createSkillActivationHandlerState(), []);
+  const solicitudHandlerState = useMemo(() => createSolicitudHandlerState(), []);
   
   // Track last processed content per message
   const lastProcessedRef = useRef<Map<string, string>>(new Map());
@@ -1031,7 +1040,56 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         }
       }
     }
-  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, getActiveHUDTemplate]);
+    
+    // Process Solicitud triggers (Peticiones activation and Solicitud completion)
+    // Detects when LLM uses a peticion key (creates solicitud for target character)
+    // or when LLM uses a solicitud key (marks solicitud as completed)
+    if (config.statsEnabled !== false) {
+      const activeSession = store.getActiveSession?.();
+      const sessionId = store.activeSessionId || '';
+
+      // Only process for the speaking character
+      if (character?.statsConfig?.enabled) {
+        const hasPeticiones = character.statsConfig.invitations && character.statsConfig.invitations.length > 0;
+        const hasPendingSolicitudes = activeSession?.sessionStats?.solicitudes?.characterSolicitudes?.[character.id]
+          ?.some(s => s.status === 'pending');
+
+        if (hasPeticiones || hasPendingSolicitudes) {
+          const solicitudContext: SolicitudTriggerContext = {
+            ...context,
+            characterId: character.id,
+            characterName: character.name,
+            statsConfig: character.statsConfig,
+            sessionStats: activeSession?.sessionStats,
+            sessionId,
+            allCharacters: characters || [],
+          };
+
+          const solicitudResult = checkSolicitudTriggersInText(
+            content,
+            solicitudContext,
+            solicitudHandlerState,
+            {
+              createSolicitud: store.createSolicitud.bind(store),
+              completeSolicitud: store.completeSolicitud.bind(store),
+            }
+          );
+
+          if (solicitudResult.matched && solicitudResult.processingResult) {
+            const { activations, completions } = solicitudResult.processingResult;
+            
+            if (activations.length > 0) {
+              console.log(`[TriggerSystem] Peticiones activated for ${character.name}: ${activations.filter(a => a.activated).map(a => a.peticionKey).join(', ')}`);
+            }
+            
+            if (completions.length > 0) {
+              console.log(`[TriggerSystem] Solicitudes completed for ${character.name}: ${completions.filter(c => c.completed).map(c => c.solicitudKey).join(', ')}`);
+            }
+          }
+        }
+      }
+    }
+  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, getActiveHUDTemplate]);
   
   /**
    * Process full content at once (non-streaming)
@@ -1074,6 +1132,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     resetItemHandlerState(itemHandlerState, messageKey);
     resetStatsHandlerState(statsHandlerState, character?.id || '', messageKey);
     resetSkillActivationState(skillActivationHandlerState, messageKey);
+    resetSolicitudHandlerState(solicitudHandlerState, character?.id || '', messageKey);
     
     // Clear last processed
     lastProcessedRef.current.delete(messageKey);
@@ -1096,12 +1155,13 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     clearItemHandlerState(itemHandlerState);
     clearStatsHandlerState(statsHandlerState);
     clearSkillActivationHandlerState(skillActivationHandlerState);
+    clearSolicitudHandlerState(solicitudHandlerState);
     
     // Clear processed tracking
     lastProcessedRef.current.clear();
     
     console.log('[TriggerSystem] All state cleared');
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState]);
   
   return {
     processStreamingContent,

@@ -1,5 +1,5 @@
 import { useTavernStore } from '@/store/tavern-store';
-import { useSyncExternalStore, useCallback } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * Hook to check if the Zustand store has finished hydrating from localStorage
@@ -7,18 +7,20 @@ import { useSyncExternalStore, useCallback } from 'react';
  * 
  * Uses useSyncExternalStore for SSR-safe hydration detection
  */
+function subscribe(callback: () => void) {
+  // Zustand persist middleware provides onFinishHydration
+  const unsubscribe = useTavernStore.persist.onFinishHydration(callback);
+  return unsubscribe;
+}
+
+function getSnapshot() {
+  return useTavernStore.persist.hasHydrated();
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
 export function useHydration() {
-  const onStoreChange = useCallback(() => {
-    return useTavernStore.persist.onFinishHydration(() => {});
-  }, []);
-
-  const getSnapshot = useCallback(() => {
-    return useTavernStore.persist.hasHydrated();
-  }, []);
-
-  const getServerSnapshot = useCallback(() => {
-    return false;
-  }, []);
-
-  return useSyncExternalStore(onStoreChange, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

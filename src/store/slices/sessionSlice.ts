@@ -56,6 +56,10 @@ function initializeSessionStatsForCharacters(
   
   return {
     characterStats,
+    solicitudes: {
+      characterSolicitudes: {},
+      lastModified: now,
+    },
     initialized: true,
     lastModified: now,
   };
