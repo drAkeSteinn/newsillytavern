@@ -47,6 +47,7 @@ export const createGroupSlice = (set: any, _get: any): GroupSlice => ({
         joinOrder: index
       })),
       // Set defaults for new fields
+      minResponsesPerTurn: group.minResponsesPerTurn ?? 1,
       maxResponsesPerTurn: group.maxResponsesPerTurn ?? 3,
       allowMentions: group.allowMentions ?? true,
       mentionTriggers: group.mentionTriggers ?? [],

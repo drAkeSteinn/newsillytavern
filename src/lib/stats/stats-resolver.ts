@@ -58,8 +58,11 @@ export interface ResolvedAttribute {
 export interface ResolvedInvitation {
   id: string;
   name: string;
-  peticionKey: string;
-  peticionDescription: string;
+  peticionKey: string;               // Key to ACTIVATE the peticion (used by sender)
+  solicitudKey: string;              // Key to COMPLETE the solicitud (used by receiver)
+  peticionDescription: string;       // Description shown to SOLICITANTE (who asks)
+  solicitudDescription: string;      // Description shown to SOLICITADO (who receives)
+  completionDescription?: string;    // Description saved when completed
   targetCharacterId: string;
   targetCharacterName: string;
   solicitudId: string;
@@ -167,10 +170,22 @@ export function resolveAllAttributes(
 }
 
 /**
- * Resolve template keys in text ({{user}}, {{char}})
+ * Resolve template keys in text ({{user}}, {{char}}, {{solicitante}}, {{solicitado}})
  * Used to resolve placeholders in descriptions before storing or displaying
+ *
+ * Key resolution:
+ * - {{user}} - The user's name
+ * - {{char}} - The current character's name
+ * - {{solicitante}} - Who is making the request (the asker)
+ * - {{solicitado}} - Who receives the request (the asked)
  */
-function resolveTemplateKeys(text: string, userName?: string, characterName?: string): string {
+function resolveTemplateKeys(
+  text: string,
+  userName?: string,
+  characterName?: string,
+  solicitanteName?: string,
+  solicitadoName?: string
+): string {
   if (!text) return text;
   let result = text;
   if (userName) {
@@ -178,6 +193,12 @@ function resolveTemplateKeys(text: string, userName?: string, characterName?: st
   }
   if (characterName) {
     result = result.replace(/\{\{char\}\}/gi, characterName);
+  }
+  if (solicitanteName) {
+    result = result.replace(/\{\{solicitante\}\}/gi, solicitanteName);
+  }
+  if (solicitadoName) {
+    result = result.replace(/\{\{solicitado\}\}/gi, solicitadoName);
   }
   return result;
 }
@@ -345,8 +366,16 @@ export function buildInvitationsBlock(
       return;
     }
 
-    // Resolve {{user}} and {{char}} in description
-    const resolvedDescription = resolveTemplateKeys(solicitud.peticionDescription, userName, characterName);
+    // Resolve keys in description:
+    // - {{solicitante}} = characterName (who makes the request - current character)
+    // - {{solicitado}} = targetCharacter.name (who receives the request)
+    const resolvedDescription = resolveTemplateKeys(
+      solicitud.peticionDescription,
+      userName,
+      characterName,
+      characterName,       // solicitante = current character (who asks)
+      targetCharacter.name // solicitado = target (who is asked)
+    );
 
     // Use custom inject format if available
     if (invitation.injectFormat) {
@@ -412,14 +441,47 @@ export function resolveInvitations(
       return;
     }
 
-    // Resolve {{user}} and {{char}} in description
-    const resolvedDescription = resolveTemplateKeys(solicitud.peticionDescription, userName, characterName);
+    // Resolve keys in peticionDescription (shown to SOLICITANTE - who asks):
+    // - {{solicitante}} = characterName (who makes the request - current character)
+    // - {{solicitado}} = targetCharacter.name (who receives the request)
+    const resolvedPeticionDescription = resolveTemplateKeys(
+      solicitud.peticionDescription,
+      userName,
+      characterName,
+      characterName,       // solicitante = current character (who asks)
+      targetCharacter.name // solicitado = target (who is asked)
+    );
+
+    // Resolve keys in solicitudDescription (shown to SOLICITADO - who receives):
+    // - {{solicitante}} = characterName (who makes the request)
+    // - {{solicitado}} = targetCharacter.name (current character who receives)
+    const resolvedSolicitudDescription = resolveTemplateKeys(
+      solicitud.solicitudDescription,
+      userName,
+      targetCharacter.name,
+      characterName,        // solicitante = who makes the request
+      targetCharacter.name  // solicitado = who receives
+    );
+
+    // Resolve keys in completionDescription (saved when completed):
+    const resolvedCompletionDescription = solicitud.completionDescription
+      ? resolveTemplateKeys(
+          solicitud.completionDescription,
+          userName,
+          targetCharacter.name,
+          characterName,        // solicitante
+          targetCharacter.name  // solicitado
+        )
+      : undefined;
 
     resolved.push({
       id: invitation.id,
       name: invitation.name,
       peticionKey: solicitud.peticionKey,
-      peticionDescription: resolvedDescription,
+      solicitudKey: solicitud.solicitudKey,  // Key for completing the solicitud
+      peticionDescription: resolvedPeticionDescription,
+      solicitudDescription: resolvedSolicitudDescription,
+      completionDescription: resolvedCompletionDescription,
       targetCharacterId: targetCharacter.id,
       targetCharacterName: targetCharacter.name,
       solicitudId: solicitud.id,
@@ -456,8 +518,16 @@ export function buildSolicitudesBlock(
   const lines: string[] = [header];
 
   pendingSolicitudes.forEach((solicitud) => {
-    // Resolve {{user}} and {{char}} in description
-    const resolvedDescription = resolveTemplateKeys(solicitud.description, userName, characterName);
+    // Resolve keys in description:
+    // - {{solicitante}} = solicitud.fromCharacterName (who sent the request)
+    // - {{solicitado}} = characterName (current character who receives)
+    const resolvedDescription = resolveTemplateKeys(
+      solicitud.description,
+      userName,
+      characterName,
+      solicitud.fromCharacterName, // solicitante = who sent the request
+      characterName                 // solicitado = current character (who receives)
+    );
     lines.push(`- key: ${solicitud.key}`);
     lines.push(`  de: ${solicitud.fromCharacterName}`);
     lines.push(`  descripcion: ${resolvedDescription}`);

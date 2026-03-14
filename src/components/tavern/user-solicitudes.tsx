@@ -16,7 +16,8 @@ interface QuickPetitionsProps {
   onActivatePeticion: (
     targetCharacterId: string,
     solicitudKey: string,
-    description: string
+    description: string,
+    completionDescription?: string
   ) => void;
 }
 
@@ -73,14 +74,16 @@ export function QuickPetitions({
     // Note: User stats would be stored under '__user__' if we want to support user attributes
     
     // Resolve invitations to get actual keys and descriptions
-    // Pass userName to resolve {{user}} in descriptions
+    // IMPORTANT: When USER makes a petition, characterName should be the USER's name
+    // - {{solicitante}} = userName (who makes the request = the user)
+    // - {{solicitado}} = targetCharacter.name (who receives the request)
     const resolved = resolveInvitations(
       userInvitations,
       userAttributeValues,
       characters,
       sessionStats,
-      userName,
-      activeCharacter?.name
+      userName,           // userName - for {{user}} key
+      userName            // characterName = userName because the USER is the one making the petition
     );
     
     return resolved;
@@ -99,10 +102,10 @@ export function QuickPetitions({
       
       {availablePetitions.map((petition) => {
         const targetChar = characters.find(c => c.id === petition.targetCharacterId);
-        // Check if this petition is already active
-        const petitionKey = `${petition.targetCharacterId}:${petition.peticionKey}`;
+        // Check if this petition is already active (use solicitudKey for checking)
+        const petitionKey = `${petition.targetCharacterId}:${petition.solicitudKey}`;
         const isAlreadyActive = activeUserPetitions.has(petitionKey);
-        
+
         return (
           <Button
             key={petition.id}
@@ -117,8 +120,9 @@ export function QuickPetitions({
             )}
             onClick={() => onActivatePeticion(
               petition.targetCharacterId,
-              petition.peticionKey,
-              petition.peticionDescription
+              petition.solicitudKey,            // Use solicitudKey (completion key) for the target
+              petition.solicitudDescription,    // Use solicitudDescription for the target
+              petition.completionDescription    // Pass completion description
             )}
           >
             {isAlreadyActive ? (

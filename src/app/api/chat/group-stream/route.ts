@@ -8,7 +8,7 @@
 // - All sections are processed consistently
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance, SessionSummary } from '@/types';
+import type { ChatMessage, CharacterCard, CharacterGroup, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance, SessionSummary, SolicitudInstance } from '@/types';
 import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import {
   createSSEJSON,
@@ -49,6 +49,58 @@ import { buildQuestPromptSection } from '@/lib/triggers/handlers/quest-handler';
 // ============================================
 
 /**
+ * Result of responder selection including metadata about why certain characters were selected
+ */
+interface ResponderSelectionResult {
+  responders: CharacterCard[];
+  stopForUser: boolean;        // True if a peticion targets the user
+  reasons: Map<string, string>; // characterId -> reason for selection
+}
+
+/**
+ * Get characters that have pending solicitudes (requests they need to respond to)
+ */
+function getCharactersWithPendingSolicitudes(
+  sessionStats: SessionStats | undefined,
+  eligibleCharacterIds: string[]
+): { characterId: string; fromCharacterName: string }[] {
+  if (!sessionStats?.solicitudes?.characterSolicitudes) {
+    return [];
+  }
+
+  const result: { characterId: string; fromCharacterName: string }[] = [];
+
+  for (const characterId of eligibleCharacterIds) {
+    const solicitudes = sessionStats.solicitudes.characterSolicitudes[characterId];
+    if (solicitudes) {
+      const pendingSolicitudes = solicitudes.filter(s => s.status === 'pending');
+      if (pendingSolicitudes.length > 0) {
+        result.push({
+          characterId,
+          fromCharacterName: pendingSolicitudes[0].fromCharacterName
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Check if there are pending solicitudes targeting the user
+ */
+function hasPendingSolicitudesForUser(
+  sessionStats: SessionStats | undefined
+): boolean {
+  if (!sessionStats?.solicitudes?.characterSolicitudes) {
+    return false;
+  }
+
+  const userSolicitudes = sessionStats.solicitudes.characterSolicitudes['__user__'];
+  return userSolicitudes?.some(s => s.status === 'pending') ?? false;
+}
+
+/**
  * Determine responders based on strategy
  * Note: Narrators are excluded from normal response flow and handled separately
  */
@@ -56,9 +108,12 @@ function getResponders(
   message: string,
   characters: CharacterCard[],
   group: CharacterGroup,
-  lastResponderId?: string
-): CharacterCard[] {
+  lastResponderId?: string,
+  sessionStats?: SessionStats
+): ResponderSelectionResult {
   const strategy = group.activationStrategy;
+  const minResponses = group.minResponsesPerTurn ?? 1;
+  const maxResponses = group.maxResponsesPerTurn ?? 3;
 
   // Get active members, EXCLUDING narrators (they have their own response logic)
   const activeMemberIds = (group.members || [])
@@ -77,7 +132,7 @@ function getResponders(
   const eligibleCharacters = characters.filter(c => eligibleIds.includes(c.id));
 
   if (eligibleCharacters.length === 0) {
-    return [];
+    return { responders: [], stopForUser: false, reasons: new Map() };
   }
 
   // Get ordered member IDs (excluding narrators)
@@ -86,24 +141,84 @@ function getResponders(
     .sort((a, b) => a.joinOrder - b.joinOrder)
     .map(m => m.characterId);
 
+  const reasons = new Map<string, string>();
+
   switch (strategy) {
     case 'all': {
       // All active members respond (no limit for 'all' strategy)
-      return eligibleCharacters;
+      eligibleCharacters.forEach(c => reasons.set(c.id, 'Todos responden'));
+      return { responders: eligibleCharacters, stopForUser: false, reasons };
     }
 
     case 'reactive': {
-      // Only mentioned characters respond
+      // ========================================
+      // REACTIVE STRATEGY with Solicitud Support
+      // ========================================
+      // Priority:
+      // 1. If peticion targets user -> STOP, let user respond
+      // 2. Characters with pending solicitudes respond
+      // 3. Mentioned characters respond
+      // 4. Fill to minResponses if needed
+
+      // Check if user has pending solicitudes
+      const stopForUser = hasPendingSolicitudesForUser(sessionStats);
+      if (stopForUser) {
+        console.log('[getResponders] Peticion targets user, stopping turn for user response');
+        return { responders: [], stopForUser: true, reasons: new Map() };
+      }
+
+      // Detect mentions
       const mentions = detectMentions(message, characters, group);
       const mentionedIds = mentions.map(m => m.characterId);
       const mentionedCharacters = eligibleCharacters.filter(c => mentionedIds.includes(c.id));
+      mentionedCharacters.forEach(c => reasons.set(c.id, 'Mencionado en el mensaje'));
 
-      // If no one is mentioned, default to the first character
-      if (mentionedCharacters.length === 0 && eligibleCharacters.length > 0) {
-        return [eligibleCharacters[0]];
+      // Get characters with pending solicitudes
+      const charactersWithSolicitudes = getCharactersWithPendingSolicitudes(sessionStats, eligibleIds);
+      const solicitudCharacterIds = charactersWithSolicitudes.map(s => s.characterId);
+      const solicitudCharacters = eligibleCharacters.filter(c => solicitudCharacterIds.includes(c.id));
+
+      // Add solicitud reasons (don't overwrite mention reasons)
+      solicitudCharacters.forEach(c => {
+        if (!reasons.has(c.id)) {
+          const solicitudInfo = charactersWithSolicitudes.find(s => s.characterId === c.id);
+          reasons.set(c.id, `Tiene solicitud pendiente de ${solicitudInfo?.fromCharacterName || 'otro personaje'}`);
+        }
+      });
+
+      // Combine: unique characters from mentions and solicitudes
+      const combinedIds = new Set([...mentionedIds, ...solicitudCharacterIds]);
+      let selectedCharacters = eligibleCharacters.filter(c => combinedIds.has(c.id));
+
+      // If no mentions or solicitudes, fill to minResponses
+      if (selectedCharacters.length === 0) {
+        // Select first eligible character as default
+        selectedCharacters = [eligibleCharacters[0]];
+        reasons.set(eligibleCharacters[0].id, 'Personaje por defecto (sin menciones ni solicitudes)');
       }
 
-      return mentionedCharacters;
+      // Ensure we have at least minResponses (but respect maxResponses)
+      if (selectedCharacters.length < minResponses) {
+        const remaining = eligibleCharacters
+          .filter(c => !combinedIds.has(c.id))
+          .slice(0, minResponses - selectedCharacters.length);
+        remaining.forEach(c => reasons.set(c.id, 'Para alcanzar mínimo de respuestas'));
+        selectedCharacters = [...selectedCharacters, ...remaining];
+      }
+
+      // Limit to maxResponses
+      const limitedResponders = selectedCharacters.slice(0, maxResponses);
+
+      console.log('[getResponders] Reactive selection:', {
+        mentionedIds,
+        solicitudCharacterIds,
+        selectedCount: limitedResponders.length,
+        minResponses,
+        maxResponses,
+        stopForUser
+      });
+
+      return { responders: limitedResponders, stopForUser, reasons };
     }
 
     case 'round_robin': {
@@ -119,14 +234,18 @@ function getResponders(
       }
 
       const roundRobinChar = characters.find(c => c.id === sortedIds[nextIndex]);
-      return roundRobinChar ? [roundRobinChar] : [];
+      if (roundRobinChar) {
+        reasons.set(roundRobinChar.id, 'Turno rotativo');
+      }
+      return { responders: roundRobinChar ? [roundRobinChar] : [], stopForUser: false, reasons };
     }
 
     case 'random': {
       // Random selection
       const shuffled = [...eligibleCharacters].sort(() => Math.random() - 0.5);
-      const maxResponses = group.maxResponsesPerTurn || 1;
-      return shuffled.slice(0, Math.min(maxResponses, shuffled.length));
+      const selected = shuffled.slice(0, Math.min(maxResponses, shuffled.length));
+      selected.forEach(c => reasons.set(c.id, 'Selección aleatoria'));
+      return { responders: selected, stopForUser: false, reasons };
     }
 
     case 'smart': {
@@ -134,8 +253,7 @@ function getResponders(
       const mentions = detectMentions(message, characters, group);
       const mentionedIds = mentions.map(m => m.characterId);
       const mentionedChars = eligibleCharacters.filter(c => mentionedIds.includes(c.id));
-
-      const maxResponses = group.maxResponsesPerTurn || 2;
+      mentionedChars.forEach(c => reasons.set(c.id, 'Mencionado en el mensaje'));
 
       // Add contextually relevant characters
       const remainingChars = eligibleCharacters.filter(c => !mentionedIds.includes(c.id));
@@ -146,20 +264,25 @@ function getResponders(
         const keywords = [...c.tags, c.name.toLowerCase()];
         return keywords.some(kw => message.toLowerCase().includes(kw.toLowerCase()));
       }).slice(0, additionalCount);
+      relevantChars.forEach(c => reasons.set(c.id, 'Contextualmente relevante'));
 
       const result = [...mentionedChars, ...relevantChars].slice(0, maxResponses);
 
       // If no one selected, default to first
       if (result.length === 0 && eligibleCharacters.length > 0) {
-        return [eligibleCharacters[0]];
+        result.push(eligibleCharacters[0]);
+        reasons.set(eligibleCharacters[0].id, 'Personaje por defecto');
       }
 
-      return result;
+      return { responders: result, stopForUser: false, reasons };
     }
 
     default: {
       // Default to first active character
-      return eligibleCharacters.slice(0, 1);
+      if (eligibleCharacters.length > 0) {
+        reasons.set(eligibleCharacters[0].id, 'Personaje por defecto');
+      }
+      return { responders: eligibleCharacters.slice(0, 1), stopForUser: false, reasons };
     }
   }
 }
@@ -263,11 +386,33 @@ export async function POST(request: NextRequest) {
     const sanitizedMessage = sanitizeInput(message);
 
     // Determine which characters should respond
-    const responders = getResponders(sanitizedMessage, characters, group, lastResponderId);
+    const selectionResult = getResponders(sanitizedMessage, characters, group, lastResponderId, typedSessionStats);
+    const { responders, stopForUser, reasons } = selectionResult;
+
+    // If stopForUser is true, return a special response indicating user should respond
+    if (stopForUser) {
+      // Create a stream that immediately returns a "user_turn" event
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(createSSEJSON({
+            type: 'user_turn',
+            reason: 'Hay una petición pendiente dirigida a ti. Espera tu respuesta.'
+          }));
+          controller.close();
+        }
+      });
+      return createSSEStreamResponse(stream);
+    }
 
     if (responders.length === 0) {
       return createErrorResponse('No active characters to respond', 400);
     }
+
+    // Log responder selection reasons
+    console.log('[Group Stream Route] Selected responders:', responders.map(r => ({
+      name: r.name,
+      reason: reasons.get(r.id)
+    })));
 
     // Get effective user name
     const effectiveUserName = getEffectiveUserName(persona, userName);

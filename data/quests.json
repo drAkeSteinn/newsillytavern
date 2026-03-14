@@ -12,6 +12,8 @@
     "autoQuestEnabled": false,
     "autoQuestInterval": 5,
     "autoQuestMode": "random",
+    "questActivationPrefix": "",
+    "questCompletionPrefix": "",
     "objectiveCompletionPrefix": "Objetivo"
   },
   "questNotifications": [

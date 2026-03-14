@@ -3,15 +3,14 @@
     "name": "Clinica",
     "description": "Una celda fria y oscura en la prision, estas con {{user}}, y eres {{char}}",
     "systemPrompt": "Eres {{char}}, estas hablando con {{user}}",
-    "activationStrategy": "all",
+    "activationStrategy": "reactive",
     "maxResponsesPerTurn": 3,
     "allowMentions": true,
     "mentionTriggers": [],
     "conversationStyle": "sequential",
     "characterIds": [
       "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
-      "611876f7-399e-49a3-a32f-aa847e8f28da",
-      "b6f6c957-a471-4169-8027-356d3f97fc1e"
+      "611876f7-399e-49a3-a32f-aa847e8f28da"
     ],
     "members": [
       {
@@ -28,20 +27,13 @@
         "isActive": true,
         "isPresent": true,
         "joinOrder": 1
-      },
-      {
-        "characterId": "b6f6c957-a471-4169-8027-356d3f97fc1e",
-        "isActive": true,
-        "isPresent": true,
-        "isNarrator": true,
-        "joinOrder": 2
       }
     ],
     "avatar": "",
     "hudTemplateId": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da",
     "id": "e1ef8f7f-f8ea-45e4-ae78-d6d8b57b5bc4",
     "createdAt": "2026-03-01T21:45:26.755Z",
-    "updatedAt": "2026-03-08T12:19:25.492Z",
+    "updatedAt": "2026-03-14T20:58:24.202Z",
     "lorebookIds": [],
     "questTemplateIds": [
       "mision-rescate",
@@ -56,6 +48,7 @@
       "hiddenFromChat": false,
       "customPrompt": "Escribe la siguiente intervención del Narrador en un chat de rol.\nDescribe lo que ocurre de forma breve y coherente con el contexto.\nSi corresponde, activa una misión usando el formato exacto al final.",
       "showSprite": false
-    }
+    },
+    "minResponsesPerTurn": 1
   }
 ]

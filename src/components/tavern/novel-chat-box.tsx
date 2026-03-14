@@ -348,7 +348,8 @@ export function NovelChatBox({
   const handleActivatePeticion = (
     targetCharacterId: string,
     solicitudKey: string,
-    description: string
+    description: string,
+    completionDescription?: string
   ) => {
     if (!activeSessionId) return;
     
@@ -357,6 +358,7 @@ export function NovelChatBox({
       targetCharacterId,
       solicitudKey,
       description,
+      completionDescription,
       activePersona?.name || 'Usuario'
     );
   };

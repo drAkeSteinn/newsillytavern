@@ -467,7 +467,16 @@ export function ChatPanel() {
               try {
                 const parsed = JSON.parse(data);
                 
-                if (parsed.type === 'character_start') {
+                if (parsed.type === 'user_turn') {
+                  // Group chat reactive strategy detected a peticion targeting the user
+                  // Stop generation and let user respond
+                  chatLogger.info('Turn stopped for user response', { reason: parsed.reason });
+                  setStreamingProgress(null);
+                  setStreamingCharacter(null);
+                  setIsGenerating(false);
+                  // Optionally show a toast notification
+                  return;
+                } else if (parsed.type === 'character_start') {
                   currentCharacterContent = '';
                   const char = groupCharacters.find(c => c.id === parsed.characterId);
                   currentCharacter = char || null;

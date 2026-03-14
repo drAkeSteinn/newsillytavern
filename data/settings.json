@@ -37,15 +37,18 @@
     "globalCooldown": 250,
     "realtimeEnabled": true,
     "transitionDuration": 500,
+    "defaultTransitionType": "fade",
     "returnToDefaultEnabled": false,
-    "defaultBackgroundUrl": "/backgrounds/Room/Room (1).png"
+    "returnToDefaultAfter": 300000,
+    "defaultBackgroundUrl": "/backgrounds/Room/Room (1).png",
+    "globalOverlays": []
   },
   "chatLayout": {
     "novelMode": true,
     "chatWidth": 85,
     "chatHeight": 36,
-    "chatX": 45.543818437102296,
-    "chatY": 75.33333333333333,
+    "chatX": 53.043806646525674,
+    "chatY": 81.16666666666667,
     "chatOpacity": 1,
     "blurBackground": false,
     "showCharacterSprite": true
@@ -135,6 +138,9 @@
     "showTokens": true,
     "animateEntry": true,
     "entryAnimation": "fade",
-    "animationDurationMs": 200
+    "animationDurationMs": 200,
+    "enableAnimations": true,
+    "enableParticles": true,
+    "animationIntensity": 50
   }
 }

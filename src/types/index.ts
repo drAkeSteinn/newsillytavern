@@ -600,6 +600,7 @@ export interface CharacterGroup {
   avatar: string;
   systemPrompt: string;
   activationStrategy: GroupActivationStrategy;
+  minResponsesPerTurn: number;  // Minimum responses per turn (for reactive/random/smart)
   maxResponsesPerTurn: number;  // Limit responses per turn (except 'all' strategy)
   allowMentions: boolean;       // Enable mention detection
   mentionTriggers: string[];    // Additional mention trigger words

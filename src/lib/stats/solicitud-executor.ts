@@ -101,6 +101,40 @@ export interface SolicitudCompletionResult {
 // ============================================
 
 /**
+ * Resolve solicitud-specific template keys in text
+ * 
+ * Keys:
+ * - {{solicitante}} - Who makes the request (the asker)
+ * - {{solicitado}} - Who receives the request (the asked)
+ * - {{user}} - The user's name
+ * - {{char}} - The current character's name
+ */
+function resolveSolicitudKeys(
+  text: string,
+  solicitanteName: string,
+  solicitadoName: string,
+  userName?: string,
+  characterName?: string
+): string {
+  if (!text) return text;
+  let result = text;
+  
+  // Resolve solicitud-specific keys
+  result = result.replace(/\{\{solicitante\}\}/gi, solicitanteName);
+  result = result.replace(/\{\{solicitado\}\}/gi, solicitadoName);
+  
+  // Resolve standard keys
+  if (userName) {
+    result = result.replace(/\{\{user\}\}/gi, userName);
+  }
+  if (characterName) {
+    result = result.replace(/\{\{char\}\}/gi, characterName);
+  }
+  
+  return result;
+}
+
+/**
  * Evaluate requirements against attribute values
  */
 function evaluateRequirements(
@@ -427,6 +461,25 @@ export function executePeticionActivation(
   // Special case: target is the user (__user__)
   // Create solicitud in user's pending list
   if (activation.targetCharacterId === USER_CHARACTER_ID) {
+    // Resolve keys in descriptions:
+    // - {{solicitante}} = context.characterName (who makes the request)
+    // - {{solicitado}} = user's name (who receives)
+    const userName = context.activePersona?.name || 'Usuario';
+    const resolvedDescription = resolveSolicitudKeys(
+      resolved.solicitudDescription,
+      context.characterName,  // solicitante
+      userName,               // solicitado
+      userName,
+      context.characterName
+    );
+    const resolvedCompletion = resolveSolicitudKeys(
+      resolved.completionDescription || '',
+      context.characterName,  // solicitante
+      userName,               // solicitado
+      userName,
+      context.characterName
+    );
+    
     const solicitud = storeActions.createSolicitud(
       context.sessionId,
       USER_CHARACTER_ID,
@@ -435,8 +488,8 @@ export function executePeticionActivation(
         peticionKey: resolved.peticionKey,  // Store for duplicate detection
         fromCharacterId: context.characterId,
         fromCharacterName: context.characterName,
-        description: resolved.solicitudDescription,
-        completionDescription: resolved.completionDescription,
+        description: resolvedDescription,
+        completionDescription: resolvedCompletion,
       }
     );
     
@@ -456,6 +509,24 @@ export function executePeticionActivation(
     };
   }
   
+  // Resolve keys in descriptions:
+  // - {{solicitante}} = context.characterName (who makes the request)
+  // - {{solicitado}} = targetCharacter.name (who receives)
+  const resolvedDescription = resolveSolicitudKeys(
+    resolved.solicitudDescription,
+    context.characterName,     // solicitante
+    targetCharacter.name,      // solicitado
+    context.activePersona?.name,
+    context.characterName
+  );
+  const resolvedCompletion = resolveSolicitudKeys(
+    resolved.completionDescription || '',
+    context.characterName,     // solicitante
+    targetCharacter.name,      // solicitado
+    context.activePersona?.name,
+    context.characterName
+  );
+  
   // Create the solicitud for the target character
   // Use solicitudKey for completion detection
   const solicitud = storeActions.createSolicitud(
@@ -466,8 +537,8 @@ export function executePeticionActivation(
       peticionKey: resolved.peticionKey,  // Store for duplicate detection
       fromCharacterId: context.characterId,
       fromCharacterName: context.characterName,
-      description: resolved.solicitudDescription,
-      completionDescription: resolved.completionDescription,
+      description: resolvedDescription,
+      completionDescription: resolvedCompletion,
     }
   );
   

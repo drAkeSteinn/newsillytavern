@@ -82,6 +82,7 @@ export interface StatsSlice {
     targetCharacterId: string,
     solicitudKey: string,
     description: string,
+    completionDescription: string | undefined,
     userName: string
   ) => SolicitudInstance | null;
   
@@ -579,7 +580,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         lastModified: Date.now(),
       },
       // Save event for {{eventos}} key - peticion was activated
-      ultima_solicitud_realizada: `${solicitudData.fromCharacterName} solicitó "${solicitudData.key}" a ${targetCharacterId === '__user__' ? 'el usuario' : targetCharacterId}: ${solicitudData.description}`,
+      ultima_solicitud_realizada: solicitudData.description,
       lastModified: Date.now(),
     };
     
@@ -702,6 +703,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
     targetCharacterId: string,
     solicitudKey: string,
     description: string,
+    completionDescription: string | undefined,
     userName: string
   ) => {
     const state = get();
@@ -762,6 +764,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       fromCharacterId: '__user__',
       fromCharacterName: userName || 'Usuario',
       description,
+      completionDescription,
       status: 'pending',
       createdAt: Date.now(),
     };
@@ -779,6 +782,8 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         },
         lastModified: Date.now(),
       },
+      // Save event for {{eventos}} key - user made a peticion to a character
+      ultima_solicitud_realizada: description,
       lastModified: Date.now(),
     };
     
@@ -848,6 +853,9 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         },
         lastModified: Date.now(),
       },
+      // Save event for {{eventos}} key - use completionDescription if available
+      ultima_solicitud_completada: completedSolicitud.completionDescription || 
+        `${completedSolicitud.fromCharacterName} recibió respuesta del usuario`,
       lastModified: Date.now(),
     };
     

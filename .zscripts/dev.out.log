@@ -1126,3 +1126,2724 @@ Import traces:
  POST /api/chat/stream 200 in 826ms (compile: 37ms, render: 789ms)
  PUT /api/persistence 200 in 44ms (compile: 1620µs, render: 42ms)
  PUT /api/persistence 200 in 42ms (compile: 1709µs, render: 40ms)
+ PUT /api/persistence 200 in 45ms (compile: 1727µs, render: 43ms)
+✓ Compiled in 166ms
+✓ Compiled in 143ms
+✓ Compiled in 173ms
+✓ Compiled in 150ms
+✓ Compiled in 143ms
+✓ Compiled in 148ms
+ GET / 200 in 429ms (compile: 56ms, render: 373ms)
+ GET /api/persistence 200 in 62ms (compile: 1951µs, render: 60ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1515µs, render: 4ms)
+ GET /api/quest-templates 200 in 5ms (compile: 1497µs, render: 3ms)
+ PUT /api/persistence 200 in 39ms (compile: 1468µs, render: 37ms)
+✓ Compiled in 175ms
+✓ Compiled in 169ms
+✓ Compiled in 147ms
+ PUT /api/persistence 200 in 56ms (compile: 3ms, render: 53ms)
+✓ Compiled in 161ms
+ PUT /api/persistence 200 in 56ms (compile: 2ms, render: 54ms)
+✓ Compiled in 177ms
+✓ Compiled in 165ms
+ GET / 200 in 404ms (compile: 59ms, render: 344ms)
+ GET /api/persistence 200 in 63ms (compile: 2ms, render: 61ms)
+ GET /api/backgrounds/index 200 in 8ms (compile: 2ms, render: 5ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 5ms)
+ PUT /api/persistence 200 in 46ms (compile: 2ms, render: 44ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: test',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 837ms (compile: 47ms, render: 790ms)
+ PUT /api/persistence 200 in 44ms (compile: 2ms, render: 42ms)
+ PUT /api/persistence 200 in 42ms (compile: 2ms, render: 40ms)
+ PUT /api/persistence 200 in 57ms (compile: 1820µs, render: 55ms)
+ PUT /api/persistence 200 in 41ms (compile: 1839µs, render: 40ms)
+ PUT /api/persistence 200 in 41ms (compile: 1583µs, render: 39ms)
+ PUT /api/persistence 200 in 65ms (compile: 1588µs, render: 64ms)
+ PUT /api/persistence 200 in 44ms (compile: 1856µs, render: 42ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 771ms (compile: 1784µs, render: 769ms)
+ PUT /api/persistence 200 in 50ms (compile: 2ms, render: 48ms)
+ PUT /api/persistence 200 in 45ms (compile: 1856µs, render: 43ms)
+ PUT /api/persistence 200 in 43ms (compile: 1611µs, render: 41ms)
+ PUT /api/persistence 200 in 41ms (compile: 1602µs, render: 40ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 764ms (compile: 1812µs, render: 762ms)
+ PUT /api/persistence 200 in 43ms (compile: 1770µs, render: 41ms)
+✓ Compiled in 136ms
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 808ms (compile: 40ms, render: 769ms)
+ PUT /api/persistence 200 in 46ms (compile: 1853µs, render: 44ms)
+ PUT /api/persistence 200 in 41ms (compile: 1661µs, render: 40ms)
+ GET / 200 in 371ms (compile: 53ms, render: 318ms)
+ GET /api/persistence 200 in 59ms (compile: 1989µs, render: 57ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 1746µs, render: 5ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 5ms)
+ PUT /api/persistence 200 in 50ms (compile: 3ms, render: 47ms)
+ PUT /api/persistence 200 in 89ms (compile: 1970µs, render: 87ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 765ms (compile: 2ms, render: 763ms)
+ PUT /api/persistence 200 in 48ms (compile: 2ms, render: 46ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 776ms (compile: 1673µs, render: 774ms)
+ PUT /api/persistence 200 in 45ms (compile: 3ms, render: 43ms)
+ PUT /api/persistence 200 in 49ms (compile: 3ms, render: 46ms)
+ PUT /api/persistence 200 in 75ms (compile: 2ms, render: 73ms)
+ PUT /api/persistence 200 in 42ms (compile: 1918µs, render: 41ms)
+ PUT /api/persistence 200 in 47ms (compile: 2ms, render: 45ms)
+ PUT /api/persistence 200 in 41ms (compile: 1711µs, render: 39ms)
+ PUT /api/persistence 200 in 44ms (compile: 1486µs, render: 42ms)
+ PUT /api/persistence 200 in 63ms (compile: 19ms, render: 43ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ PUT /api/persistence 200 in 43ms (compile: 1569µs, render: 41ms)
+ POST /api/chat/stream 200 in 818ms (compile: 1650µs, render: 817ms)
+ PUT /api/persistence 200 in 44ms (compile: 1693µs, render: 42ms)
+ PUT /api/persistence 200 in 45ms (compile: 1819µs, render: 43ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 775ms (compile: 1592µs, render: 773ms)
+ PUT /api/persistence 200 in 43ms (compile: 1826µs, render: 41ms)
+ PUT /api/persistence 200 in 44ms (compile: 1582µs, render: 42ms)
+ PUT /api/persistence 200 in 41ms (compile: 1548µs, render: 39ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 793ms (compile: 1864µs, render: 791ms)
+ PUT /api/persistence 200 in 44ms (compile: 2ms, render: 42ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: Dra. Moon te pide que te realices un test medico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 771ms (compile: 1607µs, render: 769ms)
+ PUT /api/persistence 200 in 41ms (compile: 1708µs, render: 40ms)
+ PUT /api/persistence 200 in 45ms (compile: 2ms, render: 43ms)
+ PUT /api/persistence 200 in 55ms (compile: 1579µs, render: 54ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 764ms (compile: 1888µs, render: 762ms)
+ PUT /api/persistence 200 in 66ms (compile: 1836µs, render: 64ms)
+ PUT /api/persistence 200 in 41ms (compile: 1804µs, render: 39ms)
+ PUT /api/persistence 200 in 41ms (compile: 1782µs, render: 40ms)
+✓ Compiled in 129ms
+ PUT /api/persistence 200 in 54ms (compile: 2ms, render: 52ms)
+ GET / 200 in 392ms (compile: 52ms, render: 340ms)
+ GET /api/persistence 200 in 57ms (compile: 1694µs, render: 55ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1853µs, render: 4ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 5ms)
+ PUT /api/persistence 200 in 47ms (compile: 2ms, render: 45ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke solicitó "analisis_psyquatrico" al personaje: Le pides a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 818ms (compile: 45ms, render: 773ms)
+ PUT /api/persistence 200 in 57ms (compile: 2ms, render: 55ms)
+ PUT /api/persistence 200 in 44ms (compile: 1794µs, render: 42ms)
+ PUT /api/persistence 200 in 43ms (compile: 1624µs, render: 41ms)
+ PUT /api/persistence 200 in 42ms (compile: 1712µs, render: 41ms)
+✓ Compiled in 153ms
+✓ Compiled in 137ms
+ GET / 200 in 336ms (compile: 52ms, render: 284ms)
+ GET /api/persistence 200 in 58ms (compile: 2ms, render: 56ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1725µs, render: 4ms)
+ GET /api/quest-templates 200 in 6ms (compile: 1977µs, render: 4ms)
+ PUT /api/persistence 200 in 43ms (compile: 2ms, render: 41ms)
+✓ Compiled in 180ms
+ PUT /api/persistence 200 in 41ms (compile: 1514µs, render: 40ms)
+ PUT /api/persistence 200 in 117ms (compile: 2ms, render: 114ms)
+ PUT /api/persistence 200 in 45ms (compile: 1695µs, render: 43ms)
+ PUT /api/persistence 200 in 53ms (compile: 1680µs, render: 52ms)
+✓ Compiled in 145ms
+✓ Compiled in 179ms
+✓ Compiled in 143ms
+✓ Compiled in 142ms
+✓ Compiled in 135ms
+ GET / 200 in 426ms (compile: 64ms, render: 362ms)
+ GET /api/persistence 200 in 58ms (compile: 1887µs, render: 56ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 2ms, render: 5ms)
+ GET /api/quest-templates 200 in 7ms (compile: 3ms, render: 5ms)
+ PUT /api/persistence 200 in 52ms (compile: 3ms, render: 50ms)
+ PUT /api/persistence 200 in 60ms (compile: 3ms, render: 58ms)
+✓ Compiled in 149ms
+ GET / 200 in 386ms (compile: 63ms, render: 323ms)
+ GET /api/persistence 200 in 65ms (compile: 2ms, render: 63ms)
+ GET /api/backgrounds/index 200 in 8ms (compile: 2ms, render: 6ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 5ms)
+ PUT /api/persistence 200 in 48ms (compile: 2ms, render: 46ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke le pide a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 824ms (compile: 45ms, render: 779ms)
+ PUT /api/persistence 200 in 49ms (compile: 2ms, render: 47ms)
+ PUT /api/persistence 200 in 46ms (compile: 1944µs, render: 44ms)
+ PUT /api/persistence 200 in 45ms (compile: 1683µs, render: 43ms)
+ PUT /api/persistence 200 in 44ms (compile: 1639µs, render: 42ms)
+ PUT /api/persistence 200 in 43ms (compile: 1731µs, render: 41ms)
+ PUT /api/persistence 200 in 47ms (compile: 1994µs, render: 45ms)
+ PUT /api/persistence 200 in 42ms (compile: 1860µs, render: 41ms)
+ PUT /api/persistence 200 in 48ms (compile: 1864µs, render: 47ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke le pide a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 801ms (compile: 1997µs, render: 799ms)
+ PUT /api/persistence 200 in 41ms (compile: 1763µs, render: 40ms)
+ PUT /api/persistence 200 in 46ms (compile: 1740µs, render: 44ms)
+ PUT /api/persistence 200 in 45ms (compile: 1591µs, render: 43ms)
+ PUT /api/persistence 200 in 42ms (compile: 1618µs, render: 41ms)
+ PUT /api/persistence 200 in 42ms (compile: 1577µs, render: 41ms)
+ PUT /api/persistence 200 in 42ms (compile: 1576µs, render: 40ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke le pide a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 755ms (compile: 1826µs, render: 753ms)
+ PUT /api/persistence 200 in 42ms (compile: 2ms, render: 40ms)
+ PUT /api/persistence 200 in 41ms (compile: 1626µs, render: 40ms)
+ GET /api/quest-templates 200 in 5ms (compile: 1742µs, render: 3ms)
+ PUT /api/persistence 200 in 45ms (compile: 1686µs, render: 43ms)
+ PUT /api/persistence 200 in 43ms (compile: 1808µs, render: 41ms)
+ PUT /api/persistence 200 in 41ms (compile: 1756µs, render: 39ms)
+ PUT /api/persistence 200 in 43ms (compile: 1715µs, render: 41ms)
+ PUT /api/persistence 200 in 43ms (compile: 1632µs, render: 41ms)
+ PUT /api/persistence 200 in 47ms (compile: 3ms, render: 44ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke le pide a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 773ms (compile: 1559µs, render: 771ms)
+ PUT /api/persistence 200 in 44ms (compile: 1936µs, render: 42ms)
+ PUT /api/persistence 200 in 44ms (compile: 1514µs, render: 42ms)
+✓ Compiled in 155ms
+✓ Compiled in 145ms
+ PUT /api/persistence 200 in 45ms (compile: 3ms, render: 43ms)
+ PUT /api/persistence 200 in 46ms (compile: 1956µs, render: 44ms)
+ PUT /api/persistence 200 in 43ms (compile: 1596µs, render: 41ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke le pide a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 827ms (compile: 40ms, render: 787ms)
+ PUT /api/persistence 200 in 42ms (compile: 1713µs, render: 40ms)
+ GET / 200 in 367ms (compile: 52ms, render: 315ms)
+ GET /api/persistence 200 in 60ms (compile: 2ms, render: 57ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 2ms, render: 5ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 5ms)
+ PUT /api/persistence 200 in 49ms (compile: 2ms, render: 47ms)
+ PUT /api/persistence 200 in 43ms (compile: 1942µs, render: 41ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'drAke le pide a Dra. Moon un analisis psyquatrico',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'drAke le pide a Dra. Moon un analisis psyquatrico'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 797ms (compile: 2ms, render: 795ms)
+ PUT /api/persistence 200 in 45ms (compile: 2ms, render: 43ms)

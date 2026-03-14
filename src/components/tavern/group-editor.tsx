@@ -130,9 +130,9 @@ const strategyInfo: Record<GroupActivationStrategy, {
   },
   reactive: { 
     name: 'Reactivo', 
-    description: 'Solo los mencionados responden',
+    description: 'Menciones + Solicitudes',
     icon: <Zap className="w-3.5 h-3.5" />,
-    tip: 'Los personajes responden al ser mencionados.',
+    tip: 'Responden los mencionados, personajes con solicitudes pendientes, o se detiene si hay petición al usuario.',
     color: 'amber'
   },
   smart: { 
@@ -170,6 +170,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
         description: existingGroup.description || '',
         systemPrompt: existingGroup.systemPrompt || '',
         activationStrategy: existingGroup.activationStrategy || 'all' as GroupActivationStrategy,
+        minResponsesPerTurn: existingGroup.minResponsesPerTurn ?? 1,
         maxResponsesPerTurn: existingGroup.maxResponsesPerTurn ?? 3,
         allowMentions: existingGroup.allowMentions ?? true,
         mentionTriggers: existingGroup.mentionTriggers || [],
@@ -185,6 +186,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       description: '',
       systemPrompt: '',
       activationStrategy: 'all' as GroupActivationStrategy,
+      minResponsesPerTurn: 1,
       maxResponsesPerTurn: 3,
       allowMentions: true,
       mentionTriggers: [],
@@ -204,6 +206,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
   const [description, setDescription] = useState(initialValues.description);
   const [systemPrompt, setSystemPrompt] = useState(initialValues.systemPrompt);
   const [activationStrategy, setActivationStrategy] = useState<GroupActivationStrategy>(initialValues.activationStrategy);
+  const [minResponsesPerTurn, setMinResponsesPerTurn] = useState(initialValues.minResponsesPerTurn);
   const [maxResponsesPerTurn, setMaxResponsesPerTurn] = useState(initialValues.maxResponsesPerTurn);
   const [allowMentions, setAllowMentions] = useState(initialValues.allowMentions);
   const [conversationStyle, setConversationStyle] = useState<'sequential' | 'parallel'>(initialValues.conversationStyle);
@@ -291,6 +294,7 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
       description,
       systemPrompt,
       activationStrategy,
+      minResponsesPerTurn,
       maxResponsesPerTurn,
       allowMentions,
       mentionTriggers: [],
@@ -754,27 +758,51 @@ export function GroupEditor({ groupId, onClose }: GroupEditorProps) {
                   </div>
 
                   {activationStrategy !== 'all' && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Label htmlFor="maxResponses" className="text-xs">Máx. Respuestas por Turno</Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p>Número máximo de personajes que responderán por turno.</p>
-                          </TooltipContent>
-                        </Tooltip>
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Label htmlFor="minResponses" className="text-xs">Mín. Respuestas</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Número mínimo de personajes que responderán por turno. Si hay menciones o solicitudes pendientes, se pueden agregar más.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="minResponses"
+                          type="number"
+                          min={1}
+                          max={maxResponsesPerTurn}
+                          value={minResponsesPerTurn}
+                          onChange={(e) => setMinResponsesPerTurn(Math.min(parseInt(e.target.value) || 1, maxResponsesPerTurn))}
+                          className="w-20 h-8"
+                        />
                       </div>
-                      <Input
-                        id="maxResponses"
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={maxResponsesPerTurn}
-                        onChange={(e) => setMaxResponsesPerTurn(parseInt(e.target.value) || 1)}
-                        className="w-20 h-8"
-                      />
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Label htmlFor="maxResponses" className="text-xs">Máx. Respuestas</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Número máximo de personajes que responderán por turno.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="maxResponses"
+                          type="number"
+                          min={minResponsesPerTurn}
+                          max={10}
+                          value={maxResponsesPerTurn}
+                          onChange={(e) => setMaxResponsesPerTurn(Math.max(parseInt(e.target.value) || 1, minResponsesPerTurn))}
+                          className="w-20 h-8"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
