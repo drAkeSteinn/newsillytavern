@@ -1,0 +1,1128 @@
+==========================================
+[2026-03-14 07:30:41] Starting: bun install
+==========================================
+[BUN] Installing dependencies...
+[0.30ms] ".env"
+bun install v1.3.10 (30e609e0)
+
++ @tailwindcss/postcss@4.1.18
++ @types/react@19.2.8
++ @types/react-dom@19.2.3
++ bun-types@1.3.6
++ eslint@9.39.2
++ eslint-config-next@16.1.3
++ tailwindcss@4.1.18
++ tw-animate-css@1.4.0
++ typescript@5.9.3
++ @dnd-kit/core@6.3.1
++ @dnd-kit/sortable@10.0.0
++ @dnd-kit/utilities@3.2.2
++ @hookform/resolvers@5.2.2
++ @mdxeditor/editor@3.52.3
++ @prisma/client@6.19.2
++ @radix-ui/react-accordion@1.2.12
++ @radix-ui/react-alert-dialog@1.1.15
++ @radix-ui/react-aspect-ratio@1.1.8
++ @radix-ui/react-avatar@1.1.11
++ @radix-ui/react-checkbox@1.3.3
++ @radix-ui/react-collapsible@1.1.12
++ @radix-ui/react-context-menu@2.2.16
++ @radix-ui/react-dialog@1.1.15
++ @radix-ui/react-dropdown-menu@2.1.16
++ @radix-ui/react-hover-card@1.1.15
++ @radix-ui/react-label@2.1.8
++ @radix-ui/react-menubar@1.1.16
++ @radix-ui/react-navigation-menu@1.2.14
++ @radix-ui/react-popover@1.1.15
++ @radix-ui/react-progress@1.1.8
++ @radix-ui/react-radio-group@1.3.8
++ @radix-ui/react-scroll-area@1.2.10
++ @radix-ui/react-select@2.2.6
++ @radix-ui/react-separator@1.1.8
++ @radix-ui/react-slider@1.3.6
++ @radix-ui/react-slot@1.2.4
++ @radix-ui/react-switch@1.2.6
++ @radix-ui/react-tabs@1.1.13
++ @radix-ui/react-toast@1.2.15
++ @radix-ui/react-toggle@1.1.10
++ @radix-ui/react-toggle-group@1.1.11
++ @radix-ui/react-tooltip@1.2.8
++ @reactuses/core@6.1.9
++ @tanstack/react-query@5.90.19
++ @tanstack/react-table@8.21.3
++ class-variance-authority@0.7.1
++ clsx@2.1.1
++ cmdk@1.1.1
++ date-fns@4.1.0
++ embla-carousel-react@8.6.0
++ framer-motion@12.26.2
++ input-otp@1.4.2
++ lucide-react@0.525.0
++ next@16.1.3
++ next-auth@4.24.13
++ next-intl@4.7.0
++ next-themes@0.4.6
++ prisma@6.19.2
++ react@19.2.3
++ react-day-picker@9.13.0
++ react-dom@19.2.3
++ react-hook-form@7.71.1
++ react-markdown@10.1.0
++ react-resizable-panels@3.0.6
++ react-syntax-highlighter@15.6.6
++ recharts@2.15.4
++ sharp@0.34.5
++ sonner@2.0.7
++ tailwind-merge@3.4.0
++ tailwindcss-animate@1.0.7
++ uuid@11.1.0
++ vaul@1.1.2
++ z-ai-web-dev-sdk@0.0.17
++ zod@4.3.5
++ zustand@5.0.10
+
+827 packages installed [12.01s]
+==========================================
+[2026-03-14 07:30:53] Completed: bun install
+[LOG] Step: bun install | Duration: 12s
+==========================================
+
+==========================================
+[2026-03-14 07:30:53] Starting: bun run db:push
+==========================================
+[BUN] Setting up database...
+$ prisma db push
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": SQLite database "custom.db" at "file:/home/z/my-project/db/custom.db"
+
+SQLite database custom.db created at file:/home/z/my-project/db/custom.db
+
+🚀  Your database is now in sync with your Prisma schema. Done in 18ms
+
+Running generate... (Use --skip-generate to skip the generators)
+[2K[1A[2K[GRunning generate... - Prisma Client
+[2K[1A[2K[G✔ Generated Prisma Client (v6.19.2) to ./node_modules/@prisma/client in 70ms
+┌─────────────────────────────────────────────────────────┐
+│  Update available 6.19.2 -> 7.5.0                       │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+
+==========================================
+[2026-03-14 07:30:55] Completed: bun run db:push
+[LOG] Step: bun run db:push | Duration: 2s
+==========================================
+
+==========================================
+[2026-03-14 07:30:55] Starting: Starting Next.js dev server
+==========================================
+[BUN] Starting development server...
+==========================================
+$ next dev -p 3000 2>&1 | tee dev.log
+[2026-03-14 07:30:55] Completed: Starting Next.js dev server
+[LOG] Step: Starting Next.js dev server | Duration: 0s
+==========================================
+
+==========================================
+[2026-03-14 07:30:55] Starting: Waiting for Next.js dev server
+==========================================
+Waiting for Next.js dev server to be ready on localhost:3000...
+Attempt 1/60: Next.js dev server not ready yet, waiting...
+▲ Next.js 16.1.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://21.0.3.188:3000
+- Environments: .env
+
+✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+  We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+  The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+  	- include was updated to add '.next/dev/types/**/*.ts'
+
+  The following mandatory changes were made to your tsconfig.json:
+
+  	- jsx was set to react-jsx (next.js uses the React automatic runtime)
+
+✓ Ready in 937ms
+ GET / 200 in 3.0s (compile: 2.8s, render: 130ms)
+Next.js dev server is ready!
+ GET / 200 in 3.0s (compile: 2.8s, render: 198ms)
+==========================================
+[2026-03-14 07:30:59] Completed: Waiting for Next.js dev server
+[LOG] Step: Waiting for Next.js dev server | Duration: 4s
+==========================================
+
+==========================================
+[2026-03-14 07:30:59] Starting: Health check
+==========================================
+[BUN] Performing health check...
+ GET / 200 in 23ms (compile: 1710µs, render: 21ms)
+[BUN] Health check passed
+==========================================
+[2026-03-14 07:30:59] Completed: Health check
+[LOG] Step: Health check | Duration: 0s
+==========================================
+
+==========================================
+[2026-03-14 07:30:59] Starting: Starting mini-services
+==========================================
+Found mini-services directory, scanning for sub-services...
+Mini-services startup completed. Started 0 service(s).
+==========================================
+[2026-03-14 07:30:59] Completed: Starting mini-services
+[LOG] Step: Starting mini-services | Duration: 0s
+==========================================
+
+Next.js dev server is running in background (PID: 326).
+Use 'kill 326' to stop it.
+✓ Compiled in 275ms
+✓ Compiled in 481ms
+✓ Compiled in 189ms
+✓ Compiled in 2.8s
+ GET / 200 in 2.1s (compile: 2.1s, render: 73ms)
+ GET / 200 in 28ms (compile: 11ms, render: 17ms)
+ GET / 200 in 408ms (compile: 3ms, render: 405ms)
+ GET /api/persistence 200 in 417ms (compile: 327ms, render: 90ms)
+ GET /api/backgrounds/index 200 in 367ms (compile: 241ms, render: 127ms)
+ GET /api/quest-templates 200 in 103ms (compile: 97ms, render: 6ms)
+ PUT /api/persistence 200 in 110ms (compile: 3ms, render: 107ms)
+✓ Compiled in 974ms
+ GET / 200 in 50ms (compile: 5ms, render: 45ms)
+ GET /api/persistence 200 in 108ms (compile: 3ms, render: 105ms)
+ GET /api/backgrounds/index 200 in 14ms (compile: 6ms, render: 9ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 4ms)
+ PUT /api/persistence 200 in 78ms (compile: 1733µs, render: 76ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 1015ms (compile: 232ms, render: 782ms)
+ PUT /api/persistence 200 in 47ms (compile: 4ms, render: 43ms)
+ PUT /api/persistence 200 in 51ms (compile: 3ms, render: 47ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: test',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 776ms (compile: 1738µs, render: 774ms)
+ PUT /api/persistence 200 in 40ms (compile: 1891µs, render: 38ms)
+ PUT /api/persistence 200 in 49ms (compile: 1826µs, render: 48ms)
+ GET / 200 in 55ms (compile: 6ms, render: 50ms)
+ GET /api/persistence 200 in 62ms (compile: 2ms, render: 59ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 1926µs, render: 5ms)
+ GET /api/quest-templates 200 in 7ms (compile: 3ms, render: 4ms)
+ PUT /api/persistence 200 in 67ms (compile: 2ms, render: 64ms)
+✓ Compiled in 203ms
+⚠ Cross origin request detected from preview-chat-dcc93789-fa79-4543-871b-310c90169120.space.z.ai to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+✓ Compiled in 145ms
+⨯ ./src/components/tavern/stats-editor.tsx:1800:136
+Parsing ecmascript source code failed
+[0m [90m 1798 |[39m                 [33m<[39m[33mTooltipContent[39m className[33m=[39m[32m"max-w-xs"[39m[33m>[39m
+ [90m 1799 |[39m                   [33m<[39m[33mp[39m[33m>[39m[33mTexto[39m que se guardará en el evento [32m"ultima_solicitud_completada"[39m cuando se complete esta solicitud[33m.[39m[33m<[39m[33m/[39m[33mp[39m[33m>[39m
+[31m[1m>[22m[39m[90m 1800 |[39m                   [33m<[39m[33mp[39m className[33m=[39m[32m"mt-1 text-xs text-muted-foreground"[39m[33m>[39m[33mDescribe[39m la acción completada[33m.[39m [33mSe[39m usará en el key {{[32m'{{eventos}}'[39m}}[33m<[39m[33m/[39m[33mp[39m[33m>[39m
+ [90m      |[39m                                                                                                                                        [31m[1m^[22m[39m
+ [90m 1801 |[39m                 [33m<[39m[33m/[39m[33mTooltipContent[39m[33m>[39m
+ [90m 1802 |[39m               [33m<[39m[33m/[39m[33mTooltip[39m[33m>[39m
+ [90m 1803 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Expected a semicolon
+
+Import traces:
+  Client Component Browser:
+    ./src/components/tavern/stats-editor.tsx [Client Component Browser]
+    ./src/components/tavern/character-editor.tsx [Client Component Browser]
+    ./src/components/tavern/character-panel.tsx [Client Component Browser]
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/tavern/stats-editor.tsx [Client Component SSR]
+    ./src/components/tavern/character-editor.tsx [Client Component SSR]
+    ./src/components/tavern/character-panel.tsx [Client Component SSR]
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 1077ms (compile: 951ms, render: 125ms)
+✓ Compiled in 155ms
+ GET / 200 in 423ms (compile: 96ms, render: 328ms)
+ GET /api/persistence 200 in 59ms (compile: 1812µs, render: 58ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1613µs, render: 4ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 4ms)
+ PUT /api/persistence 200 in 43ms (compile: 1831µs, render: 41ms)
+ GET / 200 in 45ms (compile: 3ms, render: 42ms)
+ GET /api/persistence 200 in 70ms (compile: 2ms, render: 68ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 1680µs, render: 5ms)
+ GET /api/quest-templates 200 in 7ms (compile: 2ms, render: 4ms)
+ PUT /api/persistence 200 in 57ms (compile: 2ms, render: 55ms)
+ PUT /api/persistence 200 in 40ms (compile: 2ms, render: 38ms)
+ PUT /api/persistence 200 in 45ms (compile: 1836µs, render: 43ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: test',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ PUT /api/persistence 200 in 80ms (compile: 1763µs, render: 78ms)
+ POST /api/chat/stream 200 in 889ms (compile: 49ms, render: 840ms)
+ PUT /api/persistence 200 in 47ms (compile: 2ms, render: 45ms)
+✓ Compiled in 267ms
+✓ Compiled in 296ms
+✓ Compiled in 175ms
+ PUT /api/persistence 200 in 45ms (compile: 1786µs, render: 43ms)
+✓ Compiled in 148ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /api/backgrounds/index 200 in 89ms (compile: 3ms, render: 86ms)
+ GET /api/persistence 200 in 84ms (compile: 1913µs, render: 82ms)
+ GET / 200 in 456ms (compile: 55ms, render: 401ms)
+ GET /api/persistence 200 in 58ms (compile: 1964µs, render: 56ms)
+ GET /api/backgrounds/index 200 in 5ms (compile: 1743µs, render: 4ms)
+ GET /api/quest-templates 200 in 6ms (compile: 2ms, render: 4ms)
+ PUT /api/persistence 200 in 44ms (compile: 1717µs, render: 42ms)
+✓ Compiled in 178ms
+ PUT /api/persistence 200 in 61ms (compile: 2ms, render: 59ms)
+ PUT /api/persistence 200 in 50ms (compile: 3ms, render: 47ms)
+ PUT /api/persistence 200 in 47ms (compile: 2ms, render: 44ms)
+ PUT /api/persistence 200 in 41ms (compile: 1734µs, render: 40ms)
+ PUT /api/persistence 200 in 58ms (compile: 1942µs, render: 56ms)
+✓ Compiled in 156ms
+ GET / 200 in 401ms (compile: 61ms, render: 340ms)
+ GET /api/persistence 200 in 72ms (compile: 2ms, render: 70ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1694µs, render: 4ms)
+ GET /api/quest-templates 200 in 6ms (compile: 2ms, render: 4ms)
+ PUT /api/persistence 200 in 48ms (compile: 2ms, render: 46ms)
+✓ Compiled in 247ms
+ GET / 200 in 381ms (compile: 64ms, render: 317ms)
+ GET /api/persistence 200 in 60ms (compile: 2ms, render: 58ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 1990µs, render: 5ms)
+ GET /api/quest-templates 200 in 6ms (compile: 2ms, render: 3ms)
+ PUT /api/persistence 200 in 51ms (compile: 2ms, render: 49ms)
+ PUT /api/persistence 200 in 57ms (compile: 3ms, render: 54ms)
+ PUT /api/persistence 200 in 49ms (compile: 3ms, render: 46ms)
+ PUT /api/persistence 200 in 44ms (compile: 1789µs, render: 43ms)
+ PUT /api/persistence 200 in 47ms (compile: 1622µs, render: 45ms)
+ PUT /api/persistence 200 in 46ms (compile: 1938µs, render: 44ms)
+ PUT /api/persistence 200 in 45ms (compile: 2ms, render: 43ms)
+ PUT /api/persistence 200 in 45ms (compile: 2ms, render: 42ms)
+✓ Compiled in 171ms
+✓ Compiled in 222ms
+✓ Compiled in 143ms
+✓ Compiled in 161ms
+✓ Compiled in 163ms
+✓ Compiled in 369ms
+✓ Compiled in 194ms
+ GET / 200 in 401ms (compile: 61ms, render: 340ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 3ms, render: 5ms)
+ GET /api/persistence 200 in 57ms (compile: 1303µs, render: 55ms)
+ GET /api/quest-templates 200 in 6ms (compile: 1922µs, render: 4ms)
+ PUT /api/persistence 200 in 40ms (compile: 1554µs, render: 38ms)
+ PUT /api/persistence 200 in 51ms (compile: 3ms, render: 48ms)
+ PUT /api/persistence 200 in 57ms (compile: 1942µs, render: 56ms)
+ PUT /api/persistence 200 in 51ms (compile: 1935µs, render: 49ms)
+ PUT /api/persistence 200 in 54ms (compile: 1894µs, render: 52ms)
+ PUT /api/persistence 200 in 44ms (compile: 1857µs, render: 42ms)
+ PUT /api/persistence 200 in 46ms (compile: 1948µs, render: 44ms)
+ PUT /api/persistence 200 in 44ms (compile: 1941µs, render: 42ms)
+ PUT /api/persistence 200 in 45ms (compile: 2ms, render: 43ms)
+✓ Compiled in 144ms
+✓ Compiled in 145ms
+✓ Compiled in 136ms
+✓ Compiled in 143ms
+✓ Compiled in 161ms
+✓ Compiled in 151ms
+✓ Compiled in 142ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /api/persistence 200 in 62ms (compile: 7ms, render: 55ms)
+ GET /api/backgrounds/index 200 in 66ms (compile: 4ms, render: 62ms)
+ GET / 200 in 464ms (compile: 57ms, render: 406ms)
+ GET /api/persistence 200 in 69ms (compile: 2ms, render: 67ms)
+ GET /api/backgrounds/index 200 in 7ms (compile: 2ms, render: 5ms)
+ GET /api/quest-templates 200 in 10ms (compile: 3ms, render: 8ms)
+ PUT /api/persistence 200 in 49ms (compile: 3ms, render: 47ms)
+ PUT /api/persistence 200 in 61ms (compile: 3ms, render: 58ms)
+ PUT /api/persistence 200 in 54ms (compile: 1971µs, render: 52ms)
+ PUT /api/persistence 200 in 66ms (compile: 3ms, render: 64ms)
+ PUT /api/persistence 200 in 46ms (compile: 2ms, render: 44ms)
+ GET /api/quest-templates 200 in 5ms (compile: 1954µs, render: 3ms)
+ GET / 200 in 46ms (compile: 2ms, render: 44ms)
+ GET /api/persistence 200 in 84ms (compile: 1903µs, render: 82ms)
+ GET /api/backgrounds/index 200 in 12ms (compile: 6ms, render: 7ms)
+ GET /api/quest-templates 200 in 6ms (compile: 1841µs, render: 4ms)
+ PUT /api/persistence 200 in 46ms (compile: 1873µs, render: 44ms)
+ PUT /api/persistence 200 in 46ms (compile: 1922µs, render: 44ms)
+ PUT /api/persistence 200 in 44ms (compile: 2ms, render: 42ms)
+ GET /api/sounds/collections 200 in 115ms (compile: 103ms, render: 11ms)
+ PUT /api/persistence 200 in 56ms (compile: 1532µs, render: 55ms)
+ PUT /api/persistence 200 in 44ms (compile: 1809µs, render: 42ms)
+✓ Compiled in 144ms
+ GET /api/sounds/collections 200 in 6ms (compile: 1754µs, render: 4ms)
+✓ Compiled in 145ms
+ GET /api/sounds/collections 200 in 6ms (compile: 1554µs, render: 5ms)
+✓ Compiled in 226ms
+ GET /api/sounds/collections 200 in 5ms (compile: 1684µs, render: 4ms)
+ GET / 200 in 393ms (compile: 53ms, render: 339ms)
+ GET /api/persistence 200 in 57ms (compile: 2ms, render: 55ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 2ms, render: 4ms)
+ GET /api/quest-templates 200 in 6ms (compile: 2ms, render: 4ms)
+ PUT /api/persistence 200 in 51ms (compile: 2ms, render: 49ms)
+ GET /api/sounds/collections 200 in 8ms (compile: 1851µs, render: 6ms)
+ GET /api/sounds/collections 200 in 8ms (compile: 2ms, render: 6ms)
+ GET /api/sounds/collections 200 in 7ms (compile: 2ms, render: 5ms)
+[BgAPI] Found collection.json for "Room"
+ GET /api/backgrounds/collections 200 in 104ms (compile: 94ms, render: 10ms)
+✓ Compiled in 156ms
+ GET /api/quest-templates 200 in 8ms (compile: 3ms, render: 5ms)
+✓ Compiled in 147ms
+✓ Compiled in 132ms
+ PUT /api/persistence 200 in 63ms (compile: 2ms, render: 61ms)
+ PUT /api/persistence 200 in 41ms (compile: 1952µs, render: 39ms)
+ GET /api/sounds/collections 200 in 6ms (compile: 1644µs, render: 4ms)
+✓ Compiled in 151ms
+✓ Compiled in 232ms
+✓ Compiled in 148ms
+ GET / 200 in 74ms (compile: 49ms, render: 25ms)
+ GET / 200 in 277ms (compile: 5ms, render: 272ms)
+ GET /api/persistence 200 in 58ms (compile: 3ms, render: 55ms)
+ GET /api/backgrounds/index 200 in 5ms (compile: 1459µs, render: 3ms)
+ GET /api/quest-templates 200 in 5ms (compile: 1631µs, render: 3ms)
+ GET /api/sounds/collections 200 in 6ms (compile: 1717µs, render: 4ms)
+ PUT /api/persistence 200 in 60ms (compile: 1965µs, render: 58ms)
+ PUT /api/persistence 200 in 61ms (compile: 3ms, render: 58ms)
+ PUT /api/persistence 200 in 75ms (compile: 3ms, render: 73ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: test',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[QuestHandler] Processing quest "Mision imposible" with 2 objectives
+[QuestHandler] Objective "Objetivo tenebroso y medico" - filter: {"enabled":true,"mode":"include","characterIds":["fbbdc8e8-12e1-421b-8a38-d4a37231de2a"]}, characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isInList: true, mode: include, isVisible: true
+[QuestHandler] Objective "objetivo sin precedentes" - filter: {"enabled":true,"mode":"include","characterIds":["611876f7-399e-49a3-a32f-aa847e8f28da"]}, characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isInList: false, mode: include, isVisible: false
+[QuestHandler] Quest "Mision imposible" - visible objectives: 1 of 2
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 828ms (compile: 52ms, render: 776ms)
+ PUT /api/persistence 200 in 43ms (compile: 2ms, render: 41ms)
+ GET /api/sounds/collections 200 in 6ms (compile: 1662µs, render: 4ms)
+ PUT /api/persistence 200 in 61ms (compile: 2ms, render: 59ms)
+ PUT /api/persistence 200 in 47ms (compile: 1882µs, render: 45ms)
+ PUT /api/persistence 200 in 48ms (compile: 1905µs, render: 46ms)
+ PUT /api/persistence 200 in 52ms (compile: 2ms, render: 50ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: 'Dra. Moon solicitó "dar_test" a el usuario: test',
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[QuestHandler] Processing quest "Mision imposible" with 2 objectives
+[QuestHandler] Objective "Objetivo tenebroso y medico" - filter: {"enabled":true,"mode":"include","characterIds":["fbbdc8e8-12e1-421b-8a38-d4a37231de2a"]}, characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isInList: true, mode: include, isVisible: true
+[QuestHandler] Objective "objetivo sin precedentes" - filter: {"enabled":true,"mode":"include","characterIds":["611876f7-399e-49a3-a32f-aa847e8f28da"]}, characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isInList: false, mode: include, isVisible: false
+[QuestHandler] Quest "Mision imposible" - visible objectives: 1 of 2
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: true,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: 'Dra. Moon solicitó "dar_test" a el usuario: test'
+}
+[resolveEventKeys] Built eventosBlock: [ESTADO RECIENTE]
+- ultima_solicitud_realizada : Dra. Moon solicitó "dar_test" a el usuario: test
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 767ms (compile: 1664µs, render: 765ms)
+ PUT /api/persistence 200 in 45ms (compile: 1801µs, render: 43ms)
+ PUT /api/persistence 200 in 41ms (compile: 1662µs, render: 40ms)
+ GET /api/sounds/collections 200 in 6ms (compile: 1676µs, render: 4ms)
+✓ Compiled in 153ms
+ GET /api/backgrounds/index 200 in 7ms (compile: 1800µs, render: 6ms)
+✓ Compiled in 165ms
+✓ Compiled in 160ms
+ GET / 200 in 421ms (compile: 56ms, render: 365ms)
+ GET /api/persistence 200 in 60ms (compile: 2ms, render: 57ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1835µs, render: 5ms)
+ GET /api/quest-templates 200 in 8ms (compile: 3ms, render: 5ms)
+ PUT /api/persistence 200 in 54ms (compile: 2ms, render: 52ms)
+ GET /api/sounds/collections 200 in 8ms (compile: 2ms, render: 6ms)
+ POST /api/chat/stream 500 in 78ms (compile: 51ms, render: 27ms)
+ PUT /api/persistence 200 in 100ms (compile: 2ms, render: 98ms)
+ PUT /api/persistence 200 in 43ms (compile: 2ms, render: 41ms)
+ POST /api/chat/stream 500 in 23ms (compile: 2ms, render: 21ms)
+ PUT /api/persistence 200 in 47ms (compile: 1955µs, render: 45ms)
+ PUT /api/persistence 200 in 42ms (compile: 1832µs, render: 40ms)
+ GET / 200 in 32ms (compile: 2ms, render: 30ms)
+ GET /api/persistence 200 in 59ms (compile: 1672µs, render: 57ms)
+ GET /api/backgrounds/index 200 in 6ms (compile: 1339µs, render: 5ms)
+ GET /api/quest-templates 200 in 5ms (compile: 1729µs, render: 3ms)
+ PUT /api/persistence 200 in 44ms (compile: 2ms, render: 42ms)
+[Stream Route] sessionStats event fields: {
+  hasSessionStats: true,
+  ultimo_objetivo_completado: undefined,
+  ultima_solicitud_realizada: undefined,
+  ultima_solicitud_completada: undefined,
+  ultima_accion_realizada: undefined
+}
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveSoundKeys] Resolving {{sonidos}} for character: {
+  characterId: 'fbbdc8e8-12e1-421b-8a38-d4a37231de2a',
+  hasSoundTriggers: true,
+  soundTriggersCount: 2,
+  soundTriggersData: [
+    {
+      id: 'f0fe8a3f-4153-4320-8ded-6b65b438e00f',
+      name: 'glohg',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: [Array]
+    },
+    {
+      id: '7435a464-45d4-4bb4-bbff-d86215394558',
+      name: 'gluck',
+      active: true,
+      keywords: [Array],
+      description: undefined,
+      characterIds: undefined
+    }
+  ]
+}
+[resolveSoundKeys] Filtered triggers: {
+  totalTriggers: 2,
+  activeTriggers: 2,
+  characterTriggers: 2,
+  characterTriggersData: [
+    { name: 'glohg', keywords: [Array], description: undefined },
+    { name: 'gluck', keywords: [Array], description: undefined }
+  ]
+}
+[resolveSoundKeys] Built sound list: [SONIDOS DISPONIBLES]
+- glohg: Sonido: glohg
+- gluck: Sonido: gluck
+- reglas
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[QuestHandler] buildQuestPromptSection called with characterId: fbbdc8e8-12e1-421b-8a38-d4a37231de2a, isForNarrator: false, hasPrefix: false
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[resolveEventKeys] sessionStats received for {{eventos}}: {
+  hasUltimoObjetivo: false,
+  hasUltimaSolicitudRealizada: false,
+  hasUltimaSolicitudCompletada: false,
+  hasUltimaAccion: false,
+  ultimoObjetivoValue: undefined,
+  ultimaSolicitudRealizadaValue: undefined
+}
+[resolveEventKeys] Built eventosBlock: 
+[Stream Route] Using TEST-MOCK provider for peticiones testing
+[Stream Route] Mock response: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]...
+ POST /api/chat/stream 200 in 826ms (compile: 37ms, render: 789ms)
+ PUT /api/persistence 200 in 44ms (compile: 1620µs, render: 42ms)
+ PUT /api/persistence 200 in 42ms (compile: 1709µs, render: 40ms)

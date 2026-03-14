@@ -742,6 +742,8 @@ export interface Persona {
 export interface SoundTrigger {
   id: string;
   name: string;
+  description: string;              // Description of the sound for {{sonidos}} template
+  characterIds: string[];           // Characters this sound is associated with (for {{sonidos}} filtering)
   active: boolean;
   keywords: string[];
   keywordsEnabled: Record<string, boolean>;
@@ -767,6 +769,9 @@ export interface SoundSettings {
   maxSoundsPerMessage: number;
   globalCooldown: number;
   realtimeEnabled: boolean;
+  // Template for {{sonidos}} key resolution
+  soundListPrefix?: string;         // Text before the sound list
+  soundListSuffix?: string;         // Text after the sound list
 }
 
 // Sound Sequence Trigger - plays multiple sound triggers in sequence
@@ -1040,7 +1045,12 @@ export type ChatboxTheme =
   | 'ocean'        // Blue ocean theme
   | 'lavender'     // Soft purple
   | 'cherry'       // Pink sakura theme
-  | 'custom';      // User-defined colors
+  | 'custom'       // User-defined colors
+  | 'cyberpunk'    // Neon effects, glitch animations
+  | 'steampunk'    // Victorian industrial, brass/copper
+  | 'gothic'       // Dark elegant, ornate borders
+  | 'retro'        // 80s/90s CRT aesthetic
+  | 'pixelart';    // 8-bit/16-bit retro gaming
 
 // Avatar shape options
 export type AvatarShape = 'circle' | 'square' | 'rounded' | 'rectangular';
@@ -1146,6 +1156,48 @@ export interface ChatboxInputSettings {
   fontSize: 'sm' | 'base' | 'lg';
 }
 
+// Theme color presets for special themes
+export interface ThemeColorPreset {
+  primary: string;
+  secondary: string;
+  background: string;
+  accent: string;
+}
+
+// Theme color presets map
+export const THEME_COLOR_PRESETS: Record<string, ThemeColorPreset> = {
+  cyberpunk: {
+    primary: '#00FFFF',    // Neon Cyan
+    secondary: '#FF00FF',  // Neon Magenta
+    background: '#0A0A0F', // Deep Black
+    accent: '#39FF14',     // Toxic Green
+  },
+  steampunk: {
+    primary: '#B5A642',    // Brass
+    secondary: '#B87333',  // Copper
+    background: '#3C2415', // Dark Leather
+    accent: '#4A7C59',     // Patina Green
+  },
+  gothic: {
+    primary: '#C0C0C0',    // Silver
+    secondary: '#8B0000',  // Blood Red
+    background: '#0D0D0D', // Deep Black
+    accent: '#9966CC',     // Amethyst
+  },
+  retro: {
+    primary: '#00FF00',    // CGA Green
+    secondary: '#00FFFF',  // CGA Cyan
+    background: '#0A0A0A', // CRT Black
+    accent: '#FF00FF',     // CGA Magenta
+  },
+  pixelart: {
+    primary: '#00A800',    // NES Green
+    secondary: '#F83800',  // NES Red
+    background: '#0A0A0A', // Black
+    accent: '#FCFCFC',     // White
+  },
+};
+
 // Complete chatbox appearance settings
 export interface ChatboxAppearanceSettings {
   // Theme
@@ -1179,6 +1231,11 @@ export interface ChatboxAppearanceSettings {
   animateEntry: boolean;
   entryAnimation: 'fade' | 'slide' | 'scale' | 'none';
   animationDurationMs: number;
+  
+  // Theme Effects (NEW)
+  enableAnimations: boolean;   // Enable animated theme effects
+  enableParticles: boolean;    // Enable floating particles
+  animationIntensity: number;  // 0-100, controls animation speed/visibility
 }
 
 // Default chatbox appearance settings
@@ -1270,6 +1327,11 @@ export const DEFAULT_CHATBOX_APPEARANCE: ChatboxAppearanceSettings = {
   animateEntry: true,
   entryAnimation: 'fade',
   animationDurationMs: 200,
+  
+  // Theme Effects
+  enableAnimations: true,
+  enableParticles: true,
+  animationIntensity: 50,
 };
 
 export interface AppSettings {
@@ -2819,6 +2881,7 @@ export interface SolicitudDefinition {
   solicitudKey: string;            // Key para completar la solicitud (quien la recibe escribe esto)
   peticionDescription: string;     // Descripción que ve quien hace la petición
   solicitudDescription: string;    // Descripción que ve quien recibe la solicitud
+  completionDescription?: string;  // Descripción que se guarda en ultima_solicitud_completada al completar
   requirements: StatRequirement[]; // Requisitos para que la solicitud esté disponible
 
   // Activation keys for Peticion (alternative keys for detection)

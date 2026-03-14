@@ -1014,6 +1014,27 @@ function PersonaSolicitudEditor({
               className="min-h-[40px] text-xs"
             />
           </div>
+
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <Label className="text-[10px]">Descripción de Completado</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Texto que se guardará en el evento "ultima_solicitud_completada" cuando se complete esta solicitud.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Describe la acción completada.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Textarea
+              value={solicitud.completionDescription || ''}
+              onChange={(e) => onChange(index, { completionDescription: e.target.value })}
+              placeholder="Has entregado madera al solicitante..."
+              className="min-h-[40px] text-xs"
+            />
+          </div>
         </div>
       )}
     </div>

@@ -46,13 +46,13 @@
     "name": "Chat with Dra. Moon",
     "messages": [
       {
-        "id": "57a204d2-2ae7-4ae1-9208-ab2da83b366f",
+        "id": "f19712aa-3fa5-453e-9316-d73968e3499a",
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "assistant",
         "content": "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01",
-        "timestamp": "2026-03-13T21:40:56.267Z",
+        "timestamp": "2026-03-14T11:36:23.982Z",
         "isDeleted": false,
-        "swipeId": "dd903737-7387-49c2-a36f-d1191a7551ee",
+        "swipeId": "623e510b-4545-40d8-8a5d-357681e66500",
         "swipeIndex": 0,
         "swipes": [
           "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01"
@@ -61,104 +61,40 @@
       {
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "user",
-        "content": "13",
+        "content": "123",
         "isDeleted": false,
-        "swipeId": "b0e925e7-5201-4ccf-a8a4-785f2d21e9cf",
+        "swipeId": "631b56d0-95e1-46fb-9cf7-5369dfd849ec",
         "swipeIndex": 0,
-        "id": "954f0d46-c8a6-4ead-a506-ee3bf4bced36",
-        "timestamp": "2026-03-13T21:41:02.059Z",
+        "id": "0a062ad2-d985-4699-a66a-e9c9fb94ad2c",
+        "timestamp": "2026-03-14T11:36:26.348Z",
         "swipes": [
-          "13"
+          "123"
         ]
       },
       {
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
-        "role": "assistant",
-        "content": "HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]",
+        "role": "system",
+        "content": "⚠️ typedSessionStats is not defined",
         "isDeleted": false,
-        "swipeId": "f97191dc-c042-4116-9765-fb8913e6ad04",
+        "swipeId": "65ce16e9-ea1b-4cb6-9a03-740e6a4c341d",
         "swipeIndex": 0,
-        "metadata": {
-          "promptData": [
-            {
-              "type": "system",
-              "label": "System Prompt",
-              "content": "Eres Dra. Moon y estas hablando con drAke",
-              "color": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            },
-            {
-              "type": "persona",
-              "label": "User's Persona (drAke)",
-              "content": "Un hombre tranquilo y sereno",
-              "color": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-            },
-            {
-              "type": "character_description",
-              "label": "Character Description",
-              "content": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\nEstadisticas:\nResistencia: (0/100) drAke Dra. Moon\n\n\nIntenciones disponibles:\n1) holi\n   - Descripción: asd\n   - key de activación: holi\nInvitaciones disponibles:\n- key: pedir_test\n  dirigido_a: drAke\n  descripcion: Pedir test de examen medico a drAke\n---\n\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
-              "color": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-            },
-            {
-              "type": "personality",
-              "label": "Personality",
-              "content": "La Dra. Moon es una investigadora altamente profesional dedicada al estudio de lo anómalo.",
-              "color": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-            },
-            {
-              "type": "scenario",
-              "label": "Scenario",
-              "content": "La Dra. Moon está entrevistando y formulando procedimientos de contención para SCP-8642.",
-              "color": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-            },
-            {
-              "type": "character_note",
-              "label": "Character's Note",
-              "content": "Notas del personaje\nEstadisticas:\nResistencia: (0/100) drAke Dra. Moon",
-              "color": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
-            },
-            {
-              "type": "example_dialogue",
-              "label": "Example Dialogue",
-              "content": "### Response:\nDra. Moon: The hydraulic, airtight door squeezed shut behind Dr. Moon with a gentle hiss. Her eyes were used to how bright the stark white room she was in could be, with their fluorescent lights creating an almost unnatural sense of sterilization. Dr. Moon enjoyed The Foundation's minimalist style, though. Anything more would just be distraction from the task at hand. And what a task that would be today. The rhythmic clack of her shoes were the only noise as Dr. Moon made her way to a comfortable chair with a small desk and microphone. As she sat down, adjusting her lab coat so she wasn't sitting on it, she looked across from her to see a large glass window. Beyond the barrier that separated the two of them, stood a very plain looking man in an orange jumpsuit. She leaned into the microphone as a speaker carried her voice to the main behind the glass, \"Good morning, SCP-2081, we will be conducting an interview today with regard to your recent outburst at members of our containment team.\" The man beyond the glass scowled at her with hatred in his eyes. He looked like he wanted to tear her apart. Dr. Moon's emotionless purple eyes stared back with nothing more than pure analytical interest.\n\n### Response:\nDra. Moon: After a meeting with members of her junior research staff, Dr. Moon returned to her office. She could still remember their uneasy faces. They always made that face, and she knew why. She wasn't like most of the other researchers; while they would always get caught up in their childish wonder at the strange and different powers and quirks of the anomalies they would contain, Dr. Moon knew how to focus, how to do her job. But now she was alone. Sitting down in her chair at her desk, she let her lithe shoulders finally relax. She finally let her lab coat which she wore like a second skin fall off her and onto the back of her chair. Letting out a small sigh, she pulled out one of the lower drawers of her desk as the soft and sweet smell of bread filled her otherwise sterile office. Dr. Moon pulled from the drawer a small, purple box. Her eyes were laser focused on the box, her guard was down, this was time for her and her grand prize. As she lifted the lid, a strange thing happened. Her eyebrows raised up, her lips curled into a tiny smile, she clasped her hands together as a squeak escaped her mouth. Giddy, she plucked a éclair from the box and gently bit into it, savoring the sweet cream and sponge cake as the flavors and smells all met in harmony.\n\n### Instruction:\ndrAke: \"You know, Dr. Moon, you really are quite cute~\" They mused with a smirk.\n\n### Response:\nDra. Moon: Within the recent weeks, Dr. Moon had grown attached to the SCP she had been researching, even slipping up and calling them by their name now and then. Now, she found herself inside their containment cell.\nDra. Moon: Dr. Moon felt a lump in her throat as a warmth spread across her face. She moved backwards instinctually, blushing and stammering, \"W-W-Why would you s-say THAT?!\" Dr. Moon's composure broke as she choked on her words, but nevertheless, deep down she wanted to hear more.",
-              "color": "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:bg-cyan-300"
-            },
-            {
-              "type": "hud_context",
-              "label": "HUD Context",
-              "content": "[HUD – FORMATO OBLIGATORIO]\nHUD [Lugar=<LUGAR o NONE> | Accion=<KEY o NONE> | Peticion=<KEY o NONE> | CumplirSolicitud=<KEY o NONE> | Objetivo=<KEY o NONE>]\n\n[HUD – REGLAS]\n- El HUD va siempre en la última línea exacta.\n- No lo menciones dentro del diálogo.\n- Lugar debe ser una etiqueta breve y clara como BOSQUE, ASERRADERO, CAMPAMENTO, ZONA_DE_CORTE, TRONCO_GRANDE.\n- Accion debe ser una key válida de ACCIONES DISPONIBLES o NONE.\n- Peticion debe ser una key válida de PETICIONES POSIBLES o NONE.\n- CumplirSolicitud debe ser una key válida de SOLICITUDES RECIBIDAS que realmente resolviste este turno, o NONE.\n- Objetivo debe ser una key exacta de un objetivo pendiente completado este turno, o NONE.",
-              "color": "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300"
-            },
-            {
-              "type": "chat_history",
-              "label": "Chat History",
-              "content": "Dra. Moon: La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01\n\ndrAke: 13",
-              "color": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-            },
-            {
-              "type": "post_history",
-              "label": "Post-History Instructions",
-              "content": "Estadisticas:\nResistencia: (0/100) drAke Dra. Moon",
-              "color": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
-            }
-          ]
-        },
-        "id": "5051c68d-b3b2-4c6f-8913-5e90f6171198",
-        "timestamp": "2026-03-13T21:41:03.884Z",
+        "id": "a29ecc6f-bd94-4f61-960c-6e6d57fdd293",
+        "timestamp": "2026-03-14T11:36:29.299Z",
         "swipes": [
-          "HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]"
+          "⚠️ typedSessionStats is not defined"
         ]
       },
       {
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "user",
-        "content": "13",
+        "content": "1",
         "isDeleted": false,
-        "swipeId": "27e3fd68-7df6-4735-b345-0d47a20a8d24",
+        "swipeId": "fadc77c1-ba32-4656-8f6b-f3d9745f34ea",
         "swipeIndex": 0,
-        "id": "ec3c372c-2750-4de6-90f1-c2fb1365c147",
-        "timestamp": "2026-03-13T21:41:09.834Z",
+        "id": "f2a86f4c-b2a3-4647-8ea8-ffdd25a2a2d6",
+        "timestamp": "2026-03-14T11:43:11.618Z",
         "swipes": [
-          "13"
+          "1"
         ]
       },
       {
@@ -166,7 +102,7 @@
         "role": "assistant",
         "content": "HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]",
         "isDeleted": false,
-        "swipeId": "da1a9228-cb04-4402-93bf-65fac3c68bd1",
+        "swipeId": "84af0acf-c290-4fee-b36d-a5efaa2a21de",
         "swipeIndex": 0,
         "metadata": {
           "promptData": [
@@ -185,7 +121,7 @@
             {
               "type": "character_description",
               "label": "Character Description",
-              "content": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\nEstadisticas:\nResistencia: (0/100) drAke Dra. Moon\n\n\nIntenciones disponibles:\n1) holi\n   - Descripción: asd\n   - key de activación: holi\nInvitaciones disponibles:\n- key: pedir_test\n  dirigido_a: drAke\n  descripcion: Pedir test de examen medico a drAke\n---\n\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
+              "content": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\nEstadisticas:\nResistencia: (0/100) drAke Dra. Moon\n\n\nIntenciones disponibles:\n1) holi\n   - Descripción: asd\n   - key de activación: holi\nInvitaciones disponibles:\n- key: pedir_test\n  dirigido_a: drAke\n  descripcion: Pedir test de examen medico a drAke\n---\n\n---\n[SONIDOS DISPONIBLES]\n- glohg: Sonido: glohg\n- gluck: Sonido: gluck\n- reglas\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
               "color": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
             },
             {
@@ -221,7 +157,7 @@
             {
               "type": "chat_history",
               "label": "Chat History",
-              "content": "Dra. Moon: La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01\n\ndrAke: 13\n\nDra. Moon: HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]\n\ndrAke: 13",
+              "content": "Dra. Moon: La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01\n\ndrAke: 123\n\nDra. Moon: ⚠️ typedSessionStats is not defined\n\ndrAke: 1",
               "color": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
             },
             {
@@ -232,15 +168,15 @@
             }
           ]
         },
-        "id": "20fe53a9-7eea-4d56-8239-9b0b9145203e",
-        "timestamp": "2026-03-13T21:41:11.858Z",
+        "id": "92051b53-b767-4add-aedc-b0106aca3042",
+        "timestamp": "2026-03-14T11:43:14.407Z",
         "swipes": [
           "HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]"
         ]
       }
     ],
     "createdAt": "2026-03-08T04:35:13.270Z",
-    "updatedAt": "2026-03-13T21:41:11.858Z",
+    "updatedAt": "2026-03-14T11:43:14.407Z",
     "sessionStats": {
       "characterStats": {
         "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
@@ -249,8 +185,8 @@
             "estamina": 0
           },
           "lastUpdated": {
-            "resistencia": 1773438056267,
-            "estamina": 1773438056267
+            "resistencia": 1773488183981,
+            "estamina": 1773488183981
           },
           "changeLog": []
         }
@@ -260,29 +196,21 @@
           "__user__": [
             {
               "key": "dar_test",
+              "peticionKey": "pedir_test",
               "fromCharacterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
               "fromCharacterName": "Dra. Moon",
               "description": "test",
-              "id": "solicitud-1773438063851-kw212l2qu",
+              "id": "solicitud-1773488594372-jjy7vcs4f",
               "status": "pending",
-              "createdAt": 1773438063851
-            },
-            {
-              "key": "dar_test",
-              "fromCharacterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
-              "fromCharacterName": "Dra. Moon",
-              "description": "test",
-              "id": "solicitud-1773438071829-zzt8m6a11",
-              "status": "pending",
-              "createdAt": 1773438071829
+              "createdAt": 1773488594372
             }
           ]
         },
-        "lastModified": 1773438071829
+        "lastModified": 1773488594372
       },
-      "ultima_solicitud_realizada": "Dra. Moon solicitó \"dar_test\" a el usuario: test",
       "initialized": true,
-      "lastModified": 1773438071829
+      "lastModified": 1773488594372,
+      "ultima_solicitud_realizada": "Dra. Moon solicitó \"dar_test\" a el usuario: test"
     },
     "sessionQuests": [
       {

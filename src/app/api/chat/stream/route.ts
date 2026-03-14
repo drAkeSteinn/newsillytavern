@@ -8,7 +8,7 @@
 // - All sections are processed consistently
 
 import { NextRequest } from 'next/server';
-import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance, SessionSummary } from '@/types';
+import type { ChatMessage, CharacterCard, LLMConfig, Persona, PromptSection, Lorebook, SessionStats, HUDContextConfig, QuestSettings, QuestTemplate, SessionQuestInstance, SessionSummary, SoundTrigger, AppSettings } from '@/types';
 import { DEFAULT_QUEST_SETTINGS } from '@/types';
 import {
   DEFAULT_CHARACTER,
@@ -81,19 +81,20 @@ export async function POST(request: NextRequest) {
       ...(body.questSettings || {})
     };
 
+    // Extract Sound data for {{sonidos}} key resolution
+    const soundTriggers: SoundTrigger[] = body.soundTriggers || [];
+    const soundSettings = body.settings?.sound;
+
     // Extract summary for memory/context compression (single summary from session)
     const summary: SessionSummary | undefined = body.summary;
-
-    // Cast sessionStats to proper type
-    const typedSessionStats = sessionStats as SessionStats | undefined;
     
     // Debug: Log sessionStats event fields
     console.log(`[Stream Route] sessionStats event fields:`, {
-      hasSessionStats: !!typedSessionStats,
-      ultimo_objetivo_completado: typedSessionStats?.ultimo_objetivo_completado,
-      ultima_solicitud_realizada: typedSessionStats?.ultima_solicitud_realizada,
-      ultima_solicitud_completada: typedSessionStats?.ultima_solicitud_completada,
-      ultima_accion_realizada: typedSessionStats?.ultima_accion_realizada,
+      hasSessionStats: !!sessionStats,
+      ultimo_objetivo_completado: sessionStats?.ultimo_objetivo_completado,
+      ultima_solicitud_realizada: sessionStats?.ultima_solicitud_realizada,
+      ultima_solicitud_completada: sessionStats?.ultima_solicitud_completada,
+      ultima_accion_realizada: sessionStats?.ultima_accion_realizada,
     });
 
     if (!llmConfig) {
@@ -134,21 +135,24 @@ export async function POST(request: NextRequest) {
     // This handles ALL key resolution internally:
     // - Template variables: {{user}}, {{char}}, {{userpersona}}
     // - Stats keys: {{resistencia}}, {{habilidades}}, etc.
+    // - Sound keys: {{sonidos}}
     // - All sections including post-history instructions
     const { prompt: systemPrompt, sections: systemSections } = buildSystemPrompt(
       effectiveCharacter,
       effectiveUserName,
       persona,
       lorebookSection,
-      typedSessionStats,
-      allCharacters // Pass all characters for peticiones/solicitudes resolution
+      sessionStats,
+      allCharacters, // Pass all characters for peticiones/solicitudes resolution
+      soundTriggers, // Pass soundTriggers for {{sonidos}} resolution
+      soundSettings  // Pass sound settings for {{sonidos}} template
     );
 
     // Build key resolution context for HUD context and quest sections
     const resolvedStats = resolveStats({
       characterId: effectiveCharacter.id,
       statsConfig: effectiveCharacter.statsConfig,
-      sessionStats: typedSessionStats,
+      sessionStats: sessionStats,
       allCharacters,
       userName: effectiveUserName,
       characterName: effectiveCharacter.name,
@@ -158,7 +162,9 @@ export async function POST(request: NextRequest) {
       effectiveUserName,
       persona,
       resolvedStats,
-      typedSessionStats  // Pass sessionStats for {{eventos}} key resolution
+      sessionStats,  // Pass sessionStats for {{eventos}} key resolution
+      soundTriggers,   // Pass soundTriggers for {{sonidos}} key resolution
+      soundSettings  // Pass sound settings for {{sonidos}} template
     );
 
     // Build HUD context section if enabled (now resolves keys!)

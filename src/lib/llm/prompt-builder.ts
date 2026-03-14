@@ -15,6 +15,8 @@ import type {
   HUDContextConfig,
   QuestTemplate,
   SessionQuestInstance,
+  SoundTrigger,
+  AppSettings,
 } from '@/types';
 import type { ChatApiMessage, CompletionPromptConfig, GroupPromptBuildResult } from './types';
 import { processExampleDialogue } from '@/lib/prompt-template';
@@ -333,6 +335,7 @@ export interface PromptBuildOptions {
  * Uses unified key resolution for ALL sections:
  * - Template variables: {{user}}, {{char}}, {{userpersona}}, etc.
  * - Stats keys: {{resistencia}}, {{habilidades}}, etc.
+ * - Sound keys: {{sonidos}}
  */
 export function buildSystemPrompt(
   character: CharacterCard,
@@ -340,7 +343,9 @@ export function buildSystemPrompt(
   persona?: Persona,
   lorebookSection?: PromptSection | null,
   sessionStats?: SessionStats,
-  allCharacters?: CharacterCard[]
+  allCharacters?: CharacterCard[],
+  soundTriggers?: SoundTrigger[],
+  soundSettings?: AppSettings['sound']
 ): { prompt: string; sections: PromptSection[] } {
   const sections: PromptSection[] = [];
 
@@ -355,7 +360,7 @@ export function buildSystemPrompt(
   });
 
   // Build unified key resolution context
-  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats, sessionStats);
+  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats, sessionStats, soundTriggers, soundSettings);
 
   // Main system instruction
   // If character has a custom system prompt, use it instead of the default

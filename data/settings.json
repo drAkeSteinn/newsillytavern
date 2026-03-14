@@ -29,7 +29,8 @@
     "globalVolume": 0.85,
     "maxSoundsPerMessage": 50,
     "globalCooldown": 150,
-    "realtimeEnabled": true
+    "realtimeEnabled": true,
+    "soundListSuffix": "- reglas"
   },
   "backgroundTriggers": {
     "enabled": true,
@@ -43,8 +44,8 @@
     "novelMode": true,
     "chatWidth": 85,
     "chatHeight": 36,
-    "chatX": 52.23315242554039,
-    "chatY": 82,
+    "chatX": 45.543818437102296,
+    "chatY": 75.33333333333333,
     "chatOpacity": 1,
     "blurBackground": false,
     "showCharacterSprite": true
@@ -58,7 +59,7 @@
     "summaryThreshold": 40
   },
   "chatboxAppearance": {
-    "theme": "default",
+    "theme": "sunset",
     "background": {
       "transparency": 0.95,
       "blur": 8,

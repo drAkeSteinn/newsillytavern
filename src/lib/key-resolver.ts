@@ -14,7 +14,7 @@
 // This ensures that lorebooks injected after template processing
 // still get their keys resolved properly.
 
-import type { CharacterCard, Persona, SessionStats } from '@/types';
+import type { CharacterCard, Persona, SessionStats, SoundTrigger, AppSettings } from '@/types';
 import type { ResolvedStats } from '@/types';
 import { resolveStatsInText } from '@/lib/stats/stats-resolver';
 
@@ -42,6 +42,10 @@ export interface KeyResolutionContext {
   // Session stats for event keys ({{solicitante}}, {{solicitado}}, {{eventos}})
   sessionStats?: SessionStats | null;
   characterId?: string;  // ID of the current character for looking up solicitudes
+
+  // Sound triggers for {{sonidos}} key
+  soundTriggers?: SoundTrigger[];
+  soundSettings?: AppSettings['sound'];
 }
 
 // ============================================
@@ -252,6 +256,130 @@ function buildEventosBlock(sessionStats: SessionStats): string {
 }
 
 // ============================================
+// Phase 4: Sound Key Resolution
+// ============================================
+
+/**
+ * Resolve {{sonidos}} key in text
+ * Shows a list of sounds available for the current character
+ * 
+ * Format:
+ * [SONIDOS DISPONIBLES]
+ * - keyword: descripción del sonido
+ * - keyword2: otra descripción
+ */
+export function resolveSoundKeys(
+  text: string,
+  context: KeyResolutionContext
+): string {
+  if (!text) return text;
+
+  let result = text;
+
+  // Check if {{sonidos}} is present
+  if (!/\{\{sonidos\}\}/gi.test(result)) {
+    return result;
+  }
+
+  // Get sound triggers for this character
+  const { soundTriggers, soundSettings, characterId } = context;
+
+  console.log(`[resolveSoundKeys] Resolving {{sonidos}} for character:`, {
+    characterId,
+    hasSoundTriggers: !!soundTriggers,
+    soundTriggersCount: soundTriggers?.length || 0,
+    soundTriggersData: soundTriggers?.map(t => ({
+      id: t.id,
+      name: t.name,
+      active: t.active,
+      keywords: t.keywords,
+      description: t.description,
+      characterIds: t.characterIds
+    }))
+  });
+
+  if (!soundTriggers || soundTriggers.length === 0) {
+    // No sound triggers configured - remove the key
+    console.log(`[resolveSoundKeys] No sound triggers configured, removing {{sonidos}}`);
+    return result.replace(/\{\{sonidos\}\}/gi, '');
+  }
+
+  // Filter triggers for this character
+  // A trigger is available to a character if:
+  // 1. characterIds is empty (available to all), OR
+  // 2. characterIds includes the current character's ID
+  const characterTriggers = soundTriggers.filter(trigger => {
+    if (!trigger.active) return false;
+    if (!trigger.characterIds || trigger.characterIds.length === 0) return true;
+    if (characterId && trigger.characterIds.includes(characterId)) return true;
+    return false;
+  });
+
+  console.log(`[resolveSoundKeys] Filtered triggers:`, {
+    totalTriggers: soundTriggers.length,
+    activeTriggers: soundTriggers.filter(t => t.active).length,
+    characterTriggers: characterTriggers.length,
+    characterTriggersData: characterTriggers.map(t => ({
+      name: t.name,
+      keywords: t.keywords,
+      description: t.description
+    }))
+  });
+
+  // Build the sound list
+  const soundList = buildSonidosBlock(characterTriggers, soundSettings);
+
+  console.log(`[resolveSoundKeys] Built sound list:`, soundList);
+
+  result = result.replace(/\{\{sonidos\}\}/gi, soundList);
+
+  return result;
+}
+
+/**
+ * Build the sonidos block showing available sounds for a character
+ * Format:
+ * [PREFIX]
+ * - keyword: descripción del sonido
+ * [SUFFIX]
+ */
+function buildSonidosBlock(
+  triggers: SoundTrigger[],
+  soundSettings?: AppSettings['sound']
+): string {
+  if (triggers.length === 0) {
+    return '';
+  }
+
+  const lines: string[] = [];
+
+  // Add prefix if configured
+  const prefix = soundSettings?.soundListPrefix || '[SONIDOS DISPONIBLES]';
+  if (prefix) {
+    lines.push(prefix);
+  }
+
+  // Add each sound
+  triggers.forEach(trigger => {
+    // Get the primary keyword for this trigger
+    const primaryKeyword = trigger.keywords.find(kw => trigger.keywordsEnabled[kw] !== false) || trigger.keywords[0];
+    
+    if (primaryKeyword) {
+      const description = trigger.description || `Sonido: ${trigger.name}`;
+      lines.push(`- ${primaryKeyword}: ${description}`);
+    }
+  });
+
+  // Add suffix if configured
+  const suffix = soundSettings?.soundListSuffix || '';
+  if (suffix) {
+    lines.push(suffix);
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================
 // Unified Resolution
 // ============================================
 
@@ -261,6 +389,7 @@ function buildEventosBlock(sessionStats: SessionStats): string {
  * Phase 1: Template variables ({{user}}, {{char}}, conditionals)
  * Phase 2: Stats keys ({{resistencia}}, {{habilidades}}, etc.)
  * Phase 3: Event keys ({{solicitante}}, {{solicitado}}, {{eventos}})
+ * Phase 4: Sound keys ({{sonidos}})
  *
  * This is the main function to use for resolving all keys
  */
@@ -278,6 +407,9 @@ export function resolveAllKeys(
 
   // Phase 3: Resolve event keys
   result = resolveEventKeys(result, context);
+
+  // Phase 4: Resolve sound keys
+  result = resolveSoundKeys(result, context);
 
   return result;
 }
@@ -328,7 +460,9 @@ export function buildKeyResolutionContext(
   userName: string = 'User',
   persona?: Persona,
   resolvedStats?: ResolvedStats | null,
-  sessionStats?: SessionStats | null
+  sessionStats?: SessionStats | null,
+  soundTriggers?: SoundTrigger[],
+  soundSettings?: AppSettings['sound']
 ): KeyResolutionContext {
   return {
     user: persona?.name || userName,
@@ -339,6 +473,8 @@ export function buildKeyResolutionContext(
     resolvedStats,
     sessionStats,
     characterId: character.id,
+    soundTriggers,
+    soundSettings,
   };
 }
 

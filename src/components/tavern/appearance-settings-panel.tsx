@@ -40,6 +40,8 @@ import {
   Circle,
   Monitor,
   Eye,
+  Wand2,
+  Zap,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -58,7 +60,7 @@ import { DEFAULT_CHATBOX_APPEARANCE } from '@/types';
 // Theme Presets
 // ============================================
 
-const THEME_PRESETS: { value: ChatboxTheme; label: string; colors: { primary: string; bg: string } }[] = [
+const THEME_PRESETS: { value: ChatboxTheme; label: string; colors: { primary: string; bg: string }; icon?: string }[] = [
   { value: 'default', label: 'Por defecto', colors: { primary: '#3b82f6', bg: '#18181b' } },
   { value: 'midnight', label: 'Medianoche', colors: { primary: '#6366f1', bg: '#0f0f23' } },
   { value: 'forest', label: 'Bosque', colors: { primary: '#22c55e', bg: '#0a1f0a' } },
@@ -67,6 +69,12 @@ const THEME_PRESETS: { value: ChatboxTheme; label: string; colors: { primary: st
   { value: 'lavender', label: 'Lavanda', colors: { primary: '#a855f7', bg: '#1a0f20' } },
   { value: 'cherry', label: 'Cerezo', colors: { primary: '#ec4899', bg: '#1a0a10' } },
   { value: 'custom', label: 'Personalizado', colors: { primary: '#ffffff', bg: '#000000' } },
+  // Special themes with effects
+  { value: 'cyberpunk', label: 'Cyberpunk', colors: { primary: '#00FFFF', bg: '#0A0A0F' }, icon: '🌆' },
+  { value: 'steampunk', label: 'Steampunk', colors: { primary: '#B5A642', bg: '#3C2415' }, icon: '⚙️' },
+  { value: 'gothic', label: 'Gótico', colors: { primary: '#C0C0C0', bg: '#0D0D0D' }, icon: '🕯️' },
+  { value: 'retro', label: 'Retro', colors: { primary: '#00FF00', bg: '#0A0A0A' }, icon: '📺' },
+  { value: 'pixelart', label: 'Pixel Art', colors: { primary: '#00A800', bg: '#0A0A0A' }, icon: '👾' },
 ];
 
 // Font family options
@@ -362,6 +370,9 @@ export function AppearanceSettingsPanel() {
   const safeAppearance = useMemo(() => ({
     ...DEFAULT_CHATBOX_APPEARANCE,
     ...appearance,
+    enableAnimations: appearance?.enableAnimations ?? DEFAULT_CHATBOX_APPEARANCE.enableAnimations,
+    enableParticles: appearance?.enableParticles ?? DEFAULT_CHATBOX_APPEARANCE.enableParticles,
+    animationIntensity: appearance?.animationIntensity ?? DEFAULT_CHATBOX_APPEARANCE.animationIntensity,
     background: { ...DEFAULT_CHATBOX_APPEARANCE.background, ...appearance?.background },
     font: { ...DEFAULT_CHATBOX_APPEARANCE.font, ...appearance?.font },
     textFormatting: { ...DEFAULT_CHATBOX_APPEARANCE.textFormatting, ...appearance?.textFormatting },
@@ -371,6 +382,9 @@ export function AppearanceSettingsPanel() {
     streaming: { ...DEFAULT_CHATBOX_APPEARANCE.streaming, ...appearance?.streaming },
     input: { ...DEFAULT_CHATBOX_APPEARANCE.input, ...appearance?.input },
   }), [appearance]);
+  
+  // Check if current theme is a special effects theme
+  const isSpecialTheme = ['cyberpunk', 'steampunk', 'gothic', 'retro', 'pixelart'].includes(safeAppearance.theme);
 
   return (
     <TooltipProvider>
@@ -486,6 +500,80 @@ export function AppearanceSettingsPanel() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Theme Effects - Only for special themes */}
+              {isSpecialTheme && (
+                <Card className="border-purple-500/30 bg-purple-500/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Wand2 className="w-4 h-4 text-purple-500" />
+                      Efectos de Tema
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Animaciones y partículas especiales para este tema
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Animation Toggle */}
+                    <label className="flex items-center justify-between p-2 rounded-lg border cursor-pointer hover:bg-muted/50">
+                      <div className="space-y-0.5">
+                        <Label className="text-xs flex items-center gap-2">
+                          <Zap className="w-3 h-3" />
+                          Animaciones
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Efectos animados temáticos
+                        </p>
+                      </div>
+                      <Switch
+                        checked={safeAppearance.enableAnimations}
+                        onCheckedChange={(enableAnimations) => updateChatboxAppearance({ enableAnimations })}
+                      />
+                    </label>
+                    
+                    {/* Particles Toggle */}
+                    <label className="flex items-center justify-between p-2 rounded-lg border cursor-pointer hover:bg-muted/50">
+                      <div className="space-y-0.5">
+                        <Label className="text-xs flex items-center gap-2">
+                          <Sparkles className="w-3 h-3" />
+                          Partículas
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Partículas flotantes decorativas
+                        </p>
+                      </div>
+                      <Switch
+                        checked={safeAppearance.enableParticles}
+                        onCheckedChange={(enableParticles) => updateChatboxAppearance({ enableParticles })}
+                      />
+                    </label>
+                    
+                    {/* Intensity Slider */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span>Intensidad de efectos</span>
+                        <span className="text-muted-foreground">{safeAppearance.animationIntensity}%</span>
+                      </div>
+                      <Slider
+                        value={[safeAppearance.animationIntensity]}
+                        min={0}
+                        max={100}
+                        step={5}
+                        onValueChange={([animationIntensity]) => updateChatboxAppearance({ animationIntensity })}
+                      />
+                    </div>
+                    
+                    {/* Theme-specific description */}
+                    <div className="p-2 rounded bg-muted/30 text-xs text-muted-foreground">
+                      {safeAppearance.theme === 'cyberpunk' && '🌆 Efectos: Glitch, líneas de escaneo, neones pulsantes'}
+                      {safeAppearance.theme === 'steampunk' && '⚙️ Efectos: Engranajes giratorios, tonos cobrizos'}
+                      {safeAppearance.theme === 'gothic' && '🕯️ Efectos: Luces de vela, ambiente oscuro'}
+                      {safeAppearance.theme === 'retro' && '📺 Efectos: Líneas CRT, fósforo verde'}
+                      {safeAppearance.theme === 'pixelart' && '👾 Efectos: Rejilla de píxeles, partículas 8-bit'}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Background Settings */}
               <Card>

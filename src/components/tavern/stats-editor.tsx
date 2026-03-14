@@ -1788,6 +1788,27 @@ function SolicitudDefinitionEditor({ solicitud, index, availableAttributes, onCh
             />
           </div>
 
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Label className="text-xs">Descripción de Completado</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Texto que se guardará en el evento "ultima_solicitud_completada" cuando se complete esta solicitud.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Describe la acción completada. Se usará en el key {'{{'}eventos{'}}'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Textarea
+              value={solicitud.completionDescription || ''}
+              onChange={(e) => onChange(index, { completionDescription: e.target.value })}
+              placeholder="Has entregado madera al solicitante..."
+              className="min-h-[50px] text-sm"
+            />
+          </div>
+
           {/* Requirements Section */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

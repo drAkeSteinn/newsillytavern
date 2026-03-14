@@ -20,6 +20,33 @@
       "questTitle": "Mision imposible",
       "type": "quest_activated",
       "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1773482904659-q508fv803",
+      "timestamp": "2026-03-14T10:08:24.659Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_updated",
+      "message": "Misión desactivada: Mision imposible",
+      "id": "notif-1773482641786-vuzka1ulp",
+      "timestamp": "2026-03-14T10:04:01.786Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1773482603520-jss4udlra",
+      "timestamp": "2026-03-14T10:03:23.520Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
       "id": "notif-1773437884655-ig6v74efd",
       "timestamp": "2026-03-13T21:38:04.655Z",
       "read": true
@@ -724,69 +751,6 @@
       "message": "¡Nueva misión activada: Mision imposible!",
       "id": "notif-1772810332564-ik1ha2b5x",
       "timestamp": "2026-03-06T15:18:52.564Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objective \"Objetivo tenebroso y medico\" completed! Rewards: resistencia: 0 → 10, Sound \"glohg\" queued for playback, Background changed to \"Habitación\"",
-      "rewards": [
-        {
-          "id": "obj-reward-mmbwbjul",
-          "type": "attribute",
-          "key": "resistencia",
-          "value": 10,
-          "action": "add"
-        },
-        {
-          "id": "obj-reward-mmeystt4",
-          "type": "trigger",
-          "trigger": {
-            "category": "sprite",
-            "key": "sprite:ind01",
-            "targetMode": "self"
-          }
-        },
-        {
-          "id": "obj-reward-mmeywuus",
-          "type": "trigger",
-          "trigger": {
-            "category": "sound",
-            "key": "glohg",
-            "targetMode": "self"
-          }
-        },
-        {
-          "id": "obj-reward-mmezfvr3",
-          "type": "trigger",
-          "trigger": {
-            "category": "background",
-            "key": "casa",
-            "targetMode": "self"
-          }
-        }
-      ],
-      "id": "notif-1772810181544-bbgljq4ox",
-      "timestamp": "2026-03-06T15:16:21.544Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "objective_complete",
-      "message": "Objetivo completado: Objetivo tenebroso y medico",
-      "id": "notif-1772810181453-v7fxkam7c",
-      "timestamp": "2026-03-06T15:16:21.453Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1772810152365-x4g4ijuwn",
-      "timestamp": "2026-03-06T15:15:52.365Z",
       "read": true
     }
   ]

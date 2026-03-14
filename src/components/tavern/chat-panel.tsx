@@ -10,7 +10,6 @@ import { useTriggerSystem } from '@/lib/triggers';
 import { useBackgroundTriggers } from '@/hooks/use-background-triggers';
 import { GroupSprites } from './group-sprites';
 import { HUDDisplay } from './hud-display';
-import { QuestHUD } from './quest-hud';
 import { QuestNotifications } from './quest-notifications';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard, SummaryData, ChatMessage } from '@/types';
@@ -47,6 +46,9 @@ export function ChatPanel() {
   // Quests for prompt injection
   const questTemplates = useTavernStore((state) => state.questTemplates);
   const questSettings = useTavernStore((state) => state.questSettings);
+  
+  // Sound triggers for {{sonidos}} key resolution
+  const soundTriggers = useTavernStore((state) => state.soundTriggers);
   
   const setGenerating = useTavernStore((state) => state.setGenerating);
   const addMessage = useTavernStore((state) => state.addMessage);
@@ -423,6 +425,8 @@ export function ChatPanel() {
             questSettings,  // Pass quest settings
             hudContext: activeHUDContext,  // Pass HUD context for prompt injection
             allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
+            soundTriggers,  // Pass sound triggers for {{sonidos}} resolution
+            settings,  // Pass settings for {{sonidos}} template
           })
         });
 
@@ -577,6 +581,8 @@ export function ChatPanel() {
             hudContext: activeHUDContext,  // Pass HUD context for prompt injection
             summary: activeSession?.summary,  // Pass session summary (single, not array)
             allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
+            soundTriggers,  // Pass sound triggers for {{sonidos}} resolution
+            settings,  // Pass settings for {{sonidos}} template
           })
         });
 
@@ -1072,11 +1078,6 @@ export function ChatPanel() {
       {/* HUD Display */}
       {hudSessionState.activeTemplateId && (
         <HUDDisplay />
-      )}
-
-      {/* Quest HUD - Shows active quests */}
-      {questSettings.enabled && (
-        <QuestHUD position="bottom-right" />
       )}
 
       {/* Floating Chat Box */}
