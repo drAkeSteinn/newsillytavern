@@ -355,7 +355,7 @@ export function buildSystemPrompt(
   });
 
   // Build unified key resolution context
-  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats);
+  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats, sessionStats);
 
   // Main system instruction
   // If character has a custom system prompt, use it instead of the default
@@ -703,7 +703,7 @@ export function buildGroupSystemPrompt(
   });
 
   // Build unified key resolution context
-  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats);
+  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats, sessionStats);
 
   // System Prompt Priority: Group > Character > Default
   let systemContent: string;
@@ -945,7 +945,7 @@ export function processCharacter(
   });
 
   // Build key resolution context
-  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats);
+  const keyContext = buildKeyResolutionContext(character, userName, persona, resolvedStats, sessionStats);
 
   // Process all text fields
   return {

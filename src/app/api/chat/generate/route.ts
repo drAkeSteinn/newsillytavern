@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         if (hudContextSection && hudContext) {
           chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
         }
-        response = await callZAI(chatMessages);
+        response = await callZAI(chatMessages, llmConfig.apiKey);
         break;
       }
 

@@ -483,6 +483,35 @@ export function NovelChatBox({
                         </div>
                       );
                     })}
+                    
+                    {/* Session Events Section */}
+                    <div className="space-y-2 pt-2 border-t">
+                      <div className="flex items-center gap-2 pb-1">
+                        <span className="text-xs font-medium text-amber-400">Eventos de Sesión</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {/* ultimo_objetivo_completado */}
+                        <div className="flex items-start gap-1.5 px-2 py-1.5 rounded border bg-amber-500/10 border-amber-500/20 text-xs">
+                          <span className="text-muted-foreground shrink-0">Objetivo completado:</span>
+                          <span className="text-amber-400">{sessionStats.ultimo_objetivo_completado || 'N/A'}</span>
+                        </div>
+                        {/* ultima_solicitud_realizada */}
+                        <div className="flex items-start gap-1.5 px-2 py-1.5 rounded border bg-emerald-500/10 border-emerald-500/20 text-xs">
+                          <span className="text-muted-foreground shrink-0">Solicitud realizada:</span>
+                          <span className="text-emerald-400">{sessionStats.ultima_solicitud_realizada || 'N/A'}</span>
+                        </div>
+                        {/* ultima_solicitud_completada */}
+                        <div className="flex items-start gap-1.5 px-2 py-1.5 rounded border bg-cyan-500/10 border-cyan-500/20 text-xs">
+                          <span className="text-muted-foreground shrink-0">Solicitud completada:</span>
+                          <span className="text-cyan-400">{sessionStats.ultima_solicitud_completada || 'N/A'}</span>
+                        </div>
+                        {/* ultima_accion_realizada */}
+                        <div className="flex items-start gap-1.5 px-2 py-1.5 rounded border bg-purple-500/10 border-purple-500/20 text-xs">
+                          <span className="text-muted-foreground shrink-0">Acción realizada:</span>
+                          <span className="text-purple-400">{sessionStats.ultima_accion_realizada || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

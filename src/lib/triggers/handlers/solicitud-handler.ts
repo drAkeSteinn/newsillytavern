@@ -104,8 +104,20 @@ export function checkSolicitudTriggersInText(
 ): SolicitudHandlerResult {
   const { characterId, statsConfig, sessionStats, sessionId, allCharacters, characterName } = context;
 
+  console.log(`[SolicitudHandler] checkSolicitudTriggersInText called`, {
+    characterId,
+    characterName,
+    textLength: text.length,
+    textPreview: text.slice(0, 100),
+    statsEnabled: statsConfig?.enabled,
+    hasInvitations: statsConfig?.invitations?.length,
+    allCharactersCount: allCharacters?.length,
+    hasPersonaInAllCharacters: allCharacters?.some(c => c.id === '__user__'),
+  });
+
   // Check if stats system is enabled
   if (!statsConfig?.enabled) {
+    console.log(`[SolicitudHandler] Stats not enabled, returning early`);
     return { matched: false };
   }
 
@@ -114,7 +126,14 @@ export function checkSolicitudTriggersInText(
   const hasPendingSolicitudes = sessionStats?.solicitudes?.characterSolicitudes?.[characterId]
     ?.some(s => s.status === 'pending');
 
+  console.log(`[SolicitudHandler] Conditions check`, {
+    hasPeticiones,
+    hasPendingSolicitudes,
+    invitationsDetail: statsConfig.invitations?.map(i => ({ key: i.peticionKey, target: i.objetivo })),
+  });
+
   if (!hasPeticiones && !hasPendingSolicitudes) {
+    console.log(`[SolicitudHandler] No peticiones and no pending solicitudes, returning early`);
     return { matched: false };
   }
 

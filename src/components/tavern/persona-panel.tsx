@@ -37,6 +37,7 @@ import {
   ChevronUp,
   GripVertical,
   Settings2,
+  Zap,
 } from 'lucide-react';
 import { useState, useRef, useMemo } from 'react';
 import type { 
@@ -307,7 +308,7 @@ export function PersonaPanel() {
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col gap-4">
+      <div className="h-full flex flex-col gap-4 overflow-hidden">
         {/* Banner Informativo */}
         <div className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/20 rounded-lg p-3 flex-shrink-0">
           <div className="flex items-start gap-3">
@@ -352,8 +353,8 @@ export function PersonaPanel() {
           </div>
         )}
 
-        {/* Sección: Lista de Personas */}
-        <div className="p-3 bg-muted/30 rounded-lg border border-border/40 flex-1 flex flex-col min-h-0">
+        {/* Sección: Lista de Personas - con scroll interno */}
+        <div className="p-3 bg-muted/30 rounded-lg border border-border/40 flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex items-center justify-between mb-3 flex-shrink-0">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <User className="w-3.5 h-3.5" />
@@ -366,7 +367,7 @@ export function PersonaPanel() {
             </Button>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0 pr-2">
             <div className="grid grid-cols-1 gap-3 pr-2">
               {personas.map((persona) => (
                 <div
@@ -467,7 +468,7 @@ export function PersonaPanel() {
                         </button>
                         
                         {showStatsEditor === persona.id && (
-                          <div className="p-3 space-y-4 border-t">
+                          <div className="p-3 space-y-4 border-t max-h-[400px] overflow-y-auto">
                             {/* Enable/Disable */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -520,7 +521,7 @@ export function PersonaPanel() {
                                     </Button>
                                   </div>
                                   
-                                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                  <div className="space-y-2">
                                     {(editForm.statsConfig?.invitations || []).map((invitation, idx) => (
                                       <PersonaInvitationEditor
                                         key={invitation.id}
@@ -567,7 +568,7 @@ export function PersonaPanel() {
                                     </Button>
                                   </div>
                                   
-                                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                  <div className="space-y-2">
                                     {(editForm.statsConfig?.solicitudDefinitions || []).map((solicitud, idx) => (
                                       <PersonaSolicitudEditor
                                         key={solicitud.id}
@@ -906,61 +907,96 @@ function PersonaSolicitudEditor({
 
       {expanded && (
         <div className="px-3 pb-3 space-y-2 border-t">
-          <div className="pt-2 grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-[10px] mb-1 block">Nombre *</Label>
-              <Input
-                value={solicitud.name}
-                onChange={(e) => onChange(index, { name: e.target.value })}
-                placeholder="Dar madera"
-                className="h-7 text-xs"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-1 mb-1">
-                <Label className="text-[10px]">Key de Peticion *</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="w-2.5 h-2.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Key que el personaje escribira para HACER la peticion.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Ejemplo: |pedir_madera|</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                value={solicitud.peticionKey}
-                onChange={(e) => onChange(index, { peticionKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                placeholder="pedir_madera"
-                className="h-7 text-xs font-mono"
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-1 mb-1">
-              <Label className="text-[10px]">Key de Solicitud *</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-2.5 h-2.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Key que el usuario escribira para COMPLETAR la solicitud cuando la acepte.</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Ejemplo: |dar_madera|</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
+          <div className="pt-2">
+            <Label className="text-[10px] mb-1 block">Nombre *</Label>
             <Input
-              value={solicitud.solicitudKey}
-              onChange={(e) => onChange(index, { solicitudKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-              placeholder="dar_madera"
-              className="h-7 text-xs font-mono"
+              value={solicitud.name}
+              onChange={(e) => onChange(index, { name: e.target.value })}
+              placeholder="Dar madera"
+              className="h-7 text-xs"
             />
           </div>
 
+          {/* Peticion Activation Keys */}
+          <div className="p-2 bg-amber-500/10 rounded border border-amber-500/20 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Zap className="w-3 h-3 text-amber-400" />
+              <Label className="text-[10px] font-medium text-amber-400">Key de Petición (Activación)</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[9px] text-muted-foreground mb-0.5 block">Key principal *</Label>
+                <Input
+                  value={solicitud.peticionKey}
+                  onChange={(e) => onChange(index, { peticionKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                  placeholder="pedir_madera"
+                  className="h-7 text-xs font-mono"
+                />
+              </div>
+              <div>
+                <Label className="text-[9px] text-muted-foreground mb-0.5 block">Keys alternativas</Label>
+                <Input
+                  value={(solicitud.peticionActivationKeys || []).join(', ')}
+                  onChange={(e) => {
+                    const keys = e.target.value.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean);
+                    onChange(index, { peticionActivationKeys: keys.length > 0 ? keys : undefined });
+                  }}
+                  placeholder="pm, pedir"
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={solicitud.peticionKeyCaseSensitive || false}
+                onCheckedChange={(checked) => onChange(index, { peticionKeyCaseSensitive: checked })}
+                className="scale-75"
+              />
+              <Label className="text-[9px]">Distinguir mayúsculas/minúsculas</Label>
+            </div>
+          </div>
+
+          {/* Solicitud Completion Keys */}
+          <div className="p-2 bg-emerald-500/10 rounded border border-emerald-500/20 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Zap className="w-3 h-3 text-emerald-400" />
+              <Label className="text-[10px] font-medium text-emerald-400">Key de Solicitud (Completación)</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[9px] text-muted-foreground mb-0.5 block">Key principal *</Label>
+                <Input
+                  value={solicitud.solicitudKey}
+                  onChange={(e) => onChange(index, { solicitudKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                  placeholder="dar_madera"
+                  className="h-7 text-xs font-mono"
+                />
+              </div>
+              <div>
+                <Label className="text-[9px] text-muted-foreground mb-0.5 block">Keys alternativas</Label>
+                <Input
+                  value={(solicitud.solicitudActivationKeys || []).join(', ')}
+                  onChange={(e) => {
+                    const keys = e.target.value.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean);
+                    onChange(index, { solicitudActivationKeys: keys.length > 0 ? keys : undefined });
+                  }}
+                  placeholder="dm, dar"
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={solicitud.solicitudKeyCaseSensitive || false}
+                onCheckedChange={(checked) => onChange(index, { solicitudKeyCaseSensitive: checked })}
+                className="scale-75"
+              />
+              <Label className="text-[9px]">Distinguir mayúsculas/minúsculas</Label>
+            </div>
+          </div>
+
           <div>
-            <Label className="text-[10px] mb-1 block">Descripcion de Peticion</Label>
+            <Label className="text-[10px] mb-1 block">Descripción de Petición</Label>
             <Textarea
               value={solicitud.peticionDescription}
               onChange={(e) => onChange(index, { peticionDescription: e.target.value })}
@@ -970,7 +1006,7 @@ function PersonaSolicitudEditor({
           </div>
 
           <div>
-            <Label className="text-[10px] mb-1 block">Descripcion de Solicitud</Label>
+            <Label className="text-[10px] mb-1 block">Descripción de Solicitud</Label>
             <Textarea
               value={solicitud.solicitudDescription}
               onChange={(e) => onChange(index, { solicitudDescription: e.target.value })}

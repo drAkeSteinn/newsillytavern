@@ -43,6 +43,7 @@ function createDefaultCharacterStats(
 
 /**
  * Initialize session stats for a character or group of characters
+ * Resets all stats, solicitudes, and session events to default values
  */
 function initializeSessionStatsForCharacters(
   characters: Array<{ id: string; statsConfig?: { enabled?: boolean; attributes?: Array<{ key: string; defaultValue: number | string }> } }>
@@ -60,6 +61,11 @@ function initializeSessionStatsForCharacters(
       characterSolicitudes: {},
       lastModified: now,
     },
+    // Reset session events to undefined (clean state)
+    ultimo_objetivo_completado: undefined,
+    ultima_solicitud_completada: undefined,
+    ultima_solicitud_realizada: undefined,
+    ultima_accion_realizada: undefined,
     initialized: true,
     lastModified: now,
   };
@@ -922,6 +928,12 @@ export const createSessionSlice = (set: any, get: any): SessionSlice => ({
               }),
             };
           }),
+          // Save event to sessionStats for {{eventos}} key
+          sessionStats: s.sessionStats ? {
+            ...s.sessionStats,
+            ultimo_objetivo_completado: targetObjective?.completionDescription || targetObjective?.description,
+            lastModified: Date.now(),
+          } : s.sessionStats,
           updatedAt: new Date().toISOString(),
         };
       }),

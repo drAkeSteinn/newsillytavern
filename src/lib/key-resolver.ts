@@ -14,7 +14,7 @@
 // This ensures that lorebooks injected after template processing
 // still get their keys resolved properly.
 
-import type { CharacterCard, Persona } from '@/types';
+import type { CharacterCard, Persona, SessionStats } from '@/types';
 import type { ResolvedStats } from '@/types';
 import { resolveStatsInText } from '@/lib/stats/stats-resolver';
 
@@ -38,6 +38,10 @@ export interface KeyResolutionContext {
 
   // Stats resolution
   resolvedStats?: ResolvedStats | null;
+
+  // Session stats for event keys ({{solicitante}}, {{solicitado}}, {{eventos}})
+  sessionStats?: SessionStats | null;
+  characterId?: string;  // ID of the current character for looking up solicitudes
 }
 
 // ============================================
@@ -143,6 +147,111 @@ export function resolveStatsKeys(
 }
 
 // ============================================
+// Phase 3: Event Key Resolution
+// ============================================
+
+/**
+ * Resolve event keys in text
+ * Handles: {{solicitante}}, {{solicitado}}, {{eventos}}
+ *
+ * {{solicitante}} - Name of who made the solicitud (from pending solicitudes)
+ * {{solicitado}} - Name of who received the solicitud (current character)
+ * {{eventos}} - Recent events summary
+ */
+export function resolveEventKeys(
+  text: string,
+  context: KeyResolutionContext
+): string {
+  if (!text) return text;
+
+  let result = text;
+  const { sessionStats, characterId, char } = context;
+
+  // {{solicitante}} - Who made the solicitud
+  if (sessionStats?.solicitudes?.characterSolicitudes && characterId) {
+    const pendingSolicitudes = sessionStats.solicitudes.characterSolicitudes[characterId]
+      ?.filter(s => s.status === 'pending') || [];
+    
+    if (pendingSolicitudes.length > 0) {
+      // Get the name of the first pending solicitud's sender
+      const solicitante = pendingSolicitudes[0].fromCharacterName;
+      result = result.replace(/\{\{solicitante\}\}/gi, solicitante);
+    } else {
+      // No pending solicitudes - replace with empty string
+      result = result.replace(/\{\{solicitante\}\}/gi, '');
+    }
+  } else {
+    result = result.replace(/\{\{solicitante\}\}/gi, '');
+  }
+
+  // {{solicitado}} - Who received the solicitud (current character)
+  // This is always the current character's name
+  if (char) {
+    result = result.replace(/\{\{solicitado\}\}/gi, char);
+  } else {
+    result = result.replace(/\{\{solicitado\}\}/gi, '');
+  }
+
+  // {{eventos}} - Recent events summary
+  if (sessionStats) {
+    console.log(`[resolveEventKeys] sessionStats received for {{eventos}}:`, {
+      hasUltimoObjetivo: !!sessionStats.ultimo_objetivo_completado,
+      hasUltimaSolicitudRealizada: !!sessionStats.ultima_solicitud_realizada,
+      hasUltimaSolicitudCompletada: !!sessionStats.ultima_solicitud_completada,
+      hasUltimaAccion: !!sessionStats.ultima_accion_realizada,
+      ultimoObjetivoValue: sessionStats.ultimo_objetivo_completado,
+      ultimaSolicitudRealizadaValue: sessionStats.ultima_solicitud_realizada,
+    });
+    const eventosBlock = buildEventosBlock(sessionStats);
+    console.log(`[resolveEventKeys] Built eventosBlock:`, eventosBlock);
+    result = result.replace(/\{\{eventos\}\}/gi, eventosBlock);
+  } else {
+    console.log(`[resolveEventKeys] No sessionStats provided for {{eventos}}`);
+    result = result.replace(/\{\{eventos\}\}/gi, '');
+  }
+
+  return result;
+}
+
+/**
+ * Build the eventos block showing recent events
+ * Only shows fields that have actual values (not undefined or empty)
+ * Format:
+ * [ESTADO RECIENTE]
+ * - ultimo_objetivo_completado : <value>
+ * - ultima_solicitud_realizada : <value>
+ * - ultima_solicitud_completada : <value>
+ * - ultima_accion_realizada : <value>
+ */
+function buildEventosBlock(sessionStats: SessionStats): string {
+  const lines: string[] = [];
+  
+  // Only add fields that have actual values
+  if (sessionStats.ultimo_objetivo_completado) {
+    lines.push(`- ultimo_objetivo_completado : ${sessionStats.ultimo_objetivo_completado}`);
+  }
+  
+  if (sessionStats.ultima_solicitud_realizada) {
+    lines.push(`- ultima_solicitud_realizada : ${sessionStats.ultima_solicitud_realizada}`);
+  }
+  
+  if (sessionStats.ultima_solicitud_completada) {
+    lines.push(`- ultima_solicitud_completada : ${sessionStats.ultima_solicitud_completada}`);
+  }
+  
+  if (sessionStats.ultima_accion_realizada) {
+    lines.push(`- ultima_accion_realizada : ${sessionStats.ultima_accion_realizada}`);
+  }
+  
+  // Return empty string if no events to show
+  if (lines.length === 0) {
+    return '';
+  }
+  
+  return `[ESTADO RECIENTE]\n${lines.join('\n')}`;
+}
+
+// ============================================
 // Unified Resolution
 // ============================================
 
@@ -151,6 +260,7 @@ export function resolveStatsKeys(
  *
  * Phase 1: Template variables ({{user}}, {{char}}, conditionals)
  * Phase 2: Stats keys ({{resistencia}}, {{habilidades}}, etc.)
+ * Phase 3: Event keys ({{solicitante}}, {{solicitado}}, {{eventos}})
  *
  * This is the main function to use for resolving all keys
  */
@@ -165,6 +275,9 @@ export function resolveAllKeys(
 
   // Phase 2: Resolve stats keys
   result = resolveStatsKeys(result, context.resolvedStats);
+
+  // Phase 3: Resolve event keys
+  result = resolveEventKeys(result, context);
 
   return result;
 }
@@ -214,7 +327,8 @@ export function buildKeyResolutionContext(
   character: CharacterCard,
   userName: string = 'User',
   persona?: Persona,
-  resolvedStats?: ResolvedStats | null
+  resolvedStats?: ResolvedStats | null,
+  sessionStats?: SessionStats | null
 ): KeyResolutionContext {
   return {
     user: persona?.name || userName,
@@ -223,6 +337,8 @@ export function buildKeyResolutionContext(
     character,
     persona,
     resolvedStats,
+    sessionStats,
+    characterId: character.id,
   };
 }
 
@@ -234,9 +350,10 @@ export function buildGroupKeyResolutionContext(
   character: CharacterCard,
   userName: string = 'User',
   persona?: Persona,
-  resolvedStats?: ResolvedStats | null
+  resolvedStats?: ResolvedStats | null,
+  sessionStats?: SessionStats | null
 ): KeyResolutionContext {
-  return buildKeyResolutionContext(character, userName, persona, resolvedStats);
+  return buildKeyResolutionContext(character, userName, persona, resolvedStats, sessionStats);
 }
 
 // ============================================

@@ -393,7 +393,8 @@ export async function POST(request: NextRequest) {
               responder,
               effectiveUserName,
               persona,
-              resolvedStats
+              resolvedStats,
+              typedSessionStats  // Pass sessionStats for {{eventos}} key resolution
             );
 
             // Build HUD context section for this character (resolves keys!)
@@ -515,8 +516,34 @@ export async function POST(request: NextRequest) {
                 : chatMessages;
 
               switch (llmConfig.provider) {
+                case 'test-mock': {
+                  // Test mode: Simulate LLM response with peticion keys for testing
+                  console.log('[Group Stream Route] Using TEST-MOCK provider for peticiones testing');
+                  
+                  // Use custom mock response from config, or default response
+                  const mockResponse = llmConfig.mockResponse || `*El personaje te mira con interés*
+
+¡Hola! Me alegra verte por aquí. Tenía algo que pedirte...
+
+[peticion_test]
+
+¿Podrías ayudarme con algo?`;
+                  
+                  console.log('[Group Stream Route] Mock response for', responder.name, ':', mockResponse.slice(0, 100) + '...');
+                  
+                  generator = async function* mockGenerator() {
+                    // Stream character by character to simulate real streaming
+                    for (const char of mockResponse) {
+                      yield char;
+                      // Small delay to simulate network latency
+                      await new Promise(resolve => setTimeout(resolve, 15));
+                    }
+                  }();
+                  break;
+                }
+
                 case 'z-ai': {
-                  generator = streamZAI(finalChatMessages);
+                  generator = streamZAI(finalChatMessages, llmConfig.apiKey);
                   break;
                 }
 

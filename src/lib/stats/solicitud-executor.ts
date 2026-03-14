@@ -60,13 +60,20 @@ export interface SolicitudStoreActions {
     characterId: string,
     solicitudKey: string
   ) => SolicitudInstance | null;
+  
+  // Getter for current session stats (to check for duplicates with fresh data)
+  getSessionStats?: (sessionId: string) => SessionStats | null;
 }
 
 export interface ResolvedPeticion {
   invitation: InvitationDefinition;
   peticionKey: string;
+  peticionActivationKeys?: string[];    // Alternative keys for peticion
+  peticionKeyCaseSensitive?: boolean;
   peticionDescription: string;
   solicitudKey: string;
+  solicitudActivationKeys?: string[];   // Alternative keys for solicitud
+  solicitudKeyCaseSensitive?: boolean;
   solicitudDescription: string;
   targetCharacterId: string;
   targetCharacterName: string;
@@ -148,29 +155,58 @@ export function getResolvedPeticiones(
   sessionStats: SessionStats | undefined,
   activePersona?: Persona
 ): ResolvedPeticion[] {
+  console.log(`[getResolvedPeticiones] Called with`, {
+    statsEnabled: statsConfig?.enabled,
+    hasInvitations: !!statsConfig?.invitations,
+    invitationsCount: statsConfig?.invitations?.length,
+    allCharactersCount: allCharacters?.length,
+    allCharactersIds: allCharacters?.map(c => c.id),
+    hasActivePersona: !!activePersona,
+    activePersonaId: activePersona?.id,
+    activePersonaName: activePersona?.name,
+    activePersonaStatsEnabled: activePersona?.statsConfig?.enabled,
+  });
+
   if (!statsConfig?.enabled || !statsConfig.invitations) {
+    console.log(`[getResolvedPeticiones] Early return - stats not enabled or no invitations`);
     return [];
   }
   
   const resolved: ResolvedPeticion[] = [];
   
   for (const invitation of statsConfig.invitations) {
+    console.log(`[getResolvedPeticiones] Processing invitation`, {
+      peticionKey: invitation.peticionKey,
+      objetivoCharacterId: invitation.objetivo?.characterId,
+      objetivoSolicitudId: invitation.objetivo?.solicitudId,
+      hasRequirements: invitation.requirements?.length,
+    });
+
     // Skip if no target configured
     if (!invitation.objetivo?.characterId || !invitation.objetivo?.solicitudId) {
+      console.log(`[getResolvedPeticiones] Skipping - no target configured`);
       continue;
     }
     
     // Check invitation requirements (the sender must meet these)
     if (!evaluateRequirements(invitation.requirements, attributeValues)) {
+      console.log(`[getResolvedPeticiones] Skipping - requirements not met`);
       continue;
     }
     
     // Special case: target is the user
     if (invitation.objetivo.characterId === USER_CHARACTER_ID) {
+      console.log(`[getResolvedPeticiones] Target is USER_CHARACTER_ID, looking for persona solicitud`);
       // Find the solicitud on the user's persona
       const solicitud = activePersona?.statsConfig?.solicitudDefinitions?.find(
         s => s.id === invitation.objetivo!.solicitudId
       );
+      
+      console.log(`[getResolvedPeticiones] Persona solicitud found`, {
+        found: !!solicitud,
+        solicitudId: solicitud?.id,
+        peticionKey: solicitud?.peticionKey,
+      });
       
       if (!solicitud) {
         continue;
@@ -182,8 +218,12 @@ export function getResolvedPeticiones(
       resolved.push({
         invitation,
         peticionKey: solicitud.peticionKey,
+        peticionActivationKeys: solicitud.peticionActivationKeys,
+        peticionKeyCaseSensitive: solicitud.peticionKeyCaseSensitive,
         peticionDescription: solicitud.peticionDescription,
         solicitudKey: solicitud.solicitudKey,
+        solicitudActivationKeys: solicitud.solicitudActivationKeys,
+        solicitudKeyCaseSensitive: solicitud.solicitudKeyCaseSensitive,
         solicitudDescription: solicitud.solicitudDescription,
         targetCharacterId: USER_CHARACTER_ID,
         targetCharacterName: activePersona?.name || 'Usuario',
@@ -215,8 +255,12 @@ export function getResolvedPeticiones(
     resolved.push({
       invitation,
       peticionKey: solicitud.peticionKey,
+      peticionActivationKeys: solicitud.peticionActivationKeys,
+      peticionKeyCaseSensitive: solicitud.peticionKeyCaseSensitive,
       peticionDescription: solicitud.peticionDescription,
       solicitudKey: solicitud.solicitudKey,
+      solicitudActivationKeys: solicitud.solicitudActivationKeys,
+      solicitudKeyCaseSensitive: solicitud.solicitudKeyCaseSensitive,
       solicitudDescription: solicitud.solicitudDescription,
       targetCharacterId: targetCharacter.id,
       targetCharacterName: targetCharacter.name,
@@ -233,6 +277,7 @@ export function getResolvedPeticiones(
 
 /**
  * Build regex pattern to detect peticion keys
+ * Supports multiple formats: [key], Peticion:key, Peticion=key, |key|, bare key
  */
 export function buildPeticionKeyPattern(
   resolvedPeticiones: ResolvedPeticion[],
@@ -240,16 +285,28 @@ export function buildPeticionKeyPattern(
 ): RegExp | null {
   if (resolvedPeticiones.length === 0) return null;
   
-  const keys = resolvedPeticiones
-    .map(p => p.peticionKey)
+  // Collect all keys (primary + alternatives)
+  const allKeys = new Set<string>();
+  for (const p of resolvedPeticiones) {
+    if (p.peticionKey) allKeys.add(p.peticionKey);
+    if (p.peticionActivationKeys) {
+      p.peticionActivationKeys.forEach(k => allKeys.add(k));
+    }
+  }
+  
+  const keys = Array.from(allKeys)
     .filter(Boolean)
     .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   
   if (keys.length === 0) return null;
   
-  // Match: [key], key after = or :, or key as a word
-  // This handles formats like: [pedir_madera], Peticion=pedir_madera, pedir_madera:
-  const patternStr = `(?:\\[(${keys.join('|')})\\]|[=:]\\s*(${keys.join('|')})\\b|\\b(${keys.join('|')})\\b)`;
+  // Match multiple formats:
+  // 1. [key] - bracketed
+  // 2. Peticion:key or Peticion=key or Peticion key - explicit format (with : or = or space)
+  // 3. |key| - pipe delimited
+  // 4. key:valor or key=valor - key with value
+  // 5. bare key as word boundary
+  const patternStr = `(?:\\[(${keys.join('|')})\\]|Peticion[:=\\s]*(${keys.join('|')})|\\|(${keys.join('|')})\\||(${keys.join('|')})\\s*[=:]|\\b(${keys.join('|')})\\b)`;
   
   try {
     return new RegExp(patternStr, caseSensitive ? 'g' : 'gi');
@@ -296,17 +353,22 @@ export function detectPeticionActivations(
   let match;
   
   while ((match = pattern.exec(text)) !== null) {
-    const key = match[1] || match[2] || match[3]; // [key], key after =/:, or bare key
+    // Handle 5 capture groups: [key], Peticion:key, |key|, key=:, bare key
+    const key = match[1] || match[2] || match[3] || match[4] || match[5];
     if (key && !detectedKeys.has(key.toLowerCase())) {
       detectedKeys.add(key.toLowerCase());
     }
   }
   
-  // For each detected key, find the matching peticion
+  // For each detected key, find the matching peticion (check primary + alternatives)
   for (const detectedKey of detectedKeys) {
-    const resolved = resolvedPeticiones.find(
-      p => p.peticionKey.toLowerCase() === detectedKey
-    );
+    const resolved = resolvedPeticiones.find(p => {
+      // Check primary key
+      if (p.peticionKey.toLowerCase() === detectedKey) return true;
+      // Check alternative keys
+      if (p.peticionActivationKeys?.some(k => k.toLowerCase() === detectedKey)) return true;
+      return false;
+    });
     
     if (!resolved) continue;
     
@@ -367,6 +429,7 @@ export function executePeticionActivation(
       USER_CHARACTER_ID,
       {
         key: resolved.solicitudKey,
+        peticionKey: resolved.peticionKey,  // Store for duplicate detection
         fromCharacterId: context.characterId,
         fromCharacterName: context.characterName,
         description: resolved.solicitudDescription,
@@ -396,6 +459,7 @@ export function executePeticionActivation(
     activation.targetCharacterId,
     {
       key: resolved.solicitudKey,  // Key the target will use to complete
+      peticionKey: resolved.peticionKey,  // Store for duplicate detection
       fromCharacterId: context.characterId,
       fromCharacterName: context.characterName,
       description: resolved.solicitudDescription,
@@ -415,6 +479,7 @@ export function executePeticionActivation(
 
 /**
  * Build regex pattern to detect solicitud keys
+ * Supports multiple formats: [key], Solicitud:key, Solicitud=key, |key|, bare key
  */
 export function buildSolicitudKeyPattern(
   solicitudes: SolicitudInstance[],
@@ -429,9 +494,13 @@ export function buildSolicitudKeyPattern(
   
   if (keys.length === 0) return null;
   
-  // Match: [key], key after = or :, or key as a word
-  // This handles formats like: [pedir_madera], Peticion=pedir_madera, pedir_madera:
-  const patternStr = `(?:\\[(${keys.join('|')})\\]|[=:]\\s*(${keys.join('|')})\\b|\\b(${keys.join('|')})\\b)`;
+  // Match multiple formats:
+  // 1. [key] - bracketed
+  // 2. Solicitud:key or Solicitud=key or Solicitud key - explicit format (with : or = or space)
+  // 3. |key| - pipe delimited
+  // 4. key:valor or key=valor - key with value
+  // 5. bare key as word boundary
+  const patternStr = `(?:\\[(${keys.join('|')})\\]|Solicitud[:=\\s]*(${keys.join('|')})|\\|(${keys.join('|')})\\||(${keys.join('|')})\\s*[=:]|\\b(${keys.join('|')})\\b)`;
   
   try {
     return new RegExp(patternStr, caseSensitive ? 'g' : 'gi');
@@ -466,7 +535,8 @@ export function detectSolicitudCompletions(
   let match;
   
   while ((match = pattern.exec(text)) !== null) {
-    const key = match[1] || match[2] || match[3];
+    // Handle 5 capture groups: [key], Solicitud:key, |key|, key=:, bare key
+    const key = match[1] || match[2] || match[3] || match[4] || match[5];
     if (key && !detectedKeys.has(key.toLowerCase())) {
       detectedKeys.add(key.toLowerCase());
     }
@@ -579,11 +649,27 @@ export class SolicitudDetectionState {
     context: SolicitudActivationContext,
     storeActions: SolicitudStoreActions
   ): SolicitudProcessingResult {
+    console.log(`[SolicitudDetectionState] processNewText called`, {
+      newTextLength: newText.length,
+      newTextPreview: newText.slice(0, 100),
+      processedLength: this.processedLength,
+      processedActivations: Array.from(this.processedActivations),
+      processedCompletions: Array.from(this.processedCompletions),
+      characterId: context.characterId,
+      allCharactersCount: context.allCharacters?.length,
+    });
+
     // Only process new content
     const newContent = newText.slice(this.processedLength);
     this.processedLength = newText.length;
     
+    console.log(`[SolicitudDetectionState] New content to process`, {
+      newContentLength: newContent.length,
+      newContentPreview: newContent.slice(0, 100),
+    });
+    
     if (!newContent.trim()) {
+      console.log(`[SolicitudDetectionState] No new content to process, returning early`);
       return { activations: [], completions: [], hasChanges: false };
     }
     
@@ -597,27 +683,131 @@ export class SolicitudDetectionState {
       context.activePersona
     );
     
+    console.log(`[SolicitudDetectionState] Resolved peticiones`, {
+      resolvedCount: resolvedPeticiones.length,
+      resolvedPeticiones: resolvedPeticiones.map(p => ({ key: p.peticionKey, target: p.targetCharacterId, targetName: p.targetCharacterName })),
+    });
+    
+    // Helper function to check if a pending solicitud already exists for a key from the same source
+    // Uses fresh sessionStats from store if available, otherwise falls back to context
+    // IMPORTANT: We check peticionKey (activation key) for duplicates, not solicitudKey (completion key)
+    const hasPendingSolicitud = (peticionKey: string, targetCharacterId: string, fromCharacterId: string): boolean => {
+      // Get fresh sessionStats from store if available
+      const freshSessionStats = storeActions.getSessionStats?.(context.sessionId);
+      const sessionStatsToUse = freshSessionStats || context.sessionStats;
+      
+      console.log(`[hasPendingSolicitud] Checking for duplicate`, {
+        peticionKey,
+        targetCharacterId,
+        fromCharacterId,
+        hasFreshStats: !!freshSessionStats,
+        hasContextStats: !!context.sessionStats,
+        usingFresh: !!freshSessionStats,
+      });
+      
+      const characterSolicitudes = sessionStatsToUse?.solicitudes?.characterSolicitudes?.[targetCharacterId];
+      if (!characterSolicitudes) {
+        console.log(`[hasPendingSolicitud] No solicitudes found for target ${targetCharacterId}`);
+        return false;
+      }
+      
+      const hasDuplicate = characterSolicitudes.some(
+        s => s.status === 'pending' &&
+             s.fromCharacterId === fromCharacterId &&
+             (s.peticionKey?.toLowerCase() === peticionKey.toLowerCase() || 
+              // Fallback: if peticionKey not stored, check if this was recently created
+              (s.peticionKey === undefined && s.key.toLowerCase() === peticionKey.toLowerCase()))
+      );
+      
+      if (hasDuplicate) {
+        console.log(`[hasPendingSolicitud] Found duplicate solicitud`, {
+          peticionKey,
+          targetCharacterId,
+          fromCharacterId,
+          existingSolicitudes: characterSolicitudes.map(s => ({ 
+            key: s.key, 
+            peticionKey: s.peticionKey, 
+            from: s.fromCharacterId, 
+            status: s.status 
+          }))
+        });
+      } else {
+        console.log(`[hasPendingSolicitud] No duplicate found, existing:`, characterSolicitudes.map(s => ({
+          key: s.key,
+          peticionKey: s.peticionKey,
+          from: s.fromCharacterId,
+          status: s.status
+        })));
+      }
+      
+      return hasDuplicate;
+    };
+    
     // Filter out already processed peticion keys
+    // AND filter out peticiones that already have a pending solicitud
     const unprocessedPeticiones = resolvedPeticiones.filter(
-      p => !this.processedActivations.has(p.peticionKey.toLowerCase())
+      p => {
+        const keyLower = p.peticionKey.toLowerCase();
+        const alreadyProcessed = this.processedActivations.has(keyLower);
+        const alreadyPending = hasPendingSolicitud(p.peticionKey, p.targetCharacterId, context.characterId);
+        
+        if (alreadyPending) {
+          console.log(`[SolicitudDetectionState] Skipping peticion ${p.peticionKey} - already has pending solicitud for target ${p.targetCharacterId} from ${context.characterId}`);
+        }
+        
+        return !alreadyProcessed && !alreadyPending;
+      }
     );
+    
+    console.log(`[SolicitudDetectionState] Unprocessed peticiones`, {
+      unprocessedCount: unprocessedPeticiones.length,
+      unprocessedKeys: unprocessedPeticiones.map(p => p.peticionKey),
+    });
     
     // Detect new activations
     const pattern = buildPeticionKeyPattern(unprocessedPeticiones);
     const newActivations: SolicitudActivationResult[] = [];
     
+    console.log(`[SolicitudDetectionState] Pattern built`, {
+      patternSource: pattern?.source,
+    });
+    
     if (pattern) {
       let match;
-      while ((match = pattern.exec(newContent)) !== null) {
-        const key = (match[1] || match[2] || match[3]).toLowerCase();
-        if (!this.processedActivations.has(key)) {
-          this.processedActivations.add(key);
-          
+      let matchCount = 0;
+      // IMPORTANT: Search in the FULL text (newText), not just newContent
+      // This is because the key pattern (e.g., "Peticion=pedir_test") may span
+      // across previously processed and new content
+      while ((match = pattern.exec(newText)) !== null) {
+        matchCount++;
+        console.log(`[SolicitudDetectionState] Match found`, {
+          matchIndex: matchCount,
+          match0: match[0],
+          match1: match[1],
+          match2: match[2],
+          match3: match[3],
+          match4: match[4],
+          match5: match[5],
+        });
+        // Handle 5 capture groups: [key], Peticion:key, |key|, key=:, bare key
+        const key = (match[1] || match[2] || match[3] || match[4] || match[5])?.toLowerCase();
+        if (key && !this.processedActivations.has(key)) {
           const resolved = resolvedPeticiones.find(
             p => p.peticionKey.toLowerCase() === key
           );
           
           if (resolved) {
+            // Double-check: Don't activate if there's already a pending solicitud for this target from this source
+            if (hasPendingSolicitud(resolved.peticionKey, resolved.targetCharacterId, context.characterId)) {
+              console.log(`[SolicitudDetectionState] Skipping activation of ${key} - already has pending solicitud for target ${resolved.targetCharacterId} from ${context.characterId}`);
+              // Mark as processed so we don't check again
+              this.processedActivations.add(key);
+              continue;
+            }
+            
+            this.processedActivations.add(key);
+            console.log(`[SolicitudDetectionState] Key extracted and added`, { key });
+            console.log(`[SolicitudDetectionState] Found resolved peticion for key, executing activation`, { key, targetId: resolved.targetCharacterId });
             const result = executePeticionActivation(
               {
                 activated: false,
@@ -634,6 +824,12 @@ export class SolicitudDetectionState {
           }
         }
       }
+      console.log(`[SolicitudDetectionState] Pattern matching complete`, {
+        totalMatches: matchCount,
+        newActivationsCount: newActivations.length,
+      });
+    } else {
+      console.log(`[SolicitudDetectionState] No pattern built (null pattern)`);
     }
     
     // Get pending solicitudes and filter out already processed
@@ -646,9 +842,11 @@ export class SolicitudDetectionState {
     
     if (completionPattern) {
       let match;
-      while ((match = completionPattern.exec(newContent)) !== null) {
-        const key = (match[1] || match[2] || match[3]).toLowerCase();
-        if (!this.processedCompletions.has(key)) {
+      // IMPORTANT: Search in the FULL text (newText), not just newContent
+      while ((match = completionPattern.exec(newText)) !== null) {
+        // Handle 5 capture groups: [key], Solicitud:key, |key|, key=:, bare key
+        const key = (match[1] || match[2] || match[3] || match[4] || match[5])?.toLowerCase();
+        if (key && !this.processedCompletions.has(key)) {
           this.processedCompletions.add(key);
           
           const solicitud = pendingSolicitudes.find(

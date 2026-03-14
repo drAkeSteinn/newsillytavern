@@ -332,6 +332,8 @@ export function ChatPanel() {
     const messageKey = `stream_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     streamingMessageKeyRef.current = messageKey;
     resetBgDetection(messageKey);
+    // Reset trigger system state for new message (important for peticiones/solicitudes detection)
+    resetTriggers(messageKey, activeCharacter);
     
     // Start sprite generation for the character (single mode)
     // This initializes the per-character state for proper sprite tracking
@@ -533,6 +535,15 @@ export function ChatPanel() {
       
       // Get session stats for attribute values
       const sessionStats = currentSession?.sessionStats;
+      
+      // Debug: Log sessionStats event fields being sent to backend
+      console.log('[ChatPanel] Sending sessionStats to backend:', {
+        hasSessionStats: !!sessionStats,
+        ultimo_objetivo_completado: sessionStats?.ultimo_objetivo_completado,
+        ultima_solicitud_realizada: sessionStats?.ultima_solicitud_realizada,
+        ultima_solicitud_completada: sessionStats?.ultima_solicitud_completada,
+        ultima_accion_realizada: sessionStats?.ultima_accion_realizada,
+      });
 
       if (useStreaming) {
         // Build allCharacters array including persona as pseudo-character for peticiones/solicitudes
@@ -613,7 +624,8 @@ export function ChatPanel() {
                   accumulatedContent += parsed.content;
                   setStreamingContent(accumulatedContent);
                   // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
-                  processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current);
+                  // Pass allCharactersWithPersona for peticiones/solicitudes system
+                  processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current, allCharactersWithPersona);
                   scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
                 } else if (parsed.type === 'error') {
                   throw new Error(parsed.error);
@@ -899,14 +911,16 @@ export function ChatPanel() {
     setGenerating(true);
     setStreamingContent('');
 
+    // Determine the character BEFORE resetting triggers
+    const replayChar = characterId ? characters.find(c => c.id === characterId) : activeCharacter;
+    
     // Generate a unique message key for triggers
     const messageKey = `replay_stream_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     streamingMessageKeyRef.current = messageKey;
     resetBgDetection(messageKey);
-    resetTriggers(messageKey, null);
+    // Reset with the actual character for proper solicitud state reset
+    resetTriggers(messageKey, replayChar || null);
 
-    // Set the streaming character
-    const replayChar = characterId ? characters.find(c => c.id === characterId) : activeCharacter;
     setStreamingCharacter(replayChar || null);
 
     // Start sprite generation for the character
@@ -931,7 +945,16 @@ export function ChatPanel() {
         setStreamingContent(accumulatedContent);
         
         // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
-        processTriggers(accumulatedContent, replayChar || null, streamingMessageKeyRef.current);
+        // Build allCharactersWithPersona for peticiones/solicitudes system
+        const replayCharactersWithPersona = [
+          ...characters,
+          ...(activePersona?.statsConfig?.enabled ? [{
+            id: '__user__',
+            name: activePersona.name || 'User',
+            statsConfig: activePersona.statsConfig,
+          }] as CharacterCard[] : []),
+        ];
+        processTriggers(accumulatedContent, replayChar || null, streamingMessageKeyRef.current, replayCharactersWithPersona);
         scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
         
         // Random delay between 30-80ms to simulate realistic typing

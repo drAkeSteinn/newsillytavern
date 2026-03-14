@@ -639,6 +639,8 @@ export interface LLMConfig {
   model: string;
   parameters: LLMParameters;
   isActive: boolean;
+  // Test Mock provider settings
+  mockResponse?: string;  // Custom response for test-mock provider
 }
 
 export type LLMProvider = 
@@ -649,7 +651,8 @@ export type LLMProvider =
   | 'koboldcpp'
   | 'vllm'
   | 'z-ai'
-  | 'custom';
+  | 'custom'
+  | 'test-mock';  // Test provider for peticiones/solicitudes testing
 
 export interface LLMParameters {
   temperature: number;
@@ -2817,6 +2820,14 @@ export interface SolicitudDefinition {
   peticionDescription: string;     // Descripción que ve quien hace la petición
   solicitudDescription: string;    // Descripción que ve quien recibe la solicitud
   requirements: StatRequirement[]; // Requisitos para que la solicitud esté disponible
+
+  // Activation keys for Peticion (alternative keys for detection)
+  peticionActivationKeys?: string[];     // Alternative keys that also trigger this peticion
+  peticionKeyCaseSensitive?: boolean;    // Case sensitivity for peticion key detection
+
+  // Activation keys for Solicitud (alternative keys for completion)
+  solicitudActivationKeys?: string[];    // Alternative keys that also complete this solicitud
+  solicitudKeyCaseSensitive?: boolean;   // Case sensitivity for solicitud key detection
 }
 
 // Invitation/Peticion definition (stored in CharacterCard)
@@ -2841,10 +2852,12 @@ export interface InvitationDefinition {
 // Stored in session state, not in character config
 export interface SolicitudInstance {
   id: string;                // Unique instance ID
-  key: string;               // Activation key for this solicitud
+  key: string;               // Solicitud key for completion (solicitudKey)
+  peticionKey?: string;      // Petition key that activated this (for duplicate detection)
   fromCharacterId: string;   // Character who sent the petition
   fromCharacterName: string; // Display name of sender
   description: string;       // What is being requested
+  completionDescription?: string;  // Description of completion (what happened)
   status: 'pending' | 'completed';  // Current status
   createdAt: number;         // Timestamp when created
   completedAt?: number;      // Timestamp when completed
@@ -2910,6 +2923,12 @@ export interface SessionStats {
 
   // Active solicitudes (requests received from other characters)
   solicitudes: SessionSolicitudes;
+
+  // Recent events (for {{eventos}} key)
+  ultimo_objetivo_completado?: string;  // Description of the last completed objective
+  ultima_solicitud_completada?: string; // Completion description of the last completed solicitud
+  ultima_solicitud_realizada?: string;  // Description of the last peticion activated
+  ultima_accion_realizada?: string;     // "personaje - descripcion de la accion"
 
   // Metadata
   initialized: boolean;      // Whether stats were initialized from defaults

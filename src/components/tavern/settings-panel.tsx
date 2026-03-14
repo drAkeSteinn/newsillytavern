@@ -71,6 +71,7 @@ import { InventoryPanel } from '@/components/inventory';
 import { AppearanceSettingsPanel } from './appearance-settings-panel';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean; description: string }[] = [
+  { value: 'test-mock', label: '🧪 Test Mock (Prueba)', defaultEndpoint: '', needsEndpoint: false, description: 'Prueba del sistema de peticiones sin LLM real' },
   { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false, description: 'SDK integrado, sin configuración' },
   { value: 'text-generation-webui', label: 'Text Generation WebUI', defaultEndpoint: 'http://localhost:5000', needsEndpoint: true, description: 'API en puerto 5000 (iniciar con --api)' },
   { value: 'ollama', label: 'Ollama', defaultEndpoint: 'http://localhost:11434', needsEndpoint: true, description: 'Servidor Ollama local' },
@@ -785,8 +786,43 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                             
                             {/* Z.ai info */}
                             {config.provider === 'z-ai' && (
-                              <div className="p-2 bg-green-500/10 rounded text-xs text-green-600 dark:text-green-400">
-                                ✓ Z.ai usa el SDK integrado. No requiere configuración adicional.
+                              <div className="space-y-3">
+                                <div className="p-2 bg-green-500/10 rounded text-xs text-green-600 dark:text-green-400">
+                                  ✓ Z.ai usa el SDK integrado.
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Token JWT (opcional)</Label>
+                                  <Input
+                                    type="password"
+                                    value={config.apiKey || ''}
+                                    onChange={(e) => 
+                                      updateLLMConfig(config.id, { apiKey: e.target.value })
+                                    }
+                                    placeholder="Si el servidor requiere X-Token header"
+                                    className="h-8 text-sm"
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    Algunos servidores Z.ai requieren un token JWT. Si ves error "missing X-Token header", necesitas este campo.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Test Mock custom response */}
+                            {config.provider === 'test-mock' && (
+                              <div className="space-y-2">
+                                <Label className="text-xs">Respuesta de Prueba (Mock Response)</Label>
+                                <textarea
+                                  value={config.mockResponse || ''}
+                                  onChange={(e) => 
+                                    updateLLMConfig(config.id, { mockResponse: e.target.value })
+                                  }
+                                  placeholder={`Escribe la respuesta simulada del personaje.\nUsa [key] para activar peticiones.\n\nEjemplo:\n*El personaje te mira*\n\n[peticion_madera]\n\n¿Podrías conseguirme madera?`}
+                                  className="mt-1 w-full h-32 p-2 text-sm rounded-md border border-input bg-background resize-y"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Usa <code className="bg-muted px-1 rounded">[clave]</code> para simular activación de peticiones.
+                                </p>
                               </div>
                             )}
                           </div>

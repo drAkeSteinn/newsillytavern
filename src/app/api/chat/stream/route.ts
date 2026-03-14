@@ -86,6 +86,15 @@ export async function POST(request: NextRequest) {
 
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
+    
+    // Debug: Log sessionStats event fields
+    console.log(`[Stream Route] sessionStats event fields:`, {
+      hasSessionStats: !!typedSessionStats,
+      ultimo_objetivo_completado: typedSessionStats?.ultimo_objetivo_completado,
+      ultima_solicitud_realizada: typedSessionStats?.ultima_solicitud_realizada,
+      ultima_solicitud_completada: typedSessionStats?.ultima_solicitud_completada,
+      ultima_accion_realizada: typedSessionStats?.ultima_accion_realizada,
+    });
 
     if (!llmConfig) {
       return createErrorResponse('No LLM configuration provided', 400);
@@ -148,7 +157,8 @@ export async function POST(request: NextRequest) {
       effectiveCharacter,
       effectiveUserName,
       persona,
-      resolvedStats
+      resolvedStats,
+      typedSessionStats  // Pass sessionStats for {{eventos}} key resolution
     );
 
     // Build HUD context section if enabled (now resolves keys!)
@@ -262,6 +272,33 @@ export async function POST(request: NextRequest) {
 
           // Route to appropriate provider
           switch (llmConfig.provider) {
+            case 'test-mock': {
+              // Test mode: Simulate LLM response with peticion keys for testing
+              // This is useful for testing peticiones/solicitudes detection without a real LLM
+              console.log('[Stream Route] Using TEST-MOCK provider for peticiones testing');
+              
+              // Use custom mock response from config, or default response
+              const mockResponse = llmConfig.mockResponse || `*El personaje te mira con interés*
+
+¡Hola! Me alegra verte por aquí. Tenía algo que pedirte...
+
+[peticion_madera]
+
+¿Podrías conseguirme algo de madera para construir un refugio?`;
+              
+              console.log('[Stream Route] Mock response:', mockResponse.slice(0, 100) + '...');
+              
+              generator = async function* mockGenerator() {
+                // Stream character by character to simulate real streaming
+                for (const char of mockResponse) {
+                  yield char;
+                  // Small delay to simulate network latency
+                  await new Promise(resolve => setTimeout(resolve, 15));
+                }
+              }();
+              break;
+            }
+
             case 'z-ai': {
               // Z.ai uses its own SDK
               let chatMessages = buildChatMessages(
@@ -275,7 +312,9 @@ export async function POST(request: NextRequest) {
               if (hudContextSection && hudContext) {
                 chatMessages = injectHUDContextIntoMessages(chatMessages, hudContextSection, hudContext.position);
               }
-              generator = streamZAI(chatMessages);
+              // Pass the API key from LLM config as the JWT token (if provided)
+              // This allows per-config token override
+              generator = streamZAI(chatMessages, llmConfig.apiKey);
               break;
             }
 

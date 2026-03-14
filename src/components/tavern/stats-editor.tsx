@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -1461,6 +1461,193 @@ function SkillEditor({ skill, index, availableAttributes, onChange, onDelete }: 
 }
 
 // ============================================
+// Trigger Key Editor Component (Reusable)
+// ============================================
+
+interface TriggerKeyEditorProps {
+  // Primary key
+  primaryKey: string;
+  onPrimaryKeyChange: (key: string) => void;
+  primaryKeyPlaceholder?: string;
+  
+  // Alternative keys
+  alternativeKeys?: string[];
+  onAlternativeKeysChange?: (keys: string[] | undefined) => void;
+  alternativeKeysPlaceholder?: string;
+  
+  // Case sensitivity
+  caseSensitive?: boolean;
+  onCaseSensitiveChange?: (value: boolean) => void;
+  
+  // Labels and descriptions
+  label: string;
+  description?: string;
+  primaryKeyLabel?: string;
+  alternativeKeysLabel?: string;
+  
+  // Color theme
+  colorTheme?: 'purple' | 'cyan' | 'amber' | 'emerald' | 'rose';
+}
+
+function TriggerKeyEditor({
+  primaryKey,
+  onPrimaryKeyChange,
+  primaryKeyPlaceholder = 'key_name',
+  alternativeKeys,
+  onAlternativeKeysChange,
+  alternativeKeysPlaceholder = 'key1, key2, key3',
+  caseSensitive = false,
+  onCaseSensitiveChange,
+  label,
+  description,
+  primaryKeyLabel = 'Key principal',
+  alternativeKeysLabel = 'Keys alternativas',
+  colorTheme = 'purple',
+}: TriggerKeyEditorProps) {
+  const colorClasses = {
+    purple: {
+      bg: 'bg-purple-500/10',
+      border: 'border-purple-500/20',
+      icon: 'text-purple-400',
+      label: 'text-purple-400',
+      keyBg: 'bg-purple-500/10',
+      keyText: 'text-purple-400',
+    },
+    cyan: {
+      bg: 'bg-cyan-500/10',
+      border: 'border-cyan-500/20',
+      icon: 'text-cyan-400',
+      label: 'text-cyan-400',
+      keyBg: 'bg-cyan-500/10',
+      keyText: 'text-cyan-400',
+    },
+    amber: {
+      bg: 'bg-amber-500/10',
+      border: 'border-amber-500/20',
+      icon: 'text-amber-400',
+      label: 'text-amber-400',
+      keyBg: 'bg-amber-500/10',
+      keyText: 'text-amber-400',
+    },
+    emerald: {
+      bg: 'bg-emerald-500/10',
+      border: 'border-emerald-500/20',
+      icon: 'text-emerald-400',
+      label: 'text-emerald-400',
+      keyBg: 'bg-emerald-500/10',
+      keyText: 'text-emerald-400',
+    },
+    rose: {
+      bg: 'bg-rose-500/10',
+      border: 'border-rose-500/20',
+      icon: 'text-rose-400',
+      label: 'text-rose-400',
+      keyBg: 'bg-rose-500/10',
+      keyText: 'text-rose-400',
+    },
+  };
+  
+  const colors = colorClasses[colorTheme];
+  const allKeys = [primaryKey, ...(alternativeKeys || [])].filter(Boolean);
+  
+  return (
+    <div className={`space-y-3 p-3 ${colors.bg} rounded-lg border ${colors.border}`}>
+      <div className="flex items-center gap-2">
+        <Zap className={`w-4 h-4 ${colors.icon}`} />
+        <Label className={`text-xs font-medium ${colors.label}`}>{label}</Label>
+        {description && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm">
+              <p>{description}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <Label className="text-xs text-muted-foreground">{primaryKeyLabel}</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Key principal que activará esta acción.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Se detectará en múltiples formatos: key:value, key=value, |key|, [key]</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <Input
+            value={primaryKey}
+            onChange={(e) => onPrimaryKeyChange(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+            placeholder={primaryKeyPlaceholder}
+            className="h-8 font-mono text-xs"
+          />
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <Label className="text-xs text-muted-foreground">{alternativeKeysLabel}</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Keys adicionales que también activarán esta acción.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Separar con comas: alt1, alt2, alt3</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <Input
+            value={(alternativeKeys || []).join(', ')}
+            onChange={(e) => {
+              const keys = e.target.value.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean);
+              onAlternativeKeysChange?.(keys.length > 0 ? keys : undefined);
+            }}
+            placeholder={alternativeKeysPlaceholder}
+            className="h-8 text-xs"
+          />
+        </div>
+      </div>
+      
+      {/* Case Sensitivity Toggle */}
+      {onCaseSensitiveChange && (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={caseSensitive}
+            onCheckedChange={onCaseSensitiveChange}
+          />
+          <Label className="text-xs flex items-center gap-1">
+            <CaseSensitive className="w-3 h-3" />
+            Distinguir mayúsculas/minúsculas
+          </Label>
+        </div>
+      )}
+      
+      {/* Detection Format Preview */}
+      {allKeys.length > 0 && (
+        <div className="text-[10px] text-muted-foreground space-y-1 p-2 bg-background/50 rounded">
+          <p className="font-medium text-foreground/70">Formatos detectados:</p>
+          <div className="flex flex-wrap gap-1">
+            {allKeys.slice(0, 3).map((key, i) => (
+              <Fragment key={i}>
+                <code className={`${colors.keyBg} ${colors.keyText} px-1 rounded`}>{key}:valor</code>
+                <code className={`${colors.keyBg} ${colors.keyText} px-1 rounded`}>{key}=valor</code>
+                <code className={`${colors.keyBg} ${colors.keyText} px-1 rounded`}>|{key}|</code>
+                <code className={`${colors.keyBg} ${colors.keyText} px-1 rounded`}>[{key}]</code>
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // Invitation/Peticion Editor Component
 // ============================================
 
@@ -1525,48 +1712,39 @@ function SolicitudDefinitionEditor({ solicitud, index, availableAttributes, onCh
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <Label className="text-xs">Key de Petición *</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Key que OTROS personajes escribirán para solicitarte esto.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Aparecerá en [PETICIONES POSIBLES] de otros personajes.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                value={solicitud.peticionKey}
-                onChange={(e) => onChange(index, { peticionKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                placeholder="pedir_madera"
-                className="h-8 font-mono text-xs"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <Label className="text-xs">Key de Solicitud *</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Key que ESTE personaje escribirá para completar la solicitud.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Aparecerá en [SOLICITUDES RECIBIDAS] cuando alguien te solicite esto.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                value={solicitud.solicitudKey}
-                onChange={(e) => onChange(index, { solicitudKey: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                placeholder="dar_madera"
-                className="h-8 font-mono text-xs"
-              />
-            </div>
-          </div>
+          {/* Peticion Activation Keys - Using TriggerKeyEditor */}
+          <TriggerKeyEditor
+            primaryKey={solicitud.peticionKey}
+            onPrimaryKeyChange={(key) => onChange(index, { peticionKey: key })}
+            primaryKeyPlaceholder="pedir_madera"
+            alternativeKeys={solicitud.peticionActivationKeys}
+            onAlternativeKeysChange={(keys) => onChange(index, { peticionActivationKeys: keys })}
+            alternativeKeysPlaceholder="pm, pedir_madera_alt"
+            caseSensitive={solicitud.peticionKeyCaseSensitive}
+            onCaseSensitiveChange={(value) => onChange(index, { peticionKeyCaseSensitive: value })}
+            label="Key de Petición (Activación)"
+            description="Key que OTROS personajes escribirán para solicitarte esto. Aparecerá en [PETICIONES POSIBLES] de otros personajes."
+            primaryKeyLabel="Key de petición"
+            alternativeKeysLabel="Keys alternativas"
+            colorTheme="cyan"
+          />
+
+          {/* Solicitud Completion Keys - Using TriggerKeyEditor */}
+          <TriggerKeyEditor
+            primaryKey={solicitud.solicitudKey}
+            onPrimaryKeyChange={(key) => onChange(index, { solicitudKey: key })}
+            primaryKeyPlaceholder="dar_madera"
+            alternativeKeys={solicitud.solicitudActivationKeys}
+            onAlternativeKeysChange={(keys) => onChange(index, { solicitudActivationKeys: keys })}
+            alternativeKeysPlaceholder="dm, dar_madera_alt"
+            caseSensitive={solicitud.solicitudKeyCaseSensitive}
+            onCaseSensitiveChange={(value) => onChange(index, { solicitudKeyCaseSensitive: value })}
+            label="Key de Solicitud (Completación)"
+            description="Key que ESTE personaje escribirá para completar la solicitud. Aparecerá en [SOLICITUDES RECIBIDAS] cuando alguien te solicite esto."
+            primaryKeyLabel="Key de solicitud"
+            alternativeKeysLabel="Keys alternativas"
+            colorTheme="emerald"
+          />
 
           <div>
             <div className="flex items-center gap-1.5 mb-1">
@@ -2388,6 +2566,9 @@ export function StatsEditor({ statsConfig, onChange, allCharacters = [] }: Stats
             <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{intenciones}}'}</code> → Lista de intenciones disponibles</p>
             <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{peticiones}}'}</code> → Peticiones que puede hacer este personaje</p>
             <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{solicitudes}}'}</code> → Solicitudes recibidas de otros personajes</p>
+            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{solicitante}}'}</code> → Nombre del personaje que hizo la solicitud</p>
+            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{solicitado}}'}</code> → Nombre del personaje que recibe la solicitud</p>
+            <p>• <code className="bg-muted px-1.5 py-0.5 rounded font-mono">{'{{eventos}}'}</code> → Estado reciente de eventos</p>
           </div>
           <p className="text-xs opacity-75 mt-2">
             Funcionan igual que <code className="bg-muted px-1 rounded">{'{{char}}'}</code> y <code className="bg-muted px-1 rounded">{'{{user}}'}</code> de SillyTavern.

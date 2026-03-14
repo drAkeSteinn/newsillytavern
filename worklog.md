@@ -982,3 +982,185 @@ Stage Summary:
 - Linter passed without errors
 - Dev server running correctly
 
+---
+Task ID: replay-solicitud-detection-fix
+Agent: Main Agent
+Task: Corregir error intermitente al reproducir respuestas con sistema de Peticiones/Solicitudes
+
+Work Log:
+- Analizado el error reportado por el usuario durante replay de respuestas
+- El error apuntaba a la linea 134 de logger.ts (console.error)
+- Identificado que el error real estaba en solicitud-executor.ts
+- Encontrado bug en las funciones de detección durante streaming:
+  * Linea 648: `const key = (match[1] || match[2] || match[3]).toLowerCase()`
+  * Linea 686: Similar, solo verificaba 3 grupos de captura
+- El patrón regex tiene 5 grupos de captura para diferentes formatos:
+  1. `[key]` - bracketed
+  2. `Peticion:key` - explicit format
+  3. `|key|` - pipe delimited
+  4. `key=` o `key:` - key with value
+  5. bare key
+- Cuando la key se detectaba en los grupos 4 o 5, la expresión devolvía `undefined`
+- Llamar `.toLowerCase()` en `undefined` causaba el error
+
+Changes Made:
+1. **solicitud-executor.ts** (linea 648):
+   - Cambiado: `const key = (match[1] || match[2] || match[3]).toLowerCase()`
+   - A: `const key = (match[1] || match[2] || match[3] || match[4] || match[5])?.toLowerCase()`
+   - Agregado check de 5 grupos de captura
+   - Agregado optional chaining `?.toLowerCase()`
+   - Agregado check `if (key && ...)` para verificar que key existe
+
+2. **solicitud-executor.ts** (linea 686):
+   - Mismo cambio para detección de solicitudes
+   - Cambiado a 5 grupos de captura con optional chaining
+
+Stage Summary:
+- Error intermitente al reproducir respuestas corregido
+- El sistema de Peticiones/Solicitudes ahora maneja todos los formatos de key correctamente
+- Los 5 formatos de detección funcionan: [key], Peticion:key, |key|, key=valor, bare key
+- Linter passed without errors
+- Dev server running correctly
+
+---
+Task ID: peticiones-streaming-fix
+Agent: Main Agent
+Task: Corregir detección de Peticiones durante streaming del LLM
+
+Work Log:
+- Analizado el flujo completo del sistema de triggers durante streaming
+- Identificado que en chat-panel.tsx NO se estaba pasando `characters` a `processTriggers`:
+  * Streaming normal (línea 616): Solo pasaba `activeCharacter` y `messageKey`
+  * Replay (línea 934): Tampoco pasaba `characters`
+- Sin `characters`, el sistema de Peticiones no puede:
+  * Encontrar el personaje objetivo (`SolicitudDefinition`)
+  * Crear la solicitud para el personaje objetivo
+  * Incluir la persona como objetivo (`__user__`)
+
+Changes Made:
+1. **chat-panel.tsx** (streaming normal):
+   - Cambiado: `processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current)`
+   - A: `processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current, allCharactersWithPersona)`
+   - `allCharactersWithPersona` ya estaba definido antes (línea 539-546) e incluye todos los personajes + persona
+
+2. **chat-panel.tsx** (replay):
+   - Cambiado: `processTriggers(accumulatedContent, replayChar || null, streamingMessageKeyRef.current)`
+   - A: Construido `replayCharactersWithPersona` con personajes + persona
+   - Pasado como cuarto parámetro a `processTriggers`
+
+3. **solicitud-executor.ts** (líneas 648 y 686):
+   - Corregido manejo de 5 grupos de captura en streaming
+   - Agregado optional chaining para evitar errores con keys en grupos 4-5
+
+Stage Summary:
+- Sistema de Peticiones ahora funciona durante streaming del LLM
+- Funciona tanto para personajes como para la Persona (__user__)
+- Chat normal y grupo ahora pasan `characters` correctamente
+- Replay también actualizado para pasar personajes
+- Linter passed without errors
+- Dev server running correctly
+
+---
+Task ID: peticiones-early-return-fix
+Agent: Main Agent
+Task: Corregir early return que impedía detección de Peticiones durante streaming
+
+Work Log:
+- Identificado el problema raíz en `use-trigger-system.ts`
+- El código tenía un early return: `if (newTokens.length === 0) { return; }`
+- Este return ocurría ANTES del procesamiento de Solicitud triggers
+- El `TokenDetector` detecta tokens específicos para sonidos/sprites
+- Pero las keys de peticiones/solicitudes son palabras simples que no siempre se detectan como "tokens"
+- Resultado: El sistema nunca llegaba al procesamiento de solicitudes
+
+Root Cause Analysis:
+1. Línea 302: `const newTokens = detector.processIncremental(content, messageKey);`
+2. Línea 304-306: `if (newTokens.length === 0) { return; }`
+3. El procesamiento de solicitudes estaba DESPUÉS de este return
+4. Si no había tokens detectados para sonidos/sprites, la función retornaba sin procesar solicitudes
+
+Changes Made:
+1. **use-trigger-system.ts**:
+   - Movido el procesamiento de Solicitud triggers AL PRINCIPIO de la función
+   - Ahora se ejecuta ANTES del early return basado en tokens
+   - Eliminado código duplicado que estaba al final de la función
+   - El procesamiento de solicitudes ahora es independiente del TokenDetector
+
+2. **chat-panel.tsx (replay)**:
+   - Movida la determinación de `replayChar` ANTES de `resetTriggers`
+   - Cambiado: `resetTriggers(messageKey, null)`
+   - A: `resetTriggers(messageKey, replayChar || null)`
+   - Esto asegura que el estado del solicitud handler se resetee para el personaje correcto
+
+Stage Summary:
+- Early return eliminado como bloqueo para detección de Peticiones
+- Solicitud triggers ahora se procesan independientemente del TokenDetector
+- El sistema detecta keys de peticiones/solicitudes tanto en streaming como en replay
+- Código duplicado eliminado del use-trigger-system.ts
+- Linter passed without errors
+- Dev server running correctly
+
+
+---
+Task ID: solicitud-events-system
+Agent: Main Agent
+Task: Implementar sistema de eventos para solicitudes/peticiones con nuevas keys
+
+Work Log:
+- Agregado campo `completionDescription` a `SolicitudInstance` en types/index.ts
+- Agregados campos de eventos a `SessionStats`:
+  * `ultimo_objetivo_completado`: Descripción del último objetivo completado
+  * `ultima_solicitud_completada`: Descripción de completado de la última solicitud
+  * `ultima_solicitud_realizada`: Descripción de la última petición realizada
+- Implementadas nuevas keys en key-resolver.ts:
+  * `{{solicitante}}` - Nombre del personaje que hizo la solicitud
+  * `{{solicitado}}` - Nombre del personaje que recibe la solicitud
+  * `{{eventos}}` - Estado reciente de eventos en formato YAML
+- Actualizado `KeyResolutionContext` con `sessionStats` y `characterId`
+- Agregada función `resolveEventKeys()` para resolver las nuevas keys
+- Agregada función `buildEventosBlock()` para construir el block de eventos
+- Actualizado `resolveAllKeys()` con Phase 3 para resolver event keys
+- Actualizado `buildKeyResolutionContext()` para aceptar `sessionStats`
+- Actualizado statsSlice.ts:
+  * Agregada acción `updateSessionEvent()` para guardar eventos
+  * Actualizado `createSolicitud()` para guardar `ultima_solicitud_realizada`
+  * Actualizado `completeSolicitud()` para guardar `ultima_solicitud_completada`
+- Actualizado sessionSlice.ts:
+  * Actualizado `completeObjective()` para guardar `ultimo_objetivo_completado`
+- Actualizado stats-editor.tsx:
+  * Agregada documentación de nuevas keys en sección "Uso de keys"
+  * Documentadas: {{solicitante}}, {{solicitado}}, {{eventos}}
+
+Changes Made:
+1. **types/index.ts**:
+   - `SolicitudInstance.completionDescription?: string`
+   - `SessionStats.ultimo_objetivo_completado?: string`
+   - `SessionStats.ultima_solicitud_completada?: string`
+   - `SessionStats.ultima_solicitud_realizada?: string`
+
+2. **lib/key-resolver.ts**:
+   - Added `sessionStats` and `characterId` to `KeyResolutionContext`
+   - Added `resolveEventKeys()` function
+   - Added `buildEventosBlock()` helper function
+   - Updated `resolveAllKeys()` with Phase 3
+   - Updated context builders
+
+3. **store/slices/statsSlice.ts**:
+   - Added `updateSessionEvent` action
+   - Updated `createSolicitud` to save event
+   - Updated `completeSolicitud` to save event
+
+4. **store/slices/sessionSlice.ts**:
+   - Updated `completeObjective` to save event to sessionStats
+
+5. **components/tavern/stats-editor.tsx**:
+   - Added documentation for new keys
+
+Stage Summary:
+- Sistema de eventos implementado completamente
+- Nuevas keys funcionan igual que {{char}} y {{user}}
+- Los eventos se guardan automáticamente al completar objetivos/solicitudes
+- El key {{eventos}} muestra el estado reciente en formato YAML
+- Las keys {{solicitante}}/{{solicitado}} facilitan la escritura de respuestas contextuales
+- Linter passed without errors
+- Dev server running correctly

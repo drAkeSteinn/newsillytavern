@@ -23,7 +23,7 @@ export async function generateResponse(
 ): Promise<GenerateResponse> {
   switch (provider) {
     case 'z-ai': {
-      return callZAI(chatMessages);
+      return callZAI(chatMessages, config.apiKey);
     }
 
     case 'openai':

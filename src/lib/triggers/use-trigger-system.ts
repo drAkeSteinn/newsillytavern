@@ -289,23 +289,26 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     messageKey: string,
     characters?: CharacterCard[]
   ) => {
+    // DEBUG: Log all processStreamingContent calls
+    console.log(`[TriggerSystem] processStreamingContent called`, {
+      messageKey,
+      characterName: character?.name,
+      characterId: character?.id,
+      contentLength: content.length,
+      contentPreview: content.slice(0, 100),
+      charactersCount: characters?.length,
+      hasPersona: characters?.some(c => c.id === '__user__'),
+    });
+
     // Check if already processed this exact content
     const lastProcessed = lastProcessedRef.current.get(messageKey);
     if (lastProcessed === content) {
+      console.log(`[TriggerSystem] Skipping - same content as last processed`);
       return;
     }
     lastProcessedRef.current.set(messageKey, content);
     
-    const detector = getTokenDetector();
-    
-    // Process incrementally - get only NEW tokens
-    const newTokens = detector.processIncremental(content, messageKey);
-    
-    if (newTokens.length === 0) {
-      return;
-    }
-    
-    // Create context
+    // Create context (needed for both token-based triggers AND solicitud processing)
     const context: TriggerContext = {
       character,
       characters,
@@ -314,6 +317,98 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       isStreaming: true,
       timestamp: Date.now(),
     };
+    
+    // ============================================
+    // PROCESS Solicitud triggers FIRST (before token-based early return)
+    // This is critical because the TokenDetector may not detect peticion/solicitud keys
+    // but we still need to process them for the peticiones/solicitudes system
+    // ============================================
+    console.log(`[TriggerSystem] Checking solicitud conditions`, {
+      statsEnabled: config.statsEnabled !== false,
+      characterStatsEnabled: character?.statsConfig?.enabled,
+      hasInvitations: character?.statsConfig?.invitations?.length,
+    });
+
+    if (config.statsEnabled !== false) {
+      const activeSession = store.getActiveSession?.();
+      const sessionId = store.activeSessionId || '';
+
+      // Only process for the speaking character
+      if (character?.statsConfig?.enabled) {
+        const hasPeticiones = character.statsConfig.invitations && character.statsConfig.invitations.length > 0;
+        const hasPendingSolicitudes = activeSession?.sessionStats?.solicitudes?.characterSolicitudes?.[character.id]
+          ?.some(s => s.status === 'pending');
+
+        console.log(`[TriggerSystem] Solicitud check for ${character.name}`, {
+          hasPeticiones,
+          hasPendingSolicitudes,
+          invitationsCount: character.statsConfig.invitations?.length,
+          invitations: character.statsConfig.invitations?.map(i => ({ key: i.peticionKey, target: i.objetivo })),
+        });
+
+        if (hasPeticiones || hasPendingSolicitudes) {
+          // Include persona as pseudo-character for peticiones targeting __user__
+          const allCharactersWithPersona = [
+            ...(characters || []),
+            ...(config.activePersona?.statsConfig?.enabled ? [{
+              id: '__user__',
+              name: config.activePersona.name || 'User',
+              statsConfig: config.activePersona.statsConfig,
+            }] as CharacterCard[] : []),
+          ];
+          
+          const solicitudContext: SolicitudTriggerContext = {
+            ...context,
+            characterId: character.id,
+            characterName: character.name,
+            statsConfig: character.statsConfig,
+            sessionStats: activeSession?.sessionStats,
+            sessionId,
+            allCharacters: allCharactersWithPersona,
+            activePersona: config.activePersona,
+          };
+
+          const solicitudResult = checkSolicitudTriggersInText(
+            content,
+            solicitudContext,
+            solicitudHandlerState,
+            {
+              createSolicitud: store.createSolicitud.bind(store),
+              completeSolicitud: store.completeSolicitud.bind(store),
+              getSessionStats: (sessionId: string) => {
+                const session = store.sessions?.find((s: any) => s.id === sessionId);
+                return session?.sessionStats || null;
+              },
+            }
+          );
+
+          if (solicitudResult.matched && solicitudResult.processingResult) {
+            const { activations, completions } = solicitudResult.processingResult;
+            
+            if (activations.length > 0) {
+              console.log(`[TriggerSystem] Peticiones activated for ${character.name}: ${activations.filter(a => a.activated).map(a => a.peticionKey).join(', ')}`);
+            }
+            
+            if (completions.length > 0) {
+              console.log(`[TriggerSystem] Solicitudes completed for ${character.name}: ${completions.filter(c => c.completed).map(c => c.solicitudKey).join(', ')}`);
+            }
+          }
+        }
+      }
+    }
+    
+    // ============================================
+    // TOKEN-BASED TRIGGERS (sound, sprite, etc.)
+    // These use the TokenDetector for pattern matching
+    // ============================================
+    const detector = getTokenDetector();
+    
+    // Process incrementally - get only NEW tokens
+    const newTokens = detector.processIncremental(content, messageKey);
+    
+    if (newTokens.length === 0) {
+      return;
+    }
     
     // Process sound triggers
     if (config.soundEnabled !== false && settings.sound?.enabled) {
@@ -1037,66 +1132,6 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                   },
                 });
               }
-            }
-          }
-        }
-      }
-    }
-    
-    // Process Solicitud triggers (Peticiones activation and Solicitud completion)
-    // Detects when LLM uses a peticion key (creates solicitud for target character)
-    // or when LLM uses a solicitud key (marks solicitud as completed)
-    if (config.statsEnabled !== false) {
-      const activeSession = store.getActiveSession?.();
-      const sessionId = store.activeSessionId || '';
-
-      // Only process for the speaking character
-      if (character?.statsConfig?.enabled) {
-        const hasPeticiones = character.statsConfig.invitations && character.statsConfig.invitations.length > 0;
-        const hasPendingSolicitudes = activeSession?.sessionStats?.solicitudes?.characterSolicitudes?.[character.id]
-          ?.some(s => s.status === 'pending');
-
-        if (hasPeticiones || hasPendingSolicitudes) {
-          // Include persona as pseudo-character for peticiones targeting __user__
-          const allCharactersWithPersona = [
-            ...(characters || []),
-            ...(config.activePersona?.statsConfig?.enabled ? [{
-              id: '__user__',
-              name: config.activePersona.name || 'User',
-              statsConfig: config.activePersona.statsConfig,
-            }] as CharacterCard[] : []),
-          ];
-          
-          const solicitudContext: SolicitudTriggerContext = {
-            ...context,
-            characterId: character.id,
-            characterName: character.name,
-            statsConfig: character.statsConfig,
-            sessionStats: activeSession?.sessionStats,
-            sessionId,
-            allCharacters: allCharactersWithPersona,
-            activePersona: config.activePersona,
-          };
-
-          const solicitudResult = checkSolicitudTriggersInText(
-            content,
-            solicitudContext,
-            solicitudHandlerState,
-            {
-              createSolicitud: store.createSolicitud.bind(store),
-              completeSolicitud: store.completeSolicitud.bind(store),
-            }
-          );
-
-          if (solicitudResult.matched && solicitudResult.processingResult) {
-            const { activations, completions } = solicitudResult.processingResult;
-            
-            if (activations.length > 0) {
-              console.log(`[TriggerSystem] Peticiones activated for ${character.name}: ${activations.filter(a => a.activated).map(a => a.peticionKey).join(', ')}`);
-            }
-            
-            if (completions.length > 0) {
-              console.log(`[TriggerSystem] Solicitudes completed for ${character.name}: ${completions.filter(c => c.completed).map(c => c.solicitudKey).join(', ')}`);
             }
           }
         }

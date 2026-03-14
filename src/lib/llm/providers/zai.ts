@@ -61,13 +61,18 @@ async function loadConfig(): Promise<ZAIConfig> {
 
 /**
  * Stream from Z.ai API with proper authentication
+ * @param messages - Chat messages to send
+ * @param overrideToken - Optional token from LLM config to override file config
  */
 export async function* streamZAI(
-  messages: ChatApiMessage[]
+  messages: ChatApiMessage[],
+  overrideToken?: string
 ): AsyncGenerator<string> {
   try {
     const config = await loadConfig();
-    const { baseUrl, apiKey, chatId, userId, token } = config;
+    // Use override token from LLM config if provided, otherwise use file config token
+    const effectiveToken = overrideToken || config.token;
+    const { baseUrl, apiKey, chatId, userId } = config;
 
     const url = `${baseUrl}/chat/completions`;
 
@@ -78,9 +83,10 @@ export async function* streamZAI(
       'X-Z-AI-From': 'Z',
     };
 
-    // Add X-Token header (JWT token from config)
-    if (token) {
-      headers['X-Token'] = token;
+    // Add X-Token header (JWT token - either from LLM config or file config)
+    if (effectiveToken) {
+      headers['X-Token'] = effectiveToken;
+      console.log('[Z.ai Provider] Using X-Token header (JWT token)');
     }
 
     if (chatId) {
@@ -164,13 +170,18 @@ export async function* streamZAI(
 
 /**
  * Call Z.ai API (non-streaming)
+ * @param messages - Chat messages to send
+ * @param overrideToken - Optional token from LLM config to override file config
  */
 export async function callZAI(
-  messages: ChatApiMessage[]
+  messages: ChatApiMessage[],
+  overrideToken?: string
 ): Promise<GenerateResponse> {
   try {
     const config = await loadConfig();
-    const { baseUrl, apiKey, chatId, userId, token } = config;
+    // Use override token from LLM config if provided, otherwise use file config token
+    const effectiveToken = overrideToken || config.token;
+    const { baseUrl, apiKey, chatId, userId } = config;
 
     const url = `${baseUrl}/chat/completions`;
 
@@ -181,9 +192,9 @@ export async function callZAI(
       'X-Z-AI-From': 'Z',
     };
 
-    // Add X-Token header (JWT token from config)
-    if (token) {
-      headers['X-Token'] = token;
+    // Add X-Token header (JWT token - either from LLM config or file config)
+    if (effectiveToken) {
+      headers['X-Token'] = effectiveToken;
     }
 
     if (chatId) {

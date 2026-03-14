@@ -98,6 +98,14 @@ export interface StatsSlice {
   getPendingUserSolicitudes: (
     sessionId: string
   ) => SolicitudInstance[];
+
+  // Session Events (for {{eventos}} key)
+  // These track recent important events in the session
+  updateSessionEvent: (
+    sessionId: string,
+    eventType: 'ultimo_objetivo_completado' | 'ultima_solicitud_completada' | 'ultima_solicitud_realizada' | 'ultima_accion_realizada',
+    description: string
+  ) => void;
 }
 
 // ============================================
@@ -220,10 +228,18 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       const session = sessions[sessionIndex];
       let sessionStats = session.sessionStats;
       
-      // Auto-initialize sessionStats if missing
+      // Auto-initialize sessionStats if missing (includes event fields reset)
       if (!sessionStats) {
         sessionStats = {
           characterStats: {},
+          solicitudes: {
+            characterSolicitudes: {},
+            lastModified: Date.now(),
+          },
+          ultimo_objetivo_completado: undefined,
+          ultima_solicitud_completada: undefined,
+          ultima_solicitud_realizada: undefined,
+          ultima_accion_realizada: undefined,
           initialized: true,
           lastModified: Date.now(),
         };
@@ -300,7 +316,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
 
   batchUpdateCharacterStats: (sessionId, characterId, updates, reason = 'llm_detection') => {
     set((state: any) => {
-      const sessions = state.sessions as Array<{ 
+      const sessions = state.sessions as Array<{
         id: string; 
         sessionStats?: SessionStats;
       }>;
@@ -311,10 +327,18 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       const session = sessions[sessionIndex];
       let sessionStats = session.sessionStats;
       
-      // Auto-initialize sessionStats if missing
+      // Auto-initialize sessionStats if missing (includes event fields reset)
       if (!sessionStats) {
         sessionStats = {
           characterStats: {},
+          solicitudes: {
+            characterSolicitudes: {},
+            lastModified: Date.now(),
+          },
+          ultimo_objetivo_completado: undefined,
+          ultima_solicitud_completada: undefined,
+          ultima_solicitud_realizada: undefined,
+          ultima_accion_realizada: undefined,
           initialized: true,
           lastModified: Date.now(),
         };
@@ -498,7 +522,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
     const session = sessions[sessionIndex];
     let sessionStats = session.sessionStats;
     
-    // Auto-initialize sessionStats if missing
+    // Auto-initialize sessionStats if missing (includes event fields)
     if (!sessionStats) {
       sessionStats = {
         characterStats: {},
@@ -506,6 +530,10 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
           characterSolicitudes: {},
           lastModified: Date.now(),
         },
+        ultimo_objetivo_completado: undefined,
+        ultima_solicitud_completada: undefined,
+        ultima_solicitud_realizada: undefined,
+        ultima_accion_realizada: undefined,
         initialized: true,
         lastModified: Date.now(),
       };
@@ -530,6 +558,13 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       createdAt: Date.now(),
     };
     
+    console.log(`[createSolicitud] Creating solicitud with data:`, {
+      key: solicitudData.key,
+      peticionKey: solicitudData.peticionKey,
+      fromCharacterId: solicitudData.fromCharacterId,
+      targetCharacterId,
+    });
+    
     // Add to target character's solicitudes
     const currentSolicitudes = sessionStats.solicitudes.characterSolicitudes[targetCharacterId] || [];
     const updatedSolicitudes = [...currentSolicitudes, newSolicitud];
@@ -543,6 +578,8 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         },
         lastModified: Date.now(),
       },
+      // Save event for {{eventos}} key - peticion was activated
+      ultima_solicitud_realizada: `${solicitudData.fromCharacterName} solicitó "${solicitudData.key}" a ${targetCharacterId === '__user__' ? 'el usuario' : targetCharacterId}: ${solicitudData.description}`,
       lastModified: Date.now(),
     };
     
@@ -607,6 +644,9 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
         },
         lastModified: Date.now(),
       },
+      // Save event for {{eventos}} key
+      ultima_solicitud_completada: completedSolicitud.completionDescription || 
+        `Solicitud "${solicitudKey}" completada por ${completedSolicitud.fromCharacterName}`,
       lastModified: Date.now(),
     };
     
@@ -676,7 +716,7 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
     const session = sessions[sessionIndex];
     let sessionStats = session.sessionStats;
     
-    // Auto-initialize sessionStats if missing
+    // Auto-initialize sessionStats if missing (includes event fields)
     if (!sessionStats) {
       sessionStats = {
         characterStats: {},
@@ -684,6 +724,10 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
           characterSolicitudes: {},
           lastModified: Date.now(),
         },
+        ultimo_objetivo_completado: undefined,
+        ultima_solicitud_completada: undefined,
+        ultima_solicitud_realizada: undefined,
+        ultima_accion_realizada: undefined,
         initialized: true,
         lastModified: Date.now(),
       };
@@ -901,6 +945,63 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
     return session.sessionStats.solicitudes.characterSolicitudes['__user__'].filter(
       s => s.status === 'pending'
     );
+  },
+
+  /**
+   * Update session event (for {{eventos}} key)
+   * Saves recent important events to session stats
+   */
+  updateSessionEvent: (sessionId, eventType, description) => {
+    set((state: any) => {
+      const sessions = state.sessions as Array<{ 
+        id: string; 
+        sessionStats?: SessionStats;
+      }>;
+      const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+      
+      if (sessionIndex === -1) return state;
+      
+      const session = sessions[sessionIndex];
+      let sessionStats = session.sessionStats;
+      
+      // Auto-initialize sessionStats if missing (includes event fields)
+      if (!sessionStats) {
+        sessionStats = {
+          characterStats: {},
+          solicitudes: {
+            characterSolicitudes: {},
+            lastModified: Date.now(),
+          },
+          ultimo_objetivo_completado: undefined,
+          ultima_solicitud_completada: undefined,
+          ultima_solicitud_realizada: undefined,
+          ultima_accion_realizada: undefined,
+          initialized: true,
+          lastModified: Date.now(),
+        };
+      }
+      
+      // Update the specific event field
+      const newSessionStats: SessionStats = {
+        ...sessionStats,
+        [eventType]: description,
+        lastModified: Date.now(),
+      };
+      
+      return {
+        sessions: state.sessions.map((s: any) =>
+          s.id === sessionId
+            ? { 
+                ...s, 
+                sessionStats: newSessionStats,
+                updatedAt: new Date().toISOString() 
+              }
+            : s
+        ),
+      };
+    });
+    
+    console.log(`[SessionEvent] Updated ${eventType}: ${description}`);
   },
 });
 
