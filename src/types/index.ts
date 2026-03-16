@@ -695,15 +695,47 @@ export interface TTSConfig {
   speed: number;
   pitch: number;
   isActive: boolean;
+  // TTS-WebUI specific settings
+  model?: string;                    // TTS model to use (e.g., 'chatterbox-tts', 'kokoro')
+  referenceAudio?: string;           // Path/URL to reference audio for voice cloning
+  language?: string;                 // Language code for multilingual models
 }
 
 export type TTSProvider = 
+  | 'tts-webui'                      // TTS-WebUI (OpenAI compatible, Chatterbox, Whisper)
   | 'edge-tts'
   | 'elevenlabs'
   | 'coqui'
   | 'bark'
   | 'silero'
+  | 'z-ai'                           // Z.ai SDK TTS
   | 'custom';
+
+// TTS-WebUI specific configuration
+export interface TTSWebUIConfig {
+  enabled: boolean;
+  baseUrl: string;                   // e.g., 'http://localhost:7778'
+  model: string;                     // Default TTS model (chatterbox, multilingual, chatterbox-turbo, etc.)
+  whisperModel: string;              // Default Whisper model for ASR
+  defaultVoice?: string;             // Default voice/reference audio path (e.g., 'voices/chatterbox/es-rick.wav')
+  speed: number;                     // Speech speed multiplier
+  responseFormat: 'mp3' | 'wav' | 'ogg' | 'flac';
+  language?: string;                 // Language for multilingual models (es, en, ja, etc.)
+  // Advanced TTS parameters
+  exaggeration: number;              // 0-1, controls expressiveness (default: 0.5)
+  cfgWeight: number;                 // 0-1, classifier-free guidance weight (default: 0.5)
+  temperature: number;               // 0-2, sampling temperature (default: 0.8)
+}
+
+// Voice reference for voice cloning
+export interface VoiceReference {
+  id: string;
+  name: string;
+  characterId?: string;              // Associated character (optional)
+  audioPath: string;                 // Path to reference audio file
+  description?: string;              // Description of the voice
+  createdAt: string;
+}
 
 export interface VoiceSettings {
   enabled: boolean;
@@ -711,6 +743,15 @@ export interface VoiceSettings {
   speed: number;
   pitch: number;
   emotionMapping: Record<string, string>;
+}
+
+// ASR (Speech-to-Text) configuration
+export interface ASRConfig {
+  enabled: boolean;
+  provider: 'tts-webui' | 'whisper' | 'z-ai';
+  endpoint?: string;
+  model: string;                     // e.g., 'whisper-large-v3'
+  language?: string;
 }
 
 // ============ Background Types ============

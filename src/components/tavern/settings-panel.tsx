@@ -69,6 +69,7 @@ import { QuestSettingsPanel } from '@/components/quests';
 import { DialogueSettingsPanel } from '@/components/dialogue';
 import { InventoryPanel } from '@/components/inventory';
 import { AppearanceSettingsPanel } from './appearance-settings-panel';
+import { TTSSettingsPanel } from './tts-settings-panel';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean; description: string }[] = [
   { value: 'test-mock', label: '🧪 Test Mock (Prueba)', defaultEndpoint: '', needsEndpoint: false, description: 'Prueba del sistema de peticiones sin LLM real' },
@@ -1016,56 +1017,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
 
             {/* Voice Settings */}
             <TabsContent value="voice" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
-              <div className="space-y-4">
-                {/* Banner Informativo */}
-                <div className="bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-lg p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-pink-500/20 rounded-lg">
-                      <Volume2 className="w-5 h-5 text-pink-500" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-pink-600">Sistema de Voz (TTS)</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        La síntesis de voz permite que el personaje hable sus mensajes.
-                        Configura un proveedor TTS como ElevenLabs, Azure, o el SDK integrado.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Volume2 className="w-3.5 h-3.5" />
-                        <span className="font-medium">Proveedores TTS</span>
-                      </div>
-                      <Button size="sm" className="h-7 text-xs">
-                        <Plus className="w-3 h-3 mr-1" />
-                        Agregar
-                      </Button>
-                    </div>
-                    <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                      <Volume2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                      <p className="text-sm">Sin proveedores TTS configurados</p>
-                      <p className="text-xs mt-1">Agrega un proveedor para activar la síntesis de voz</p>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-lg border border-border/40 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                      <HelpCircle className="w-3.5 h-3.5" />
-                      <span className="font-medium">Acerca de TTS</span>
-                    </div>
-                    <p>
-                      La síntesis de voz (TTS) permite que el personaje hable sus mensajes.
-                      Configura un proveedor TTS como ElevenLabs, Azure, o el SDK integrado.
-                    </p>
-                    <div className="mt-3 p-2 bg-pink-500/10 rounded border border-pink-500/20">
-                      <p className="text-xs text-pink-600">💡 El SDK integrado de Z.ai no requiere configuración adicional.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <TTSSettingsPanel />
             </TabsContent>
 
             {/* Hotkeys Settings */}
