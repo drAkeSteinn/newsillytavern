@@ -8,9 +8,11 @@ import { CharacterSprite } from './character-sprite';
 // Unified Trigger System - Single import for all triggers
 import { useTriggerSystem } from '@/lib/triggers';
 import { useBackgroundTriggers } from '@/hooks/use-background-triggers';
+import { useTTS, useTTSAutoGeneration } from '@/hooks/use-tts';
 import { GroupSprites } from './group-sprites';
 import { HUDDisplay } from './hud-display';
 import { QuestNotifications } from './quest-notifications';
+import { TTSFloatingIndicator } from './tts-playback-controls';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard, SummaryData, ChatMessage } from '@/types';
 import { t } from '@/lib/i18n';
@@ -154,6 +156,30 @@ export function ChatPanel() {
   
   // Background triggers hook (separate for now, will be integrated later)
   const { scanForBackgroundTriggers, resetDetection: resetBgDetection } = useBackgroundTriggers();
+  
+  // TTS hook for text-to-speech functionality
+  const { 
+    speakWithDualVoice, 
+    speak, 
+    stop: stopTTS, 
+    isPlaying: isTTSPlaying,
+    ttsConfig 
+  } = useTTS();
+  
+  // Auto-generation TTS - automatically plays TTS for new assistant messages
+  // Pass TTS functions and config from parent to avoid creating new instances
+  // Use useMemo to stabilize the messages array reference and prevent unnecessary re-renders
+  const messages = useMemo(() => {
+    return activeSession?.messages.filter(m => !m.isDeleted) || [];
+  }, [activeSession?.messages]);
+  useTTSAutoGeneration(messages, {
+    enabled: true,
+    delay: 500,
+    speak,
+    speakWithDualVoice,
+    ttsConfig,
+    isPlaying: isTTSPlaying,
+  });
   
   // Track current streaming message key for triggers
   const streamingMessageKeyRef = useRef<string>('');
@@ -938,6 +964,26 @@ export function ChatPanel() {
     updateMessage(activeSessionId, messageId, newContent);
   }, [activeSessionId, updateMessage]);
 
+  // Handle speak - play TTS for a message
+  const handleSpeak = useCallback((messageId: string, content: string, characterId?: string) => {
+    // Stop any currently playing TTS
+    if (isTTSPlaying) {
+      stopTTS();
+    }
+
+    // Get the character's voice settings
+    const character = characterId ? characters.find(c => c.id === characterId) : activeCharacter;
+    const voiceSettings = character?.voice;
+
+    // Use dual voice system if character has voice settings
+    if (voiceSettings?.enabled) {
+      speakWithDualVoice(content, voiceSettings, characterId);
+    } else {
+      // Fall back to global TTS settings
+      speak(content, null, characterId);
+    }
+  }, [activeCharacter, characters, isTTSPlaying, stopTTS, speakWithDualVoice, speak]);
+
   // Handle replay - re-simulate the response streaming to trigger sprites and sounds
   const handleReplay = useCallback(async (messageId: string, content: string, characterId?: string) => {
     if (isGenerating || isGenerationInProgressRef.current) return;
@@ -1036,9 +1082,19 @@ export function ChatPanel() {
         if (replayChar) {
           endSpriteGenerationForCharacter(replayChar.id);
         }
+        
+        // Play TTS for the replayed message
+        if (replayChar && content) {
+          const voiceSettings = replayChar.voice;
+          if (voiceSettings?.enabled) {
+            speakWithDualVoice(content, voiceSettings, characterId);
+          } else if (ttsConfig?.enabled) {
+            speak(content, null, characterId);
+          }
+        }
       }
     }
-  }, [isGenerating, activeCharacter, characters, activePersona, setGenerating, resetTriggers, resetBgDetection, scanForBackgroundTriggers, processTriggers, startSpriteGenerationForCharacter, endSpriteGenerationForCharacter, setStreamingCharacter, setStreamingContent]);
+  }, [isGenerating, activeCharacter, characters, activePersona, setGenerating, resetTriggers, resetBgDetection, scanForBackgroundTriggers, processTriggers, startSpriteGenerationForCharacter, endSpriteGenerationForCharacter, setStreamingCharacter, setStreamingContent, speakWithDualVoice, speak, ttsConfig]);
 
   // Get clearChat from store for proper reset
   const clearChat = useTavernStore((state) => state.clearChat);
@@ -1146,6 +1202,7 @@ export function ChatPanel() {
         onRegenerate={handleRegenerate}
         onEdit={handleEdit}
         onReplay={handleReplay}
+        onSpeak={handleSpeak}
         streamingContent={streamingContent}
         streamingCharacter={streamingCharacter}
         streamingProgress={streamingProgress}
@@ -1158,6 +1215,9 @@ export function ChatPanel() {
 
       {/* Quest Notifications */}
       <QuestNotifications />
+      
+      {/* TTS Floating Indicator */}
+      <TTSFloatingIndicator />
     </div>
   );
 }

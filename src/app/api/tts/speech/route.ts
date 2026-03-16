@@ -47,6 +47,9 @@ interface TTSRequest {
   exaggeration?: number;
   cfg_weight?: number;
   temperature?: number;
+  // Additional params for TTS-WebUI
+  device?: string;
+  dtype?: string;
 }
 
 interface TTSWebUIResponse {
@@ -56,6 +59,23 @@ interface TTSWebUIResponse {
 
 /**
  * Generate speech using TTS-WebUI (OpenAI compatible API)
+ * 
+ * For multilingual model, the correct format is:
+ * {
+ *   "model": "chatterbox",
+ *   "input": "text",
+ *   "voice": "voices/chatterbox/es-rick.wav",
+ *   "response_format": "wav",
+ *   "params": {
+ *     "model_name": "multilingual",
+ *     "language_id": "es",
+ *     "dtype": "bfloat16",
+ *     "device": "auto",
+ *     "exaggeration": 0.5,
+ *     "cfg_weight": 0.5,
+ *     "temperature": 0.8
+ *   }
+ * }
  */
 async function generateWithTTSWebUI(
   text: string,
@@ -70,6 +90,8 @@ async function generateWithTTSWebUI(
     exaggeration?: number;
     cfg_weight?: number;
     temperature?: number;
+    device?: string;
+    dtype?: string;
   }
 ): Promise<TTSWebUIResponse> {
   const { 
@@ -81,63 +103,78 @@ async function generateWithTTSWebUI(
     language,
     exaggeration,
     cfg_weight,
-    temperature 
+    temperature,
+    device,
+    dtype
   } = options;
 
   try {
     // Normalize endpoint (remove trailing /v1 if present, we'll add it)
     let baseUrl = endpoint.replace(/\/v1$/, '').replace(/\/$/, '');
     
-    // Build request body for TTS-WebUI (OpenAI compatible format)
-    // For multilingual model: model="chatterbox", model_name="multilingual", language_id="es"
+    // Build request body for TTS-WebUI
+    // Base fields (OpenAI compatible)
     const requestBody: Record<string, unknown> = {
       input: text,
       response_format: response_format || 'wav',
     };
 
-    // Handle model selection
-    // When using multilingual, we need to send model="chatterbox" and model_name="multilingual"
-    if (model === 'multilingual') {
-      requestBody.model = 'chatterbox';
-      requestBody.model_name = 'multilingual';
-      // Add language_id for multilingual
-      if (language) {
-        requestBody.language_id = language;
-      }
-    } else {
-      // For other models, just use the model name directly
-      requestBody.model = model || 'chatterbox';
-    }
+    // Set model - always use 'chatterbox' as base model
+    requestBody.model = 'chatterbox';
 
     // Add voice/reference audio for voice cloning
-    if (voice) {
+    // Only set voice if we have a valid voice ID (not 'default' or empty)
+    // For multilingual model, voice is optional (uses synthetic voice)
+    if (voice && voice !== 'default' && voice !== 'none') {
       requestBody.voice = voice;
-    } else {
-      requestBody.voice = 'default';
     }
-
-    // Add language for multilingual model (also support 'language' field for compatibility)
-    if (model === 'multilingual' && language && !requestBody.language_id) {
-      requestBody.language_id = language;
-    }
+    // If no valid voice provided, don't set 'voice' at all
+    // TTS-WebUI will use its default behavior for the selected model
 
     // Add speed if specified
     if (speed !== undefined && speed !== 1.0) {
       requestBody.speed = speed;
     }
 
-    // Add advanced parameters if specified
-    if (exaggeration !== undefined) {
-      requestBody.exaggeration = exaggeration;
-    }
-    if (cfg_weight !== undefined) {
-      requestBody.cfg_weight = cfg_weight;
-    }
-    if (temperature !== undefined) {
-      requestBody.temperature = temperature;
+    // Build params object for model-specific parameters
+    const params: Record<string, unknown> = {};
+
+    // For multilingual model, add model_name and language_id to params
+    if (model === 'multilingual') {
+      params.model_name = 'multilingual';
+      if (language) {
+        params.language_id = language;
+      }
     }
 
-    console.log(`[TTS] Request to ${baseUrl}/v1/audio/speech:`, JSON.stringify(requestBody, null, 2));
+    // Add device and dtype (defaults for TTS-WebUI)
+    params.device = device || 'auto';
+    params.dtype = dtype || 'bfloat16';
+
+    // Add advanced TTS parameters to params object
+    if (exaggeration !== undefined) {
+      params.exaggeration = exaggeration;
+    }
+    if (cfg_weight !== undefined) {
+      params.cfg_weight = cfg_weight;
+    }
+    if (temperature !== undefined) {
+      params.temperature = temperature;
+    }
+
+    // Only add params if we have any
+    if (Object.keys(params).length > 0) {
+      requestBody.params = params;
+    }
+
+    console.log(`[TTS] Request to ${baseUrl}/v1/audio/speech:`);
+    console.log(`[TTS] Full request details:`);
+    console.log(`  - endpoint: ${baseUrl}`);
+    console.log(`  - model: ${requestBody.model}`);
+    console.log(`  - voice: ${requestBody.voice}`);
+    console.log(`  - response_format: ${requestBody.response_format}`);
+    console.log(`  - params:`, JSON.stringify(params, null, 2));
+    console.log(`[TTS] Full JSON body:`, JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(`${baseUrl}/v1/audio/speech`, {
       method: 'POST',
@@ -291,17 +328,22 @@ export async function GET(request: NextRequest) {
 
   try {
     // Try a simple TTS request to check if service is running
+    // Use multilingual model without voice (synthetic voice)
     const testResponse = await fetch(`${baseUrl}/v1/audio/speech`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'multilingual',
+        model: 'chatterbox',
         input: 'test',
-        voice: 'default',
         response_format: 'wav',
-        language: 'en',
+        params: {
+          model_name: 'multilingual',
+          language_id: 'en',
+          device: 'auto',
+          dtype: 'bfloat16',
+        },
       }),
     });
 

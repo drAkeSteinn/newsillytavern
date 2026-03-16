@@ -42,6 +42,8 @@ import {
   Zap,
   List,
   Shuffle,
+  Mic,
+  Square,
 } from 'lucide-react';
 import {
   Popover,
@@ -54,6 +56,8 @@ import { DEFAULT_CHATBOX_APPEARANCE, THEME_COLOR_PRESETS } from '@/types';
 import { t } from '@/lib/i18n';
 import { QuickPetitions } from './user-solicitudes';
 import { ThemeEffects, getThemeColors as getThemeColorsUtil } from './theme-effects';
+import { useTTS } from '@/hooks/use-tts';
+import { useAudioRecorder, useAudioTranscription } from '@/hooks/use-audio-recorder';
 
 // Tab type for the chatbox
 type ChatboxTab = 'chat' | 'solicitudes' | 'misiones';
@@ -66,6 +70,7 @@ interface NovelChatBoxProps {
   onRegenerate?: (messageId: string) => void;
   onEdit?: (messageId: string, newContent: string) => void;
   onReplay?: (messageId: string, content: string, characterId?: string) => void;
+  onSpeak?: (messageId: string, content: string, characterId?: string) => void;
   streamingContent?: string;
   streamingCharacter?: CharacterCard | null;
   streamingProgress?: { current: number; total: number } | null;
@@ -84,6 +89,7 @@ export function NovelChatBox({
   onRegenerate,
   onEdit,
   onReplay,
+  onSpeak,
   streamingContent = '',
   streamingCharacter = null,
   streamingProgress = null,
@@ -130,6 +136,78 @@ export function NovelChatBox({
     deactivateQuest,
     setQuestSettings,
   } = useTavernStore();
+
+  // ASR config state (loaded from API)
+  const [asrConfig, setAsrConfig] = useState<{
+    model: string;
+    language: string;
+    enabled: boolean;
+  }>({
+    model: 'whisper-small',
+    language: 'es',
+    enabled: true,
+  });
+
+  // Load ASR config on mount
+  useEffect(() => {
+    const loadAsrConfig = async () => {
+      try {
+        const response = await fetch('/api/tts/config');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.config?.asr) {
+            setAsrConfig({
+              model: data.config.asr.model || 'whisper-small',
+              language: data.config.asr.language || 'es',
+              enabled: data.config.asr.enabled ?? true,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[NovelChatBox] Failed to load ASR config:', error);
+      }
+    };
+    loadAsrConfig();
+  }, []);
+
+  // Audio recording hooks
+  const { transcribe, isTranscribing } = useAudioTranscription();
+  
+  const {
+    isRecording,
+    duration: recordingDuration,
+    startRecording,
+    stopRecording,
+    audioBase64,
+    reset: resetRecording,
+    error: recordingError,
+    permissionStatus,
+  } = useAudioRecorder({
+    maxDuration: 60000, // 60 seconds max
+    onError: (error) => {
+      console.error('[NovelChatBox] Recording error:', error);
+    },
+  });
+
+  // Handle recording button click
+  const handleRecordingClick = useCallback(async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      const success = await startRecording();
+      if (!success) {
+        console.error('[NovelChatBox] Failed to start recording');
+      }
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
+  // Show recording error feedback
+  useEffect(() => {
+    if (recordingError) {
+      // Could show toast here if available
+      console.error('[NovelChatBox] Recording error:', recordingError);
+    }
+  }, [recordingError]);
 
   const activeSession = getActiveSession();
   const layout = settings.chatLayout;
@@ -187,6 +265,38 @@ export function NovelChatBox({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
     }
   }, [input]);
+
+  // Handle transcription when audio is ready
+  useEffect(() => {
+    if (!audioBase64 || isTranscribing) return;
+
+    const processTranscription = async () => {
+      console.log('[NovelChatBox] Processing transcription with model:', asrConfig.model);
+      const result = await transcribe(audioBase64, {
+        model: asrConfig.model,
+        language: asrConfig.language,
+      });
+
+      if (result?.text) {
+        // Set the transcribed text as input
+        setInput(result.text);
+        // Focus the textarea so user can edit if needed
+        textareaRef.current?.focus();
+      }
+
+      // Reset recording state
+      resetRecording();
+    };
+
+    processTranscription();
+  }, [audioBase64, isTranscribing, transcribe, resetRecording, asrConfig]);
+
+  // Handle recording error
+  useEffect(() => {
+    if (recordingError) {
+      console.error('[NovelChatBox] Recording error:', recordingError);
+    }
+  }, [recordingError]);
 
   const updateLayout = useCallback((updates: Partial<ChatLayoutSettings>) => {
     updateSettings({
@@ -909,6 +1019,7 @@ export function NovelChatBox({
                         onRegenerate={() => onRegenerate?.(message.id)}
                         onEdit={onEdit}
                         onReplay={onReplay}
+                        onSpeak={() => onSpeak?.(message.id, message.content, message.characterId)}
                         isNarrator={isNarratorMessage}
                       />
                     );
@@ -1077,14 +1188,58 @@ export function NovelChatBox({
                       fontSize: safeAppearance.input.fontSize === 'sm' ? '0.75rem' : 
                                safeAppearance.input.fontSize === 'lg' ? '1.125rem' : '1rem',
                     }}
-                    disabled={isGenerating}
+                    disabled={isGenerating || isTranscribing}
                     rows={1}
                   />
+                  {/* Voice Recording Button */}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={isRecording ? "destructive" : recordingError ? "destructive" : "outline"}
+                    className={cn(
+                      "h-8 w-8 flex-shrink-0 transition-all",
+                      isRecording && "animate-pulse",
+                      permissionStatus === 'denied' && "opacity-50"
+                    )}
+                    onClick={handleRecordingClick}
+                    disabled={isGenerating || isTranscribing || permissionStatus === 'denied'}
+                    title={
+                      permissionStatus === 'denied' 
+                        ? 'Micrófono bloqueado - Permite el acceso en la configuración del navegador'
+                        : recordingError 
+                          ? recordingError 
+                          : isRecording 
+                            ? 'Detener grabación' 
+                            : 'Grabar mensaje de voz'
+                    }
+                  >
+                    {isTranscribing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : permissionStatus === 'denied' ? (
+                      <Mic className="w-4 h-4 opacity-50" />
+                    ) : isRecording ? (
+                      <Square className="w-4 h-4" />
+                    ) : (
+                      <Mic className="w-4 h-4" />
+                    )}
+                  </Button>
+                  {/* Recording Duration Indicator */}
+                  {isRecording && (
+                    <span className="text-xs text-red-500 font-mono min-w-[40px] animate-pulse">
+                      {Math.floor(recordingDuration / 60000)}:{String(Math.floor((recordingDuration % 60000) / 1000)).padStart(2, '0')}
+                    </span>
+                  )}
+                  {/* Permission denied warning */}
+                  {permissionStatus === 'denied' && !isRecording && (
+                    <span className="text-xs text-amber-500">
+                      <span className="opacity-70">🔒 Micrófono bloqueado</span>
+                    </span>
+                  )}
                   <Button
                     size="icon"
                     className="h-8 w-8 flex-shrink-0"
                     onClick={handleSend}
-                    disabled={!input.trim() || isGenerating}
+                    disabled={!input.trim() || isGenerating || isTranscribing}
                   >
                     {isGenerating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

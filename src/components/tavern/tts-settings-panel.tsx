@@ -83,6 +83,7 @@ interface ServiceStatus {
 // Default configuration
 const DEFAULT_TTS_CONFIG: TTSWebUIConfig = {
   enabled: false,
+  autoGeneration: false,
   baseUrl: 'http://localhost:7778',
   model: 'multilingual',
   whisperModel: 'whisper-large-v3',
@@ -92,6 +93,10 @@ const DEFAULT_TTS_CONFIG: TTSWebUIConfig = {
   exaggeration: 0.5,
   cfgWeight: 0.5,
   temperature: 0.8,
+  generateDialogues: true,
+  generateNarrations: true,
+  generatePlainText: true,
+  applyRegex: false,
 };
 
 const DEFAULT_ASR_CONFIG: ASRConfig = {
@@ -373,12 +378,97 @@ export function TTSSettingsPanel() {
             <CardContent className="space-y-4">
               {/* Enable TTS */}
               <div className="flex items-center justify-between">
-                <Label htmlFor="tts-enabled">Habilitar TTS</Label>
+                <div className="space-y-0.5">
+                  <Label htmlFor="tts-enabled">Habilitar TTS</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Activa el sistema de texto-a-voz
+                  </p>
+                </div>
                 <Switch
                   id="tts-enabled"
                   checked={ttsConfig.enabled}
                   onCheckedChange={(checked) => updateTtsConfig({ enabled: checked })}
                 />
+              </div>
+
+              {/* Auto Generation */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-generation">Generación Automática</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Reproducir audio automáticamente en nuevos mensajes
+                  </p>
+                </div>
+                <Switch
+                  id="auto-generation"
+                  checked={ttsConfig.autoGeneration || false}
+                  onCheckedChange={(checked) => updateTtsConfig({ autoGeneration: checked })}
+                  disabled={!ttsConfig.enabled}
+                />
+              </div>
+
+              {/* Text Filtering Section */}
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-sm font-medium">Qué Generar</Label>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Selecciona qué tipos de texto convertir a voz
+                </p>
+                
+                {/* Generate Dialogues */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="generate-dialogues" className="text-xs">
+                      Diálogos ("texto entre comillas")
+                    </Label>
+                  </div>
+                  <Switch
+                    id="generate-dialogues"
+                    checked={ttsConfig.generateDialogues ?? true}
+                    onCheckedChange={(checked) => updateTtsConfig({ generateDialogues: checked })}
+                    disabled={!ttsConfig.enabled}
+                  />
+                </div>
+
+                {/* Generate Narrations */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="generate-narrations" className="text-xs">
+                      Narración (*texto entre asteriscos*)
+                    </Label>
+                  </div>
+                  <Switch
+                    id="generate-narrations"
+                    checked={ttsConfig.generateNarrations ?? true}
+                    onCheckedChange={(checked) => updateTtsConfig({ generateNarrations: checked })}
+                    disabled={!ttsConfig.enabled}
+                  />
+                </div>
+
+                {/* Generate Plain Text */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="generate-plain-text" className="text-xs">
+                      Texto plano (sin formato)
+                    </Label>
+                  </div>
+                  <Switch
+                    id="generate-plain-text"
+                    checked={ttsConfig.generatePlainText ?? true}
+                    onCheckedChange={(checked) => updateTtsConfig({ generatePlainText: checked })}
+                    disabled={!ttsConfig.enabled}
+                  />
+                </div>
+
+                {/* Example */}
+                <div className="text-[10px] bg-muted/50 p-2 rounded border">
+                  <p className="text-muted-foreground mb-1">Ejemplo:</p>
+                  <p className="font-mono">*Camina* "Hola" y sonríe.</p>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-blue-600">✓ Diálogos: "Hola"</p>
+                    <p className="text-purple-600">✓ Narración: Camina</p>
+                    <p className="text-orange-600">✓ Texto plano: y sonríe.</p>
+                  </div>
+                </div>
               </div>
 
               {/* Endpoint */}
@@ -666,12 +756,47 @@ export function TTSSettingsPanel() {
                     <SelectValue placeholder="Seleccionar modelo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="whisper-large-v3">Whisper Large V3</SelectItem>
-                    <SelectItem value="whisper-medium">Whisper Medium</SelectItem>
-                    <SelectItem value="whisper-small">Whisper Small</SelectItem>
-                    <SelectItem value="whisper-tiny">Whisper Tiny</SelectItem>
+                    <SelectItem value="whisper-large-v3">
+                      <div className="flex flex-col">
+                        <span>Whisper Large V3</span>
+                        <span className="text-xs text-muted-foreground">~10GB VRAM - Mejor precisión</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="distil-whisper-large-v3">
+                      <div className="flex flex-col">
+                        <span>Distil Whisper Large V3</span>
+                        <span className="text-xs text-muted-foreground">~1.5GB VRAM - 4x más rápido</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="whisper-medium">
+                      <div className="flex flex-col">
+                        <span>Whisper Medium</span>
+                        <span className="text-xs text-muted-foreground">~5GB VRAM - Balance</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="whisper-small">
+                      <div className="flex flex-col">
+                        <span>Whisper Small ⭐ Recomendado ES</span>
+                        <span className="text-xs text-muted-foreground">~2GB VRAM - Bueno para español</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="whisper-base">
+                      <div className="flex flex-col">
+                        <span>Whisper Base</span>
+                        <span className="text-xs text-muted-foreground">~1GB VRAM - Rápido</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="whisper-tiny">
+                      <div className="flex flex-col">
+                        <span>Whisper Tiny</span>
+                        <span className="text-xs text-muted-foreground">~0.5GB VRAM - Ultra ligero</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Para español: <strong>whisper-small</strong> o <strong>distil-whisper-large-v3</strong> ofrecen buen balance
+                </p>
               </div>
 
               {/* Language */}

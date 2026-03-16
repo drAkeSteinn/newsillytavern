@@ -13,6 +13,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'tts-config.json');
 // Default configuration
 const DEFAULT_TTS_CONFIG: TTSWebUIConfig = {
   enabled: false,
+  autoGeneration: false,
   baseUrl: 'http://localhost:7778',
   model: 'multilingual',
   whisperModel: 'whisper-large-v3',
@@ -22,12 +23,16 @@ const DEFAULT_TTS_CONFIG: TTSWebUIConfig = {
   exaggeration: 0.5,
   cfgWeight: 0.5,
   temperature: 0.8,
+  generateDialogues: true,
+  generateNarrations: true,
+  generatePlainText: true,
+  applyRegex: false,
 };
 
 const DEFAULT_ASR_CONFIG: ASRConfig = {
-  enabled: false,
+  enabled: true,
   provider: 'tts-webui',
-  model: 'whisper-large-v3',
+  model: 'whisper-small', // Recommended for Spanish - good balance of speed and accuracy
 };
 
 interface TTSConfigFile {
@@ -50,8 +55,35 @@ async function readConfig(): Promise<TTSConfigFile> {
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf-8');
     const config = JSON.parse(content);
+    
+    // Migrate old properties to new ones
+    const ttsConfig = { ...DEFAULT_TTS_CONFIG, ...config.tts };
+    
+    // Migration: narrateDialoguesOnly -> generateDialogues
+    if ('narrateDialoguesOnly' in ttsConfig && !('generateDialogues' in ttsConfig)) {
+      // If narrateDialoguesOnly was true, only generate dialogues
+      ttsConfig.generateDialogues = true;
+      ttsConfig.generateNarrations = !ttsConfig.ignoreAsterisks;
+      ttsConfig.generatePlainText = !ttsConfig.ignorePlainText;
+    }
+    
+    // Migration: ignoreAsterisks -> generateNarrations (inverse)
+    if ('ignoreAsterisks' in ttsConfig && !('generateNarrations' in ttsConfig)) {
+      ttsConfig.generateNarrations = !(ttsConfig as Record<string, unknown>).ignoreAsterisks;
+    }
+    
+    // Migration: ignorePlainText -> generatePlainText (inverse)
+    if ('ignorePlainText' in ttsConfig && !('generatePlainText' in ttsConfig)) {
+      ttsConfig.generatePlainText = !(ttsConfig as Record<string, unknown>).ignorePlainText;
+    }
+    
+    // Remove old properties
+    delete (ttsConfig as Record<string, unknown>).narrateDialoguesOnly;
+    delete (ttsConfig as Record<string, unknown>).ignoreAsterisks;
+    delete (ttsConfig as Record<string, unknown>).ignorePlainText;
+    
     return {
-      tts: { ...DEFAULT_TTS_CONFIG, ...config.tts },
+      tts: ttsConfig,
       asr: { ...DEFAULT_ASR_CONFIG, ...config.asr },
       updatedAt: config.updatedAt || new Date().toISOString(),
     };

@@ -415,7 +415,7 @@ export interface CharacterCard {
   spriteLibraries?: SpriteLibraries;         // Reusable action/pose/clothes definitions
   spriteIndex?: SpriteIndex;                 // Cached sprite file index
   
-  voice: VoiceSettings | null;
+  voice: CharacterVoiceSettings | null;
   hudTemplateId?: string | null;  // HUD template to use for this character
   lorebookIds?: string[];         // Lorebooks to use for this character
   questTemplateIds?: string[];       // Quest templates to use for this character
@@ -714,6 +714,7 @@ export type TTSProvider =
 // TTS-WebUI specific configuration
 export interface TTSWebUIConfig {
   enabled: boolean;
+  autoGeneration: boolean;           // Auto-play TTS on new messages
   baseUrl: string;                   // e.g., 'http://localhost:7778'
   model: string;                     // Default TTS model (chatterbox, multilingual, chatterbox-turbo, etc.)
   whisperModel: string;              // Default Whisper model for ASR
@@ -725,6 +726,13 @@ export interface TTSWebUIConfig {
   exaggeration: number;              // 0-1, controls expressiveness (default: 0.5)
   cfgWeight: number;                 // 0-1, classifier-free guidance weight (default: 0.5)
   temperature: number;               // 0-2, sampling temperature (default: 0.8)
+  // Text generation options (what to generate)
+  // Positive logic: true = generate, false = skip
+  generateDialogues: boolean;        // Generate dialogues ("text in quotes")
+  generateNarrations: boolean;       // Generate narrations (*text in asterisks*)
+  generatePlainText: boolean;        // Generate plain text (no quotes or asterisks)
+  applyRegex: boolean;               // Apply custom regex filter
+  customRegex?: string;              // Custom regex pattern to apply
 }
 
 // Voice reference for voice cloning
@@ -744,6 +752,63 @@ export interface VoiceSettings {
   pitch: number;
   emotionMapping: Record<string, string>;
 }
+
+// ============================================
+// DUAL VOICE SYSTEM (Dialogue + Narrator)
+// ============================================
+
+/**
+ * Configuration for a single voice (dialogue or narrator)
+ * Can override global TTS settings
+ */
+export interface CharacterVoiceConfig {
+  enabled: boolean;
+  voiceId: string;              // Voice ID from TTS-WebUI (e.g., "voices/chatterbox/es-rick.wav")
+  // Parameters that override global config
+  exaggeration?: number;        // 0-1, expressiveness (default: 0.5)
+  cfgWeight?: number;           // 0-1, classifier-free guidance (default: 0.5)
+  temperature?: number;         // 0-2, sampling variability (default: 0.8)
+  speed?: number;               // 0.5-2, speech speed multiplier (default: 1.0)
+  language?: string;            // Language code: es, en, ja, etc.
+}
+
+/**
+ * Complete voice settings for a character
+ * Supports dual voice system: dialogue voice + narrator voice
+ */
+export interface CharacterVoiceSettings {
+  enabled: boolean;             // TTS enabled for this character
+  // Voice for dialogues (text in "quotes")
+  dialogueVoice: CharacterVoiceConfig;
+  // Voice for narrator (text in *asterisks*)
+  narratorVoice: CharacterVoiceConfig;
+  // Text generation options (what to generate)
+  // Positive logic: true = generate, false = skip
+  generateDialogues: boolean;        // Generate dialogues ("text in quotes")
+  generateNarrations: boolean;       // Generate narrations (*text in asterisks*)
+  generatePlainText: boolean;        // Generate plain text (no quotes or asterisks)
+  // Legacy compatibility
+  emotionMapping?: Record<string, string>;
+}
+
+// Default voice configurations
+export const DEFAULT_VOICE_CONFIG: CharacterVoiceConfig = {
+  enabled: true,
+  voiceId: 'default',
+  exaggeration: 0.5,
+  cfgWeight: 0.5,
+  temperature: 0.8,
+  speed: 1.0,
+};
+
+export const DEFAULT_CHARACTER_VOICE_SETTINGS: CharacterVoiceSettings = {
+  enabled: false,
+  dialogueVoice: { ...DEFAULT_VOICE_CONFIG },
+  narratorVoice: { ...DEFAULT_VOICE_CONFIG },
+  generateDialogues: true,       // By default, generate all text types
+  generateNarrations: true,
+  generatePlainText: true,
+};
 
 // ASR (Speech-to-Text) configuration
 export interface ASRConfig {

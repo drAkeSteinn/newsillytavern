@@ -46,7 +46,8 @@ import {
   BookOpen,
   ScrollText
 } from 'lucide-react';
-import type { CharacterCard, SpriteLibraries } from '@/types';
+import type { CharacterCard, SpriteLibraries, CharacterVoiceSettings } from '@/types';
+import { DEFAULT_CHARACTER_VOICE_SETTINGS } from '@/types';
 import { SpriteManager } from './sprite-manager';
 // Legacy components removed - using V2 system now
 import { SpriteLibraryEditor } from './sprite-library-editor';
@@ -57,6 +58,7 @@ import { LorebookSelector } from './lorebook-selector';
 import { QuestSelector } from './quest-selector';
 import { StatsEditor } from './stats-editor';
 import { TriggerCollectionEditor } from './trigger-collection-editor';
+import { CharacterVoicePanel } from './character-voice-panel';
 import { getLogger } from '@/lib/logger';
 import { getMigrationStatus, type MigrationStatus } from '@/lib/migration/sprite-migration';
 
@@ -969,141 +971,12 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
               />
             </TabsContent>
 
-            {/* Voice Tab - Diseño mejorado */}
+            {/* Voice Tab - Dual Voice System */}
             <TabsContent value="voice" className="mt-0">
-              <div className="space-y-4">
-                {/* Banner informativo */}
-                <div className="bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-lg p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-pink-500/20 rounded-lg">
-                      <Mic className="w-5 h-5 text-pink-500" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-pink-600">Sistema de Voz (TTS)</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Configura la <strong>texto-a-voz</strong> del personaje para que responda con audio.
-                        Usa el proveedor TTS activo en la configuración global.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Voice Toggle Section */}
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/40">
-                  <div className="flex items-center gap-2">
-                    <Mic className="w-4 h-4 text-pink-500" />
-                    <span className="text-sm font-medium">Activar Voz</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Cuando está activado, las respuestas del personaje se reproducirán como audio.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Switch
-                    checked={character.voice?.enabled || false}
-                    onCheckedChange={(checked) => setCharacter(prev => ({
-                      ...prev,
-                      voice: checked 
-                        ? { enabled: true, voiceId: 'default', speed: 1, pitch: 1, emotionMapping: {} }
-                        : { enabled: false, voiceId: '', speed: 1, pitch: 1, emotionMapping: {} }
-                    }))}
-                  />
-                </div>
-                
-                {character.voice?.enabled ? (
-                  <div className="space-y-3">
-                    {/* Status Badge */}
-                    <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-xs text-green-600 font-medium">Voz activada para este personaje</span>
-                    </div>
-                    
-                    {/* Voice Settings */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Zap className="w-4 h-4 text-amber-500" />
-                          <span className="text-xs font-medium">Velocidad</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p>Velocidad de reproducción de la voz (0.5 - 2.0)</p>
-                              <p className="text-xs text-muted-foreground mt-1">1.0 = velocidad normal</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="0.5"
-                          max="2"
-                          value={character.voice.speed || 1}
-                          onChange={(e) => setCharacter(prev => ({
-                            ...prev,
-                            voice: { ...prev.voice!, speed: parseFloat(e.target.value) || 1 }
-                          }))}
-                          className="h-8"
-                        />
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          Actual: {character.voice.speed || 1}x
-                        </p>
-                      </div>
-                      <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Activity className="w-4 h-4 text-purple-500" />
-                          <span className="text-xs font-medium">Tono</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p>Tono de la voz (0.5 - 2.0)</p>
-                              <p className="text-xs text-muted-foreground mt-1">1.0 = tono normal</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="0.5"
-                          max="2"
-                          value={character.voice.pitch || 1}
-                          onChange={(e) => setCharacter(prev => ({
-                            ...prev,
-                            voice: { ...prev.voice!, pitch: parseFloat(e.target.value) || 1 }
-                          }))}
-                          className="h-8"
-                        />
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          Actual: {character.voice.pitch || 1}x
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Info Note */}
-                    <div className="text-xs bg-cyan-500/5 border border-cyan-500/20 p-3 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <HelpCircle className="w-4 h-4 text-cyan-500 mt-0.5" />
-                        <div>
-                          <p>El proveedor TTS se configura en <strong>Ajustes → TTS</strong>.</p>
-                          <p className="mt-1 text-muted-foreground">Puedes mapear emociones a voces específicas en la configuración avanzada.</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg border border-border/40">
-                    <Mic className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p className="text-sm font-medium">Voz desactivada</p>
-                    <p className="text-xs mt-1">Activa el sistema para configurar texto-a-voz.</p>
-                  </div>
-                )}
-              </div>
+              <CharacterVoicePanel
+                voiceSettings={character.voice}
+                onChange={(voice) => setCharacter(prev => ({ ...prev, voice }))}
+              />
             </TabsContent>
           </ScrollArea>
         </Tabs>
