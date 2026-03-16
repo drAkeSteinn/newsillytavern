@@ -46,37 +46,37 @@
     "name": "Chat with Dra. Moon",
     "messages": [
       {
-        "id": "e8cdfea6-8b18-4dd9-9535-9b40949e927c",
+        "id": "8062a667-0619-48ad-911c-322d4da486c1",
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "assistant",
-        "content": "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01",
-        "timestamp": "2026-03-14T21:33:49.141Z",
+        "content": "Accion=hab1 mision:imposible sprite:ind01 glohg Peticion=pedir_test",
+        "timestamp": "2026-03-15T21:17:11.269Z",
         "isDeleted": false,
-        "swipeId": "eef738b0-bd18-484d-9141-0c5b6483aec5",
+        "swipeId": "280c43f7-0f05-4622-83c6-1862d7361dc7",
         "swipeIndex": 0,
         "swipes": [
-          "La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01"
+          "Accion=hab1 mision:imposible sprite:ind01 glohg Peticion=pedir_test"
         ]
       },
       {
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "user",
-        "content": "sd",
+        "content": "1",
         "isDeleted": false,
-        "swipeId": "7d5c6c3a-41aa-4e75-b79f-d6dd211aec93",
+        "swipeId": "d194f627-3ddf-4255-98a7-54ed3ee7e983",
         "swipeIndex": 0,
-        "id": "81c134f3-6ab5-41b6-a4d7-38cd81700484",
-        "timestamp": "2026-03-14T21:33:59.980Z",
+        "id": "869172a7-1a46-411c-819e-bb20e77238da",
+        "timestamp": "2026-03-15T21:17:14.462Z",
         "swipes": [
-          "sd"
+          "1"
         ]
       },
       {
         "characterId": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
         "role": "assistant",
-        "content": "HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]",
+        "content": "glohg gluck ... sofa Accion=hab1 mision:imposible sprite:ind01 glohg Peticion=pedir_test... cama gluck",
         "isDeleted": false,
-        "swipeId": "da97c4b8-f74e-49f1-a6a4-fce45c6ad2bf",
+        "swipeId": "3f00ec7f-42d4-4cb3-9ac8-00dfdd358ad0",
         "swipeIndex": 0,
         "metadata": {
           "promptData": [
@@ -95,7 +95,7 @@
             {
               "type": "character_description",
               "label": "Character Description",
-              "content": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\n[ACCIONES DISPONIBLES]\n- key: hab1\n  tipo: ejecucion\n  descripcion: Un golpe en la mesa\n  completa_objetivo: NONE\n\n[SOLICITUDES RECIBIDAS]\n- key: dar_analisis_psyquiatrico\n  de: drAke\n  descripcion: drAke le pide a Dra. Moon un analisis psyquatrico\n\n[PETICIONES POSIBLES]\n- key: pedir_test\n  dirigido_a: drAke\n  descripcion: Le pides a drAke que se realice un test medico\n---\n[ESTADO RECIENTE]\n- ultima_solicitud_realizada : drAke le pide a Dra. Moon un analisis psyquatrico\n---\n[SONIDOS DISPONIBLES]\n- glohg: Sonido: glohg\n- gluck: Sonido: gluck\n- reglas\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
+              "content": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\n[ACCIONES DISPONIBLES]\n- key: hab1\n  tipo: ejecucion\n  descripcion: Un golpe en la mesa\n  completa_objetivo: NONE\n\n\n\n[PETICIONES POSIBLES]\n- key: pedir_test\n  dirigido_a: drAke\n  descripcion: Le pides a drAke que se realice un test medico\n---\n\n---\n[SONIDOS DISPONIBLES]\n- glohg: Sonido: glohg\n- gluck: Sonido: gluck\n- reglas\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
               "color": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
             },
             {
@@ -131,7 +131,7 @@
             {
               "type": "chat_history",
               "label": "Chat History",
-              "content": "Dra. Moon: La Dra. Sarah Moon sprite:ind01 se encontraba sentada en una fría sala de interrogatorio tenuemente iluminada, el logotipo de la Fundación SCP exhibido con orgullo en su amplia bata de laboratorio. El aire era seco y esterilizado, producto del robusto sistema de ventilación del Sitio-58. sprite:test\n\n\"Iniciando Registro de Entrevista A-1 con SCP-8642. Por favor, indique su nombre y cómo se siente.\" mision:imposible sprite:ind01\n\ndrAke: sd",
+              "content": "Dra. Moon: Accion=hab1 mision:imposible sprite:ind01 glohg Peticion=pedir_test\n\ndrAke: 1",
               "color": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
             },
             {
@@ -142,43 +142,50 @@
             }
           ]
         },
-        "id": "91a97ab4-628f-4909-a8f4-5aef52b66793",
-        "timestamp": "2026-03-14T21:34:01.929Z",
+        "id": "e3e94e91-c94c-4d7d-8f95-664149da820f",
+        "timestamp": "2026-03-15T21:17:19.083Z",
         "swipes": [
-          "HUD [Lugar=a | Peticion=pedir_test | Objetivo=a]"
+          "glohg gluck ... sofa Accion=hab1 mision:imposible sprite:ind01 glohg Peticion=pedir_test... cama gluck"
         ]
       }
     ],
     "createdAt": "2026-03-08T04:35:13.270Z",
-    "updatedAt": "2026-03-14T21:34:01.929Z",
+    "updatedAt": "2026-03-15T21:17:19.083Z",
     "sessionStats": {
       "characterStats": {
         "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
           "attributeValues": {
-            "resistencia": 0,
-            "estamina": 0
+            "resistencia": 10,
+            "estamina": -10
           },
           "lastUpdated": {
-            "resistencia": 1773524029141,
-            "estamina": 1773524029141
+            "resistencia": 1773609438715,
+            "estamina": 1773609438678
           },
-          "changeLog": []
+          "changeLog": [
+            {
+              "attributeId": "attr-1772530312975",
+              "attributeKey": "estamina",
+              "attributeName": "estamina",
+              "oldValue": 0,
+              "newValue": -10,
+              "reason": "trigger",
+              "timestamp": 1773609438678
+            },
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 0,
+              "newValue": 10,
+              "reason": "trigger",
+              "timestamp": 1773609438715
+            }
+          ]
         }
       },
       "solicitudes": {
         "characterSolicitudes": {
-          "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": [
-            {
-              "id": "solicitud-user-1773524033753-60nhcerlt",
-              "key": "dar_analisis_psyquiatrico",
-              "fromCharacterId": "__user__",
-              "fromCharacterName": "drAke",
-              "description": "drAke le pide a Dra. Moon un analisis psyquatrico",
-              "completionDescription": "Dra. Moon acepto aplicar un test psyquatrico drAke",
-              "status": "pending",
-              "createdAt": 1773524033753
-            }
-          ],
           "__user__": [
             {
               "key": "dar_test",
@@ -187,22 +194,23 @@
               "fromCharacterName": "Dra. Moon",
               "description": "Dra. Moon le pide a drAke un test medico",
               "completionDescription": "drAke acepto aplicar un test medico a Dra. Moon",
-              "id": "solicitud-1773524041891-b3pulr5ym",
+              "id": "solicitud-1773609438961-bjjah5ox2",
               "status": "pending",
-              "createdAt": 1773524041891
+              "createdAt": 1773609438961
             }
           ]
         },
-        "lastModified": 1773524041891
+        "lastModified": 1773609438961
       },
       "ultima_solicitud_realizada": "Dra. Moon le pide a drAke un test medico",
+      "ultima_accion_realizada": "Dra. Moon - Golpe: Un golpe en la mesa",
       "initialized": true,
-      "lastModified": 1773524041891
+      "lastModified": 1773609438961
     },
     "sessionQuests": [
       {
         "templateId": "asd",
-        "status": "available",
+        "status": "active",
         "objectives": [
           {
             "templateId": "obj-mmafuc58",
@@ -215,7 +223,9 @@
             "isCompleted": false
           }
         ],
-        "progress": 0
+        "progress": 0,
+        "activatedAt": "2026-03-15T21:17:18.753Z",
+        "activatedAtTurn": 0
       }
     ],
     "turnCount": 0

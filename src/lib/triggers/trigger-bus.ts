@@ -2,11 +2,12 @@
 // Trigger Bus - Event System for Triggers
 // ============================================
 
+import type { DetectedKey } from './key-detector';
 import type { DetectedToken } from './token-detector';
 import type { CharacterCard } from '@/types';
 
 // ============================================
-// Event Types
+// Context Types
 // ============================================
 
 export interface TriggerContext {
@@ -17,6 +18,20 @@ export interface TriggerContext {
   isStreaming: boolean;
   timestamp: number;
 }
+
+// ============================================
+// Event Types (NEW: Keys-based)
+// ============================================
+
+export interface KeysDetectedEvent {
+  type: 'keys_detected';
+  keys: DetectedKey[];
+  context: TriggerContext;
+}
+
+// ============================================
+// Event Types (LEGACY: Token-based)
+// ============================================
 
 export interface TokensDetectedEvent {
   type: 'tokens_detected';
@@ -37,7 +52,7 @@ export interface MessageEndEvent {
   fullText: string;
 }
 
-export type TriggerEvent = TokensDetectedEvent | MessageStartEvent | MessageEndEvent;
+export type TriggerEvent = TokensDetectedEvent | KeysDetectedEvent | MessageStartEvent | MessageEndEvent;
 
 // ============================================
 // Event Handler Type
@@ -142,6 +157,17 @@ export function createTokensEvent(
   return {
     type: 'tokens_detected',
     tokens,
+    context,
+  };
+}
+
+export function createKeysEvent(
+  keys: DetectedKey[],
+  context: TriggerContext
+): KeysDetectedEvent {
+  return {
+    type: 'keys_detected',
+    keys,
     context,
   };
 }

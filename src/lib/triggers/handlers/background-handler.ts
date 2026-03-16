@@ -77,6 +77,19 @@ export interface BackgroundHandlerResult {
   shouldReturnToDefault: boolean;
 }
 
+/**
+ * Extended result for multiple background matches
+ * Used when processing streaming content that may have multiple background changes
+ */
+export interface BackgroundHandlerMultiResult {
+  matched: boolean;
+  triggers: Array<{
+    trigger: TriggerMatch;
+    tokens: DetectedToken[];
+    position: number; // Character position for ordering
+  }>;
+}
+
 // ============================================
 // Match Mode Implementation
 // ============================================
@@ -405,6 +418,170 @@ export function checkBackgroundTriggers(
 }
 
 /**
+ * Check background triggers and return ALL matches in order of appearance
+ * This is used for streaming content where multiple background changes should occur
+ * 
+ * Unlike checkBackgroundTriggers which returns only the highest priority match,
+ * this function returns all matches sorted by their position in the text.
+ */
+export function checkBackgroundTriggersMulti(
+  tokens: DetectedToken[],
+  context: BackgroundTriggerContext,
+  state: BackgroundHandlerState
+): BackgroundHandlerMultiResult {
+  const { backgroundPacks, backgroundSettings, cooldownContextKey } = context;
+  
+  const result: BackgroundHandlerMultiResult = {
+    matched: false,
+    triggers: [],
+  };
+  
+  // Check if background triggers are enabled
+  if (!backgroundSettings?.enabled) {
+    return result;
+  }
+  
+  // Get active packs and sort by priority (higher first)
+  const activePacks = backgroundPacks
+    .filter(p => p.active)
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  
+  if (activePacks.length === 0) {
+    return result;
+  }
+  
+  // Get cooldown manager
+  const cooldownManager = getCooldownManager();
+  const cooldownKey = cooldownContextKey || 'default';
+  const globalCooldown = backgroundSettings.globalCooldown ?? 0;
+  
+  // Get triggered positions for this message
+  const triggered = state.triggeredPositions.get(context.messageKey) ?? new Set<number>();
+  
+  console.log(`[BgHandler] Multi-checking ${tokens.length} tokens against ${activePacks.length} packs`);
+  
+  // Track which tokens have been matched (to prevent same token matching multiple backgrounds)
+  const matchedTokenPositions = new Set<number>();
+  
+  // Process tokens in order of appearance
+  for (const token of tokens) {
+    // Skip if this token position already triggered a background
+    if (triggered.has(token.wordPosition) || matchedTokenPositions.has(token.wordPosition)) {
+      continue;
+    }
+    
+    const tokenText = token.token.toLowerCase();
+    
+    // Find matching background for this token
+    for (const pack of activePacks) {
+      const packCooldown = pack.cooldown ?? 0;
+      
+      // Check cooldown ONLY if cooldown > 0
+      if (globalCooldown > 0 || packCooldown > 0) {
+        const isReady = cooldownManager.isReady(cooldownKey, pack.id, {
+          global: globalCooldown,
+          perTrigger: packCooldown,
+        });
+        
+        if (!isReady) {
+          continue; // Skip this pack but continue with others
+        }
+      }
+      
+      // Sort items by priority within this pack
+      const sortedItems = [...pack.items].sort(compareByPriority);
+      
+      // Check each item in the pack
+      for (const item of sortedItems) {
+        if (!item.enabled) continue;
+        
+        // Check if this token matches any trigger key (exact match)
+        const keyMatch = item.triggerKeys.some(tk => tk.toLowerCase() === tokenText);
+        
+        if (!keyMatch) continue;
+        
+        // Found a match!
+        console.log(`[BgHandler] Multi-MATCH: "${item.backgroundName}" for token "${token.original}" at position ${token.position}`);
+        
+        // Check for variant match
+        const variant = findMatchingVariant(item, [tokenText], tokenText);
+        
+        // Merge overlays from all sources
+        const overlays = mergeOverlays(
+          backgroundSettings.globalOverlays ?? [],
+          pack.defaultOverlays ?? [],
+          item.overlays ?? [],
+          variant?.overlays ?? []
+        );
+        
+        // Use variant URL if available, otherwise item URL
+        const finalUrl = variant?.url || item.backgroundUrl;
+        const finalName = variant ? `${item.backgroundName} (${variant.name})` : item.backgroundName;
+        
+        // Get transition settings
+        const transitionType = item.transitionType ?? pack.transitionType ?? backgroundSettings.defaultTransitionType ?? 'fade';
+        const transitionDuration = item.transitionDuration ?? pack.transitionDuration ?? backgroundSettings.transitionDuration ?? 500;
+        
+        // Create trigger match
+        const triggerMatch: TriggerMatch = {
+          triggerId: pack.id,
+          triggerType: 'background',
+          keyword: item.triggerKeys[0] || '',
+          data: {
+            backgroundUrl: finalUrl,
+            backgroundName: finalName,
+            transitionDuration,
+            transitionType,
+            packName: pack.name,
+            priority: item.priority,
+            overlays,
+            variant,
+          },
+        };
+        
+        // Add to results
+        result.triggers.push({
+          trigger: triggerMatch,
+          tokens: [token],
+          position: token.position,
+        });
+        
+        // Mark this token position as matched
+        matchedTokenPositions.add(token.wordPosition);
+        triggered.add(token.wordPosition);
+        
+        // Mark cooldown as fired
+        if (globalCooldown > 0 || (pack.cooldown ?? 0) > 0) {
+          cooldownManager.markFired(cooldownKey, pack.id);
+        }
+        
+        result.matched = true;
+        
+        // Break to next token (one background per token)
+        break;
+      }
+      
+      // If we matched for this token, move to next token
+      if (matchedTokenPositions.has(token.wordPosition)) {
+        break;
+      }
+    }
+  }
+  
+  // Update state
+  state.triggeredPositions.set(context.messageKey, triggered);
+  
+  // Sort triggers by position (order of appearance in text)
+  result.triggers.sort((a, b) => a.position - b.position);
+  
+  if (result.triggers.length > 0) {
+    console.log(`[BgHandler] Multi-result: ${result.triggers.length} background changes in order: ${result.triggers.map(t => t.trigger.data?.backgroundName).join(' → ')}`);
+  }
+  
+  return result;
+}
+
+/**
  * Check if should return to default background
  */
 export function checkReturnToDefault(
@@ -486,6 +663,46 @@ export function executeBackgroundTrigger(
   // Set overlays if callback provided
   if (callbacks.setOverlays && overlays) {
     callbacks.setOverlays(overlays);
+  }
+}
+
+/**
+ * Execute all background triggers from a multi-result
+ * Applies backgrounds in order with a small delay between changes
+ */
+export function executeAllBackgroundTriggers(
+  result: BackgroundHandlerMultiResult,
+  context: TriggerContext,
+  callbacks: {
+    setBackground: (url: string, transition?: { type: string; duration: number }) => void;
+    setOverlays?: (overlays: BackgroundOverlay[]) => void;
+  }
+): void {
+  if (!result.matched || result.triggers.length === 0) return;
+  
+  console.log(`[BgHandler] Executing ${result.triggers.length} background change(s)`);
+  
+  // Execute each trigger in order
+  for (let i = 0; i < result.triggers.length; i++) {
+    const { trigger } = result.triggers[i];
+    
+    // Add a small delay between background changes for visual effect
+    // The first change happens immediately, subsequent changes after the transition
+    if (i > 0) {
+      // Get the transition duration from the previous trigger
+      const prevData = result.triggers[i - 1].trigger.data as {
+        transitionDuration?: number;
+      };
+      const delay = prevData.transitionDuration ?? 500;
+      
+      // Use setTimeout to delay subsequent changes
+      setTimeout(() => {
+        executeBackgroundTrigger(trigger, context, callbacks);
+      }, delay * i);
+    } else {
+      // Execute first trigger immediately
+      executeBackgroundTrigger(trigger, context, callbacks);
+    }
   }
 }
 

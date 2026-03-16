@@ -131,7 +131,21 @@ class Logger {
           console.warn(prefix, message, data || '');
           break;
         case 'error':
-          console.error(prefix, message, data || '');
+          // Enhanced error logging for better debugging
+          if (data?.error instanceof Error) {
+            const err = data.error as Error;
+            console.error(prefix, message, {
+              errorMessage: err.message,
+              errorName: err.name,
+              stack: err.stack,
+              ...data,
+            });
+          } else if (data?.message && data?.stack) {
+            // Already formatted error
+            console.error(prefix, message, data);
+          } else {
+            console.error(prefix, message, data || '');
+          }
           break;
       }
     }

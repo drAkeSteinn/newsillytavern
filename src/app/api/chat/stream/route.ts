@@ -279,9 +279,9 @@ export async function POST(request: NextRequest) {
           // Route to appropriate provider
           switch (llmConfig.provider) {
             case 'test-mock': {
-              // Test mode: Simulate LLM response with peticion keys for testing
-              // This is useful for testing peticiones/solicitudes detection without a real LLM
-              console.log('[Stream Route] Using TEST-MOCK provider for peticiones testing');
+              // Test mode: Simulate LLM response with trigger keys for testing
+              // This is useful for testing trigger detection without a real LLM
+              console.log('[Stream Route] Using TEST-MOCK provider for trigger testing');
               
               // Use custom mock response from config, or default response
               const mockResponse = llmConfig.mockResponse || `*El personaje te mira con interés*
@@ -290,16 +290,29 @@ export async function POST(request: NextRequest) {
 
 [peticion_madera]
 
-¿Podrías conseguirme algo de madera para construir un refugio?`;
+¿Podrías conseguirme algo de madera para construir un refugio?
+
+También puedo ofrecerte algunos sonidos:
+
+|glohg|
+
+Y cambiar mi expresión:
+
+[sprite:alegre]`;
               
               console.log('[Stream Route] Mock response:', mockResponse.slice(0, 100) + '...');
               
               generator = async function* mockGenerator() {
-                // Stream character by character to simulate real streaming
-                for (const char of mockResponse) {
-                  yield char;
-                  // Small delay to simulate network latency
-                  await new Promise(resolve => setTimeout(resolve, 15));
+                // Stream word by word to simulate realistic streaming
+                // This matches how the Replay system works and ensures
+                // trigger detection works correctly
+                const words = mockResponse.split(/(\s+)/);
+                
+                for (const word of words) {
+                  yield word;
+                  // Random delay between 30-80ms to simulate realistic typing
+                  // This matches the delay used in the Replay system
+                  await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 50));
                 }
               }();
               break;

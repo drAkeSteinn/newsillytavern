@@ -490,8 +490,18 @@ export function ChatPanel() {
                   currentCharacterContent += parsed.content;
                   setStreamingContent(currentCharacterContent);
                   // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
-                  processTriggers(currentCharacterContent, currentCharacter, streamingMessageKeyRef.current, groupCharacters);
-                  scanForBackgroundTriggers(currentCharacterContent, streamingMessageKeyRef.current);
+                  try {
+                    processTriggers(currentCharacterContent, currentCharacter, streamingMessageKeyRef.current, groupCharacters);
+                  } catch (triggerError) {
+                    console.error('[ChatPanel] Group trigger processing error:', triggerError);
+                    // Don't throw - continue streaming even if triggers fail
+                  }
+                  try {
+                    scanForBackgroundTriggers(currentCharacterContent, streamingMessageKeyRef.current);
+                  } catch (bgError) {
+                    console.error('[ChatPanel] Group background trigger error:', bgError);
+                    // Don't throw - continue streaming even if background triggers fail
+                  }
                 } else if (parsed.type === 'character_done') {
                   if (parsed.fullContent && activeSessionId && isStillActive()) {
                     addMessage(activeSessionId, {
@@ -640,8 +650,18 @@ export function ChatPanel() {
                   setStreamingContent(accumulatedContent);
                   // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
                   // Pass allCharactersWithPersona for peticiones/solicitudes system
-                  processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current, allCharactersWithPersona);
-                  scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
+                  try {
+                    processTriggers(accumulatedContent, activeCharacter, streamingMessageKeyRef.current, allCharactersWithPersona);
+                  } catch (triggerError) {
+                    console.error('[ChatPanel] Trigger processing error:', triggerError);
+                    // Don't throw - continue streaming even if triggers fail
+                  }
+                  try {
+                    scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
+                  } catch (bgError) {
+                    console.error('[ChatPanel] Background trigger error:', bgError);
+                    // Don't throw - continue streaming even if background triggers fail
+                  }
                 } else if (parsed.type === 'error') {
                   throw new Error(parsed.error);
                 } else if (parsed.type === 'done') {
@@ -724,15 +744,19 @@ export function ChatPanel() {
       }
     } catch (error) {
       // Capture detailed error information
+      console.error('[ChatPanel] Generation error caught:', error);
+
       const errorMessage = error instanceof Error
         ? `${error.name}: ${error.message}`
         : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       chatLogger.error('Generation error', {
-        message: errorMessage,
+        errorMessage: errorMessage,
         stack: errorStack,
-        type: typeof error
+        type: typeof error,
+        errorString: String(error),
+        isError: error instanceof Error,
       });
 
       if (isStillActive() && activeSessionId) {
@@ -969,14 +993,38 @@ export function ChatPanel() {
             statsConfig: activePersona.statsConfig,
           }] as CharacterCard[] : []),
         ];
-        processTriggers(accumulatedContent, replayChar || null, streamingMessageKeyRef.current, replayCharactersWithPersona);
-        scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
+        try {
+          processTriggers(accumulatedContent, replayChar || null, streamingMessageKeyRef.current, replayCharactersWithPersona);
+        } catch (triggerError) {
+          console.error('[ChatPanel] Replay trigger processing error:', triggerError);
+          // Don't throw - continue replay even if triggers fail
+        }
+        try {
+          scanForBackgroundTriggers(accumulatedContent, streamingMessageKeyRef.current);
+        } catch (bgError) {
+          console.error('[ChatPanel] Replay background trigger error:', bgError);
+          // Don't throw - continue replay even if background triggers fail
+        }
         
         // Random delay between 30-80ms to simulate realistic typing
         await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 50));
       }
     } catch (error) {
-      chatLogger.error('Replay error', { error });
+      // Capture detailed error information
+      console.error('[ChatPanel] Replay error caught:', error);
+      const errorMessage = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      chatLogger.error('Replay error', {
+        errorMessage,
+        stack: errorStack,
+        type: typeof error,
+        characterId,
+        hasReplayChar: !!replayChar,
+        hasActiveCharacter: !!activeCharacter,
+      });
     } finally {
       if (isStillActive()) {
         setGenerating(false);
@@ -990,7 +1038,7 @@ export function ChatPanel() {
         }
       }
     }
-  }, [isGenerating, activeCharacter, characters, setGenerating, resetTriggers, resetBgDetection, scanForBackgroundTriggers, processTriggers]);
+  }, [isGenerating, activeCharacter, characters, activePersona, setGenerating, resetTriggers, resetBgDetection, scanForBackgroundTriggers, processTriggers, startSpriteGenerationForCharacter, endSpriteGenerationForCharacter, setStreamingCharacter, setStreamingContent]);
 
   // Get clearChat from store for proper reset
   const clearChat = useTavernStore((state) => state.clearChat);

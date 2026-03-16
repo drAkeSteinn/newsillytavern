@@ -145,9 +145,9 @@ function extractWordTokens(
   // Standard word regex: letters, numbers, underscores, hyphens (2-40 chars)
   const wordRe = /[\p{L}\p{N}_-]{2,40}/gu;
   
-  // Key:value pattern regex: word:word (like sprite:ind01, mision:test, etc.)
-  // This captures patterns like "sprite:ind01", "mision:rescate", "quest:test"
-  const keyValueRe = /[\p{L}\p{N}_-]{2,30}:[\p{L}\p{N}_-]{2,30}/gu;
+  // Key:value pattern regex: word:word or word=word (like sprite:ind01, mision:test, Accion=hab1, etc.)
+  // This captures patterns like "sprite:ind01", "mision:rescate", "quest:test", "Accion=hab1"
+  const keyValueRe = /[\p{L}\p{N}_-]{2,30}[:=][\p{L}\p{N}_-]{2,30}/gu;
   
   // Track positions to avoid duplicates
   const usedPositions = new Set<number>();

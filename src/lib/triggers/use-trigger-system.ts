@@ -3,9 +3,10 @@
 // ============================================
 //
 // This hook integrates all trigger components:
-// - Token Detector (unified tokenization)
-// - Trigger Bus (event system)
-// - Handlers (Sound, Sprite, HUD, Background)
+// - KeyDetector (unified key detection for all formats)
+// - HandlerRegistry (orchestration of KeyHandlers)
+// - KeyHandlers (Sound, Skill, Solicitud - unified interface)
+// - Legacy TokenDetector (for Sprite, HUD, Background, Quest, Item, Stats)
 //
 // Usage:
 // ```tsx
@@ -21,6 +22,47 @@
 import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useTavernStore } from '@/store';
 import type { CharacterCard, HUDTemplate } from '@/types';
+
+// ============================================
+// UNIFIED: KeyDetector and KeyHandler system
+// ============================================
+import { 
+  getKeyDetector,
+  resetKeyDetector,
+  normalizeKey,
+  keyMatches,
+  type DetectedKey,
+  type KeyFormat,
+} from './key-detector';
+import {
+  getHandlerRegistry,
+  resetHandlerRegistry,
+  type HandlerRegistryResult,
+} from './handler-registry';
+import type { KeyHandler, TriggerMatchResult } from './types';
+
+// ============================================
+// UNIFIED: KeyHandler implementations
+// ============================================
+import {
+  createSoundKeyHandler,
+  SoundKeyHandler,
+  type SoundKeyHandlerContext,
+} from './handlers/sound-key-handler';
+import {
+  createSkillKeyHandler,
+  SkillKeyHandler,
+  type SkillKeyHandlerContext,
+} from './handlers/skill-key-handler';
+import {
+  createSolicitudKeyHandler,
+  SolicitudKeyHandler,
+  type SolicitudKeyHandlerContext,
+} from './handlers/solicitud-key-handler';
+
+// ============================================
+// LEGACY: TokenDetector (for handlers not yet migrated)
+// ============================================
 import { 
   getTokenDetector, 
   type TokenDetectorConfig 
@@ -68,8 +110,10 @@ import {
 import {
   createBackgroundHandlerState,
   checkBackgroundTriggers,
+  checkBackgroundTriggersMulti,
   checkReturnToDefault,
   executeBackgroundTrigger,
+  executeAllBackgroundTriggers,
   resetBackgroundHandlerState,
   clearBackgroundHandlerState,
   type BackgroundHandlerState,
@@ -317,6 +361,170 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       isStreaming: true,
       timestamp: Date.now(),
     };
+    
+    // ============================================
+    // UNIFIED KEY DETECTION (NEW SYSTEM)
+    // Detect ALL key formats in one pass: [key], |key|, Peticion:key, key:value, etc.
+    // ============================================
+    const keyDetector = getKeyDetector();
+    const registry = getHandlerRegistry();
+    
+    // Detect formatted keys incrementally (only NEW keys since last call)
+    const newKeys = keyDetector.detectKeys(content, messageKey);
+    
+    // Also detect plain word keys for registered sound triggers
+    // This is needed because "glohg" and "gluck" are plain words without special format
+    const soundKeywords = store.soundTriggers
+      ?.filter(t => t.active)
+      ?.flatMap(t => t.keywords) || [];
+    
+    // Also detect skill activation keys as plain words
+    // This is needed because "hab1" can appear as a plain word
+    const skillActivationKeys = character?.statsConfig?.skills
+      ?.filter(s => s.activationKey || (s.activationKeys && s.activationKeys.length > 0))
+      ?.flatMap(s => [
+        s.activationKey,
+        ...(s.activationKeys || [])
+      ].filter(Boolean)) || [];
+    
+    // Combine all keywords to detect as plain words
+    const allKeywords = [...soundKeywords, ...skillActivationKeys];
+    
+    const wordKeys = keyDetector.detectWordKeys(content, messageKey, allKeywords);
+    
+    // Combine all detected keys (formatted + plain words)
+    const allDetectedKeys = [...newKeys, ...wordKeys];
+    
+    console.log(`[TriggerSystem] Detection summary: ${newKeys.length} formatted + ${wordKeys.length} word = ${allDetectedKeys.length} total`);
+    
+    if (allDetectedKeys.length > 0) {
+      console.log(`[TriggerSystem] Detected ${allDetectedKeys.length} keys:`, 
+        allDetectedKeys.map(k => ({ key: k.key, format: k.format, position: k.position })));
+      
+      // Build contexts for each handler type
+      const activeSession = store.getActiveSession?.();
+      const sessionId = store.activeSessionId || '';
+      
+      // Include persona as pseudo-character for peticiones targeting __user__
+      const allCharactersWithPersona = [
+        ...(characters || []),
+        ...(config.activePersona?.statsConfig?.enabled ? [{
+          id: '__user__',
+          name: config.activePersona.name || 'User',
+          statsConfig: config.activePersona.statsConfig,
+        }] as CharacterCard[] : []),
+      ];
+      
+      // Process keys through unified handlers
+      for (const detectedKey of allDetectedKeys) {
+        // NOTE: Sound handling is done by the legacy system below (token-based)
+        // This avoids double-processing sounds through both systems
+        // The KeyHandler system is kept for skills and solicitudes only
+        
+        // Skill handler (for skill activations)
+        if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
+          const skillHandlerContext: SkillKeyHandlerContext = {
+            ...context,
+            characterId: character.id,
+            characterName: character.name,  // For ultima_accion_realizada format
+            statsConfig: character.statsConfig,
+            sessionStats: activeSession?.sessionStats,
+            sessionId,
+            storeActions: {
+              updateCharacterStat: store.updateCharacterStat.bind(store),
+              updateSessionEvent: store.updateSessionEvent?.bind(store),
+            },
+          };
+          
+          const skillHandler = createSkillKeyHandler();
+          if (skillHandler.canHandle(detectedKey, skillHandlerContext)) {
+            const result = skillHandler.handleKey(detectedKey, skillHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Skill key matched: ${detectedKey.key} (format: ${detectedKey.format}, value: ${detectedKey.value || 'none'})`);
+              skillHandler.execute(result.trigger, skillHandlerContext);
+              
+              // Execute activation rewards (sounds, sprites, etc.)
+              const rewards = result.trigger.data?.activationRewards || [];
+              console.log(`[TriggerSystem] Skill has ${rewards.length} activation rewards`);
+              if (rewards.length > 0) {
+                console.log(`[TriggerSystem] Executing ${rewards.length} skill activation rewards for skill "${result.trigger.data?.skillName || 'unknown'}"`);
+                for (const reward of rewards) {
+                  try {
+                    console.log(`[TriggerSystem] Executing reward:`, reward.type, reward.key || reward.category);
+                    executeTriggerRewardFromQuest(reward, {
+                      sessionId,
+                      characterId: character.id,
+                      character,
+                      allCharacters: allCharactersWithPersona,
+                      sessionStats: activeSession?.sessionStats,
+                      timestamp: Date.now(),
+                      soundCollections: store.soundCollections,
+                      soundTriggers: store.soundTriggers,
+                      backgroundPacks: store.backgroundTriggerPacks,
+                      soundSettings: {
+                        enabled: settings.sound?.enabled ?? false,
+                        globalVolume: settings.sound?.globalVolume ?? 0.85,
+                      },
+                      backgroundSettings: {
+                        transitionDuration: settings.backgroundTriggers?.transitionDuration ?? 500,
+                        defaultTransitionType: settings.backgroundTriggers?.defaultTransitionType ?? 'fade',
+                      },
+                    }, {
+                      updateCharacterStat: store.updateCharacterStat.bind(store),
+                      applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                      scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+                      isSpriteLocked: store.isSpriteLocked?.bind(store),
+                      playSound: store.playSound?.bind(store),
+                      setBackground: store.setBackground?.bind(store),
+                      setActiveOverlays: store.setActiveOverlays?.bind(store),
+                    });
+                  } catch (err) {
+                    console.error('[TriggerSystem] Failed to execute skill activation reward:', err);
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // Solicitud handler (for peticiones/solicitudes)
+        if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
+          const hasPeticiones = character.statsConfig.invitations && character.statsConfig.invitations.length > 0;
+          const hasPendingSolicitudes = activeSession?.sessionStats?.solicitudes?.characterSolicitudes?.[character.id]
+            ?.some(s => s.status === 'pending');
+          
+          if (hasPeticiones || hasPendingSolicitudes) {
+            const solicitudHandlerContext: SolicitudKeyHandlerContext = {
+              ...context,
+              characterId: character.id,
+              characterName: character.name,
+              statsConfig: character.statsConfig,
+              sessionStats: activeSession?.sessionStats,
+              sessionId,
+              allCharacters: allCharactersWithPersona,
+              activePersona: config.activePersona,
+              storeActions: {
+                createSolicitud: store.createSolicitud.bind(store),
+                completeSolicitud: store.completeSolicitud.bind(store),
+                getSessionStats: (sid: string) => {
+                  const session = store.sessions?.find((s: any) => s.id === sid);
+                  return session?.sessionStats || null;
+                },
+              },
+            };
+            
+            const solicitudHandler = createSolicitudKeyHandler();
+            if (solicitudHandler.canHandle(detectedKey, solicitudHandlerContext)) {
+              const result = solicitudHandler.handleKey(detectedKey, solicitudHandlerContext);
+              if (result?.matched) {
+                console.log(`[TriggerSystem] Solicitud key matched: ${detectedKey.key}`);
+                solicitudHandler.execute(result.trigger, solicitudHandlerContext);
+              }
+            }
+          }
+        }
+      }
+    }
     
     // ============================================
     // PROCESS Solicitud triggers FIRST (before token-based early return)
@@ -639,7 +847,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       }
     }
     
-    // Process Background triggers
+    // Process Background triggers - Use Multi version for multiple background changes
     if (config.backgroundEnabled !== false && settings.backgroundTriggers?.enabled) {
       const bgContext: BackgroundTriggerContext = {
         ...context,
@@ -658,14 +866,15 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         cooldownContextKey: character?.id || 'default',
       };
       
-      const bgResult = checkBackgroundTriggers(
+      // Use Multi version to detect ALL background matches in order of appearance
+      const bgResult = checkBackgroundTriggersMulti(
         newTokens,
         bgContext,
         backgroundHandlerState
       );
       
-      if (bgResult?.matched && bgResult.trigger) {
-        executeBackgroundTrigger(bgResult.trigger, context, {
+      if (bgResult?.matched && bgResult.triggers.length > 0) {
+        executeAllBackgroundTriggers(bgResult, context, {
           setBackground: store.setBackground.bind(store),
           setOverlays: store.setActiveOverlays.bind(store),
         });
@@ -1070,73 +1279,13 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       }
     }
     
-    // Process Skill Activation triggers
-    // Detects when LLM uses a skill activation key and applies activation costs
-    if (config.statsEnabled !== false) {
-      const activeSession = store.getActiveSession?.();
-      const sessionId = store.activeSessionId || '';
-
-      // Only process for the speaking character
-      if (character?.statsConfig?.enabled) {
-        const skillsWithActivationKeys = character.statsConfig.skills.filter(
-          s => s.activationKey || (s.activationKeys && s.activationKeys.length > 0)
-        );
-
-        if (skillsWithActivationKeys.length > 0) {
-          const skillActivationContext: SkillActivationTriggerContext = {
-            ...context,
-            characterId: character.id,
-            statsConfig: character.statsConfig,
-            sessionStats: activeSession?.sessionStats,
-          };
-
-          const skillResult = checkSkillActivationTriggersInText(
-            content,
-            skillActivationContext,
-            skillActivationHandlerState
-          );
-
-          if (skillResult.matched && skillResult.matches.length > 0) {
-            const activationResults = executeAllSkillActivations(skillResult, {
-              sessionId,
-              characterId: character.id,
-              sessionStats: activeSession?.sessionStats,
-              statsConfig: character.statsConfig,
-            }, {
-              updateCharacterStat: store.updateCharacterStat.bind(store),
-            });
-
-            if (activationResults.skillResults.length > 0) {
-              console.log(`[TriggerSystem] Skills activated for ${character.name}: ${activationResults.skillResults.map(r => `${r.skillName} (${r.changes.length} changes)`).join(', ')}`);
-            }
-            
-            // Execute skill activation rewards (triggers)
-            if (activationResults.allRewards.length > 0) {
-              console.log(`[TriggerSystem] Executing ${activationResults.allRewards.length} skill activation rewards for ${character.name}`);
-              for (const reward of activationResults.allRewards) {
-                executeTriggerRewardFromQuest(reward, {
-                  character,
-                  allCharacters: characters || [],
-                  spriteTriggers: store.spriteTriggers,
-                  soundTriggers: store.soundTriggers,
-                  backgroundTriggers: store.backgroundTriggers,
-                  soundSequenceTriggers: store.soundSequenceTriggers,
-                  applySprite: store.setActiveSprite.bind(store),
-                  playSound: audioPlayerRef.current?.playSound.bind(audioPlayerRef.current),
-                  setBackground: store.setBackground.bind(store),
-                  executeSoundSequence: (sequenceId: string) => {
-                    const sequence = store.soundSequenceTriggers.find(s => s.id === sequenceId || s.activationKey === sequenceId);
-                    if (sequence && audioPlayerRef.current) {
-                      audioPlayerRef.current.playSoundSequence(sequence, store.soundTriggers);
-                    }
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
-    }
+    // ============================================
+    // LEGACY: Skill Activation triggers - DISABLED
+    // Now handled by SkillKeyHandler in the unified system above
+    // ============================================
+    // if (config.statsEnabled !== false) {
+    //   ... legacy skill activation code removed ...
+    // }
   }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, getActiveHUDTemplate]);
   
   /**
@@ -1162,11 +1311,13 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
    * Reset for new message
    */
   const resetForNewMessage = useCallback((messageKey: string, character: CharacterCard | null) => {
-    const detector = getTokenDetector();
-    const bus = getTriggerBus();
+    // Reset unified KeyDetector
+    const keyDetector = getKeyDetector();
+    keyDetector.reset(messageKey);
     
-    // Reset detector
-    detector.reset(messageKey);
+    // Reset legacy TokenDetector
+    const tokenDetector = getTokenDetector();
+    tokenDetector.reset(messageKey);
     
     // Get sessionId for quest handler reset
     const sessionId = store.activeSessionId || undefined;
@@ -1186,14 +1337,18 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     lastProcessedRef.current.delete(messageKey);
     
     // Emit message end event
+    const bus = getTriggerBus();
     bus.emit(createMessageEndEvent(messageKey, character, ''));
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, store.activeSessionId]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, store.activeSessionId]);
   
   /**
    * Clear ALL trigger state - call this when chat is reset
    * This clears all detection states so quests can be re-activated
    */
   const clearAllState = useCallback(() => {
+    // Clear unified KeyDetector
+    getKeyDetector().clearAll();
+    
     // Clear all handler states
     clearSoundHandlerState(soundHandlerState);
     clearSpriteHandlerState(spriteHandlerState);

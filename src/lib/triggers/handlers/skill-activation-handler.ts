@@ -69,6 +69,7 @@ export interface SkillActivationResult {
 export interface SkillActivationHandlerState {
   processedMessages: Set<string>;
   activationHistory: Map<string, number>; // skillId -> last activation timestamp
+  activatedSkillsPerMessage: Map<string, Set<string>>; // messageKey -> Set of activated skillIds
 }
 
 // ============================================
@@ -79,6 +80,7 @@ export function createSkillActivationHandlerState(): SkillActivationHandlerState
   return {
     processedMessages: new Set(),
     activationHistory: new Map(),
+    activatedSkillsPerMessage: new Map(),
   };
 }
 
@@ -87,6 +89,7 @@ export function resetSkillActivationState(
   messageKey: string
 ): void {
   state.processedMessages.delete(messageKey);
+  state.activatedSkillsPerMessage.delete(messageKey);
 }
 
 export function clearSkillActivationHandlerState(
@@ -94,6 +97,7 @@ export function clearSkillActivationHandlerState(
 ): void {
   state.processedMessages.clear();
   state.activationHistory.clear();
+  state.activatedSkillsPerMessage.clear();
 }
 
 // ============================================
@@ -265,19 +269,24 @@ function tokenMatchesActivationKey(
     return { matches: true, matchedKey: activationKey };
   }
   
+  // For key:value and key=value patterns, use the ORIGINAL token text
+  // because normalizeToken strips special characters like : and =
+  const originalLower = token.original.toLowerCase();
+  
   // 2. Key:value format (key:value or key: value)
-  // Token detector already combines these into single tokens
-  if (normalizedToken.includes(':')) {
-    const [keyPart] = normalizedToken.split(':');
-    if (keyPart === normalizedKey) {
+  if (originalLower.includes(':')) {
+    const [keyPart] = originalLower.split(':');
+    const normalizedKeyPart = normalizeToken(keyPart, { caseSensitive });
+    if (normalizedKeyPart === normalizedKey) {
       return { matches: true, matchedKey: activationKey };
     }
   }
   
   // 3. Key=value format
-  if (normalizedToken.includes('=')) {
-    const [keyPart] = normalizedToken.split('=');
-    if (keyPart === normalizedKey) {
+  if (originalLower.includes('=')) {
+    const [keyPart] = originalLower.split('=');
+    const normalizedKeyPart = normalizeToken(keyPart, { caseSensitive });
+    if (normalizedKeyPart === normalizedKey) {
       return { matches: true, matchedKey: activationKey };
     }
   }
@@ -374,6 +383,9 @@ export function detectSkillActivations(
     return result;
   }
   
+  // Get already activated skills for this message (prevent duplicates across streaming)
+  const activatedSkills = state.activatedSkillsPerMessage.get(messageKey) ?? new Set<string>();
+  
   // Get current attribute values for requirement checking
   const currentValues = getCurrentAttributeValues(characterId, sessionStats, statsConfig);
   
@@ -386,10 +398,11 @@ export function detectSkillActivations(
     const skillMatches = findMatchingSkills(token, skillsWithKeys);
     
     for (const { skill, matchedKey } of skillMatches) {
-      // Skip if already matched this skill (avoid duplicates)
-      if (result.matches.some(m => m.skillId === skill.id)) {
-        continue;
-      }
+      // Allow multiple activations of the same skill
+      // Each occurrence triggers the skill independently
+      
+      // Mark as activated for tracking (but don't skip)
+      activatedSkills.add(skill.id);
       
       // Check requirements
       const requirementCheck = checkAllRequirements(
@@ -425,6 +438,9 @@ export function detectSkillActivations(
       state.activationHistory.set(skill.id, Date.now());
     }
   }
+  
+  // Save activated skills back to state
+  state.activatedSkillsPerMessage.set(messageKey, activatedSkills);
   
   result.matched = result.matches.length > 0;
   
@@ -463,6 +479,9 @@ export function detectSkillActivationsIncremental(
     return result;
   }
   
+  // Get already activated skills for this message (prevent duplicates across streaming)
+  const activatedSkills = state.activatedSkillsPerMessage.get(messageKey) ?? new Set<string>();
+  
   // Get current attribute values for requirement checking
   const currentValues = getCurrentAttributeValues(characterId, sessionStats, statsConfig);
   
@@ -475,10 +494,11 @@ export function detectSkillActivationsIncremental(
     const skillMatches = findMatchingSkills(token, skillsWithKeys);
     
     for (const { skill, matchedKey } of skillMatches) {
-      // Skip if already matched this skill in this message
-      if (result.matches.some(m => m.skillId === skill.id)) {
-        continue;
-      }
+      // Allow multiple activations of the same skill
+      // Each occurrence triggers the skill independently
+      
+      // Mark as activated for tracking (but don't skip)
+      activatedSkills.add(skill.id);
       
       // Check requirements
       const requirementCheck = checkAllRequirements(
@@ -504,7 +524,7 @@ export function detectSkillActivationsIncremental(
       
       // Create trigger match
       result.triggers.push({
-        triggerId: `skill_${skill.id}`,
+        triggerId: `skill_${skill.id}_${Date.now()}`, // Unique ID for each activation
         triggerType: 'skill_activation',
         keyword: matchedKey,
         data: match,
@@ -514,6 +534,9 @@ export function detectSkillActivationsIncremental(
       state.activationHistory.set(skill.id, Date.now());
     }
   }
+  
+  // Save activated skills back to state
+  state.activatedSkillsPerMessage.set(messageKey, activatedSkills);
   
   result.matched = result.matches.length > 0;
   

@@ -6,10 +6,10 @@
 // that can be used by sounds, sprites, backgrounds, and future trigger types.
 //
 // Key Features:
-// - Single pass tokenization for all triggers
+// - Unified key detection (all formats: [key], |key|, Peticion:key, etc.)
 // - Real-time streaming support
-// - Centralized cooldown management
-// - Extensible handler system
+// - Immediate trigger execution
+// - Position-based deduplication
 //
 // Usage:
 // ```tsx
@@ -29,7 +29,52 @@
 // }
 // ```
 
-// Core
+// ============================================
+// NEW: Unified Key Detector (Preferred)
+// ============================================
+export {
+  KeyDetector,
+  getKeyDetector,
+  resetKeyDetector,
+  normalizeKey,
+  keyMatches,
+  keyMatchesAny,
+  classifyKey,
+} from './key-detector';
+
+export type {
+  DetectedKey,
+  KeyFormat,
+  KeyCategory,
+} from './key-detector';
+
+// ============================================
+// Handler Interface (Unified)
+// ============================================
+export type {
+  TriggerMatch,
+  TriggerMatchResult,
+  KeyHandler,
+  HandlerProcessResult,
+  CooldownConfig,
+  CooldownState,
+} from './types';
+
+// ============================================
+// Handler Registry (Unified Orchestration)
+// ============================================
+export {
+  getHandlerRegistry,
+  resetHandlerRegistry,
+  categorizeKeys,
+  logDetectedKeys,
+  type HandlerRegistryConfig,
+  type HandlerRegistryResult,
+} from './handler-registry';
+
+// ============================================
+// LEGACY: Token Detector (will be deprecated)
+// ============================================
 export { 
   TokenDetector, 
   getTokenDetector, 
@@ -56,6 +101,7 @@ export {
 export type { 
   TriggerContext, 
   TriggerEvent,
+  KeysDetectedEvent,
   TokensDetectedEvent,
   MessageStartEvent, 
   MessageEndEvent,
@@ -68,20 +114,12 @@ export {
   resetCooldownManager 
 } from './cooldown-manager';
 
-// Types
-export type {
-  TriggerMatchResult,
-  TriggerMatch,
-  TriggerHandler,
-  CooldownConfig,
-  CooldownState,
-} from './types';
-
 // Sound Handler
 export {
   createSoundHandlerState,
   checkSoundTriggers,
   executeSoundTrigger,
+  executeAllSoundTriggers,
   resetSoundHandlerState,
   type SoundHandlerState,
   type SoundTriggerContext,
@@ -99,7 +137,7 @@ export {
   type SpriteHandlerResult,
 } from './handlers/sprite-handler';
 
-// Background Handler (placeholder)
+// Background Handler
 export {
   createBackgroundHandlerState,
   type BackgroundHandlerState,
@@ -122,3 +160,25 @@ export {
   type TriggerSystemConfig,
   type TriggerSystemResult,
 } from './use-trigger-system';
+
+// ============================================
+// NEW: Unified Key Handlers
+// ============================================
+export {
+  createSoundKeyHandler,
+  SoundKeyHandler,
+  type SoundKeyHandlerContext,
+} from './handlers/sound-key-handler';
+
+export {
+  createSkillKeyHandler,
+  SkillKeyHandler,
+  type SkillKeyHandlerContext,
+} from './handlers/skill-key-handler';
+
+export {
+  createSolicitudKeyHandler,
+  SolicitudKeyHandler,
+  type SolicitudKeyHandlerContext,
+  type SolicitudMatchData,
+} from './handlers/solicitud-key-handler';

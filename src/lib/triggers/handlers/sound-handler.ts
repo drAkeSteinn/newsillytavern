@@ -2,11 +2,13 @@
 // Sound Handler - Handles Sound Triggers
 // ============================================
 
-import type { TriggerMatch } from '../types';
+import type { TriggerMatch, TriggerMatchResult } from '../types';
 import type { DetectedToken } from '../token-detector';
+import type { DetectedKey } from '../key-detector';
 import type { TriggerContext } from '../trigger-bus';
 import type { SoundTrigger, SoundCollection, SoundSequenceTrigger } from '@/types';
 import { getCooldownManager } from '../cooldown-manager';
+import { normalizeKey } from '../key-detector';
 
 // ============================================
 // Audio Queue System
@@ -261,6 +263,10 @@ export function executeSoundTrigger(match: TriggerMatch, context: TriggerContext
     triggerName: string;
     keyword?: string;
   };
+  
+  // Log source for debugging
+  const source = context.fullText?.substring(0, 50) || 'unknown';
+  console.log(`[SoundHandler] Queueing sound "${triggerName}" (keyword: ${keyword || 'none'}) from: ${source}...`);
   
   // Add to queue
   audioQueue.push({
@@ -632,5 +638,202 @@ export function executeAllSoundSequenceTriggers(
   // Execute sequences sequentially
   for (const sequenceMatch of result.sequences) {
     executeSoundSequence(sequenceMatch, context);
+  }
+}
+
+// ============================================
+// NEW: Key-based Sound Detection (Unified System)
+// ============================================
+
+/**
+ * Check if a detected key matches a trigger keyword
+ * 
+ * Matching rules (same as token matching):
+ * - Single-word keyword: Requires EXACT match (no partial matches)
+ * - Multi-word keyword: Checks if all words appear or if keyword appears as substring
+ */
+export function keyMatchesSoundKeyword(
+  key: DetectedKey,
+  keyword: string,
+  caseSensitive: boolean = false
+): boolean {
+  // Normalize both key and keyword using the unified normalizer
+  const normalizedKeyword = normalizeKey(keyword);
+  const normalizedDetectedKey = normalizeKey(key.key);
+  
+  if (!normalizedKeyword || !normalizedDetectedKey) return false;
+  
+  // For single-word keywords, require EXACT match
+  const keywordWords = normalizedKeyword.split(/\s+/);
+  if (keywordWords.length === 1) {
+    return normalizedDetectedKey === normalizedKeyword;
+  }
+  
+  // For multi-word keywords, check if all words appear
+  const allWordsMatch = keywordWords.every(word => normalizedDetectedKey.includes(word));
+  if (allWordsMatch) return true;
+  
+  // Also check if the full keyword phrase appears
+  return normalizedDetectedKey.includes(normalizedKeyword);
+}
+
+/**
+ * Sound Handler Result for Keys (new unified system)
+ */
+export interface SoundKeyHandlerResult {
+  matched: boolean;
+  triggers: Array<{
+    trigger: TriggerMatch;
+    key: DetectedKey;
+  }>;
+}
+
+/**
+ * Check sound triggers using DetectedKey[] (NEW unified system)
+ * 
+ * This is the preferred method for checking sound triggers.
+ * Works with all key formats: [key], |key|, Peticion:key, key:value, etc.
+ */
+export function checkSoundTriggersWithKeys(
+  keys: DetectedKey[],
+  context: SoundTriggerContext,
+  state: SoundHandlerState,
+  maxSoundsPerMessage: number = 10
+): SoundKeyHandlerResult {
+  const { soundTriggers, soundCollections, soundSettings, cooldownContextKey } = context;
+  
+  const result: SoundKeyHandlerResult = {
+    matched: false,
+    triggers: [],
+  };
+  
+  // Check if sound is enabled
+  if (!soundSettings?.enabled) {
+    return result;
+  }
+  
+  // Get cooldown manager and config
+  const cooldownManager = getCooldownManager();
+  const cooldownKey = cooldownContextKey || 'default';
+  const globalCooldown = soundSettings.globalCooldown ?? 0;
+  
+  // Get current count
+  let currentCount = state.soundCountPerMessage.get(context.messageKey) ?? 0;
+  
+  // Get triggered positions for this message
+  const triggered = state.triggeredPositions.get(context.messageKey) ?? new Set<number>();
+  
+  const activeTriggers = soundTriggers.filter(t => t.active);
+  
+  console.log(`[SoundHandler] Processing ${keys.length} keys, globalCooldown=${globalCooldown}ms`);
+  
+  // Process keys in order of appearance (already sorted by position)
+  for (const key of keys) {
+    // Stop if we've hit the max sounds limit
+    if (currentCount >= maxSoundsPerMessage) {
+      console.log(`[SoundHandler] Max sounds per message reached: ${maxSoundsPerMessage}`);
+      break;
+    }
+    
+    // Skip if this position already triggered
+    if (triggered.has(key.position)) {
+      continue;
+    }
+    
+    for (const trigger of activeTriggers) {
+      // Stop if we've hit the max sounds limit
+      if (currentCount >= maxSoundsPerMessage) {
+        break;
+      }
+      
+      // Check keywords
+      const matchingKeyword = trigger.keywords.find(kw => {
+        // Check if keyword is disabled
+        if (trigger.keywordsEnabled?.[kw] === false) {
+          return false;
+        }
+        return keyMatchesSoundKeyword(key, kw);
+      });
+      
+      if (!matchingKeyword) continue;
+      
+      // Check cooldown ONLY if cooldown values > 0
+      const triggerCooldown = trigger.cooldown ?? 0;
+      
+      if (globalCooldown > 0 || triggerCooldown > 0) {
+        const isReady = cooldownManager.isReady(cooldownKey, trigger.id, {
+          global: globalCooldown,
+          perTrigger: triggerCooldown,
+        });
+        
+        if (!isReady) {
+          console.log(`[SoundHandler] Trigger "${trigger.name}" on cooldown, skipping`);
+          continue;
+        }
+      }
+      
+      // Get sound file
+      const soundFile = getSoundFile(trigger, soundCollections);
+      if (!soundFile) continue;
+      
+      // Mark as triggered
+      triggered.add(key.position);
+      
+      // Mark cooldown as fired (if cooldown is enabled)
+      if (globalCooldown > 0 || triggerCooldown > 0) {
+        cooldownManager.markFired(cooldownKey, trigger.id);
+      }
+      
+      // Increment count
+      currentCount++;
+      
+      // Add to results
+      result.triggers.push({
+        trigger: {
+          triggerId: trigger.id,
+          triggerType: 'sound',
+          keyword: matchingKeyword,
+          data: {
+            soundUrl: soundFile,
+            volume: (trigger.volume ?? 1) * soundSettings.globalVolume,
+            triggerName: trigger.name,
+          },
+        },
+        key,
+      });
+      
+      result.matched = true;
+      
+      console.log(`[SoundHandler] Queued: "${trigger.name}" (keyword: ${matchingKeyword}, format: ${key.format})`);
+      
+      // Break inner loop to continue with next key (one trigger per key position)
+      break;
+    }
+  }
+  
+  // Update state
+  state.soundCountPerMessage.set(context.messageKey, currentCount);
+  state.triggeredPositions.set(context.messageKey, triggered);
+  
+  if (result.triggers.length > 0) {
+    console.log(`[SoundHandler] Total sounds queued: ${result.triggers.length}`);
+  }
+  
+  return result;
+}
+
+/**
+ * Execute all sound triggers from a key-based result
+ */
+export function executeAllSoundKeyTriggers(
+  result: SoundKeyHandlerResult, 
+  context: TriggerContext
+): void {
+  if (!result.matched || result.triggers.length === 0) return;
+  
+  console.log(`[SoundHandler] Queueing ${result.triggers.length} sound(s) from keys`);
+  
+  for (const { trigger } of result.triggers) {
+    executeSoundTrigger(trigger, context);
   }
 }
