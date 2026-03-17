@@ -168,17 +168,36 @@ export function NovelChatBox({
     wakeWords: [],
   });
 
-  // Get wake words from active character + global config
+  // Get wake words from active character OR group members + global config
   const characterWakeWords = useMemo(() => {
     const words: string[] = [];
     
-    // Add character name as wake word (always included)
-    if (activeCharacter?.name) {
+    if (isGroupMode && activeGroup && characters.length > 0) {
+      // GROUP MODE: Add all group members' names as wake words
+      // This allows the user to address any character in the group
+      const groupCharacterIds = activeGroup.members?.map(m => m.characterId) || activeGroup.characterIds || [];
+      
+      for (const charId of groupCharacterIds) {
+        const char = characters.find(c => c.id === charId);
+        if (char?.name) {
+          words.push(char.name);
+          // Add alternate names if available
+          if (char.data?.alternate_names) {
+            words.push(...char.data.alternate_names);
+          }
+        }
+      }
+      
+      console.log('[KWS] Group mode - wake words:', words);
+    } else if (activeCharacter?.name) {
+      // SINGLE CHARACTER MODE: Add only the active character's name
       words.push(activeCharacter.name);
       // Add alternate names if available
       if (activeCharacter.data?.alternate_names) {
         words.push(...activeCharacter.data.alternate_names);
       }
+      
+      console.log('[KWS] Single mode - wake words:', words);
     }
     
     // Add global wake words from config (case-preserved, comparison is case-insensitive)
@@ -188,7 +207,7 @@ export function NovelChatBox({
     
     // Remove duplicates
     return [...new Set(words)];
-  }, [activeCharacter, kwsConfig.wakeWords]);
+  }, [isGroupMode, activeGroup, activeCharacter, characters, kwsConfig.wakeWords]);
 
   // Wake Word Detection hook - Uses only Web Speech API (no Whisper needed)
   const {
@@ -196,7 +215,7 @@ export function NovelChatBox({
     isCapturing: kwsCapturing,
     transcript: kwsTranscript,
     capturedMessage: kwsCapturedMessage,
-    lastDetectedWord,
+    lastDetectedWord: kwsLastDetectedWord,
     error: kwsError,
     startListening: startKWS,
     stopListening: stopKWS,
@@ -211,12 +230,20 @@ export function NovelChatBox({
     onWakeWordDetected: (word) => {
       console.log('[KWS] Wake word detected:', word);
     },
-    onMessageReady: (message) => {
+    onMessageReady: (message, detectedWakeWord) => {
       // Message captured and silence detected - send automatically!
-      console.log('[KWS] ✅ Message ready to send:', message);
+      console.log('[KWS] ✅ Message ready to send:', message, 'wake word:', detectedWakeWord);
       if (message.trim()) {
-        // Send the message directly (like Alexa)
-        onSendMessage(message.trim());
+        // In group mode, prepend the detected wake word so the backend
+        // can detect which character was mentioned
+        if (isGroupMode && detectedWakeWord) {
+          const messageWithWakeWord = `${detectedWakeWord} ${message.trim()}`;
+          console.log('[KWS] Group mode - sending with wake word:', messageWithWakeWord);
+          onSendMessage(messageWithWakeWord);
+        } else {
+          // Single mode - send message as-is
+          onSendMessage(message.trim());
+        }
       }
     },
   });
@@ -1394,11 +1421,11 @@ export function NovelChatBox({
                     </div>
                   )}
                   {/* Wake Word Detected Indicator */}
-                  {lastDetectedWord && kwsCapturing && (
+                  {kwsLastDetectedWord && kwsCapturing && (
                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
                       <Zap className="w-3 h-3 text-amber-400" />
                       <span className="text-[10px] text-amber-400 font-medium">
-                        {lastDetectedWord} →
+                        {kwsLastDetectedWord} →
                       </span>
                     </div>
                   )}

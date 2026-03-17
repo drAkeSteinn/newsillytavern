@@ -8,7 +8,7 @@ interface UseWakeWordDetectionOptions {
   silenceDurationMs?: number;
   cooldownMs?: number;
   onWakeWordDetected?: (word: string) => void;
-  onMessageReady?: (message: string) => void;
+  onMessageReady?: (message: string, detectedWakeWord: string | null) => void;
   onTranscriptUpdate?: (transcript: string, isCapturing: boolean) => void;
 }
 
@@ -63,6 +63,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
   const lastDetectionTimeRef = useRef(0);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wakeWordsRef = useRef(wakeWords);
+  const currentWakeWordRef = useRef<string | null>(null); // Track current wake word for callback
   const onMessageReadyRef = useRef(onMessageReady);
   const onWakeWordDetectedRef = useRef(onWakeWordDetected);
   const onTranscriptUpdateRef = useRef(onTranscriptUpdate);
