@@ -1,17 +1,11 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { VADProcessor, createVADProcessor } from '@/lib/vad-processor';
-import type { VADConfig } from '@/types';
 
 interface UseAudioRecorderOptions {
   maxDuration?: number; // Max recording duration in ms
   onStop?: (audioBlob: Blob, duration: number) => void;
   onError?: (error: string) => void;
-  /** VAD configuration for auto-stop on silence */
-  vadConfig?: Partial<VADConfig>;
-  /** Enable VAD auto-stop (default: true) */
-  enableVAD?: boolean;
 }
 
 interface UseAudioRecorderReturn {
@@ -29,31 +23,14 @@ interface UseAudioRecorderReturn {
   permissionStatus: 'granted' | 'denied' | 'prompt' | 'checking';
   requestPermission: () => Promise<boolean>;
   resetError: () => void;
-  /** Current audio level (0-100) */
-  audioLevel: number;
-  /** Whether speech is currently detected */
-  isSpeechDetected: boolean;
-  /** Whether VAD is enabled */
-  vadEnabled: boolean;
-  /** Toggle VAD on/off */
-  setVadEnabled: (enabled: boolean) => void;
-  /** Update VAD configuration */
-  updateVadConfig: (config: Partial<VADConfig>) => void;
 }
 
 /**
  * Hook for recording audio from the microphone
  * Returns audio as Blob and Base64 encoded string
- * Includes VAD (Voice Activity Detection) for auto-stop on silence
  */
 export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudioRecorderReturn {
-  const { 
-    maxDuration = 60000, 
-    onStop, 
-    onError,
-    vadConfig,
-    enableVAD = true 
-  } = options;
+  const { maxDuration = 60000, onStop, onError } = options;
 
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -62,17 +39,12 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'checking'>('checking');
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [isSpeechDetected, setIsSpeechDetected] = useState(false);
-  const [vadEnabled, setVadEnabled] = useState(enableVAD);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
-  const vadRef = useRef<VADProcessor | null>(null);
-  const currentVadConfigRef = useRef<Partial<VADConfig>>(vadConfig || {});
 
   // Check microphone permission on mount
   useEffect(() => {
@@ -115,9 +87,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
       }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (vadRef.current) {
-        vadRef.current.stop();
       }
     };
   }, []);
@@ -188,27 +157,9 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
       timerRef.current = null;
     }
     
-    // Stop VAD
-    if (vadRef.current) {
-      vadRef.current.stop();
-      vadRef.current = null;
-    }
-    
-    // Reset audio level
-    setAudioLevel(0);
-    setIsSpeechDetected(false);
-    
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       console.log('[AudioRecorder] MediaRecorder stopped');
-    }
-  }, []);
-
-  // Update VAD config
-  const updateVadConfig = useCallback((config: Partial<VADConfig>) => {
-    currentVadConfigRef.current = { ...currentVadConfigRef.current, ...config };
-    if (vadRef.current) {
-      vadRef.current.updateConfig(currentVadConfigRef.current);
     }
   }, []);
 
@@ -326,15 +277,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
           mediaStreamRef.current.getTracks().forEach((track) => track.stop());
           mediaStreamRef.current = null;
         }
-        
-        // Stop VAD
-        if (vadRef.current) {
-          vadRef.current.stop();
-          vadRef.current = null;
-        }
-        
-        setAudioLevel(0);
-        setIsSpeechDetected(false);
       };
 
       // Handle errors
@@ -362,43 +304,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
         }
       }, 100);
 
-      // Start VAD if enabled
-      if (vadEnabled) {
-        console.log('[AudioRecorder] Starting VAD...');
-        
-        const fullVadConfig: VADConfig = {
-          enabled: true,
-          silenceThreshold: 30,
-          silenceDurationMs: 1500,
-          minRecordingMs: 500,
-          maxRecordingMs: maxDuration,
-          ...currentVadConfigRef.current,
-        };
-        
-        vadRef.current = createVADProcessor(fullVadConfig, {
-          onSilenceDetected: () => {
-            console.log('[AudioRecorder] VAD silence detected, auto-stopping...');
-            stopRecording();
-          },
-          onSpeechStart: () => {
-            console.log('[AudioRecorder] Speech started');
-            setIsSpeechDetected(true);
-          },
-          onSpeechEnd: () => {
-            console.log('[AudioRecorder] Speech ended');
-            setIsSpeechDetected(false);
-          },
-          onVolumeChange: (volume) => {
-            setAudioLevel(volume);
-          },
-          onError: (err) => {
-            console.error('[AudioRecorder] VAD error:', err);
-          },
-        });
-        
-        await vadRef.current.start(stream);
-      }
-
       console.log('[AudioRecorder] Recording started successfully');
       return true;
       
@@ -410,7 +315,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
       onError?.(errorMessage);
       return false;
     }
-  }, [maxDuration, onStop, onError, blobToBase64, stopRecording, error, vadEnabled]);
+  }, [maxDuration, onStop, onError, blobToBase64, stopRecording, error]);
 
   // Pause recording
   const pauseRecording = useCallback(() => {
@@ -452,8 +357,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     setDuration(0);
     setError(null);
     setIsPaused(false);
-    setAudioLevel(0);
-    setIsSpeechDetected(false);
     chunksRef.current = [];
   }, []);
 
@@ -472,11 +375,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     permissionStatus,
     requestPermission,
     resetError,
-    audioLevel,
-    isSpeechDetected,
-    vadEnabled,
-    setVadEnabled,
-    updateVadConfig,
   };
 }
 

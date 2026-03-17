@@ -416,7 +416,6 @@ export interface CharacterCard {
   spriteIndex?: SpriteIndex;                 // Cached sprite file index
   
   voice: CharacterVoiceSettings | null;
-  wakeWordConfig?: WakeWordConfig;    // Wake word detection config for this character
   hudTemplateId?: string | null;  // HUD template to use for this character
   lorebookIds?: string[];         // Lorebooks to use for this character
   questTemplateIds?: string[];       // Quest templates to use for this character
@@ -820,11 +819,11 @@ export interface ASRConfig {
   language?: string;
 }
 
-// ============ Wake Word Detection Types ============
+// ============ KWS (Keyword Spotting / Wake Word) Types ============
 
 /**
- * Configuration for wake word detection per character
- * Enables hands-free voice activation using keyword spotting
+ * Wake Word configuration
+ * Controls how the system detects activation phrases
  */
 export interface WakeWordConfig {
   enabled: boolean;

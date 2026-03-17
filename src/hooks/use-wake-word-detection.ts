@@ -1,402 +1,405 @@
-/**
- * useWakeWordDetection Hook
- * 
- * React hook for wake word detection with VAD integration
- * Provides easy integration with the chat system
- */
-
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { WakeWordDetector, CharacterWakeWords } from '@/lib/wake-word-detector';
-import { VADProcessor, createVADProcessor } from '@/lib/vad-processor';
-import type { 
-  VADConfig, 
-  WakeWordDetectionResult 
-} from '@/types';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
-export interface UseWakeWordDetectionOptions {
-  /** Characters with their wake words */
-  characters?: CharacterWakeWords[];
-  /** Global VAD configuration */
-  vadConfig?: Partial<VADConfig>;
-  /** Default language for speech recognition */
+interface UseWakeWordDetectionOptions {
+  wakeWords?: string[];
   language?: string;
-  /** Auto-start detection on mount */
-  autoStart?: boolean;
-  /** Callback when wake word is detected */
-  onWakeWordDetected?: (result: WakeWordDetectionResult) => void;
-  /** Callback when recording should start */
-  onStartRecording?: () => void;
-  /** Callback when recording should stop (VAD silence) */
-  onStopRecording?: () => void;
-  /** Callback for transcript updates */
-  onTranscript?: (transcript: string, isFinal: boolean) => void;
-  /** Callback for errors */
-  onError?: (error: string) => void;
+  silenceDurationMs?: number;
+  cooldownMs?: number;
+  onWakeWordDetected?: (word: string) => void;
+  onMessageReady?: (message: string) => void;
+  onTranscriptUpdate?: (transcript: string, isCapturing: boolean) => void;
 }
 
-export interface UseWakeWordDetectionReturn {
-  // State
+interface UseWakeWordDetectionReturn {
   isListening: boolean;
-  isActive: boolean;
-  isSupported: boolean;
-  currentTranscript: string;
-  audioLevel: number;
-  lastDetection: WakeWordDetectionResult | null;
+  isCapturing: boolean;
+  transcript: string;
+  capturedMessage: string;
+  lastDetectedWord: string | null;
   error: string | null;
-  permissionGranted: boolean | null;
-  
-  // Actions
-  startDetection: () => Promise<boolean>;
-  stopDetection: () => void;
-  updateCharacters: (characters: CharacterWakeWords[]) => void;
-  updateVADConfig: (config: Partial<VADConfig>) => void;
-  requestPermission: () => Promise<boolean>;
-  clearError: () => void;
+  startListening: () => Promise<boolean>;
+  stopListening: () => void;
+  permissionStatus: 'granted' | 'denied' | 'prompt' | 'checking';
 }
-
-// Check support during module load
-const checkSpeechRecognitionSupport = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return !!(window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition);
-};
 
 /**
- * Hook for wake word detection with VAD
+ * Hook for Wake Word Detection - Alexa Style
+ * 
+ * Flow:
+ * 1. Listen continuously
+ * 2. Detect wake word (case-insensitive)
+ * 3. Capture everything after the wake word
+ * 4. On silence, send the message and restart recognition (clears buffer)
+ * 5. Return to listening state
  */
-export function useWakeWordDetection(
-  options: UseWakeWordDetectionOptions = {}
-): UseWakeWordDetectionReturn {
+export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}): UseWakeWordDetectionReturn {
   const {
-    characters = [],
-    vadConfig,
+    wakeWords = [],
     language = 'es-ES',
-    autoStart = false,
+    silenceDurationMs = 1500,
+    cooldownMs = 2000,
     onWakeWordDetected,
-    onStartRecording,
-    onStopRecording,
-    onTranscript,
-    onError,
+    onMessageReady,
+    onTranscriptUpdate,
   } = options;
-  
-  // State - initialize with support check
+
+  // State
   const [isListening, setIsListening] = useState(false);
-  const [isActive, setIsActive] = useState(false);
-  const [isSupported] = useState(checkSpeechRecognitionSupport);
-  const [currentTranscript, setCurrentTranscript] = useState('');
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [lastDetection, setLastDetection] = useState<WakeWordDetectionResult | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [capturedMessage, setCapturedMessage] = useState('');
+  const [lastDetectedWord, setLastDetectedWord] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
-  
-  // Refs
-  const detectorRef = useRef<WakeWordDetector | null>(null);
-  const vadRef = useRef<VADProcessor | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'checking'>('checking');
+
+  // Refs - avoid stale closures in recognition callbacks
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  
-  // Store callbacks in refs to avoid dependency issues
-  const callbacksRef = useRef({
-    onWakeWordDetected,
-    onStartRecording,
-    onStopRecording,
-    onTranscript,
-    onError,
-    vadConfig,
-  });
-  
-  // Update callbacks ref when options change
+  const isCapturingRef = useRef(false);
+  const isListeningRef = useRef(false);
+  const messageBufferRef = useRef('');
+  const lastDetectionTimeRef = useRef(0);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wakeWordsRef = useRef(wakeWords);
+  const onMessageReadyRef = useRef(onMessageReady);
+  const onWakeWordDetectedRef = useRef(onWakeWordDetected);
+  const onTranscriptUpdateRef = useRef(onTranscriptUpdate);
+
+  // Keep refs updated
   useEffect(() => {
-    callbacksRef.current = {
-      onWakeWordDetected,
-      onStartRecording,
-      onStopRecording,
-      onTranscript,
-      onError,
-      vadConfig,
+    wakeWordsRef.current = wakeWords;
+  }, [wakeWords]);
+
+  useEffect(() => {
+    onMessageReadyRef.current = onMessageReady;
+  }, [onMessageReady]);
+
+  useEffect(() => {
+    onWakeWordDetectedRef.current = onWakeWordDetected;
+  }, [onWakeWordDetected]);
+
+  useEffect(() => {
+    onTranscriptUpdateRef.current = onTranscriptUpdate;
+  }, [onTranscriptUpdate]);
+
+  // Check microphone permission on mount
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          setPermissionStatus(result.state as 'granted' | 'denied' | 'prompt');
+          
+          result.onchange = () => {
+            setPermissionStatus(result.state as 'granted' | 'denied' | 'prompt');
+          };
+        }
+      } catch {
+        setPermissionStatus('prompt');
+      }
     };
-  });
-  
-  // Handle wake word trigger - start recording with VAD
-  const handleWakeWordTrigger = useCallback(async (_result: WakeWordDetectionResult) => {
-    console.log('[useWakeWord] Starting recording after wake word detection');
+    checkPermission();
+  }, []);
+
+  // Clear silence timeout
+  const clearSilenceTimeout = useCallback(() => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Stop listening
+  const stopListening = useCallback(() => {
+    console.log('[KWS] Stopping...');
     
-    try {
-      // Request microphone access for recording
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 16000,
-          channelCount: 1,
-        },
-        video: false,
-      });
-      
-      mediaStreamRef.current = stream;
-      setPermissionGranted(true);
-      
-      // Create VAD processor for auto-stop
-      vadRef.current = createVADProcessor(callbacksRef.current.vadConfig || {}, {
-        onSilenceDetected: () => {
-          console.log('[useWakeWord] VAD silence detected, stopping recording');
-          callbacksRef.current.onStopRecording?.();
-          vadRef.current?.stop();
-        },
-        onSpeechStart: () => {
-          console.log('[useWakeWord] Speech started');
-        },
-        onSpeechEnd: () => {
-          console.log('[useWakeWord] Speech ended');
-        },
-        onVolumeChange: (volume) => {
-          setAudioLevel(volume);
-        },
-        onError: (err) => {
-          console.error('[useWakeWord] VAD error:', err);
-          setError(err);
-        },
-      });
-      
-      // Start VAD monitoring
-      await vadRef.current.start(stream);
-      
-      // Notify recording start
-      callbacksRef.current.onStartRecording?.();
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start recording';
-      console.error('[useWakeWord] Failed to start recording:', errorMessage);
-      
-      if (err instanceof Error && err.name === 'NotAllowedError') {
-        setPermissionGranted(false);
-        setError('Microphone permission denied');
-      } else {
-        setError(errorMessage);
+    isListeningRef.current = false;
+    clearSilenceTimeout();
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    
+    isCapturingRef.current = false;
+    setIsListening(false);
+    setIsCapturing(false);
+    setTranscript('');
+    messageBufferRef.current = '';
+  }, [clearSilenceTimeout]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
+  }, [stopListening]);
+
+  // Check if text contains wake word (case-insensitive)
+  const findWakeWord = useCallback((text: string): string | null => {
+    const lowerText = text.toLowerCase();
+    
+    for (const word of wakeWordsRef.current) {
+      const lowerWord = word.toLowerCase().trim();
+      if (lowerWord && lowerText.includes(lowerWord)) {
+        return word; // Return original case
       }
     }
+    
+    return null;
   }, []);
-  
-  // Initialize detector
-  useEffect(() => {
-    // Skip if not supported
-    if (!isSupported) {
-      return;
-    }
+
+  // Extract message after wake word
+  const extractMessageAfterWakeWord = useCallback((text: string, wakeWord: string): string => {
+    const lowerText = text.toLowerCase();
+    const lowerWord = wakeWord.toLowerCase();
+    const index = lowerText.indexOf(lowerWord);
     
-    // Create detector
-    detectorRef.current = new WakeWordDetector({
-      onWakeWordDetected: (result) => {
-        console.log('[useWakeWord] Wake word detected:', result);
-        setLastDetection(result);
-        callbacksRef.current.onWakeWordDetected?.(result);
-        handleWakeWordTrigger(result);
-      },
-      onListeningChange: setIsListening,
-      onTranscript: (transcript, isFinal) => {
-        setCurrentTranscript(transcript);
-        callbacksRef.current.onTranscript?.(transcript, isFinal);
-      },
-      onError: (err) => {
-        setError(err);
-        callbacksRef.current.onError?.(err);
-      },
-      onPermissionChange: (granted) => {
-        setPermissionGranted(granted);
-      },
-    });
+    if (index === -1) return text;
     
-    // Set initial characters
-    if (characters.length > 0) {
-      detectorRef.current.setCharacters(characters);
-    }
-    
-    // Set language
-    detectorRef.current.setLanguage(language);
-    
-    // Auto-start if enabled
-    if (autoStart) {
-      detectorRef.current.start();
-    }
-    
-    // Cleanup
-    return () => {
-      detectorRef.current?.destroy();
-      detectorRef.current = null;
-      vadRef.current?.stop();
-      vadRef.current = null;
-      mediaStreamRef.current?.getTracks().forEach(t => t.stop());
-    };
-  }, [isSupported, handleWakeWordTrigger, autoStart, language]);
-  
-  // Update characters when they change
-  useEffect(() => {
-    if (detectorRef.current) {
-      detectorRef.current.setCharacters(characters);
-    }
-  }, [characters]);
-  
-  // Start detection
-  const startDetection = useCallback(async (): Promise<boolean> => {
-    if (!detectorRef.current) {
-      setError('Detector not initialized');
-      return false;
-    }
+    // Get everything after the wake word
+    const after = text.substring(index + wakeWord.length).trim();
+    // Remove leading punctuation
+    return after.replace(/^[,.\s:!¿¡]+/, '').trim();
+  }, []);
+
+  // Start listening
+  const startListening = useCallback(async (): Promise<boolean> => {
+    if (isListeningRef.current) return true;
     
     setError(null);
-    const success = await detectorRef.current.start();
-    setIsActive(success);
-    return success;
-  }, []);
-  
-  // Stop detection
-  const stopDetection = useCallback(() => {
-    detectorRef.current?.stop();
-    vadRef.current?.stop();
-    mediaStreamRef.current?.getTracks().forEach(t => t.stop());
-    setIsActive(false);
-    setIsListening(false);
-    setAudioLevel(0);
-  }, []);
-  
-  // Update characters
-  const updateCharacters = useCallback((newCharacters: CharacterWakeWords[]) => {
-    detectorRef.current?.setCharacters(newCharacters);
-  }, []);
-  
-  // Update VAD config
-  const updateVADConfig = useCallback((config: Partial<VADConfig>) => {
-    vadRef.current?.updateConfig(config);
-  }, []);
-  
-  // Request permission
-  const requestPermission = useCallback(async (): Promise<boolean> => {
+    
+    // Check for Speech Recognition support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.');
+      return false;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-      setPermissionGranted(true);
-      setError(null);
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      mediaStreamRef.current = stream;
+      setPermissionStatus('granted');
+      
+      // Create recognition instance
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = language;
+
+      recognition.onstart = () => {
+        console.log('[KWS] Started. Listening for:', wakeWordsRef.current);
+        isListeningRef.current = true;
+        setIsListening(true);
+        isCapturingRef.current = false;
+        setIsCapturing(false);
+        setTranscript('');
+        setLastDetectedWord(null);
+        messageBufferRef.current = '';
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        // Build transcript from current segment only (use resultIndex, not from 0)
+        // This prevents accumulation of old transcripts
+        let currentSegment = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          currentSegment += event.results[i][0].transcript;
+        }
+        
+        // Build full transcript for display (all results in this session)
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        
+        console.log('[KWS] Current segment:', currentSegment, '| Full:', fullTranscript, '| Capturing:', isCapturingRef.current);
+        
+        setTranscript(fullTranscript);
+        onTranscriptUpdateRef.current?.(fullTranscript, isCapturingRef.current);
+        
+        // Clear existing silence timeout
+        clearSilenceTimeout();
+        
+        // Check for wake word in current segment first, then full transcript
+        const detectedWordInSegment = findWakeWord(currentSegment);
+        const detectedWord = detectedWordInSegment || findWakeWord(fullTranscript);
+        
+        if (!isCapturingRef.current) {
+          // Not capturing - look for wake word
+          if (detectedWord) {
+            const now = Date.now();
+            if (now - lastDetectionTimeRef.current >= cooldownMs) {
+              lastDetectionTimeRef.current = now;
+              
+              console.log('[KWS] Wake word detected:', detectedWord);
+              setLastDetectedWord(detectedWord);
+              isCapturingRef.current = true;
+              setIsCapturing(true);
+              
+              onWakeWordDetectedRef.current?.(detectedWord);
+              
+              // Extract message after wake word
+              const message = extractMessageAfterWakeWord(fullTranscript, detectedWord);
+              if (message) {
+                messageBufferRef.current = message;
+                setCapturedMessage(message);
+                console.log('[KWS] Initial message:', message);
+              }
+            }
+          }
+        } else {
+          // Already capturing - append current segment to buffer
+          // Only use currentSegment (new speech) to avoid duplication
+          if (currentSegment.trim()) {
+            // Check if wake word appears again (user restarting command)
+            if (detectedWordInSegment) {
+              // New wake word detected - restart capture from here
+              const message = extractMessageAfterWakeWord(currentSegment, detectedWordInSegment);
+              messageBufferRef.current = message;
+              setCapturedMessage(message);
+              console.log('[KWS] New wake word, restarted message:', message);
+            } else {
+              // Continue building message - append or update
+              // The currentSegment might be a refinement of the last part
+              // We store the accumulated message and add new content
+              const existingMessage = messageBufferRef.current;
+              
+              // Only add if this segment contains new content
+              if (!existingMessage.includes(currentSegment.trim())) {
+                // This is new content, append it
+                const newMessage = existingMessage ? `${existingMessage} ${currentSegment}`.trim() : currentSegment;
+                messageBufferRef.current = newMessage;
+                setCapturedMessage(newMessage);
+                console.log('[KWS] Appended message:', newMessage);
+              } else {
+                // Content already in buffer, just update display
+                setCapturedMessage(existingMessage);
+              }
+            }
+          }
+          
+          // Set silence timeout to send message
+          silenceTimeoutRef.current = setTimeout(() => {
+            const finalMessage = messageBufferRef.current.trim();
+            console.log('[KWS] Silence detected! Sending message:', finalMessage);
+            
+            if (finalMessage) {
+              onMessageReadyRef.current?.(finalMessage);
+            }
+            
+            // Reset capture state
+            isCapturingRef.current = false;
+            setIsCapturing(false);
+            messageBufferRef.current = '';
+            setCapturedMessage('');
+            setLastDetectedWord(null);
+            setTranscript('');
+            
+            // CRITICAL: Stop and restart recognition to clear the buffer
+            // This prevents old transcripts from accumulating
+            if (recognitionRef.current && isListeningRef.current) {
+              try {
+                recognitionRef.current.stop();
+                // onend will auto-restart because isListeningRef.current is true
+              } catch {}
+            }
+          }, silenceDurationMs);
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        // 'no-speech' and 'aborted' are normal events, not real errors
+        // - no-speech: No voice detected for a period (normal while waiting)
+        // - aborted: Recognition stopped (normal when we restart)
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          console.log('[KWS] Event:', event.error, '(normal, ignoring)');
+          return;
+        }
+        
+        console.error('[KWS] Error:', event.error);
+        
+        if (event.error === 'not-allowed') {
+          setError('Permiso de micrófono denegado');
+          setPermissionStatus('denied');
+          isListeningRef.current = false;
+          setIsListening(false);
+        } else {
+          setError(`Error: ${event.error}`);
+        }
+      };
+
+      recognition.onend = () => {
+        console.log('[KWS] Recognition ended, isListening:', isListeningRef.current);
+        
+        // If we were capturing and have a message, send it
+        if (isCapturingRef.current && messageBufferRef.current.trim()) {
+          console.log('[KWS] Sending on end:', messageBufferRef.current.trim());
+          onMessageReadyRef.current?.(messageBufferRef.current.trim());
+          isCapturingRef.current = false;
+          setIsCapturing(false);
+          messageBufferRef.current = '';
+        }
+        
+        // Auto-restart if supposed to be listening
+        if (isListeningRef.current && recognitionRef.current === recognition) {
+          console.log('[KWS] Auto-restarting...');
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error('[KWS] Restart failed:', e);
+            isListeningRef.current = false;
+            setIsListening(false);
+          }
+        }
+      };
+
+      // Start
+      recognition.start();
+      recognitionRef.current = recognition;
       return true;
-    } catch {
-      setPermissionGranted(false);
-      setError('Microphone permission denied');
+      
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start';
+      console.error('[KWS] Start error:', msg);
+      
+      if (msg.includes('Permission') || msg.includes('denied')) {
+        setPermissionStatus('denied');
+        setError('Permiso de micrófono denegado');
+      } else {
+        setError(msg);
+      }
+      
       return false;
     }
-  }, []);
-  
-  // Clear error
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-  
+  }, [language, cooldownMs, silenceDurationMs, findWakeWord, extractMessageAfterWakeWord, clearSilenceTimeout]);
+
   return {
     isListening,
-    isActive,
-    isSupported,
-    currentTranscript,
-    audioLevel,
-    lastDetection,
+    isCapturing,
+    transcript,
+    capturedMessage,
+    lastDetectedWord,
     error,
-    permissionGranted,
-    startDetection,
-    stopDetection,
-    updateCharacters,
-    updateVADConfig,
-    requestPermission,
-    clearError,
+    startListening,
+    stopListening,
+    permissionStatus,
   };
 }
 
-/**
- * Hook for just VAD (Voice Activity Detection)
- */
-export function useVAD(
-  config: Partial<VADConfig> = {},
-  callbacks: {
-    onSilenceDetected?: () => void;
-    onSpeechStart?: () => void;
-    onSpeechEnd?: () => void;
-    onVolumeChange?: (volume: number) => void;
-  } = {}
-) {
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [isSpeechDetected, setIsSpeechDetected] = useState(false);
-  const [isActive, setIsActive] = useState(false);
-  
-  const vadRef = useRef<VADProcessor | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  
-  // Store callbacks in ref
-  const callbacksRef = useRef(callbacks);
-  useEffect(() => {
-    callbacksRef.current = callbacks;
-  });
-  
-  const startVAD = useCallback(async (mediaStream?: MediaStream): Promise<boolean> => {
-    try {
-      let stream = mediaStream;
-      
-      if (!stream) {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            sampleRate: 16000,
-            channelCount: 1,
-          },
-          video: false,
-        });
-        streamRef.current = stream;
-      }
-      
-      vadRef.current = createVADProcessor(config, {
-        onSilenceDetected: () => {
-          setIsSpeechDetected(false);
-          callbacksRef.current.onSilenceDetected?.();
-        },
-        onSpeechStart: () => {
-          setIsSpeechDetected(true);
-          callbacksRef.current.onSpeechStart?.();
-        },
-        onSpeechEnd: () => {
-          setIsSpeechDetected(false);
-          callbacksRef.current.onSpeechEnd?.();
-        },
-        onVolumeChange: (volume) => {
-          setAudioLevel(volume);
-          callbacksRef.current.onVolumeChange?.(volume);
-        },
-        onError: console.error,
-      });
-      
-      await vadRef.current.start(stream);
-      setIsActive(true);
-      return true;
-    } catch (err) {
-      console.error('[useVAD] Failed to start:', err);
-      return false;
-    }
-  }, [config]);
-  
-  const stopVAD = useCallback(() => {
-    vadRef.current?.stop();
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    setIsActive(false);
-    setIsSpeechDetected(false);
-    setAudioLevel(0);
-  }, []);
-  
-  useEffect(() => {
-    return () => {
-      stopVAD();
-    };
-  }, [stopVAD]);
-  
-  return {
-    audioLevel,
-    isSpeechDetected,
-    isActive,
-    startVAD,
-    stopVAD,
-  };
+// Type declarations for Web Speech API
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
 }

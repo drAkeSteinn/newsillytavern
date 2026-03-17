@@ -40,9 +40,13 @@ import {
   Music,
   FileAudio,
   Save,
+  Ear,
+  Activity,
+  Radio,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { TTSWebUIConfig, ASRConfig } from '@/types';
+import type { TTSWebUIConfig, ASRConfig, WakeWordConfig, VADConfig } from '@/types';
 
 // Supported languages for multilingual model
 const SUPPORTED_LANGUAGES = [
@@ -105,9 +109,27 @@ const DEFAULT_ASR_CONFIG: ASRConfig = {
   model: 'openai/whisper-small', // Recommended for Spanish
 };
 
+const DEFAULT_KWS_CONFIG: WakeWordConfig = {
+  enabled: false,
+  wakeWords: [],
+  sensitivity: 'medium',
+  cooldownMs: 3000,
+  language: 'es-ES',
+};
+
+const DEFAULT_VAD_CONFIG: VADConfig = {
+  enabled: true,
+  silenceThreshold: 30,
+  silenceDurationMs: 1500,
+  minRecordingMs: 500,
+  maxRecordingMs: 30000,
+};
+
 export function TTSSettingsPanel() {
   const [ttsConfig, setTtsConfig] = useState<TTSWebUIConfig>(DEFAULT_TTS_CONFIG);
   const [asrConfig, setAsrConfig] = useState<ASRConfig>(DEFAULT_ASR_CONFIG);
+  const [kwsConfig, setKwsConfig] = useState<WakeWordConfig>(DEFAULT_KWS_CONFIG);
+  const [vadConfig, setVadConfig] = useState<VADConfig>(DEFAULT_VAD_CONFIG);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>({
     status: 'checking',
     endpoint: DEFAULT_TTS_CONFIG.baseUrl,
@@ -141,6 +163,8 @@ export function TTSSettingsPanel() {
       if (data.success && data.config) {
         setTtsConfig(data.config.tts);
         setAsrConfig(data.config.asr);
+        if (data.config.kws) setKwsConfig(data.config.kws);
+        if (data.config.vad) setVadConfig(data.config.vad);
       }
     } catch (error) {
       console.error('Failed to load TTS config:', error);
@@ -154,7 +178,12 @@ export function TTSSettingsPanel() {
       const response = await fetch('/api/tts/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tts: ttsConfig, asr: asrConfig }),
+        body: JSON.stringify({ 
+          tts: ttsConfig, 
+          asr: asrConfig,
+          kws: kwsConfig,
+          vad: vadConfig,
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -214,6 +243,18 @@ export function TTSSettingsPanel() {
   // Update ASR config and mark as changed
   const updateAsrConfig = (updates: Partial<ASRConfig>) => {
     setAsrConfig(prev => ({ ...prev, ...updates }));
+    setHasChanges(true);
+  };
+
+  // Update KWS config and mark as changed
+  const updateKwsConfig = (updates: Partial<WakeWordConfig>) => {
+    setKwsConfig(prev => ({ ...prev, ...updates }));
+    setHasChanges(true);
+  };
+
+  // Update VAD config and mark as changed
+  const updateVadConfig = (updates: Partial<VADConfig>) => {
+    setVadConfig(prev => ({ ...prev, ...updates }));
     setHasChanges(true);
   };
 
@@ -347,15 +388,15 @@ export function TTSSettingsPanel() {
         </Button>
       )}
 
-      <Tabs defaultValue="tts" className="w-full">
+      <Tabs defaultValue="kws" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="kws" className="gap-2">
+            <Ear className="w-4 h-4" />
+            Voz (KWS)
+          </TabsTrigger>
           <TabsTrigger value="tts" className="gap-2">
             <Volume2 className="w-4 h-4" />
             TTS
-          </TabsTrigger>
-          <TabsTrigger value="asr" className="gap-2">
-            <Mic className="w-4 h-4" />
-            Transcripción
           </TabsTrigger>
           <TabsTrigger value="voices" className="gap-2">
             <Music className="w-4 h-4" />
@@ -722,93 +763,250 @@ export function TTSSettingsPanel() {
           </Card>
         </TabsContent>
 
-        {/* ASR Tab */}
-        <TabsContent value="asr" className="space-y-4 mt-4">
+        {/* KWS Tab - Wake Word Detection (Alexa-style) */}
+        <TabsContent value="kws" className="space-y-4 mt-4">
+          {/* KWS Info Banner */}
+          <Card className="border-2 border-green-500/30 bg-green-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <Radio className="w-5 h-5 text-green-500" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-green-600 dark:text-green-400">
+                    Activación por Voz - Estilo Alexa
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Di el nombre del personaje + tu mensaje + silencio. El mensaje se envía automáticamente.
+                    Funciona 100% en el navegador con Web Speech API (Chrome/Edge).
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
-                <Mic className="w-4 h-4" />
-                Configuración ASR (Transcripción)
+                <Ear className="w-4 h-4" />
+                Configuración de Voz
               </CardTitle>
               <CardDescription>
-                Configura el reconocimiento de voz usando Whisper
+                Configura cómo funciona la activación por voz
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Enable ASR */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="asr-enabled">Habilitar Transcripción</Label>
-                <Switch
-                  id="asr-enabled"
-                  checked={asrConfig.enabled}
-                  onCheckedChange={(checked) => updateAsrConfig({ enabled: checked })}
-                />
-              </div>
-
-              {/* Whisper Model */}
+              {/* Language */}
               <div className="space-y-2">
-                <Label>Modelo Whisper</Label>
+                <Label>Idioma de Reconocimiento</Label>
                 <Select
-                  value={asrConfig.model}
-                  onValueChange={(value) => updateAsrConfig({ model: value })}
+                  value={kwsConfig.language || 'es-ES'}
+                  onValueChange={(value) => updateKwsConfig({ language: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar modelo" />
+                    <SelectValue placeholder="Seleccionar idioma" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="openai/whisper-large-v3">
+                    <SelectItem value="es-ES">Español (España)</SelectItem>
+                    <SelectItem value="es-MX">Español (México)</SelectItem>
+                    <SelectItem value="en-US">English (US)</SelectItem>
+                    <SelectItem value="en-GB">English (UK)</SelectItem>
+                    <SelectItem value="ja-JP">日本語</SelectItem>
+                    <SelectItem value="zh-CN">中文</SelectItem>
+                    <SelectItem value="ko-KR">한국어</SelectItem>
+                    <SelectItem value="fr-FR">Français</SelectItem>
+                    <SelectItem value="de-DE">Deutsch</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Idioma para el reconocimiento de voz
+                </p>
+              </div>
+
+              {/* Silence Duration - Key setting */}
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Tiempo de Silencio para Enviar</Label>
+                  <span className="text-sm text-muted-foreground">{vadConfig.silenceDurationMs}ms</span>
+                </div>
+                <Slider
+                  value={[vadConfig.silenceDurationMs]}
+                  min={500}
+                  max={3000}
+                  step={100}
+                  onValueChange={([value]) => updateVadConfig({ silenceDurationMs: value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Cuánto tiempo de silencio esperar antes de enviar el mensaje (recomendado: 1500ms)
+                </p>
+              </div>
+
+              {/* Sensitivity */}
+              <div className="space-y-2">
+                <Label>Sensibilidad de Detección</Label>
+                <Select
+                  value={kwsConfig.sensitivity}
+                  onValueChange={(value: 'low' | 'medium' | 'high') => 
+                    updateKwsConfig({ sensitivity: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
                       <div className="flex flex-col">
-                        <span>Whisper Large V3</span>
-                        <span className="text-xs text-muted-foreground">~10GB VRAM - Mejor precisión</span>
+                        <span>Baja</span>
+                        <span className="text-xs text-muted-foreground">Menos falsos positivos</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="openai/whisper-medium">
+                    <SelectItem value="medium">
                       <div className="flex flex-col">
-                        <span>Whisper Medium</span>
-                        <span className="text-xs text-muted-foreground">~5GB VRAM - Balance</span>
+                        <span>Media ⭐ Recomendado</span>
+                        <span className="text-xs text-muted-foreground">Balance</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="openai/whisper-small">
+                    <SelectItem value="high">
                       <div className="flex flex-col">
-                        <span>Whisper Small ⭐ Recomendado ES</span>
-                        <span className="text-xs text-muted-foreground">~2GB VRAM - Bueno para español</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="openai/whisper-base">
-                      <div className="flex flex-col">
-                        <span>Whisper Base</span>
-                        <span className="text-xs text-muted-foreground">~1GB VRAM - Rápido</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="openai/whisper-tiny">
-                      <div className="flex flex-col">
-                        <span>Whisper Tiny</span>
-                        <span className="text-xs text-muted-foreground">~0.5GB VRAM - Ultra ligero</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="distil-whisper/distil-large-v3">
-                      <div className="flex flex-col">
-                        <span>Distil Whisper Large V3</span>
-                        <span className="text-xs text-muted-foreground">~1.5GB VRAM - 4x más rápido</span>
+                        <span>Alta</span>
+                        <span className="text-xs text-muted-foreground">Más sensible</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Para español: <strong>openai/whisper-small</strong> ofrece buen balance
-                </p>
               </div>
 
-              {/* Language */}
+              {/* Cooldown */}
               <div className="space-y-2">
-                <Label>Idioma (opcional)</Label>
-                <Input
-                  value={asrConfig.language || ''}
-                  onChange={(e) => updateAsrConfig({ language: e.target.value || undefined })}
-                  placeholder="es, en, ja, etc."
+                <div className="flex justify-between">
+                  <Label>Tiempo entre Mensajes</Label>
+                  <span className="text-sm text-muted-foreground">{kwsConfig.cooldownMs}ms</span>
+                </div>
+                <Slider
+                  value={[kwsConfig.cooldownMs]}
+                  min={1000}
+                  max={10000}
+                  step={500}
+                  onValueChange={([value]) => updateKwsConfig({ cooldownMs: value })}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Código de idioma para mejorar precisión
+                  Tiempo mínimo entre mensajes para evitar envíos accidentales
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Custom Wake Words */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                Palabras de Activación
+              </CardTitle>
+              <CardDescription>
+                Palabras que activan la captura del mensaje. El nombre del personaje actual siempre está incluido.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Current wake words */}
+              <div className="space-y-2">
+                <Label>Palabras Configuradas</Label>
+                <div className="flex flex-wrap gap-2">
+                  {kwsConfig.wakeWords.length > 0 ? (
+                    kwsConfig.wakeWords.map((word, index) => (
+                      <div 
+                        key={index}
+                        className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-400 text-xs"
+                      >
+                        <span>{word}</span>
+                        <button
+                          onClick={() => {
+                            const newWords = kwsConfig.wakeWords.filter((_, i) => i !== index);
+                            updateKwsConfig({ wakeWords: newWords });
+                          }}
+                          className="ml-1 hover:text-red-400"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      Solo se usará el nombre del personaje activo
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Add new wake word */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nueva palabra (ej: hey, oye, orden)"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const input = e.target as HTMLInputElement;
+                      const word = input.value.trim().toLowerCase();
+                      if (word && !kwsConfig.wakeWords.includes(word)) {
+                        updateKwsConfig({ wakeWords: [...kwsConfig.wakeWords, word] });
+                        input.value = '';
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                    const word = input.value.trim().toLowerCase();
+                    if (word && !kwsConfig.wakeWords.includes(word)) {
+                      updateKwsConfig({ wakeWords: [...kwsConfig.wakeWords, word] });
+                      input.value = '';
+                    }
+                  }}
+                >
+                  Agregar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Presiona Enter o clic en Agregar. Estas palabras + el nombre del personaje activarán la captura.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* How it works */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">¿Cómo Funciona?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-xs text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center text-[10px] font-bold">1</span>
+                <p><strong>Activa el botón 🎧</strong> - Haz clic en el botón Ear junto al micrófono en el chat.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center text-[10px] font-bold">2</span>
+                <p><strong>Di el nombre + mensaje</strong> - Ejemplo: "Luna, ¿cómo estás hoy?" o "Hey Luna, cuéntame un chiste".</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center text-[10px] font-bold">3</span>
+                <p><strong>Espera el silencio</strong> - Cuando dejes de hablar, el mensaje se envía automáticamente.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center text-[10px] font-bold">4</span>
+                <p><strong>Repite</strong> - El sistema sigue escuchando para el siguiente mensaje.</p>
+              </div>
+              <div className="p-2 mt-2 rounded border bg-muted/30">
+                <p className="text-amber-600 dark:text-amber-400">
+                  💡 <strong>Ejemplo completo:</strong> "Luna, ¿qué piensas del clima de hoy?" 
+                  → Detecta "Luna" → Captura "¿qué piensas del clima de hoy?" → Silencio → ¡Enviado!
+                </p>
+              </div>
+              <div className="p-2 rounded border bg-blue-500/10 border-blue-500/20">
+                <p className="text-blue-400">
+                  🎤 <strong>Palabras clave:</strong> El nombre del personaje actual + las palabras que agregues arriba.
+                  Por ejemplo: "Luna", "hey", "oye" → "Oye Luna, ven aquí" funcionará.
                 </p>
               </div>
             </CardContent>

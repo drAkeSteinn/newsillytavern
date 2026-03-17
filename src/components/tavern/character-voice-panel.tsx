@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -42,23 +42,17 @@ import {
   Check,
   Loader2,
   AlertCircle,
-  Ear,
-  Plus,
-  X,
-  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { 
   CharacterVoiceSettings, 
   CharacterVoiceConfig, 
   VoiceInfo,
-  TTSWebUIConfig,
-  WakeWordConfig,
+  TTSWebUIConfig 
 } from '@/types';
 import { 
   DEFAULT_CHARACTER_VOICE_SETTINGS, 
-  DEFAULT_VOICE_CONFIG,
-  DEFAULT_WAKE_WORD_CONFIG,
+  DEFAULT_VOICE_CONFIG 
 } from '@/types';
 
 // Supported languages for multilingual model
@@ -81,18 +75,12 @@ interface CharacterVoicePanelProps {
   voiceSettings: CharacterVoiceSettings | null;
   onChange: (settings: CharacterVoiceSettings) => void;
   globalConfig?: TTSWebUIConfig | null;
-  wakeWordConfig?: WakeWordConfig | null;
-  onWakeWordChange?: (config: WakeWordConfig) => void;
-  characterName?: string;
 }
 
 export function CharacterVoicePanel({ 
   voiceSettings, 
   onChange,
-  globalConfig,
-  wakeWordConfig,
-  onWakeWordChange,
-  characterName = 'Personaje',
+  globalConfig 
 }: CharacterVoicePanelProps) {
   const [availableVoices, setAvailableVoices] = useState<VoiceInfo[]>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
@@ -190,7 +178,7 @@ export function CharacterVoicePanel({
 
         {settings.enabled && (
           <>
-            {/* Text Generation Options */}
+            {/* Text Generation Options - Positive Logic */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -206,6 +194,14 @@ export function CharacterVoicePanel({
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-blue-500" />
                     <Label className="text-xs">Diálogos ("texto entre comillas")</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Generar audio para el texto entre comillas dobles.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <Switch
                     checked={settings.generateDialogues ?? true}
@@ -217,6 +213,14 @@ export function CharacterVoicePanel({
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-purple-500" />
                     <Label className="text-xs">Narración (*texto entre asteriscos*)</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Generar audio para el texto entre asteriscos.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <Switch
                     checked={settings.generateNarrations ?? true}
@@ -228,11 +232,29 @@ export function CharacterVoicePanel({
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-orange-500" />
                     <Label className="text-xs">Texto plano (sin formato)</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Generar audio para texto sin comillas ni asteriscos.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <Switch
                     checked={settings.generatePlainText ?? true}
                     onCheckedChange={(checked) => updateSettings({ generatePlainText: checked })}
                   />
+                </div>
+
+                {/* Example */}
+                <div className="text-xs bg-muted/50 p-2 rounded border">
+                  <p className="text-muted-foreground mb-1">Ejemplo:</p>
+                  <p className="font-mono">*Camina* "Hola, ¿cómo estás?"</p>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-blue-600">✓ Diálogos: "Hola, ¿cómo estás?"</p>
+                    <p className="text-purple-600">✓ Narración: Camina</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -300,13 +322,6 @@ export function CharacterVoicePanel({
           </>
         )}
 
-        {/* Wake Word Configuration */}
-        <WakeWordConfigSection
-          config={wakeWordConfig}
-          onChange={onWakeWordChange}
-          characterName={characterName}
-        />
-
         {!settings.enabled && (
           <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg border border-border/40">
             <Mic className="w-10 h-10 mx-auto mb-3 opacity-40" />
@@ -340,6 +355,7 @@ function VoiceConfigEditor({
   onRefreshVoices,
   globalLanguage,
 }: VoiceConfigEditorProps) {
+  // Safety check: ensure config exists
   if (!config) {
     return (
       <div className="text-xs text-muted-foreground p-2">
@@ -348,6 +364,7 @@ function VoiceConfigEditor({
     );
   }
 
+  // Filter voices by language if set
   const configLanguage = config.language;
   const filteredVoices = configLanguage
     ? voices.filter(v => v.language === configLanguage)
@@ -355,6 +372,7 @@ function VoiceConfigEditor({
 
   return (
     <div className="space-y-3">
+      {/* Enable this voice */}
       <div className="flex items-center justify-between">
         <Label className="text-xs">Habilitar</Label>
         <Switch
@@ -365,6 +383,7 @@ function VoiceConfigEditor({
 
       {config.enabled && (
         <>
+          {/* Voice Selection */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-xs">Voz</Label>
@@ -394,12 +413,18 @@ function VoiceConfigEditor({
                 {filteredVoices.map((voice) => (
                   <SelectItem key={voice.id} value={voice.id}>
                     {voice.name}
+                    {voice.language && (
+                      <span className="text-muted-foreground ml-1">
+                        ({voice.language.toUpperCase()})
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Language */}
           <div className="space-y-1">
             <Label className="text-xs">Idioma</Label>
             <Select
@@ -419,6 +444,7 @@ function VoiceConfigEditor({
             </Select>
           </div>
 
+          {/* Exaggeration */}
           <div className="space-y-1">
             <div className="flex justify-between">
               <Label className="text-xs">Exageración</Label>
@@ -436,6 +462,43 @@ function VoiceConfigEditor({
             />
           </div>
 
+          {/* CFG Weight */}
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <Label className="text-xs">CFG Weight</Label>
+              <span className="text-[10px] text-muted-foreground">
+                {config.cfgWeight?.toFixed(2) || '0.50'}
+              </span>
+            </div>
+            <Slider
+              value={[config.cfgWeight ?? 0.5]}
+              min={0}
+              max={1}
+              step={0.05}
+              onValueChange={([value]) => onChange({ cfgWeight: value })}
+              className="py-1"
+            />
+          </div>
+
+          {/* Temperature */}
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <Label className="text-xs">Temperatura</Label>
+              <span className="text-[10px] text-muted-foreground">
+                {config.temperature?.toFixed(2) || '0.80'}
+              </span>
+            </div>
+            <Slider
+              value={[config.temperature ?? 0.8]}
+              min={0.1}
+              max={2}
+              step={0.1}
+              onValueChange={([value]) => onChange({ temperature: value })}
+              className="py-1"
+            />
+          </div>
+
+          {/* Speed */}
           <div className="space-y-1">
             <div className="flex justify-between">
               <Label className="text-xs">Velocidad</Label>
@@ -455,198 +518,6 @@ function VoiceConfigEditor({
         </>
       )}
     </div>
-  );
-}
-
-// ============================================
-// Wake Word Configuration Section
-// ============================================
-
-interface WakeWordConfigSectionProps {
-  config?: WakeWordConfig | null;
-  onChange?: (config: WakeWordConfig) => void;
-  characterName: string;
-}
-
-// Hook to check if SpeechRecognition is supported (client-side only)
-function useSpeechRecognitionSupport() {
-  return useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    return !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition);
-  }, []);
-}
-
-function WakeWordConfigSection({ 
-  config, 
-  onChange,
-  characterName 
-}: WakeWordConfigSectionProps) {
-  const [newWakeWord, setNewWakeWord] = useState('');
-  const isSupported = useSpeechRecognitionSupport();
-
-  const wakeConfig: WakeWordConfig = {
-    ...DEFAULT_WAKE_WORD_CONFIG,
-    ...config,
-  };
-
-  const updateConfig = (updates: Partial<WakeWordConfig>) => {
-    onChange?.({ ...wakeConfig, ...updates });
-  };
-
-  const addWakeWord = () => {
-    const word = newWakeWord.trim().toLowerCase();
-    if (!word || wakeConfig.wakeWords.includes(word)) {
-      setNewWakeWord('');
-      return;
-    }
-    updateConfig({ wakeWords: [...wakeConfig.wakeWords, word] });
-    setNewWakeWord('');
-  };
-
-  const removeWakeWord = (word: string) => {
-    updateConfig({ wakeWords: wakeConfig.wakeWords.filter(w => w !== word) });
-  };
-
-  const suggestedWakeWords = [
-    characterName.toLowerCase(),
-    `hey ${characterName.toLowerCase()}`,
-    `oye ${characterName.toLowerCase()}`,
-  ].filter(w => !wakeConfig.wakeWords.includes(w));
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Ear className="w-4 h-4 text-green-500" />
-          Activación por Voz
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <p>
-                Activa la escucha continua. Cuando digas una de las palabras configuradas, 
-                la grabación comenzará automáticamente.
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </CardTitle>
-        <CardDescription>
-          Di el nombre del personaje para activar la grabación
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!isSupported && (
-          <div className="text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 p-2 rounded border border-yellow-500/20">
-            Tu navegador no soporta Speech Recognition. Usa Chrome o Edge.
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <Label className="text-xs">Activar detección</Label>
-          <Switch
-            checked={wakeConfig.enabled}
-            onCheckedChange={(checked) => updateConfig({ enabled: checked })}
-            disabled={!isSupported}
-          />
-        </div>
-
-        {wakeConfig.enabled && isSupported && (
-          <>
-            <div className="space-y-2">
-              <Label className="text-xs">Palabras de Activación</Label>
-              
-              <div className="flex flex-wrap gap-1">
-                {wakeConfig.wakeWords.map((word) => (
-                  <div
-                    key={word}
-                    className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs"
-                  >
-                    <span>{word}</span>
-                    <button
-                      onClick={() => removeWakeWord(word)}
-                      className="hover:bg-primary/20 rounded-full p-0.5"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {wakeConfig.wakeWords.length === 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    Sin palabras configuradas
-                  </span>
-                )}
-              </div>
-
-              <div className="flex gap-1">
-                <Input
-                  value={newWakeWord}
-                  onChange={(e) => setNewWakeWord(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addWakeWord()}
-                  placeholder="Nueva palabra..."
-                  className="h-7 text-xs flex-1"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={addWakeWord}
-                  disabled={!newWakeWord.trim()}
-                  className="h-7 px-2"
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-
-              {suggestedWakeWords.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground">Sugerencias:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {suggestedWakeWords.slice(0, 3).map((word) => (
-                      <button
-                        key={word}
-                        onClick={() => updateConfig({ wakeWords: [...wakeConfig.wakeWords, word] })}
-                        className="flex items-center gap-1 bg-muted hover:bg-muted/80 px-2 py-0.5 rounded text-xs transition-colors"
-                      >
-                        <Sparkles className="w-2 h-2" />
-                        {word}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Idioma de Reconocimiento</Label>
-              <Select
-                value={wakeConfig.language || 'es-ES'}
-                onValueChange={(value) => updateConfig({ language: value })}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="es-ES">Español (España)</SelectItem>
-                  <SelectItem value="es-MX">Español (México)</SelectItem>
-                  <SelectItem value="en-US">English (US)</SelectItem>
-                  <SelectItem value="en-GB">English (UK)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="text-xs bg-muted/50 p-2 rounded border">
-              <p className="font-medium text-muted-foreground mb-1">Cómo funciona:</p>
-              <ol className="text-[10px] text-muted-foreground space-y-0.5 list-decimal list-inside">
-                <li>El navegador escucha continuamente en segundo plano</li>
-                <li>Cuando detecta "{wakeConfig.wakeWords[0] || 'la palabra'}", inicia la grabación</li>
-                <li>La grabación se detiene automáticamente al detectar silencio</li>
-                <li>El audio se envía a Whisper para transcripción</li>
-              </ol>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

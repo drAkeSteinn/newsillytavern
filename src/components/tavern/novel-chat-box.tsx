@@ -44,6 +44,8 @@ import {
   Shuffle,
   Mic,
   Square,
+  Ear,
+  Radio,
 } from 'lucide-react';
 import {
   Popover,
@@ -58,6 +60,7 @@ import { QuickPetitions } from './user-solicitudes';
 import { ThemeEffects, getThemeColors as getThemeColorsUtil } from './theme-effects';
 import { useTTS } from '@/hooks/use-tts';
 import { useAudioRecorder, useAudioTranscription } from '@/hooks/use-audio-recorder';
+import { useWakeWordDetection } from '@/hooks/use-wake-word-detection';
 
 // Tab type for the chatbox
 type ChatboxTab = 'chat' | 'solicitudes' | 'misiones';
@@ -148,7 +151,77 @@ export function NovelChatBox({
     enabled: true,
   });
 
-  // Load ASR config on mount
+  // KWS config state
+  const [kwsConfig, setKwsConfig] = useState<{
+    enabled: boolean;
+    language: string;
+    sensitivity: 'low' | 'medium' | 'high';
+    cooldownMs: number;
+    silenceDurationMs: number;
+    wakeWords: string[];
+  }>({
+    enabled: false,
+    language: 'es-ES',
+    sensitivity: 'medium',
+    cooldownMs: 2000,
+    silenceDurationMs: 1500,
+    wakeWords: [],
+  });
+
+  // Get wake words from active character + global config
+  const characterWakeWords = useMemo(() => {
+    const words: string[] = [];
+    
+    // Add character name as wake word (always included)
+    if (activeCharacter?.name) {
+      words.push(activeCharacter.name);
+      // Add alternate names if available
+      if (activeCharacter.data?.alternate_names) {
+        words.push(...activeCharacter.data.alternate_names);
+      }
+    }
+    
+    // Add global wake words from config (case-preserved, comparison is case-insensitive)
+    if (kwsConfig.wakeWords && kwsConfig.wakeWords.length > 0) {
+      words.push(...kwsConfig.wakeWords);
+    }
+    
+    // Remove duplicates
+    return [...new Set(words)];
+  }, [activeCharacter, kwsConfig.wakeWords]);
+
+  // Wake Word Detection hook - Uses only Web Speech API (no Whisper needed)
+  const {
+    isListening: kwsListening,
+    isCapturing: kwsCapturing,
+    transcript: kwsTranscript,
+    capturedMessage: kwsCapturedMessage,
+    lastDetectedWord,
+    error: kwsError,
+    startListening: startKWS,
+    stopListening: stopKWS,
+  } = useWakeWordDetection({
+    wakeWords: characterWakeWords,
+    language: kwsConfig.language,
+    silenceDurationMs: kwsConfig.silenceDurationMs,
+    cooldownMs: kwsConfig.cooldownMs,
+    onTranscriptUpdate: (transcript, isCapturing) => {
+      console.log('[KWS] Transcript:', transcript, 'Capturing:', isCapturing);
+    },
+    onWakeWordDetected: (word) => {
+      console.log('[KWS] Wake word detected:', word);
+    },
+    onMessageReady: (message) => {
+      // Message captured and silence detected - send automatically!
+      console.log('[KWS] ✅ Message ready to send:', message);
+      if (message.trim()) {
+        // Send the message directly (like Alexa)
+        onSendMessage(message.trim());
+      }
+    },
+  });
+
+  // Load ASR/KWS config on mount
   useEffect(() => {
     const loadAsrConfig = async () => {
       try {
@@ -162,6 +235,18 @@ export function NovelChatBox({
               enabled: data.config.asr.enabled ?? true,
             });
           }
+          // Load KWS config
+          if (data.config?.kws) {
+            setKwsConfig(prev => ({
+              ...prev,
+              enabled: data.config.kws.enabled ?? false,
+              language: data.config.kws.language || 'es-ES',
+              sensitivity: data.config.kws.sensitivity || 'medium',
+              cooldownMs: data.config.kws.cooldownMs || 2000,
+              silenceDurationMs: data.config.vad?.silenceDurationMs || 1500,
+              wakeWords: data.config.kws.wakeWords || [],
+            }));
+          }
         }
       } catch (error) {
         console.error('[NovelChatBox] Failed to load ASR config:', error);
@@ -169,6 +254,15 @@ export function NovelChatBox({
     };
     loadAsrConfig();
   }, []);
+
+  // Handle KWS toggle
+  const handleKWSToggle = useCallback(async () => {
+    if (kwsListening) {
+      stopKWS();
+    } else {
+      await startKWS();
+    }
+  }, [kwsListening, startKWS, stopKWS]);
 
   // Audio recording hooks
   const { transcribe, isTranscribing } = useAudioTranscription();
@@ -1232,11 +1326,90 @@ export function NovelChatBox({
                       <Mic className="w-4 h-4" />
                     )}
                   </Button>
+                  {/* KWS Toggle Button */}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={kwsListening ? "default" : "outline"}
+                    className={cn(
+                      "h-8 w-8 flex-shrink-0 transition-all",
+                      kwsListening && "animate-pulse bg-green-600 hover:bg-green-700"
+                    )}
+                    onClick={handleKWSToggle}
+                    disabled={isGenerating || isTranscribing}
+                    title={
+                      kwsListening
+                        ? 'Desactivar escucha por voz'
+                        : `Activar escucha por voz (${activeCharacter?.name || 'KWS'})`
+                    }
+                  >
+                    {kwsListening ? (
+                      <Radio className="w-4 h-4" />
+                    ) : (
+                      <Ear className="w-4 h-4" />
+                    )}
+                  </Button>
                   {/* Recording Duration Indicator */}
                   {isRecording && (
                     <span className="text-xs text-red-500 font-mono min-w-[40px] animate-pulse">
                       {Math.floor(recordingDuration / 60000)}:{String(Math.floor((recordingDuration % 60000) / 1000)).padStart(2, '0')}
                     </span>
+                  )}
+                  {/* KWS Status Indicator */}
+                  {kwsListening && !kwsCapturing && (
+                    <span className={cn(
+                      "text-xs font-mono min-w-[50px]",
+                      "text-green-500 animate-pulse"
+                    )}>
+                      🎧 ESCUCHANDO
+                    </span>
+                  )}
+                  {/* KWS Capturing Indicator - After wake word detected */}
+                  {kwsCapturing && (
+                    <span className={cn(
+                      "text-xs font-mono min-w-[50px]",
+                      "text-amber-400 animate-pulse"
+                    )}>
+                      🎤 CAPTURANDO...
+                    </span>
+                  )}
+                  {/* KWS Transcript Preview - Shows what KWS is detecting in real-time */}
+                  {kwsListening && kwsTranscript && (
+                    <div className={cn(
+                      "flex items-center gap-1 px-2 py-0.5 rounded-full border max-w-[200px]",
+                      kwsCapturing 
+                        ? "bg-amber-500/10 border-amber-500/30" 
+                        : "bg-green-500/10 border-green-500/20"
+                    )}>
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0",
+                        kwsCapturing ? "bg-amber-500" : "bg-green-500"
+                      )} />
+                      <span className={cn(
+                        "text-[10px] truncate italic",
+                        kwsCapturing ? "text-amber-300" : "text-green-400"
+                      )}>
+                        &quot;{kwsTranscript}&quot;
+                      </span>
+                    </div>
+                  )}
+                  {/* Wake Word Detected Indicator */}
+                  {lastDetectedWord && kwsCapturing && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                      <Zap className="w-3 h-3 text-amber-400" />
+                      <span className="text-[10px] text-amber-400 font-medium">
+                        {lastDetectedWord} →
+                      </span>
+                    </div>
+                  )}
+                  {/* Message being captured - will be sent on silence */}
+                  {kwsCapturing && kwsCapturedMessage && (
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/30 max-w-[200px]">
+                      <Send className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                      <span className="text-[10px] text-blue-300 truncate">
+                        {kwsCapturedMessage}
+                      </span>
+                    </div>
                   )}
                   {/* Permission denied warning - now clickable */}
                   {permissionStatus === 'denied' && !isRecording && !isTranscribing && (
