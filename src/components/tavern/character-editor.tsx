@@ -46,8 +46,8 @@ import {
   BookOpen,
   ScrollText
 } from 'lucide-react';
-import type { CharacterCard, SpriteLibraries, CharacterVoiceSettings } from '@/types';
-import { DEFAULT_CHARACTER_VOICE_SETTINGS } from '@/types';
+import type { CharacterCard, SpriteLibraries, CharacterVoiceSettings, WakeWordConfig } from '@/types';
+import { DEFAULT_CHARACTER_VOICE_SETTINGS, DEFAULT_WAKE_WORD_CONFIG } from '@/types';
 import { SpriteManager } from './sprite-manager';
 // Legacy components removed - using V2 system now
 import { SpriteLibraryEditor } from './sprite-library-editor';
@@ -85,6 +85,7 @@ const defaultCharacter: Omit<CharacterCard, 'id' | 'createdAt' | 'updatedAt'> = 
   avatar: '',
   sprites: [],
   voice: null,
+  wakeWordConfig: DEFAULT_WAKE_WORD_CONFIG,
   lorebookIds: [],
   questTemplateIds: [],
 };
@@ -976,6 +977,11 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
               <CharacterVoicePanel
                 voiceSettings={character.voice}
                 onChange={(voice) => setCharacter(prev => ({ ...prev, voice }))}
+                wakeWordConfig={character.wakeWordConfig || null}
+                onWakeWordChange={(wakeWordConfig: WakeWordConfig) => 
+                  setCharacter(prev => ({ ...prev, wakeWordConfig }))
+                }
+                characterName={character.name || 'Personaje'}
               />
             </TabsContent>
           </ScrollArea>

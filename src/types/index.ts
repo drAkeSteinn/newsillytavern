@@ -416,6 +416,7 @@ export interface CharacterCard {
   spriteIndex?: SpriteIndex;                 // Cached sprite file index
   
   voice: CharacterVoiceSettings | null;
+  wakeWordConfig?: WakeWordConfig;    // Wake word detection config for this character
   hudTemplateId?: string | null;  // HUD template to use for this character
   lorebookIds?: string[];         // Lorebooks to use for this character
   questTemplateIds?: string[];       // Quest templates to use for this character
@@ -818,6 +819,59 @@ export interface ASRConfig {
   model: string;                     // e.g., 'whisper-large-v3'
   language?: string;
 }
+
+// ============ Wake Word Detection Types ============
+
+/**
+ * Configuration for wake word detection per character
+ * Enables hands-free voice activation using keyword spotting
+ */
+export interface WakeWordConfig {
+  enabled: boolean;
+  wakeWords: string[];               // e.g., ["hey luna", "luna", "oye luna"]
+  sensitivity: 'low' | 'medium' | 'high';  // Detection sensitivity
+  cooldownMs: number;                // Cooldown between detections (default: 3000ms)
+  language?: string;                 // Language for speech recognition (e.g., 'es-ES')
+}
+
+/**
+ * VAD (Voice Activity Detection) configuration
+ * Controls automatic recording stop based on silence detection
+ */
+export interface VADConfig {
+  enabled: boolean;                  // Enable auto-stop on silence
+  silenceThreshold: number;          // Audio level threshold (0-100, default: 30)
+  silenceDurationMs: number;         // Silence duration to trigger stop (default: 1500ms)
+  minRecordingMs: number;            // Minimum recording time before VAD can stop (default: 500ms)
+  maxRecordingMs: number;            // Maximum recording time (default: 30000ms)
+}
+
+/**
+ * Result of wake word detection
+ */
+export interface WakeWordDetectionResult {
+  characterId: string;
+  wakeWord: string;
+  confidence: number;                // 0-1 confidence score
+  timestamp: number;                 // Detection timestamp
+}
+
+// Default configurations
+export const DEFAULT_WAKE_WORD_CONFIG: WakeWordConfig = {
+  enabled: false,
+  wakeWords: [],
+  sensitivity: 'medium',
+  cooldownMs: 3000,
+  language: 'es-ES',
+};
+
+export const DEFAULT_VAD_CONFIG: VADConfig = {
+  enabled: true,
+  silenceThreshold: 30,
+  silenceDurationMs: 1500,
+  minRecordingMs: 500,
+  maxRecordingMs: 30000,
+};
 
 // ============ Background Types ============
 
