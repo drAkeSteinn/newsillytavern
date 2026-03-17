@@ -973,29 +973,29 @@
     "turnCount": 0
   },
   {
-    "id": "d0911f4e-72e4-4556-9648-e3601065deb5",
-    "characterId": "b6f6c957-a471-4169-8027-356d3f97fc1e",
-    "name": "Chat with Narrador",
+    "id": "cd330e63-42b7-4257-84c5-80fa54357be3",
+    "characterId": "41df701c-9d1a-430f-9759-bbf29a31dafd",
+    "name": "Chat with Rick Sanchez",
     "messages": [
       {
-        "id": "ffe8526e-81e9-404c-9bc9-77612e872fee",
-        "characterId": "b6f6c957-a471-4169-8027-356d3f97fc1e",
+        "id": "02b18fe5-5e9e-4ac4-af50-727d50779afa",
+        "characterId": "41df701c-9d1a-430f-9759-bbf29a31dafd",
         "role": "assistant",
-        "content": "",
-        "timestamp": "2026-03-16T16:33:49.861Z",
+        "content": "\"Sí, sí, adelante. Haz tu pregunta. Sorpréndeme. O decepcióname, que estadísticamente es lo más probable.\"",
+        "timestamp": "2026-03-16T22:56:09.050Z",
         "isDeleted": false,
-        "swipeId": "4df68a87-4561-41c2-abf7-dfe80dcc3f50",
+        "swipeId": "42ae2e95-3f79-41bf-87e3-0967e0d8c6b6",
         "swipeIndex": 0,
         "swipes": [
-          ""
+          "\"Sí, sí, adelante. Haz tu pregunta. Sorpréndeme. O decepcióname, que estadísticamente es lo más probable.\""
         ]
       }
     ],
-    "createdAt": "2026-03-16T16:33:49.861Z",
-    "updatedAt": "2026-03-16T16:33:49.861Z",
+    "createdAt": "2026-03-16T22:56:09.050Z",
+    "updatedAt": "2026-03-16T22:56:09.050Z",
     "sessionStats": {
       "characterStats": {
-        "b6f6c957-a471-4169-8027-356d3f97fc1e": {
+        "41df701c-9d1a-430f-9759-bbf29a31dafd": {
           "attributeValues": {},
           "lastUpdated": {},
           "changeLog": []
@@ -1003,30 +1003,12 @@
       },
       "solicitudes": {
         "characterSolicitudes": {},
-        "lastModified": 1773678829861
+        "lastModified": 1773701769049
       },
       "initialized": true,
-      "lastModified": 1773678829861
+      "lastModified": 1773701769049
     },
-    "sessionQuests": [
-      {
-        "templateId": "asd",
-        "status": "available",
-        "objectives": [
-          {
-            "templateId": "obj-mmafuc58",
-            "currentCount": 0,
-            "isCompleted": false
-          },
-          {
-            "templateId": "obj-mmbwe737",
-            "currentCount": 0,
-            "isCompleted": false
-          }
-        ],
-        "progress": 0
-      }
-    ],
+    "sessionQuests": [],
     "turnCount": 0
   }
 ]

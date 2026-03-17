@@ -1,6 +1,7 @@
 // ============================================
 // useTTS Hook - TTS integration for chat
 // Handles TTS playback, auto-generation, and voice settings
+// Optimized to prevent unnecessary re-renders
 // ============================================
 
 'use client';
@@ -32,6 +33,8 @@ interface UseTTSReturn {
   currentQueue: TTSQueueItem[];
   ttsConfig: TTSWebUIConfig | null;
   isLoadingConfig: boolean;
+  isConnected: boolean;
+  connectionError: string | null;
   
   // Actions
   speak: (
@@ -51,20 +54,45 @@ interface UseTTSReturn {
   // Config
   loadConfig: () => Promise<void>;
   loadVoices: () => Promise<void>;
+  checkConnection: () => Promise<boolean>;
 }
 
 export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
   const { autoPlayOnNewMessage = true } = options;
   
+  // Local state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentQueue, setCurrentQueue] = useState<TTSQueueItem[]>([]);
   const [ttsConfig, setTtsConfig] = useState<TTSWebUIConfig | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   
   // Refs
   const lastMessageIdRef = useRef<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializedRef = useRef(false);
+
+  // Check TTS connection status
+  const checkConnection = useCallback(async (): Promise<boolean> => {
+    if (!ttsConfig?.enabled) {
+      return false;
+    }
+
+    try {
+      const result = await ttsService.testConnection();
+      const connected = result.status === 'online';
+      setIsConnected(connected);
+      setConnectionError(connected ? null : result.error || 'Connection failed');
+      return connected;
+    } catch (error) {
+      setIsConnected(false);
+      setConnectionError(error instanceof Error ? error.message : 'Connection failed');
+      return false;
+    }
+  }, [ttsConfig?.enabled]);
 
   // Load TTS config from API
   const loadConfig = useCallback(async () => {
@@ -96,28 +124,51 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     loadConfig();
   }, [loadConfig]);
 
-  // Set up TTS service callbacks
+  // Set up TTS service callbacks - only once
   useEffect(() => {
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
+
     ttsService.setCallbacks({
-      onPlaybackStart: (item) => {
+      onPlaybackStart: () => {
         setIsPlaying(true);
         setIsPaused(false);
       },
-      onPlaybackEnd: (item) => {
+      onPlaybackEnd: () => {
         setIsPlaying(ttsService.getIsPlaying());
         setIsPaused(false);
-        setCurrentQueue(ttsService.getQueue());
+        // Update queue only when playback ends
+        const queue = ttsService.getQueue();
+        setCurrentQueue([...queue]);
       },
       onPlaybackError: (item, error) => {
         console.error('[useTTS] Playback error:', error);
-        setIsPlaying(ttsService.getIsPlaying());
+        setIsPlaying(false);
         setIsPaused(false);
       },
       onQueueUpdate: (queue) => {
-        setCurrentQueue([...queue]);
+        // Don't update on every queue change to prevent re-renders
+        // Only update if queue length changes significantly
+        if (Math.abs(queue.length - currentQueue.length) > 0) {
+          setCurrentQueue([...queue]);
+        }
       },
     });
-  }, []);
+  }, []); // Empty deps - only run once
+
+  // Check connection when config loads
+  useEffect(() => {
+    if (!ttsConfig?.enabled) return;
+    
+    checkConnection();
+    connectionCheckIntervalRef.current = setInterval(checkConnection, 30000);
+    
+    return () => {
+      if (connectionCheckIntervalRef.current) {
+        clearInterval(connectionCheckIntervalRef.current);
+      }
+    };
+  }, [ttsConfig?.enabled, checkConnection]);
 
   // Speak text with single voice (simple mode)
   const speak = useCallback(async (
@@ -127,6 +178,13 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
   ) => {
     if (!ttsConfig?.enabled) {
       console.log('[useTTS] TTS is disabled');
+      return;
+    }
+
+    // Check connection before speaking
+    const connected = await checkConnection();
+    if (!connected) {
+      console.warn('[useTTS] TTS service is not connected, skipping speech');
       return;
     }
 
@@ -164,7 +222,7 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
 
     // Add to queue
     ttsService.addToQueue(cleanText, voiceConfig, { characterId });
-  }, [ttsConfig]);
+  }, [ttsConfig, checkConnection]);
 
   // Speak with dual voice (dialogue + narrator)
   const speakWithDualVoice = useCallback(async (
@@ -174,6 +232,13 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
   ) => {
     if (!ttsConfig?.enabled) {
       console.log('[useTTS] TTS is disabled');
+      return;
+    }
+
+    // Check connection before speaking
+    const connected = await checkConnection();
+    if (!connected) {
+      console.warn('[useTTS] TTS service is not connected, skipping speech');
       return;
     }
 
@@ -202,7 +267,7 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
         ttsService.addToQueue(segment.text, segment.voiceConfig, { characterId });
       }
     }
-  }, [ttsConfig]);
+  }, [ttsConfig, checkConnection]);
 
   // Stop playback
   const stop = useCallback(() => {
@@ -235,6 +300,8 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     currentQueue,
     ttsConfig,
     isLoadingConfig,
+    isConnected,
+    connectionError,
     speak,
     speakWithDualVoice,
     stop,
@@ -242,6 +309,7 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     resume,
     loadConfig,
     loadVoices,
+    checkConnection,
   };
 }
 
@@ -253,11 +321,11 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
 interface UseTTSAutoGenerationOptions {
   enabled?: boolean;
   delay?: number;
-  // Pass TTS functions and config from parent to avoid creating new instances
   speak?: (text: string, voiceSettings?: CharacterVoiceSettings | null, characterId?: string) => Promise<void>;
   speakWithDualVoice?: (text: string, voiceSettings: CharacterVoiceSettings, characterId?: string) => Promise<void>;
   ttsConfig: TTSWebUIConfig | null;
   isPlaying?: boolean;
+  isConnected?: boolean;
 }
 
 export function useTTSAutoGeneration(
@@ -270,7 +338,8 @@ export function useTTSAutoGeneration(
     speak,
     speakWithDualVoice,
     ttsConfig,
-    isPlaying
+    isPlaying,
+    isConnected
   } = options;
   
   const lastProcessedIdRef = useRef<string>('');
@@ -281,24 +350,8 @@ export function useTTSAutoGeneration(
   const characters = useTavernStore((state) => state.characters);
 
   useEffect(() => {
-    // Debug: Log when effect runs with detailed info
     const currentMessageCount = messages.length;
     const lastMessage = messages[messages.length - 1];
-    
-    console.log('[useTTSAutoGeneration] 🔍 Effect triggered', {
-      messageCount: currentMessageCount,
-      previousCount: lastMessageCountRef.current,
-      countChanged: currentMessageCount !== lastMessageCountRef.current,
-      lastMessageId: lastMessage?.id,
-      lastMessageRole: lastMessage?.role,
-      lastProcessedId: lastProcessedIdRef.current,
-      isProcessing: isProcessingRef.current,
-      enabled,
-      ttsEnabled: ttsConfig?.enabled,
-      autoGeneration: ttsConfig?.autoGeneration,
-      hasSpeak: !!speak,
-      hasSpeakWithDualVoice: !!speakWithDualVoice,
-    });
     
     // Clear any pending timeout
     if (timeoutRef.current) {
@@ -306,59 +359,33 @@ export function useTTSAutoGeneration(
       timeoutRef.current = null;
     }
 
-    // Check if auto-generation is enabled and functions are available
-    if (!enabled) {
-      console.log('[useTTSAutoGeneration] ⏸️ Disabled: enabled=false');
-      return;
-    }
-    if (!ttsConfig?.enabled) {
-      console.log('[useTTSAutoGeneration] ⏸️ Disabled: ttsConfig.enabled=false');
-      return;
-    }
-    if (!ttsConfig?.autoGeneration) {
-      console.log('[useTTSAutoGeneration] ⏸️ Disabled: ttsConfig.autoGeneration=false');
-      return;
-    }
-    if (!speak || !speakWithDualVoice) {
-      console.log('[useTTSAutoGeneration] ⏸️ Disabled: missing speak functions');
+    // Check all conditions
+    if (!enabled) return;
+    if (!ttsConfig?.enabled) return;
+    if (!ttsConfig?.autoGeneration) return;
+    if (!speak || !speakWithDualVoice) return;
+    if (!isConnected) {
+      console.log('[useTTSAutoGeneration] ⏸️ TTS not connected');
       return;
     }
 
     // Check if message count increased (new message added)
     const isNewMessage = currentMessageCount > lastMessageCountRef.current;
-    
-    // Update the count reference for next comparison
     lastMessageCountRef.current = currentMessageCount;
     
-    // Find the last message
-    if (!lastMessage) {
-      console.log('[useTTSAutoGeneration] ⏸️ No messages');
-      return;
-    }
+    if (!lastMessage) return;
 
     // Skip if already processed
-    if (lastMessage.id === lastProcessedIdRef.current) {
-      console.log('[useTTSAutoGeneration] ⏭️ Skipping: already processed', {
-        messageId: lastMessage.id,
-      });
-      return;
-    }
+    if (lastMessage.id === lastProcessedIdRef.current) return;
     
     // Skip if is user or system message
     if (lastMessage.role === 'user' || lastMessage.role === 'system') {
-      console.log('[useTTSAutoGeneration] ⏭️ Skipping: user/system message', {
-        role: lastMessage.role,
-      });
-      // Still mark as processed so we don't check it again
       lastProcessedIdRef.current = lastMessage.id;
       return;
     }
     
     // Skip if we're currently processing (prevent race conditions)
-    if (isProcessingRef.current) {
-      console.log('[useTTSAutoGeneration] ⏭️ Skipping: already processing');
-      return;
-    }
+    if (isProcessingRef.current) return;
 
     // Mark as processed immediately to prevent duplicate processing
     lastProcessedIdRef.current = lastMessage.id;
@@ -370,13 +397,9 @@ export function useTTSAutoGeneration(
 
     console.log('[useTTSAutoGeneration] ✅ Processing message for TTS:', {
       messageId: lastMessage.id,
-      role: lastMessage.role,
-      characterId: lastMessage.characterId,
       characterName: character?.name,
       hasVoiceSettings: !!voiceSettings,
       voiceEnabled: voiceSettings?.enabled,
-      contentPreview: lastMessage.content.substring(0, 50) + '...',
-      isNewMessage,
     });
 
     // Delay before playing to allow message to fully render
@@ -384,21 +407,9 @@ export function useTTSAutoGeneration(
       isProcessingRef.current = false;
       
       if (voiceSettings?.enabled) {
-        console.log('[useTTSAutoGeneration] 🎵 Using dual voice system');
-        // Use dual voice system
-        speakWithDualVoice(
-          lastMessage.content,
-          voiceSettings,
-          lastMessage.characterId
-        );
+        speakWithDualVoice(lastMessage.content, voiceSettings, lastMessage.characterId);
       } else {
-        console.log('[useTTSAutoGeneration] 🎵 Using global TTS settings');
-        // Use global TTS settings
-        speak(
-          lastMessage.content,
-          null,
-          lastMessage.characterId
-        );
+        speak(lastMessage.content, null, lastMessage.characterId);
       }
     }, delay);
 
@@ -417,6 +428,7 @@ export function useTTSAutoGeneration(
     characters,
     speak,
     speakWithDualVoice,
+    isConnected,
   ]);
 
   return { isPlaying: isPlaying ?? false };

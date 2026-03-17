@@ -182,6 +182,8 @@ export function NovelChatBox({
     reset: resetRecording,
     error: recordingError,
     permissionStatus,
+    requestPermission,
+    resetError,
   } = useAudioRecorder({
     maxDuration: 60000, // 60 seconds max
     onError: (error) => {
@@ -193,13 +195,20 @@ export function NovelChatBox({
   const handleRecordingClick = useCallback(async () => {
     if (isRecording) {
       stopRecording();
+    } else if (permissionStatus === 'denied') {
+      // Try to request permission again
+      resetError();
+      const granted = await requestPermission();
+      if (!granted) {
+        console.error('[NovelChatBox] Permission still denied');
+      }
     } else {
       const success = await startRecording();
       if (!success) {
         console.error('[NovelChatBox] Failed to start recording');
       }
     }
-  }, [isRecording, startRecording, stopRecording]);
+  }, [isRecording, startRecording, stopRecording, permissionStatus, requestPermission, resetError]);
 
   // Show recording error feedback
   useEffect(() => {
@@ -1198,14 +1207,14 @@ export function NovelChatBox({
                     variant={isRecording ? "destructive" : recordingError ? "destructive" : "outline"}
                     className={cn(
                       "h-8 w-8 flex-shrink-0 transition-all",
-                      isRecording && "animate-pulse",
-                      permissionStatus === 'denied' && "opacity-50"
+                      isRecording && "animate-pulse bg-red-600 hover:bg-red-700",
+                      permissionStatus === 'denied' && "border-amber-500 hover:bg-amber-500/10"
                     )}
                     onClick={handleRecordingClick}
-                    disabled={isGenerating || isTranscribing || permissionStatus === 'denied'}
+                    disabled={isGenerating || isTranscribing}
                     title={
                       permissionStatus === 'denied' 
-                        ? 'Micrófono bloqueado - Permite el acceso en la configuración del navegador'
+                        ? 'Clic para solicitar permiso de micrófono'
                         : recordingError 
                           ? recordingError 
                           : isRecording 
@@ -1216,7 +1225,7 @@ export function NovelChatBox({
                     {isTranscribing ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : permissionStatus === 'denied' ? (
-                      <Mic className="w-4 h-4 opacity-50" />
+                      <Mic className="w-4 h-4 text-amber-500" />
                     ) : isRecording ? (
                       <Square className="w-4 h-4" />
                     ) : (
@@ -1229,11 +1238,14 @@ export function NovelChatBox({
                       {Math.floor(recordingDuration / 60000)}:{String(Math.floor((recordingDuration % 60000) / 1000)).padStart(2, '0')}
                     </span>
                   )}
-                  {/* Permission denied warning */}
-                  {permissionStatus === 'denied' && !isRecording && (
-                    <span className="text-xs text-amber-500">
-                      <span className="opacity-70">🔒 Micrófono bloqueado</span>
-                    </span>
+                  {/* Permission denied warning - now clickable */}
+                  {permissionStatus === 'denied' && !isRecording && !isTranscribing && (
+                    <button 
+                      onClick={handleRecordingClick}
+                      className="text-xs text-amber-500 hover:text-amber-400 transition-colors cursor-pointer"
+                    >
+                      <span className="opacity-70">🔓 Solicitar permiso</span>
+                    </button>
                   )}
                   <Button
                     size="icon"

@@ -140,6 +140,12 @@
       "messagesSinceLastSummary": 0,
       "lastSummaryMessageIndex": 0,
       "isGroupChat": false
+    },
+    "cd330e63-42b7-4257-84c5-80fa54357be3": {
+      "sessionId": "cd330e63-42b7-4257-84c5-80fa54357be3",
+      "messagesSinceLastSummary": 0,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
     }
   }
 }

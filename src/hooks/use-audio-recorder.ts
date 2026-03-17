@@ -21,6 +21,8 @@ interface UseAudioRecorderReturn {
   reset: () => void;
   error: string | null;
   permissionStatus: 'granted' | 'denied' | 'prompt' | 'checking';
+  requestPermission: () => Promise<boolean>;
+  resetError: () => void;
 }
 
 /**
@@ -53,8 +55,13 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
           const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
           setPermissionStatus(result.state as 'granted' | 'denied' | 'prompt');
           
+          // Listen for permission changes
           result.onchange = () => {
             setPermissionStatus(result.state as 'granted' | 'denied' | 'prompt');
+            // Clear error when permission changes
+            if (result.state === 'granted') {
+              setError(null);
+            }
           };
         } else {
           // Fallback: assume prompt needed
@@ -99,6 +106,48 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     });
   }, []);
 
+  // Reset error state
+  const resetError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // Request permission explicitly (separate from recording)
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    setError(null);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000,
+          channelCount: 1,
+        },
+        video: false,
+      });
+      
+      // Permission granted - stop the stream immediately
+      stream.getTracks().forEach(track => track.stop());
+      setPermissionStatus('granted');
+      console.log('[AudioRecorder] Permission granted');
+      return true;
+    } catch (permError) {
+      console.error('[AudioRecorder] Permission denied:', permError);
+      setPermissionStatus('denied');
+      
+      const errorMsg = permError instanceof Error ? permError.name : 'Permission denied';
+      if (errorMsg === 'NotAllowedError' || errorMsg === 'PermissionDeniedError') {
+        setError('Permiso de micrófono denegado. Haz clic en el icono de micrófono en la barra de direcciones del navegador para permitir el acceso.');
+      } else if (errorMsg === 'NotFoundError') {
+        setError('No se encontró ningún micrófono. Por favor, conecta un micrófono.');
+      } else {
+        setError(`Error de micrófono: ${errorMsg}`);
+      }
+      
+      return false;
+    }
+  }, []);
+
   // Stop recording - using ref to avoid stale closure
   const stopRecording = useCallback(() => {
     console.log('[AudioRecorder] stopRecording called');
@@ -121,7 +170,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     try {
       setError(null);
       chunksRef.current = [];
-      setPermissionStatus('checking');
 
       // Request microphone access with specific constraints
       console.log('[AudioRecorder] Requesting microphone access...');
@@ -325,6 +373,8 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     reset,
     error,
     permissionStatus,
+    requestPermission,
+    resetError,
   };
 }
 
@@ -346,7 +396,10 @@ export function useAudioTranscription() {
     setIsTranscribing(true);
     setTranscriptionError(null);
 
-    console.log('[Transcription] Starting with model:', options?.model || 'whisper-small');
+    // Use correct model format: openai/whisper-small
+    const model = options?.model || 'openai/whisper-small';
+    
+    console.log('[Transcription] Starting with model:', model);
 
     try {
       const response = await fetch('/api/tts/transcriptions', {
@@ -354,7 +407,7 @@ export function useAudioTranscription() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audio: audioBase64,
-          model: options?.model || 'whisper-small',
+          model: model,
           language: options?.language || 'es',
           provider: 'tts-webui',
           endpoint: options?.endpoint,

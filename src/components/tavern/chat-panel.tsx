@@ -163,7 +163,8 @@ export function ChatPanel() {
     speak, 
     stop: stopTTS, 
     isPlaying: isTTSPlaying,
-    ttsConfig 
+    ttsConfig,
+    isConnected: isTTSConnected,
   } = useTTS();
   
   // Auto-generation TTS - automatically plays TTS for new assistant messages
@@ -179,6 +180,7 @@ export function ChatPanel() {
     speakWithDualVoice,
     ttsConfig,
     isPlaying: isTTSPlaying,
+    isConnected: isTTSConnected,
   });
   
   // Track current streaming message key for triggers

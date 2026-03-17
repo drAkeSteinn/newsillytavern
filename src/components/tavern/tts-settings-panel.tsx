@@ -102,7 +102,7 @@ const DEFAULT_TTS_CONFIG: TTSWebUIConfig = {
 const DEFAULT_ASR_CONFIG: ASRConfig = {
   enabled: false,
   provider: 'tts-webui',
-  model: 'whisper-large-v3',
+  model: 'openai/whisper-small', // Recommended for Spanish
 };
 
 export function TTSSettingsPanel() {
@@ -756,46 +756,46 @@ export function TTSSettingsPanel() {
                     <SelectValue placeholder="Seleccionar modelo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="whisper-large-v3">
+                    <SelectItem value="openai/whisper-large-v3">
                       <div className="flex flex-col">
                         <span>Whisper Large V3</span>
                         <span className="text-xs text-muted-foreground">~10GB VRAM - Mejor precisión</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="distil-whisper-large-v3">
-                      <div className="flex flex-col">
-                        <span>Distil Whisper Large V3</span>
-                        <span className="text-xs text-muted-foreground">~1.5GB VRAM - 4x más rápido</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="whisper-medium">
+                    <SelectItem value="openai/whisper-medium">
                       <div className="flex flex-col">
                         <span>Whisper Medium</span>
                         <span className="text-xs text-muted-foreground">~5GB VRAM - Balance</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="whisper-small">
+                    <SelectItem value="openai/whisper-small">
                       <div className="flex flex-col">
                         <span>Whisper Small ⭐ Recomendado ES</span>
                         <span className="text-xs text-muted-foreground">~2GB VRAM - Bueno para español</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="whisper-base">
+                    <SelectItem value="openai/whisper-base">
                       <div className="flex flex-col">
                         <span>Whisper Base</span>
                         <span className="text-xs text-muted-foreground">~1GB VRAM - Rápido</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="whisper-tiny">
+                    <SelectItem value="openai/whisper-tiny">
                       <div className="flex flex-col">
                         <span>Whisper Tiny</span>
                         <span className="text-xs text-muted-foreground">~0.5GB VRAM - Ultra ligero</span>
                       </div>
                     </SelectItem>
+                    <SelectItem value="distil-whisper/distil-large-v3">
+                      <div className="flex flex-col">
+                        <span>Distil Whisper Large V3</span>
+                        <span className="text-xs text-muted-foreground">~1.5GB VRAM - 4x más rápido</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Para español: <strong>whisper-small</strong> o <strong>distil-whisper-large-v3</strong> ofrecen buen balance
+                  Para español: <strong>openai/whisper-small</strong> ofrece buen balance
                 </p>
               </div>
 

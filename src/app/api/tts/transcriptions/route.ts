@@ -7,7 +7,16 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // TTS-WebUI configuration
 const TTS_WEBUI_DEFAULT_URL = 'http://localhost:7778';
-const WHISPER_DEFAULT_MODEL = 'whisper-large-v3';
+
+// Whisper models with correct format for TTS-WebUI
+const WHISPER_MODELS = [
+  { id: 'openai/whisper-large-v3', name: 'Whisper Large V3', vram: '~10GB' },
+  { id: 'openai/whisper-medium', name: 'Whisper Medium', vram: '~5GB' },
+  { id: 'openai/whisper-small', name: 'Whisper Small (Recommended ES)', vram: '~2GB' },
+  { id: 'openai/whisper-base', name: 'Whisper Base', vram: '~1GB' },
+  { id: 'openai/whisper-tiny', name: 'Whisper Tiny', vram: '~0.5GB' },
+  { id: 'distil-whisper/distil-large-v3', name: 'Distil Whisper Large V3', vram: '~1.5GB' },
+];
 
 interface TranscriptionRequest {
   audio: string; // Base64 encoded audio
@@ -34,6 +43,13 @@ interface TranscriptionResponse {
 
 /**
  * Transcribe audio using TTS-WebUI Whisper API
+ * 
+ * Correct format based on curl:
+ * curl -X POST "http://localhost:7778/v1/audio/transcriptions" \
+ *   -F "file=@audio.wav" \
+ *   -F "model=openai/whisper-large-v3" \
+ *   -F "language=es" \
+ *   -F "response_format=json"
  */
 async function transcribeWithTTSWebUI(
   audioBase64: string,
@@ -55,11 +71,22 @@ async function transcribeWithTTSWebUI(
     // Convert base64 to buffer
     const audioBuffer = Buffer.from(audioBase64, 'base64');
 
-    // Create form data
+    // Create form data with correct field names for OpenAI-compatible API
     const formData = new FormData();
-    formData.append('file', new Blob([audioBuffer]), 'audio.wav');
-    formData.append('model', model || WHISPER_DEFAULT_MODEL);
-
+    
+    // File field - use 'file' as field name, and provide a filename with extension
+    // Whisper needs to know the file format
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+    formData.append('file', audioBlob, 'audio.wav');
+    
+    // Model field - use the correct format with provider prefix
+    // Format: "openai/whisper-large-v3" or "distil-whisper/distil-large-v3"
+    const modelId = model.startsWith('openai/') || model.startsWith('distil-') 
+      ? model 
+      : `openai/${model}`;
+    formData.append('model', modelId);
+    
+    // Optional fields
     if (language) {
       formData.append('language', language);
     }
@@ -74,6 +101,7 @@ async function transcribeWithTTSWebUI(
     }
 
     console.log(`[ASR] Request to ${baseUrl}/v1/audio/transcriptions`);
+    console.log(`[ASR] Model: ${modelId}, Language: ${language || 'auto'}`);
 
     const response = await fetch(`${baseUrl}/v1/audio/transcriptions`, {
       method: 'POST',
@@ -149,13 +177,17 @@ export async function POST(request: NextRequest) {
     const provider = body.provider || 'tts-webui';
     const endpoint = body.endpoint || TTS_WEBUI_DEFAULT_URL;
 
+    // Get the model with correct format
+    // Default to openai/whisper-small for Spanish
+    const model = body.model || 'openai/whisper-small';
+
     let result: { data?: TranscriptionResponse; error?: string };
 
     switch (provider) {
       case 'tts-webui':
         result = await transcribeWithTTSWebUI(body.audio, {
           endpoint,
-          model: body.model || WHISPER_DEFAULT_MODEL,
+          model,
           language: body.language,
           prompt: body.prompt,
           response_format: body.response_format,
@@ -218,12 +250,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: 'online',
         endpoint: baseUrl,
-        models: [
-          { id: 'whisper-large-v3', name: 'Whisper Large V3', type: 'asr' },
-          { id: 'whisper-medium', name: 'Whisper Medium', type: 'asr' },
-          { id: 'whisper-small', name: 'Whisper Small', type: 'asr' },
-          { id: 'whisper-tiny', name: 'Whisper Tiny', type: 'asr' },
-        ],
+        models: WHISPER_MODELS.map(m => ({
+          id: m.id,
+          name: m.name,
+          vram: m.vram,
+          type: 'asr'
+        })),
       });
     }
 
