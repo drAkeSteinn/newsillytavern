@@ -106,7 +106,14 @@ export function CharacterVoicePanel({
     setIsLoadingVoices(true);
 
     try {
-      const response = await fetch(`${baseUrl}/v1/audio/voices`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(`${baseUrl}/v1/audio/voices`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         const data = await response.json();
         let voices: VoiceInfo[] = [];
@@ -123,7 +130,10 @@ export function CharacterVoicePanel({
         setAvailableVoices(voices);
       }
     } catch (error) {
-      console.error('[TTS] Failed to load voices:', error);
+      // Silently fail - TTS service may not be available
+      // This is expected when the service isn't running
+      console.log('[TTS] Voice service not available, using defaults');
+      setAvailableVoices([]);
     } finally {
       setIsLoadingVoices(false);
     }

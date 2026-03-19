@@ -70,6 +70,7 @@ import { DialogueSettingsPanel } from '@/components/dialogue';
 import { InventoryPanel } from '@/components/inventory';
 import { AppearanceSettingsPanel } from './appearance-settings-panel';
 import { TTSSettingsPanel } from './tts-settings-panel';
+import { SpriteGeneralPanel } from './sprite-general-panel';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean; description: string }[] = [
   { value: 'test-mock', label: '🧪 Test Mock (Prueba)', defaultEndpoint: '', needsEndpoint: false, description: 'Prueba del sistema de peticiones sin LLM real' },
@@ -142,10 +143,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           backgroundIndex: store.backgroundIndex,
           backgroundTriggerPacks: store.backgroundTriggerPacks,
           backgroundCollections: store.backgroundCollections,
-          // Visual systems - Sprites
-          spritePacks: store.spritePacks,
-          spriteIndex: store.spriteIndex,
-          spriteLibraries: store.spriteLibraries,
+          // Visual systems - Sprites (V2)
           spritePacksV2: store.spritePacksV2,
           // HUD
           hudTemplates: store.hudTemplates,
@@ -215,7 +213,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           'personas', 'lorebooks', 'activeLorebookIds',
           'soundTriggers', 'soundCollections', 'soundSequenceTriggers',
           'backgrounds', 'backgroundPacks', 'backgroundIndex', 'backgroundTriggerPacks', 'backgroundCollections',
-          'spritePacks', 'spriteIndex', 'spriteLibraries', 'spritePacksV2',
+          'spritePacksV2',
           'hudTemplates',
           'atmosphereSettings', 'activeAtmospherePresetId',
           'summarySettings', 'characterMemories', 'sessionTracking',
@@ -281,10 +279,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           backgroundIndex: store.backgroundIndex,
           backgroundTriggerPacks: store.backgroundTriggerPacks,
           backgroundCollections: store.backgroundCollections,
-          // Visual systems - Sprites
-          spritePacks: store.spritePacks,
-          spriteIndex: store.spriteIndex,
-          spriteLibraries: store.spriteLibraries,
+          // Visual systems - Sprites (V2)
           spritePacksV2: store.spritePacksV2,
           // HUD
           hudTemplates: store.hudTemplates,
@@ -371,7 +366,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           'personas', 'lorebooks', 'activeLorebookIds',
           'soundTriggers', 'soundCollections', 'soundSequenceTriggers',
           'backgrounds', 'backgroundPacks', 'backgroundIndex', 'backgroundTriggerPacks', 'backgroundCollections',
-          'spritePacks', 'spriteIndex', 'spriteLibraries', 'spritePacksV2',
+          'spritePacksV2',
           'hudTemplates',
           'atmosphereSettings', 'activeAtmospherePresetId',
           'summarySettings', 'summaries', 'characterMemories', 'sessionTracking',
@@ -600,6 +595,10 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               <TabsTrigger value="inventory" className="gap-1.5 text-xs">
                 <Package className="w-4 h-4" />
                 Inventario
+              </TabsTrigger>
+              <TabsTrigger value="sprites" className="gap-1.5 text-xs">
+                <Layers className="w-4 h-4" />
+                Sprites
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1313,6 +1312,11 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             {/* Inventory Settings */}
             <TabsContent value="inventory" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
               <InventoryPanel />
+            </TabsContent>
+            
+            {/* Sprites General Panel */}
+            <TabsContent value="sprites" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
+              <SpriteGeneralPanel />
             </TabsContent>
           </div>
         </Tabs>

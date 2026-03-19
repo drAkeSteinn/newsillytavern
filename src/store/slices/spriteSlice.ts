@@ -35,9 +35,7 @@ import type {
   SpriteState, 
   SpriteLockState, 
   SpriteTriggerHit, 
-  SpritePack, 
   SpriteIndex, 
-  SpriteLibraries,
   // NEW V2 Types
   SpritePackV2,
   TriggerCollection,
@@ -52,8 +50,143 @@ import {
   createDefaultTriggerCollection,
   createDefaultTriggerQueueState,
 } from '@/types';
+import type { SoundChainStep, SoundTrigger, SoundCollection } from '@/types';
 
 import { uuidv4 } from '@/lib/uuid';
+
+// ============================================
+// Sound Chain Player
+// ============================================
+
+// Active sound chain tracking
+const activeSoundChains = new Map<string, { timeouts: NodeJS.Timeout[]; audios: HTMLAudioElement[] }>();
+
+/**
+ * Play a sound chain for a character
+ * This is called directly when startSoundChain is invoked
+ */
+function playSoundChainForCharacter(
+  characterId: string,
+  chain: SoundChain,
+  soundTriggers: SoundTrigger[],
+  soundCollections: SoundCollection[],
+  globalVolume: number
+): void {
+  // Stop any existing chain for this character
+  stopSoundChainForCharacter(characterId);
+  
+  const chainState = { timeouts: [] as NodeJS.Timeout[], audios: [] as HTMLAudioElement[] };
+  activeSoundChains.set(characterId, chainState);
+  
+  const chainVolume = (chain.volume ?? 1) * globalVolume;
+  
+  console.log('[SpriteSlice] Playing sound chain:', {
+    characterId,
+    steps: chain.steps.length,
+    volume: chainVolume,
+  });
+  
+  chain.steps.forEach((step: SoundChainStep, index: number) => {
+    const timeout = setTimeout(() => {
+      playSoundChainStep(
+        characterId,
+        step,
+        soundTriggers,
+        soundCollections,
+        chainVolume
+      );
+    }, step.delayMs);
+    
+    chainState.timeouts.push(timeout);
+  });
+}
+
+/**
+ * Play a single sound chain step
+ */
+function playSoundChainStep(
+  characterId: string,
+  step: SoundChainStep,
+  soundTriggers: SoundTrigger[],
+  soundCollections: SoundCollection[],
+  chainVolume: number
+): void {
+  let soundUrl: string | null = null;
+  let volume = (step.volume ?? 1) * chainVolume;
+  
+  // Try sound trigger key first
+  if (step.soundTriggerKey) {
+    const trigger = soundTriggers.find(t => t.name === step.soundTriggerKey || t.id === step.soundTriggerKey);
+    if (trigger) {
+      const collection = soundCollections.find(c => c.name === trigger.collection);
+      if (collection && collection.files.length > 0) {
+        // Pick sound based on play mode
+        let soundFile: string;
+        if (trigger.playMode === 'random') {
+          soundFile = collection.files[Math.floor(Math.random() * collection.files.length)];
+        } else {
+          const index = (trigger.currentIndex || 0) % collection.files.length;
+          soundFile = collection.files[index];
+        }
+        soundUrl = soundFile;
+        volume *= trigger.volume;
+      }
+    }
+  }
+  // Fall back to direct URL
+  else if (step.soundUrl) {
+    soundUrl = step.soundUrl;
+  }
+  
+  if (!soundUrl) {
+    console.warn('[SpriteSlice] No sound URL for step:', step);
+    return;
+  }
+  
+  try {
+    const audio = new Audio(soundUrl);
+    audio.volume = Math.min(1, Math.max(0, volume));
+    
+    audio.play().catch(e => {
+      console.warn('[SpriteSlice] Audio play failed:', e);
+    });
+    
+    // Track the audio
+    const chainState = activeSoundChains.get(characterId);
+    if (chainState) {
+      chainState.audios.push(audio);
+    }
+    
+    audio.onended = () => {
+      const state = activeSoundChains.get(characterId);
+      if (state) {
+        const idx = state.audios.indexOf(audio);
+        if (idx > -1) state.audios.splice(idx, 1);
+      }
+    };
+  } catch (error) {
+    console.error('[SpriteSlice] Failed to play sound:', error);
+  }
+}
+
+/**
+ * Stop sound chain for a character
+ */
+function stopSoundChainForCharacter(characterId: string): void {
+  const chainState = activeSoundChains.get(characterId);
+  if (!chainState) return;
+  
+  // Clear all timeouts
+  chainState.timeouts.forEach(t => clearTimeout(t));
+  
+  // Stop all audio
+  chainState.audios.forEach(a => {
+    a.pause();
+    a.remove();
+  });
+  
+  activeSoundChains.delete(characterId);
+}
 
 // ============================================
 // Per-Character Sprite State
@@ -63,7 +196,10 @@ export interface CharacterSpriteState {
   // Current sprite from trigger (HIGHEST PRIORITY - DO NOT OVERRIDE)
   triggerSpriteUrl: string | null;
   triggerSpriteLabel: string | null;
-  
+  triggerCollectionId: string | null;  // ID of the trigger collection that activated this sprite
+  triggerPackId: string | null;  // ID of the sprite pack
+  useTimelineSounds: boolean;  // Whether to play timeline sounds for this sprite
+
   // Return to idle state for this character
   returnToIdle: {
     active: boolean;
@@ -74,7 +210,7 @@ export interface CharacterSpriteState {
     returnSpriteUrl: string;     // URL to return to (if mode is idle/talk/thinking)
     returnSpriteLabel: string | null;
   };
-  
+
   // Track if trigger was activated during current generation
   triggerActivatedDuringGeneration: boolean;
   
@@ -99,6 +235,8 @@ export interface CharacterSpriteState {
 export const createDefaultCharacterState = (): CharacterSpriteState => ({
   triggerSpriteUrl: null,
   triggerSpriteLabel: null,
+  triggerCollectionId: null,
+  triggerPackId: null,
   returnToIdle: {
     active: false,
     scheduledAt: 0,
@@ -132,9 +270,7 @@ export interface SpriteSlice {
   lockIntervalId: ReturnType<typeof setInterval> | null;
 
   // Sprite packs and index (global resources)
-  spritePacks: SpritePack[];
   spriteIndex: SpriteIndex;
-  spriteLibraries: SpriteLibraries;
 
   // Last trigger info (for cooldowns)
   lastSpriteTriggerAt: number;
@@ -303,15 +439,8 @@ export interface SpriteSlice {
   endGeneration: () => void;
   wasTriggerActivated: () => boolean;
 
-  // Packs management
-  setSpritePacks: (packs: SpritePack[]) => void;
-  addSpritePack: (pack: Omit<SpritePack, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateSpritePack: (id: string, updates: Partial<SpritePack>) => void;
-  deleteSpritePack: (id: string) => void;
-  cloneSpritePack: (id: string) => void;
-  toggleSpritePack: (id: string) => void;
+  // Index management
   setSpriteIndex: (index: SpriteIndex) => void;
-  setSpriteLibraries: (libraries: SpriteLibraries) => void;
 
   // Sprite URL lookup
   getSpriteUrlByLabel: (label: string) => string | null;
@@ -377,16 +506,10 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   lockIntervalMs: 0,
   lockIntervalId: null,
 
-  spritePacks: [],
   spriteIndex: {
     sprites: [],
     lastUpdated: 0,
     source: '',
-  },
-  spriteLibraries: {
-    actions: [],
-    poses: [],
-    clothes: [],
   },
 
   lastSpriteTriggerAt: 0,
@@ -425,6 +548,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
             ...currentCharState,
             triggerSpriteUrl: hit.spriteUrl,
             triggerSpriteLabel: hit.spriteLabel,
+            triggerCollectionId: hit.collectionId || null,
+            triggerPackId: hit.packId || null,
+            useTimelineSounds: hit.useTimelineSounds ?? false,
             triggerActivatedDuringGeneration: true,
             spriteState: 'idle', // Triggers set state to idle
             returnToIdle: {
@@ -934,51 +1060,8 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
     return false;
   },
 
-  // Packs management
-  setSpritePacks: (packs: SpritePack[]) => set({ spritePacks: packs }),
-
-  addSpritePack: (pack: Omit<SpritePack, 'id' | 'createdAt' | 'updatedAt'>) => set((state: any) => ({
-    spritePacks: [...state.spritePacks, {
-      ...pack,
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }],
-  })),
-
-  updateSpritePack: (id: string, updates: Partial<SpritePack>) => set((state: any) => ({
-    spritePacks: state.spritePacks.map((p: SpritePack) =>
-      p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-    ),
-  })),
-
-  deleteSpritePack: (id: string) => set((state: any) => ({
-    spritePacks: state.spritePacks.filter((p: SpritePack) => p.id !== id),
-  })),
-
-  cloneSpritePack: (id: string) => set((state: any) => {
-    const pack = state.spritePacks.find((p: SpritePack) => p.id === id);
-    if (!pack) return state;
-    return {
-      spritePacks: [...state.spritePacks, {
-        ...pack,
-        id: uuidv4(),
-        title: `${pack.title} (copy)`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }],
-    };
-  }),
-
-  toggleSpritePack: (id: string) => set((state: any) => ({
-    spritePacks: state.spritePacks.map((p: SpritePack) =>
-      p.id === id ? { ...p, active: !p.active, updatedAt: new Date().toISOString() } : p
-    ),
-  })),
-
+  // Index management
   setSpriteIndex: (index: SpriteIndex) => set({ spriteIndex: index }),
-
-  setSpriteLibraries: (libraries: SpriteLibraries) => set({ spriteLibraries: libraries }),
 
   getSpriteUrlByLabel: (label: string) => {
     const state = get();
@@ -1057,13 +1140,30 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
     });
     
     // Schedule fallback if configured
-    if (nextEntry.fallbackDelayMs && nextEntry.fallbackDelayMs > 0 && nextEntry.fallbackSpriteUrl) {
-      // Schedule the fallback using the resolved URL
+    if (nextEntry.fallbackDelayMs && nextEntry.fallbackDelayMs > 0) {
+      // Determine returnToMode based on fallbackMode
+      let returnToMode: 'idle' | 'talk' | 'thinking' | 'clear' = 'idle';
+      let returnSpriteUrl = nextEntry.fallbackSpriteUrl || '';
+
+      if (nextEntry.fallbackMode === 'idle_collection') {
+        // For 'idle_collection', use 'clear' mode to let normal state logic apply
+        returnToMode = 'clear';
+        returnSpriteUrl = ''; // Empty is fine for 'clear' mode
+      } else if (nextEntry.fallbackSpriteUrl) {
+        // For 'custom_sprite' and 'collection_default', apply the sprite
+        returnToMode = 'idle';
+      } else {
+        // Fallback if no sprite URL was resolved - use 'clear' mode
+        returnToMode = 'clear';
+        returnSpriteUrl = '';
+      }
+
+      // Schedule the fallback
       get().scheduleReturnToIdleForCharacter(
         characterId,
         nextEntry.spriteUrl,
-        'idle',  // Apply the return sprite
-        nextEntry.fallbackSpriteUrl,
+        returnToMode,
+        returnSpriteUrl,
         null,
         nextEntry.fallbackDelayMs
       );
@@ -1171,6 +1271,15 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   startSoundChain: (characterId: string, chain: SoundChain) => {
     if (!chain.enabled || chain.steps.length === 0) return;
     
+    // Get sound data from state and play
+    const state = get();
+    const soundTriggers = (state as any).soundTriggers || [];
+    const soundCollections = (state as any).soundCollections || [];
+    const globalVolume = (state as any).settings?.sound?.globalVolume ?? 0.85;
+    
+    // Play the sound chain
+    playSoundChainForCharacter(characterId, chain, soundTriggers, soundCollections, globalVolume);
+    
     set((state: any) => {
       const charState = state.characterSpriteStates[characterId] || createDefaultCharacterState();
       
@@ -1229,6 +1338,9 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   },
   
   interruptChain: (characterId: string) => {
+    // Stop any active sound chains
+    stopSoundChainForCharacter(characterId);
+    
     set((state: any) => {
       const charState = state.characterSpriteStates[characterId];
       if (!charState?.chainProgress?.active || !charState.chainProgress.interruptible) {

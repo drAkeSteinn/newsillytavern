@@ -23,7 +23,7 @@
     "voice": null,
     "id": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
     "createdAt": "2026-03-01T21:41:38.289Z",
-    "updatedAt": "2026-03-15T16:51:47.233Z",
+    "updatedAt": "2026-03-19T06:01:27.893Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -72,17 +72,7 @@
           ],
           "activationKey": "hab1",
           "type": "ejecucion",
-          "activationRewards": [
-            {
-              "id": "skill-reward-mmrzotnt",
-              "type": "trigger",
-              "trigger": {
-                "category": "sound",
-                "key": "glohg",
-                "targetMode": "self"
-              }
-            }
-          ]
+          "activationRewards": []
         }
       ],
       "intentions": [],
@@ -178,14 +168,14 @@
         "name": "idle",
         "sprites": [
           {
-            "id": "9515a3c1-a093-4337-ac80-4864eeb2e5e5",
-            "label": "01",
-            "url": "/sprites/Moon/1772240870166-656lst.webm",
-            "isAnimated": true
+            "id": "24897257-9608-4ec7-a446-818f3880053d",
+            "label": "win",
+            "url": "/sprites/Moon/1772316532074-3ni00o.png",
+            "isAnimated": false
           }
         ],
         "createdAt": "2026-03-07T15:32:29.547Z",
-        "updatedAt": "2026-03-07T15:32:40.814Z"
+        "updatedAt": "2026-03-19T00:28:44.602Z"
       },
       {
         "id": "9df425d6-af83-4d34-9830-3a8b6fc47d42",
@@ -202,18 +192,19 @@
         "updatedAt": "2026-03-07T15:33:03.172Z"
       },
       {
-        "id": "56f83a53-4e85-464b-88bc-d4dea0a20fd1",
-        "name": "test",
+        "id": "3cca864f-331d-452c-80ab-ef811b6be2c9",
+        "name": "Test",
+        "description": "asd",
         "sprites": [
           {
-            "id": "0ab74db3-bfb5-47ff-8105-b35db2340838",
-            "label": "goth",
-            "url": "/sprites/Moon/1772325779628-igzukb.png",
-            "isAnimated": false
+            "id": "70344e8e-f4da-4aa4-abd0-a0aedf1a79e8",
+            "label": "01",
+            "url": "/sprites/Moon/1772240870166-656lst.webm",
+            "isAnimated": true
           }
         ],
-        "createdAt": "2026-03-07T15:33:32.067Z",
-        "updatedAt": "2026-03-07T15:33:39.926Z"
+        "createdAt": "2026-03-19T00:31:48.183Z",
+        "updatedAt": "2026-03-19T00:32:00.145Z"
       }
     ],
     "stateCollectionsV2": [
@@ -222,73 +213,45 @@
         "packId": "330cda65-a9c4-417f-863d-a90afcd2dfe7",
         "behavior": "principal",
         "currentIndex": 0
-      },
-      {
-        "state": "talk",
-        "packId": "9df425d6-af83-4d34-9830-3a8b6fc47d42",
-        "behavior": "principal",
-        "currentIndex": 0
       }
     ],
     "triggerCollections": [
       {
-        "id": "b6a3e7ab-420f-43c8-923d-14d6eda6aab2",
-        "name": "Testcollection",
+        "id": "3b77d994-603a-455b-bc02-04f9eba83ecf",
+        "name": "test",
         "active": true,
-        "priority": 2,
-        "packId": "56f83a53-4e85-464b-88bc-d4dea0a20fd1",
-        "collectionKey": "sprite:test",
+        "priority": 1,
+        "packId": "3cca864f-331d-452c-80ab-ef811b6be2c9",
+        "collectionKey": "sprite:test01",
         "collectionKeys": [],
         "collectionKeyRequirePipes": false,
         "collectionKeyCaseSensitive": false,
         "collectionBehavior": "principal",
-        "principalSpriteId": "5bd06b63-51b8-492b-96bc-3bec8e08fe5f",
+        "principalSpriteId": "70344e8e-f4da-4aa4-abd0-a0aedf1a79e8",
         "fallbackMode": "idle_collection",
-        "fallbackSpriteId": "90c30ffa-8f21-4155-ab1b-14d33c914c85",
-        "fallbackDelayMs": 3000,
-        "spriteChain": {
-          "enabled": false,
+        "fallbackDelayMs": 6000,
+        "soundChain": {
+          "enabled": true,
           "steps": [],
-          "loop": false,
-          "interruptible": true
+          "stopOnInterrupt": true
         },
-        "cooldownMs": 1000,
-        "spriteConfigs": {
-          "5bd06b63-51b8-492b-96bc-3bec8e08fe5f": {
-            "spriteId": "5bd06b63-51b8-492b-96bc-3bec8e08fe5f",
-            "key": "sprite:ind01",
-            "keys": [],
-            "requirePipes": false,
-            "caseSensitive": false,
-            "fallbackMode": "idle_collection",
-            "enabled": true,
-            "fallbackDelayMs": 6000
-          },
-          "90c30ffa-8f21-4155-ab1b-14d33c914c85": {
-            "spriteId": "90c30ffa-8f21-4155-ab1b-14d33c914c85",
-            "key": "sprite:ind02",
-            "keys": [],
-            "requirePipes": false,
-            "caseSensitive": false,
-            "fallbackMode": "idle_collection",
-            "enabled": true,
-            "fallbackDelayMs": 6000
-          },
-          "0ab74db3-bfb5-47ff-8105-b35db2340838": {
-            "spriteId": "0ab74db3-bfb5-47ff-8105-b35db2340838",
-            "key": "sprite:ind01",
-            "keys": [],
-            "requirePipes": false,
-            "caseSensitive": false,
-            "fallbackMode": "idle_collection",
-            "fallbackDelayMs": 6000,
-            "enabled": true
-          }
-        },
-        "createdAt": "2026-03-06T07:33:57.807Z",
-        "updatedAt": "2026-03-07T15:34:30.314Z"
+        "cooldownMs": 0,
+        "spriteConfigs": {},
+        "createdAt": "2026-03-19T06:01:26.633Z",
+        "updatedAt": "2026-03-19T06:01:26.633Z"
       }
-    ]
+    ],
+    "spriteLibraries": {
+      "actions": [
+        {
+          "id": "664dfe24-2d19-4940-a628-9e4ae258296a",
+          "name": "holi",
+          "prefix": "act-"
+        }
+      ],
+      "poses": [],
+      "clothes": []
+    }
   },
   {
     "name": "SCP-8642",

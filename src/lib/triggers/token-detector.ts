@@ -267,6 +267,10 @@ function extractHudTokens(
 
 /**
  * Parse a HUD key=value or key: value string
+ *
+ * IMPORTANT: For sprite triggers, we need to preserve the full "key:value" format
+ * as the token, so that triggers like "sprite:alegre" can match properly.
+ * The metadata still contains the separate key and value for special handling.
  */
 function parseHudKeyValue(
   text: string,
@@ -275,21 +279,24 @@ function parseHudKeyValue(
   // Try both = and : separators
   // Pattern: key=value or key: value
   const match = text.match(/^([a-zA-Z][a-zA-Z0-9_]*)\s*[:=]\s*(.+)$/);
-  
+
   if (match && match[1] && match[2]) {
     const key = match[1].trim();
     const value = match[2].trim();
-    
+    // Preserve the full "key:value" format for matching (with colon replaced for normalization)
+    // This allows triggers like "sprite:alegre" to match properly
+    const fullKeyValue = `${key}:${value}`;
+
     return {
-      token: normalizeToken(key),
-      original: key,
+      token: normalizeToken(fullKeyValue), // Normalized: "spritealegre" (colon removed)
+      original: fullKeyValue, // Original: "sprite:alegre"
       type: 'hud',
       position,
       wordPosition: 0, // Will be set by caller
       metadata: { hudKey: key, hudValue: value },
     };
   }
-  
+
   // Simple token without value
   return {
     token: normalizeToken(text),

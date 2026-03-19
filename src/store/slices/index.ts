@@ -52,3 +52,7 @@ export {
 } from './statsSlice';
 export { createQuestTemplateSlice } from './questTemplateSlice';
 export type { QuestTemplateSlice } from './questTemplateSlice';
+
+// Timeline Editor Slice (V3 - Keyframe-based sprite animation)
+export { createTimelineEditorSlice, useTimelineEditorCollections, useTimelineEditorState, useSelectedCollection, useSelectedSprite } from './timelineEditorSlice';
+export type { TimelineEditorSlice } from './timelineEditorSlice';

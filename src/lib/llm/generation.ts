@@ -22,6 +22,22 @@ export async function generateResponse(
   characterName: string
 ): Promise<GenerateResponse> {
   switch (provider) {
+    case 'test-mock': {
+      // Test mode: Return a mock response for testing without a real LLM
+      // This is useful for testing summary generation and other non-streaming operations
+      console.log('[generateResponse] Using TEST-MOCK provider');
+      const mockSummaryResponse = `The conversation covered various topics between ${characterName} and the user. Key points were discussed and decisions were made about future plans.`;
+      return {
+        content: mockSummaryResponse,
+        usage: {
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+        },
+        model: 'test-mock',
+      };
+    }
+
     case 'z-ai': {
       return callZAI(chatMessages, config.apiKey);
     }

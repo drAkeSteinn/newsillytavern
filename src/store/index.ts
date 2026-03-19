@@ -27,6 +27,7 @@ import {
   createInventorySlice,
   createStatsSlice,
   createQuestTemplateSlice,
+  createTimelineEditorSlice,
 } from './slices';
 
 // Import slice types
@@ -50,6 +51,7 @@ import type {
   InventorySlice,
   StatsSlice,
   QuestTemplateSlice,
+  TimelineEditorSlice,
 } from './slices';
 
 // Import defaults for merge function
@@ -75,7 +77,8 @@ export type TavernState = CharacterSlice &
   DialogueSlice &
   InventorySlice &
   StatsSlice &
-  QuestTemplateSlice;
+  QuestTemplateSlice &
+  TimelineEditorSlice;
 
 // Create the combined store
 export const useTavernStore = create<TavernState>()(
@@ -101,6 +104,7 @@ export const useTavernStore = create<TavernState>()(
       ...createInventorySlice(set, get),
       ...createStatsSlice(set, get),
       ...createQuestTemplateSlice(set, get),
+      ...createTimelineEditorSlice(set, get),
     }),
     {
       name: 'tavernflow-storage', // Same name for backward compatibility
@@ -124,11 +128,7 @@ export const useTavernStore = create<TavernState>()(
         backgroundIndex: state.backgroundIndex,
         lorebooks: state.lorebooks,
         activeLorebookIds: state.activeLorebookIds,
-        // Sprite data
-        spritePacks: state.spritePacks,
-        spriteIndex: state.spriteIndex,
-        spriteLibraries: state.spriteLibraries,
-        // NEW V2: Sprite Packs V2 (global templates)
+        // Sprite data (V2 system)
         spritePacksV2: state.spritePacksV2,
         // HUD data (templates only, not session state)
         hudTemplates: state.hudTemplates,
@@ -161,6 +161,8 @@ export const useTavernStore = create<TavernState>()(
         inventorySettings: state.inventorySettings,
         inventoryNotifications: state.inventoryNotifications,
         // Stats state is stored within sessions.sessionStats
+        // Timeline Editor state
+        collections: state.collections,
       }),
       merge: (persistedState: unknown, currentState) => {
         const persisted = persistedState as Record<string, unknown> | undefined;
@@ -327,4 +329,4 @@ export const useTavernStore = create<TavernState>()(
 );
 
 // Export types
-export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice, StatsSlice, QuestTemplateSlice };
+export type { CharacterSlice, SessionSlice, GroupSlice, LLMSlice, SettingsSlice, LorebookSlice, PersonaSlice, BackgroundSlice, SoundSlice, UISlice, SpriteSlice, HUDSlice, AtmosphereSlice, MemorySlice, QuestSlice, DialogueSlice, InventorySlice, StatsSlice, QuestTemplateSlice, TimelineEditorSlice };

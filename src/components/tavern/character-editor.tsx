@@ -34,33 +34,22 @@ import {
   Loader2,
   HelpCircle,
   Palette,
-  Zap,
-  Library,
   Package,
-  Bug,
-  Wand2,
-  Crown,
-  Star,
   Layers,
   Activity,
   BookOpen,
   ScrollText
 } from 'lucide-react';
-import type { CharacterCard, SpriteLibraries, CharacterVoiceSettings } from '@/types';
+import type { CharacterCard, CharacterVoiceSettings } from '@/types';
 import { DEFAULT_CHARACTER_VOICE_SETTINGS } from '@/types';
+import { SpriteCollectionSelector } from './sprite-collection-selector';
 import { SpriteManager } from './sprite-manager';
-// Legacy components removed - using V2 system now
-import { SpriteLibraryEditor } from './sprite-library-editor';
-import { SpriteDebugPanel } from './sprite-debug-panel';
-import { PresetSelector, presetToData } from './preset-selector';
 import { HUDSelector } from './hud-selector';
 import { LorebookSelector } from './lorebook-selector';
 import { QuestSelector } from './quest-selector';
 import { StatsEditor } from './stats-editor';
-import { TriggerCollectionEditor } from './trigger-collection-editor';
 import { CharacterVoicePanel } from './character-voice-panel';
 import { getLogger } from '@/lib/logger';
-import { getMigrationStatus, type MigrationStatus } from '@/lib/migration/sprite-migration';
 
 const editorLogger = getLogger('editor');
 
@@ -133,7 +122,6 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
   const [character, setCharacter] = useState(getInitialCharacter);
   const [newTag, setNewTag] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [appliedPresets, setAppliedPresets] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
@@ -203,242 +191,31 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
     }));
   };
 
-  // Get migration status
-  const migrationStatus: MigrationStatus = useMemo(() => {
-    return getMigrationStatus(character);
-  }, [character.triggerCollections, character.spritePacksV2, character.stateCollectionsV2]);
-
-  // Apply preset
-  const handleApplyPreset = (preset: { title: string; libraries?: any }) => {
-    const data = presetToData(preset);
-    
-    setCharacter(prev => {
-      // Merge libraries
-      const mergedLibraries = {
-        actions: [...(prev.spriteLibraries?.actions || []), ...data.libraries.actions],
-        poses: [...(prev.spriteLibraries?.poses || []), ...data.libraries.poses],
-        clothes: [...(prev.spriteLibraries?.clothes || []), ...data.libraries.clothes],
-      };
-      
-      // Remove duplicates by name+prefix
-      const dedupeLibraries = <T extends { name: string; prefix: string }>(arr: T[]): T[] => {
-        const seen = new Set<string>();
-        return arr.filter(item => {
-          const key = `${item.prefix}${item.name}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      };
-      
-      return {
-        ...prev,
-        spriteLibraries: {
-          actions: dedupeLibraries(mergedLibraries.actions),
-          poses: dedupeLibraries(mergedLibraries.poses),
-          clothes: dedupeLibraries(mergedLibraries.clothes),
-        },
-      };
-    });
-    
-    setAppliedPresets(prev => [...prev, preset.title]);
-  };
-
   return (
     <TooltipProvider>
       <div className="space-y-4 h-full flex flex-col">
-        {/* Header: Avatar + Name + Tags - Diseño mejorado */}
-        <div className="flex gap-4 flex-shrink-0">
-          {/* Avatar */}
-          <div className="relative group flex-shrink-0">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div 
-                  className={cn(
-                    "w-28 h-28 rounded-lg overflow-hidden bg-muted border-2 border-dashed border-muted-foreground/25 flex items-center justify-center transition-colors",
-                    !uploading && "cursor-pointer hover:border-primary/50 hover:bg-muted/50"
-                  )}
-                  onClick={() => !uploading && fileInputRef.current?.click()}
-                >
-                  {uploading ? (
-                    <div className="text-center text-muted-foreground">
-                      <Loader2 className="w-6 h-6 mx-auto animate-spin" />
-                      <span className="text-xs mt-1">Subiendo...</span>
-                    </div>
-                  ) : character.avatar ? (
-                    <img 
-                      src={character.avatar} 
-                      alt={character.name || 'Avatar'}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center text-muted-foreground">
-                      <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
-                      <span className="text-[10px]">Avatar</span>
-                    </div>
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Haz clic para subir una imagen de avatar</p>
-              </TooltipContent>
-            </Tooltip>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/*"
-              onChange={handleAvatarUpload}
-              disabled={uploading}
-            />
-          </div>
-
-          {/* Name & Tags - Diseño mejorado con secciones */}
-          <div className="flex-1 space-y-3">
-            {/* Sección: Información básica */}
-            <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                <Palette className="w-3.5 h-3.5" />
-                <span className="font-medium">Información Básica</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Label htmlFor="name" className="text-xs">Nombre *</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>El nombre del personaje que se mostrará en el chat.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="name"
-                    value={character.name}
-                    onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Nombre del personaje"
-                    className="h-8"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Label className="text-xs">Etiquetas</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Tags para organizar y buscar personajes.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <Input
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      placeholder="Agregar..."
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                      className="h-8 flex-1"
-                    />
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleAddTag}>
-                      <Plus className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {character.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {character.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="gap-1 text-xs py-0.5 px-2">
-                      {tag}
-                      <X 
-                        className="w-3 h-3 cursor-pointer opacity-60 hover:opacity-100" 
-                        onClick={() => handleRemoveTag(tag)}
-                      />
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sección: Asignaciones */}
-            <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <Package className="w-3.5 h-3.5" />
-                <span className="font-medium">Asignaciones</span>
-              </div>
-              
-              {/* HUD Selector */}
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Layers className="w-3.5 h-3.5 text-cyan-500" />
-                  <Label className="text-xs">Plantilla HUD</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Selecciona una plantilla HUD para mostrar estadísticas del personaje.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <HUDSelector
-                  value={character.hudTemplateId}
-                  onChange={(hudTemplateId) => setCharacter(prev => ({ ...prev, hudTemplateId }))}
-                  placeholder="Sin HUD asignado"
-                />
-              </div>
-
-              {/* Lorebook Selector */}
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <BookOpen className="w-3.5 h-3.5 text-amber-500" />
-                  <Label className="text-xs">Lorebooks</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Lorebooks asociados con información adicional del personaje.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <LorebookSelector
-                  value={character.lorebookIds}
-                  onChange={(lorebookIds) => setCharacter(prev => ({ ...prev, lorebookIds }))}
-                  placeholder="Sin lorebooks asignados"
-                />
-              </div>
-
-              {/* Quest Templates Selector */}
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <ScrollText className="w-3.5 h-3.5 text-purple-500" />
-                  <Label className="text-xs">Misiones</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Templates de misiones disponibles para este personaje.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <QuestSelector
-                  value={character.questTemplateIds}
-                  onChange={(questTemplateIds) => setCharacter(prev => ({ ...prev, questTemplateIds }))}
-                  placeholder="Sin misiones asignadas"
-                />
-              </div>
-            </div>
+        {/* Compact Header - Only character name */}
+        <div className="flex items-center justify-between flex-shrink-0 px-1">
+          <h2 className="text-lg font-semibold truncate">
+            {character.name || 'Nuevo Personaje'}
+          </h2>
+          <div className="text-xs text-muted-foreground">
+            {characterId ? 'Editando' : 'Creando'}
           </div>
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="description" className="flex-1 flex flex-col min-h-0">
+        <Tabs defaultValue="info" className="flex-1 flex flex-col min-h-0">
           <TabsList className="grid grid-cols-7 w-full flex-shrink-0 h-9">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="info" className="text-xs gap-1">
+                  <Palette className="w-3.5 h-3.5" />
+                  Información
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Avatar, información básica y asignaciones del personaje</p></TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <TabsTrigger value="description" className="text-xs gap-1">
@@ -469,20 +246,11 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
             <Tooltip>
               <TooltipTrigger asChild>
                 <TabsTrigger value="sprites" className="text-xs gap-1">
-                  <ImageIcon className="w-3.5 h-3.5" />
+                  <Layers className="w-3.5 h-3.5" />
                   Sprites
                 </TabsTrigger>
               </TooltipTrigger>
-              <TooltipContent><p>Colecciones de sprites para estados (idle, talk, thinking)</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger value="triggers" className="text-xs gap-1">
-                  <Zap className="w-3.5 h-3.5" />
-                  Triggers
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent><p>Cambia sprites automáticamente según palabras clave</p></TooltipContent>
+              <TooltipContent><p>Sprite Packs, Estados y Triggers del personaje</p></TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -505,6 +273,246 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
           </TabsList>
 
           <ScrollArea className="flex-1 mt-3">
+            {/* Info Tab - Avatar, Basic Info, Assignments */}
+            <TabsContent value="info" className="mt-0">
+              <div className="space-y-4">
+                {/* Info Banner */}
+                <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Palette className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-blue-600">Información del Personaje</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Configura el <strong>avatar</strong>, <strong>información básica</strong> y <strong>asignaciones</strong> del personaje.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  {/* Avatar Section */}
+                  <div className="flex-shrink-0">
+                    <div className="relative group">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div 
+                            className={cn(
+                              "w-32 h-32 rounded-lg overflow-hidden bg-muted border-2 border-dashed border-muted-foreground/25 flex items-center justify-center transition-colors",
+                              !uploading && "cursor-pointer hover:border-primary/50 hover:bg-muted/50"
+                            )}
+                            onClick={() => !uploading && fileInputRef.current?.click()}
+                          >
+                            {uploading ? (
+                              <div className="text-center text-muted-foreground">
+                                <Loader2 className="w-6 h-6 mx-auto animate-spin" />
+                                <span className="text-xs mt-1">Subiendo...</span>
+                              </div>
+                            ) : character.avatar ? (
+                              <img 
+                                src={character.avatar} 
+                                alt={character.name || 'Avatar'}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="text-center text-muted-foreground">
+                                <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
+                                <span className="text-[10px]">Avatar</span>
+                              </div>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Haz clic para subir una imagen de avatar</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        disabled={uploading}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Name & Tags */}
+                  <div className="flex-1 space-y-3">
+                    {/* Sección: Información básica */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                        <Palette className="w-3.5 h-3.5" />
+                        <span className="font-medium">Información Básica</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Label htmlFor="name" className="text-xs">Nombre *</Label>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>El nombre del personaje que se mostrará en el chat.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <Input
+                            id="name"
+                            value={character.name}
+                            onChange={(e) => setCharacter(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="Nombre del personaje"
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Label className="text-xs">Etiquetas</Label>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>Tags para organizar y buscar personajes.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <Input
+                              value={newTag}
+                              onChange={(e) => setNewTag(e.target.value)}
+                              placeholder="Agregar..."
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                              className="h-8 flex-1"
+                            />
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleAddTag}>
+                              <Plus className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      {character.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {character.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="gap-1 text-xs py-0.5 px-2">
+                              {tag}
+                              <X 
+                                className="w-3 h-3 cursor-pointer opacity-60 hover:opacity-100" 
+                                onClick={() => handleRemoveTag(tag)}
+                              />
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sección: Asignaciones */}
+                    <div className="p-3 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <Package className="w-3.5 h-3.5" />
+                        <span className="font-medium">Asignaciones</span>
+                      </div>
+                      
+                      {/* HUD Selector */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                          <Label className="text-xs">Plantilla HUD</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Selecciona una plantilla HUD para mostrar estadísticas del personaje.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <HUDSelector
+                          value={character.hudTemplateId}
+                          onChange={(hudTemplateId) => setCharacter(prev => ({ ...prev, hudTemplateId }))}
+                          placeholder="Sin HUD asignado"
+                        />
+                      </div>
+
+                      {/* Sprite Collection Selector */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <ImageIcon className="w-3.5 h-3.5 text-purple-500" />
+                          <Label className="text-xs">Colección de Sprites</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Selecciona la colección de sprites que usará este personaje. Las colecciones se gestionan en Sprite Timeline.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <SpriteCollectionSelector
+                          value={character.spriteConfig?.collection}
+                          onChange={(collectionName) => setCharacter(prev => ({ 
+                            ...prev, 
+                            spriteConfig: { 
+                              ...prev.spriteConfig, 
+                              enabled: true,
+                              collection: collectionName,
+                              sprites: prev.spriteConfig?.sprites || {},
+                              stateCollections: prev.spriteConfig?.stateCollections || {}
+                            } 
+                          }))}
+                          placeholder="Sin colección asignada"
+                        />
+                      </div>
+
+                      {/* Lorebook Selector */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                          <Label className="text-xs">Lorebooks</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Lorebooks asociados con información adicional del personaje.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <LorebookSelector
+                          value={character.lorebookIds}
+                          onChange={(lorebookIds) => setCharacter(prev => ({ ...prev, lorebookIds }))}
+                          placeholder="Sin lorebooks asignados"
+                        />
+                      </div>
+
+                      {/* Quest Templates Selector */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <ScrollText className="w-3.5 h-3.5 text-purple-500" />
+                          <Label className="text-xs">Misiones</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Templates de misiones disponibles para este personaje.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <QuestSelector
+                          value={character.questTemplateIds}
+                          onChange={(questTemplateIds) => setCharacter(prev => ({ ...prev, questTemplateIds }))}
+                          placeholder="Sin misiones asignadas"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
             {/* Description Tab - Diseño mejorado con secciones */}
             <TabsContent value="description" className="mt-0">
               <div className="space-y-4">
@@ -806,160 +814,11 @@ export function CharacterEditor({ characterId, onClose }: CharacterEditorProps) 
             </TabsContent>
 
             {/* Sprites Tab */}
-            <TabsContent value="sprites" className="mt-0 space-y-3">
-              {/* Explanation Banner */}
-              <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-lg p-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-purple-500/20 rounded-lg">
-                    <ImageIcon className="w-5 h-5 text-purple-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-medium text-purple-600">Sistema de Colecciones de Sprites</h4>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Los estados <strong>Idle, Talk y Thinking</strong> ahora son colecciones de sprites. 
-                      Agrega sprites personalizados y define cuál es el principal y cuáles son alternativos.
-                    </p>
-                    <div className="flex gap-2 mt-2">
-                      <Badge variant="outline" className="text-xs bg-amber-500/10">
-                        <Crown className="w-3 h-3 mr-1 text-amber-500" />
-                        Principal
-                      </Badge>
-                      <Badge variant="outline" className="text-xs bg-blue-500/10">
-                        <Star className="w-3 h-3 mr-1 text-blue-500" />
-                        Alternativos
-                      </Badge>
-                      <Badge variant="outline" className="text-xs bg-green-500/10">
-                        Principal/Aleatorio/Lista
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
+            <TabsContent value="sprites" className="mt-0">
               <SpriteManager
                 character={character}
                 onChange={(updates) => setCharacter(prev => ({ ...prev, ...updates }))}
               />
-            </TabsContent>
-
-            {/* Triggers Tab - Sub-tabs for Collections, Libraries, Presets, Debug */}
-            <TabsContent value="triggers" className="mt-0 space-y-3">
-              {/* Explanation Banner */}
-              <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg p-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-amber-500/20 rounded-lg">
-                    <Zap className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-sm font-medium text-amber-600">Sistema de Triggers Dinámicos</h4>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Los triggers detectan <strong>palabras clave</strong> en el chat y cambian el sprite automáticamente. 
-                      Funcionan junto con el sistema de Sprites estáticos.
-                    </p>
-                    {/* V2 status indicator */}
-                    {migrationStatus.hasV2Data && (
-                      <div className="flex gap-2 mt-2 mb-1">
-                        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600">
-                          <Layers className="w-3 h-3 mr-1" />
-                          V2 Activo ({migrationStatus.v2Collections} coll, {migrationStatus.v2Packs} packs)
-                        </Badge>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-4 gap-2 mt-2 text-xs">
-                      <div className="p-1.5 bg-purple-500/10 rounded text-center">
-                        <Layers className="w-3 h-3 mx-auto text-purple-500" />
-                        <span className="block mt-0.5">Collections</span>
-                        <span className="text-muted-foreground">Triggers V2</span>
-                      </div>
-                      <div className="p-1.5 bg-blue-500/10 rounded text-center">
-                        <Library className="w-3 h-3 mx-auto text-blue-500" />
-                        <span className="block mt-0.5">Libraries</span>
-                        <span className="text-muted-foreground">act-*</span>
-                      </div>
-                      <div className="p-1.5 bg-pink-500/10 rounded text-center">
-                        <Wand2 className="w-3 h-3 mx-auto text-pink-500" />
-                        <span className="block mt-0.5">Presets</span>
-                        <span className="text-muted-foreground">config</span>
-                      </div>
-                      <div className="p-1.5 bg-cyan-500/10 rounded text-center">
-                        <Bug className="w-3 h-3 mx-auto text-cyan-500" />
-                        <span className="block mt-0.5">Debug</span>
-                        <span className="text-muted-foreground">test</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <Tabs defaultValue="collections" className="w-full">
-                <TabsList className="grid grid-cols-4 w-full">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger value="collections" className="text-xs gap-1 bg-purple-500/5">
-                        <Layers className="w-3.5 h-3.5 text-purple-500" />
-                        Collections
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Sistema de Trigger Collections con prioridades y cadenas</p></TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger value="libraries" className="text-xs gap-1">
-                        <Library className="w-3.5 h-3.5" />
-                        Libraries
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Define acciones (act-wave), posturas (pose-sitting), ropa (cloth-casual)</p></TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger value="presets" className="text-xs gap-1">
-                        <Wand2 className="w-3.5 h-3.5" />
-                        Presets
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Configuraciones predefinidas para comenzar rápido</p></TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger value="debug" className="text-xs gap-1">
-                        <Bug className="w-3.5 h-3.5" />
-                        Debug
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Prueba la detección de tokens en tiempo real</p></TooltipContent>
-                  </Tooltip>
-                </TabsList>
-
-                {/* Trigger Collections V2 */}
-                <TabsContent value="collections" className="mt-0">
-                  <TriggerCollectionEditor
-                    character={character}
-                    onChange={(updates) => setCharacter(prev => ({ ...prev, ...updates }))}
-                  />
-                </TabsContent>
-
-                {/* Sprite Libraries */}
-                <TabsContent value="libraries" className="mt-0">
-                  <SpriteLibraryEditor
-                    libraries={character.spriteLibraries || { actions: [], poses: [], clothes: [] }}
-                    onChange={(libraries: SpriteLibraries) => setCharacter(prev => ({ ...prev, spriteLibraries: libraries }))}
-                  />
-                </TabsContent>
-
-                {/* Presets */}
-                <TabsContent value="presets" className="mt-0">
-                  <PresetSelector
-                    onApplyPreset={handleApplyPreset}
-                    appliedPresets={appliedPresets}
-                  />
-                </TabsContent>
-
-                {/* Debug Panel */}
-                <TabsContent value="debug" className="mt-0">
-                  <SpriteDebugPanel />
-                </TabsContent>
-              </Tabs>
             </TabsContent>
 
             {/* Stats Tab */}

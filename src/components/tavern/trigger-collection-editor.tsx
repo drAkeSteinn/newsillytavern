@@ -48,6 +48,8 @@ import {
   Volume2,
   ArrowRight,
   Info,
+  TestTube,
+  CheckCircle,
 } from 'lucide-react';
 import type { 
   CharacterCard,
@@ -59,6 +61,7 @@ import type {
   TriggerFallbackMode,
 } from '@/types';
 import { SpritePreview } from './sprite-preview';
+import { useTavernStore } from '@/store';
 const uuidv4 = () => crypto.randomUUID();
 import { getLogger } from '@/lib/logger';
 
@@ -132,9 +135,15 @@ export function TriggerCollectionEditor({
     return character.spritePacksV2 || [];
   }, [character.spritePacksV2]);
 
+  // Store actions for testing
+  const applyTriggerForCharacter = useTavernStore((state) => state.applyTriggerForCharacter);
+  const scheduleReturnToIdleForCharacter = useTavernStore((state) => state.scheduleReturnToIdleForCharacter);
+  const cancelReturnToIdleForCharacter = useTavernStore((state) => state.cancelReturnToIdleForCharacter);
+
   // State
   const [showEditor, setShowEditor] = useState(false);
   const [editingCollection, setEditingCollection] = useState<TriggerCollection | null>(null);
+  const [testingCollectionId, setTestingCollectionId] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     keys: true,
     behavior: true,
@@ -148,6 +157,105 @@ export function TriggerCollectionEditor({
     onChange({
       triggerCollections: newCollections,
     });
+  };
+
+  // Test trigger - Apply the trigger sprite to the character
+  const handleTestTrigger = (collection: TriggerCollection) => {
+    const pack = spritePacksV2.find(p => p.id === collection.packId);
+    if (!pack || pack.sprites.length === 0) {
+      logger.warn('Cannot test: no sprites in pack', { collectionId: collection.id });
+      return;
+    }
+
+    // Get the sprite to show based on behavior
+    let sprite;
+    switch (collection.collectionBehavior) {
+      case 'random':
+        const randomIndex = Math.floor(Math.random() * pack.sprites.length);
+        sprite = pack.sprites[randomIndex];
+        break;
+      case 'principal':
+      case 'list':
+      default:
+        sprite = collection.principalSpriteId 
+          ? pack.sprites.find(s => s.id === collection.principalSpriteId)
+          : pack.sprites[0];
+        break;
+    }
+
+    if (!sprite) {
+      logger.warn('Cannot test: no sprite found', { collectionId: collection.id });
+      return;
+    }
+
+    // Mark as testing
+    setTestingCollectionId(collection.id);
+    logger.info('Testing trigger', { 
+      collectionId: collection.id, 
+      spriteUrl: sprite.url,
+      spriteLabel: sprite.label 
+    });
+
+    // Apply the trigger sprite
+    applyTriggerForCharacter(character.id, {
+      spriteUrl: sprite.url,
+      spriteLabel: sprite.label,
+      returnToIdleMs: collection.fallbackDelayMs,
+      packId: collection.packId,
+      collectionId: collection.id,
+      useTimelineSounds: collection.useTimelineSounds ?? false,
+    });
+
+    // Note: Timeline sounds are now handled by useTimelineSpriteSounds hook
+    // which watches for triggerSpriteUrl changes and checks useTimelineSounds
+
+    // Schedule fallback if configured
+    if (collection.fallbackDelayMs > 0) {
+      // Get fallback sprite based on mode
+      let fallbackSpriteUrl: string | null = null;
+      let returnToMode: 'idle' | 'talk' | 'thinking' | 'clear' = 'idle';
+
+      if (collection.fallbackMode === 'custom_sprite' && collection.fallbackSpriteId) {
+        const fallbackSprite = pack.sprites.find(s => s.id === collection.fallbackSpriteId);
+        fallbackSpriteUrl = fallbackSprite?.url || null;
+        returnToMode = 'idle'; // Apply the custom sprite
+      } else if (collection.fallbackMode === 'collection_default') {
+        const principalSprite = collection.principalSpriteId
+          ? pack.sprites.find(s => s.id === collection.principalSpriteId)
+          : pack.sprites[0];
+        fallbackSpriteUrl = principalSprite?.url || null;
+        returnToMode = 'idle'; // Apply the collection default sprite
+      } else if (collection.fallbackMode === 'idle_collection') {
+        // For 'idle_collection', clear the trigger and let the normal state logic
+        // (idle state from State Collections V2) determine what to show
+        returnToMode = 'clear';
+        // fallbackSpriteUrl can be empty for 'clear' mode
+        fallbackSpriteUrl = '';
+      }
+
+      // Always schedule fallback when delay > 0
+      // For 'clear' mode, the empty string is fine (won't be used)
+      scheduleReturnToIdleForCharacter(
+        character.id,
+        sprite.url,
+        returnToMode,
+        fallbackSpriteUrl || '',
+        sprite.label,
+        collection.fallbackDelayMs
+      );
+
+      logger.info('Test trigger: fallback scheduled', {
+        collectionId: collection.id,
+        fallbackMode: collection.fallbackMode,
+        returnToMode,
+        fallbackDelayMs: collection.fallbackDelayMs,
+      });
+    }
+
+    // Clear testing indicator after a delay
+    setTimeout(() => {
+      setTestingCollectionId(null);
+    }, 1000);
   };
 
   // Create new collection
@@ -169,7 +277,7 @@ export function TriggerCollectionEditor({
       fallbackSpriteId: undefined,
       fallbackDelayMs: 3000,
       spriteChain: undefined,
-      soundChain: undefined,
+      useTimelineSounds: false,
       cooldownMs: 1000,
       spriteConfigs: {},
       createdAt: now,
@@ -428,7 +536,7 @@ export function TriggerCollectionEditor({
                       </div>
 
                       {/* Chain indicators */}
-                      {(collection.spriteChain?.enabled || collection.soundChain?.enabled) && (
+                      {(collection.spriteChain?.enabled || collection.useTimelineSounds) && (
                         <div className="flex gap-2">
                           {collection.spriteChain?.enabled && (
                             <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-600">
@@ -436,10 +544,10 @@ export function TriggerCollectionEditor({
                               Sprite Chain ({collection.spriteChain.steps.length} steps)
                             </Badge>
                           )}
-                          {collection.soundChain?.enabled && (
-                            <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">
+                          {collection.useTimelineSounds && (
+                            <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600">
                               <Volume2 className="w-3 h-3 mr-1" />
-                              Sound Chain ({collection.soundChain.steps.length} steps)
+                              Timeline Sounds
                             </Badge>
                           )}
                         </div>
@@ -454,7 +562,32 @@ export function TriggerCollectionEditor({
                       )}
 
                       {/* Actions */}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {/* Test Button */}
+                        <Button
+                          variant={testingCollectionId === collection.id ? "default" : "outline"}
+                          size="sm"
+                          className={cn(
+                            "h-7",
+                            testingCollectionId === collection.id 
+                              ? "bg-green-500 hover:bg-green-600 text-white" 
+                              : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                          )}
+                          onClick={() => handleTestTrigger(collection)}
+                          disabled={!spritePacksV2.find(p => p.id === collection.packId)?.sprites?.length}
+                        >
+                          {testingCollectionId === collection.id ? (
+                            <>
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                              Aplicado
+                            </>
+                          ) : (
+                            <>
+                              <TestTube className="w-3.5 h-3.5 mr-1" />
+                              Test
+                            </>
+                          )}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1057,132 +1190,29 @@ function TriggerCollectionEditorForm({
         )}
       </div>
 
-      {/* Sound Chains */}
+      {/* Timeline Sounds */}
       <div className="space-y-3 p-4 border rounded-lg bg-green-500/5 border-green-500/20">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium flex items-center gap-2 text-green-600">
-            <Volume2 className="w-4 h-4" />
-            Sound Chain
-          </h4>
+          <div>
+            <h4 className="text-sm font-medium flex items-center gap-2 text-green-600">
+              <Volume2 className="w-4 h-4" />
+              Timeline Sounds
+            </h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              Cuando está activado, reproduce los sonidos configurados en el timeline del sprite.
+            </p>
+          </div>
           <Switch
-            checked={collection.soundChain?.enabled ?? false}
-            onCheckedChange={(enabled) => updateField('soundChain', {
-              ...collection.soundChain,
-              enabled,
-              steps: collection.soundChain?.steps || [],
-              stopOnInterrupt: collection.soundChain?.stopOnInterrupt ?? true,
-            })}
+            checked={collection.useTimelineSounds ?? false}
+            onCheckedChange={(useTimelineSounds) => updateField('useTimelineSounds', useTimelineSounds)}
           />
         </div>
-        
-        {collection.soundChain?.enabled && (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Secuencia de sonidos que se reproducen junto con los sprites.
-            </p>
-            
-            <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border">
-              <div>
-                <Label className="text-xs font-medium">Detener al Interrumpir</Label>
-                <p className="text-[10px] text-muted-foreground">
-                  Detiene los sonidos si el trigger es interrumpido
-                </p>
-              </div>
-              <Switch
-                checked={collection.soundChain?.stopOnInterrupt ?? true}
-                onCheckedChange={(stopOnInterrupt) => updateField('soundChain', {
-                  ...collection.soundChain!,
-                  stopOnInterrupt,
-                })}
-              />
-            </div>
 
-            <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-              <Info className="w-3 h-3 inline mr-1" />
-              Los sonidos se configuran referenciando triggers de sonido existentes por su key.
-            </p>
-
-            {/* Sound Steps */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Steps ({collection.soundChain?.steps.length || 0})</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-xs"
-                  onClick={() => {
-                    const steps = collection.soundChain?.steps || [];
-                    const newStep = {
-                      soundTriggerKey: '',
-                      soundUrl: undefined,
-                      delayMs: 0,
-                      volume: 1,
-                    };
-                    updateField('soundChain', {
-                      ...collection.soundChain!,
-                      steps: [...steps, newStep],
-                    });
-                  }}
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Agregar Sonido
-                </Button>
-              </div>
-              
-              <ScrollArea className="h-24">
-                <div className="space-y-1 pr-2">
-                  {(collection.soundChain?.steps || []).map((step, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2 p-2 bg-background rounded border"
-                    >
-                      <Volume2 className="w-4 h-4 text-green-500" />
-                      <Input
-                        value={step.soundTriggerKey}
-                        onChange={(e) => {
-                          const newSteps = [...(collection.soundChain?.steps || [])];
-                          newSteps[index] = { ...newSteps[index], soundTriggerKey: e.target.value };
-                          updateField('soundChain', {
-                            ...collection.soundChain!,
-                            steps: newSteps,
-                          });
-                        }}
-                        placeholder="Key del sonido"
-                        className="h-7 flex-1 font-mono text-sm"
-                      />
-                      <Input
-                        type="number"
-                        value={step.delayMs}
-                        onChange={(e) => {
-                          const newSteps = [...(collection.soundChain?.steps || [])];
-                          newSteps[index] = { ...newSteps[index], delayMs: parseInt(e.target.value) || 0 };
-                          updateField('soundChain', {
-                            ...collection.soundChain!,
-                            steps: newSteps,
-                          });
-                        }}
-                        className="h-7 w-16"
-                        placeholder="delay"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-destructive"
-                        onClick={() => {
-                          const newSteps = (collection.soundChain?.steps || []).filter((_, i) => i !== index);
-                          updateField('soundChain', {
-                            ...collection.soundChain!,
-                            steps: newSteps,
-                          });
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
+        {collection.useTimelineSounds && (
+          <div className="text-xs bg-muted/30 p-3 rounded-lg">
+            <Info className="w-3 h-3 inline mr-1" />
+            Los sonidos se configuran en cada sprite individual del Sprite Pack.
+            Asegúrate de que los sprites tengan configurado su timeline con tracks de sonido.
           </div>
         )}
       </div>

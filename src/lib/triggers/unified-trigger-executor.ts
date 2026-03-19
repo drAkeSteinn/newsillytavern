@@ -268,7 +268,8 @@ function executeSpriteTriggerForCharacter(
     if (fallbackDelayMs && fallbackDelayMs > 0) {
       let returnSpriteUrl: string | null = null;
       let returnSpriteLabel: string | null = null;
-      
+      let returnToMode: 'idle' | 'talk' | 'thinking' | 'clear' = 'idle';
+
       if (fallbackMode === 'custom_sprite' && fallbackSpriteId && packId) {
         // Find fallback sprite in pack
         const pack = character.spritePacksV2?.find(p => p.id === packId);
@@ -276,11 +277,14 @@ function executeSpriteTriggerForCharacter(
         if (fallbackSprite) {
           returnSpriteUrl = fallbackSprite.url;
           returnSpriteLabel = fallbackSprite.label;
+          returnToMode = 'idle'; // Apply the custom sprite
         }
       } else if (fallbackMode === 'idle_collection') {
-        // Get idle sprite
-        returnSpriteUrl = getIdleSpriteUrl();
-        returnSpriteLabel = 'idle';
+        // For 'idle_collection', use 'clear' mode to let the normal state logic
+        // (idle state from State Collections V2) determine what to show
+        returnToMode = 'clear';
+        returnSpriteUrl = ''; // Empty is fine for 'clear' mode
+        returnSpriteLabel = null;
       } else if (fallbackMode === 'collection_default' && packId) {
         // Use collection's principal sprite or first sprite
         const pack = character.spritePacksV2?.find(p => p.id === packId);
@@ -291,36 +295,40 @@ function executeSpriteTriggerForCharacter(
           if (principalSprite) {
             returnSpriteUrl = principalSprite.url;
             returnSpriteLabel = principalSprite.label;
+            returnToMode = 'idle'; // Apply the collection default sprite
           }
         }
         if (!returnSpriteUrl) {
-          returnSpriteUrl = getIdleSpriteUrl();
-          returnSpriteLabel = 'idle';
+          // Fallback to 'clear' mode if no sprite found
+          returnToMode = 'clear';
+          returnSpriteUrl = '';
+          returnSpriteLabel = null;
         }
       } else {
-        // Default fallback: use idle sprite
-        returnSpriteUrl = getIdleSpriteUrl();
-        returnSpriteLabel = 'idle';
+        // Default fallback: use 'clear' mode
+        returnToMode = 'clear';
+        returnSpriteUrl = '';
+        returnSpriteLabel = null;
       }
-      
-      if (returnSpriteUrl) {
-        console.log(`[UnifiedTriggerExecutor] Scheduling fallback for sprite:`, {
-          characterId: character.id,
-          fallbackMode,
-          fallbackDelayMs,
-          returnSpriteUrl,
-          returnSpriteLabel,
-        });
-        
-        storeActions.scheduleReturnToIdleForCharacter(
-          character.id,
-          spriteUrl,
-          'idle',  // Apply the return sprite
-          returnSpriteUrl,
-          returnSpriteLabel,
-          fallbackDelayMs
-        );
-      }
+
+      console.log(`[UnifiedTriggerExecutor] Scheduling fallback for sprite:`, {
+        characterId: character.id,
+        fallbackMode,
+        fallbackDelayMs,
+        returnToMode,
+        returnSpriteUrl: returnSpriteUrl || '(clear mode)',
+        returnSpriteLabel,
+      });
+
+      // Always schedule fallback when delay > 0
+      storeActions.scheduleReturnToIdleForCharacter(
+        character.id,
+        spriteUrl,
+        returnToMode,
+        returnSpriteUrl || '',
+        returnSpriteLabel,
+        fallbackDelayMs
+      );
     }
     
     return {

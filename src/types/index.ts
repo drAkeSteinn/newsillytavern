@@ -105,20 +105,6 @@ export interface AtmosphereTriggerHit {
 
 // ============ Sprite System Types (V2) ============
 
-// Sprite Library Entry - reusable action/pose/clothes definitions
-export interface SpriteLibraryEntry {
-  id: string;
-  name: string;              // Display name (e.g., "wave", "sitting", "casual")
-  prefix: string;            // Key prefix (e.g., "act-", "pose-", "cloth-")
-}
-
-// Sprite Libraries collection
-export interface SpriteLibraries {
-  actions: SpriteLibraryEntry[];
-  poses: SpriteLibraryEntry[];
-  clothes: SpriteLibraryEntry[];
-}
-
 // Sprite Index Entry - available sprites from filesystem
 export interface SpriteIndexEntry {
   label: string;             // Unique label for this sprite
@@ -153,6 +139,7 @@ export interface SpriteTriggerHit {
   returnToIdleMs?: number;
   cooldownMs?: number;
   score?: number;
+  useTimelineSounds?: boolean;  // Whether to play timeline sounds for this sprite
 }
 
 // ============================================
@@ -170,6 +157,10 @@ export interface SpritePackEntryV2 {
   thumbnail?: string;        // Preview thumbnail
   tags?: string[];           // For filtering/searching
   isAnimated?: boolean;      // Is GIF/WebM
+
+  // Timeline data for sounds (optional)
+  // When configured, sounds will play when this sprite is activated
+  timeline?: SpriteTimelineData;
 }
 
 /**
@@ -270,22 +261,24 @@ export type TriggerFallbackMode = 'idle_collection' | 'custom_sprite' | 'collect
  */
 export interface SpriteTriggerConfig {
   spriteId: string;
-  
+
   // Keys for activation
   key: string;                     // Primary key
   keys?: string[];                 // Alternative keys
   requirePipes: boolean;
   caseSensitive: boolean;
-  
+
   // Fallback configuration
   fallbackMode: TriggerFallbackMode;
   fallbackSpriteId?: string;       // For 'custom_sprite' mode
   fallbackDelayMs?: number;        // Override collection default
-  
-  // Chains for this sprite
+
+  // Sprite chain for animation sequences
   spriteChain?: SpriteChain;
-  soundChain?: SoundChain;
-  
+
+  // Timeline sounds - When enabled, plays sounds configured in sprite's timeline
+  useTimelineSounds: boolean;      // Default: false
+
   // Enable/disable this sprite config
   enabled: boolean;
 }
@@ -298,35 +291,38 @@ export interface TriggerCollection {
   name: string;
   active: boolean;
   priority: number;                // Higher = more important (default: 1)
-  
+
   // Reference to sprite pack
   packId: string;
-  
+
   // Collection-level key activation
   collectionKey: string;           // Main key that activates collection
   collectionKeys?: string[];       // Alternative keys
   collectionKeyRequirePipes?: boolean;
   collectionKeyCaseSensitive?: boolean;
-  
+
   // Behavior when activated by collection key
   collectionBehavior: 'principal' | 'random' | 'list';
   principalSpriteId?: string;      // For 'principal' mode
-  
+
   // Default fallback (used if sprite config doesn't override)
   fallbackMode: TriggerFallbackMode;
   fallbackSpriteId?: string;
   fallbackDelayMs: number;         // 0 = persist forever
-  
-  // Default chains (used if sprite config doesn't override)
+
+  // Sprite chain for animation sequences
   spriteChain?: SpriteChain;
-  soundChain?: SoundChain;
-  
+
+  // Timeline sounds - When enabled, plays sounds configured in sprite's timeline
+  // This is the default for the collection, individual sprite configs can override
+  useTimelineSounds: boolean;      // Default: false
+
   // Cooldown
   cooldownMs: number;
-  
+
   // Individual sprite configurations
   spriteConfigs: Record<string, SpriteTriggerConfig>;
-  
+
   // Metadata
   createdAt: string;
   updatedAt: string;
@@ -412,7 +408,6 @@ export interface CharacterCard {
   spritePacksV2?: SpritePackV2[];           // Packs of sprites (containers)
   stateCollectionsV2?: StateCollectionV2[];  // State collections (idle/talk/thinking)
   triggerCollections?: TriggerCollection[];  // Trigger collections
-  spriteLibraries?: SpriteLibraries;         // Reusable action/pose/clothes definitions
   spriteIndex?: SpriteIndex;                 // Cached sprite file index
   
   voice: CharacterVoiceSettings | null;
@@ -3313,4 +3308,328 @@ export const createDefaultTriggerQueueState = (): TriggerQueueState => ({
   queue: [],
   active: null,
   maxQueueSize: 5,
+});
+
+// ============================================
+// SPRITE TIMELINE EDITOR SYSTEM (V3)
+// ============================================
+
+/**
+ * Sprite Timeline Editor - A new system for creating animated sprites
+ * with keyframe-based sound triggers and multiple tracks.
+ * 
+ * This is a standalone system that will eventually replace parts of
+ * the character sprite system.
+ */
+
+// Supported sprite animation formats
+export type SpriteAnimationFormat = 'webm' | 'mp4' | 'gif' | 'webp' | 'png' | 'jpg';
+
+// Track type for timeline
+export type TimelineTrackType = 'sprite' | 'sound' | 'effect';
+
+// Keyframe interpolation type
+export type KeyframeInterpolation = 'hold' | 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+
+// Playhead state
+export type PlayheadState = 'stopped' | 'playing' | 'paused';
+
+/**
+ * Sprite Timeline Collection - A collection of animated sprites
+ * Similar to a folder/pack concept
+ */
+export interface SpriteTimelineCollection {
+  id: string;
+  name: string;
+  description?: string;
+  sprites: TimelineSprite[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Timeline Sprite - Individual sprite with timeline data
+ */
+export interface TimelineSprite {
+  id: string;
+  label: string;
+  url: string;
+  thumbnail?: string;
+  
+  // Animation metadata (auto-detected or manual)
+  format: SpriteAnimationFormat;
+  duration: number;              // Duration in milliseconds (auto-detected for videos)
+  width?: number;
+  height?: number;
+  fps?: number;                  // For video formats
+  hasAudio?: boolean;            // If the video contains audio
+  
+  // Timeline data
+  timeline: SpriteTimelineData;
+  
+  // Trigger configuration
+  triggerKeys: string[];         // Keywords that activate this sprite
+  triggerRequirePipes: boolean;
+  triggerCaseSensitive: boolean;
+  
+  // Metadata
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Sprite Timeline Data - The actual timeline with tracks and keyframes
+ */
+export interface SpriteTimelineData {
+  duration: number;              // Total duration in ms (usually matches sprite duration)
+  tracks: TimelineTrack[];
+  markers: TimelineMarker[];
+  
+  // Playback settings
+  loop: boolean;
+  autoPlaySounds: boolean;       // Automatically play sounds at keyframes
+  globalVolume: number;          // 0-1, master volume for all sound tracks
+}
+
+/**
+ * Timeline Track - A single track in the timeline (sprite, sound, or effect)
+ */
+export interface TimelineTrack {
+  id: string;
+  type: TimelineTrackType;
+  name: string;
+  keyframes: TimelineKeyframe[];
+  
+  // Track settings
+  enabled: boolean;
+  locked: boolean;
+  muted: boolean;
+  volume: number;                // 0-1, for sound tracks
+  
+  // Visual settings
+  color?: string;                // Track color in timeline UI
+  height?: number;               // Track height in pixels
+}
+
+/**
+ * Timeline Keyframe - A single point in time on a track
+ */
+export interface TimelineKeyframe {
+  id: string;
+  time: number;                  // Position in milliseconds
+  
+  // Value depends on track type
+  value: KeyframeValue;
+  
+  // Interpolation to next keyframe
+  interpolation: KeyframeInterpolation;
+  
+  // Easing curve for custom interpolation (optional)
+  easingCurve?: number[];        // Bezier curve control points [x1, y1, x2, y2]
+  
+  // Metadata
+  label?: string;
+  color?: string;
+}
+
+/**
+ * Keyframe Value - The value at a keyframe, depends on track type
+ */
+export type KeyframeValue = 
+  | SpriteKeyframeValue
+  | SoundKeyframeValue
+  | EffectKeyframeValue;
+
+/**
+ * Sprite Keyframe Value - For sprite tracks
+ */
+export interface SpriteKeyframeValue {
+  type: 'sprite';
+  opacity: number;               // 0-1
+  scale: number;                 // 0.1-3
+  rotation: number;              // -360 to 360 degrees
+  x: number;                     // Position offset
+  y: number;
+}
+
+/**
+ * Sound Keyframe Value - For sound tracks
+ */
+export interface SoundKeyframeValue {
+  type: 'sound';
+  soundUrl?: string;             // Direct URL to sound file
+  soundCollection?: string;      // Or reference to sound collection
+  soundFile?: string;            // File name within collection
+  volume: number;                // 0-1
+  pan: number;                   // -1 (left) to 1 (right)
+  play: boolean;                 // Whether to play the sound
+  stop: boolean;                 // Whether to stop all sounds on this track
+}
+
+/**
+ * Effect Keyframe Value - For effect tracks (future use)
+ */
+export interface EffectKeyframeValue {
+  type: 'effect';
+  effectType: 'shake' | 'flash' | 'blur' | 'color' | 'custom';
+  intensity: number;             // 0-1
+  duration: number;              // Effect duration in ms
+  params?: Record<string, unknown>;
+}
+
+/**
+ * Timeline Marker - A marker on the timeline for reference
+ */
+export interface TimelineMarker {
+  id: string;
+  time: number;                  // Position in milliseconds
+  label: string;
+  color?: string;
+}
+
+/**
+ * Timeline Playback State - Current playback state
+ */
+export interface TimelinePlaybackState {
+  playheadState: PlayheadState;
+  currentTime: number;           // Current position in ms
+  startTime: number;             // When playback started (for calculating position)
+  playbackRate: number;          // 0.25-2, speed multiplier
+  
+  // Active sounds
+  activeSounds: ActiveTimelineSound[];
+}
+
+/**
+ * Active Timeline Sound - A sound currently playing from the timeline
+ */
+export interface ActiveTimelineSound {
+  id: string;
+  trackId: string;
+  keyframeId: string;
+  audioElement: HTMLAudioElement | null;
+  startedAt: number;
+}
+
+/**
+ * Timeline Editor State - State for the timeline editor UI
+ */
+export interface TimelineEditorState {
+  // Current selection
+  selectedCollectionId: string | null;
+  selectedSpriteId: string | null;
+  selectedTrackId: string | null;
+  selectedKeyframeId: string | null;
+  
+  // Timeline view
+  zoom: number;                  // 0.1-10, pixels per millisecond
+  scrollX: number;               // Horizontal scroll position
+  scrollY: number;               // Vertical scroll position
+  
+  // Playback
+  playback: TimelinePlaybackState;
+  
+  // Snapping
+  snapEnabled: boolean;
+  snapInterval: number;          // Snap to every N ms (e.g., 100ms)
+  
+  // UI state
+  showTimeline: boolean;
+  showProperties: boolean;
+  showSoundLibrary: boolean;
+}
+
+// ============================================
+// DEFAULT VALUES FOR TIMELINE SYSTEM
+// ============================================
+
+export const DEFAULT_SPRITE_KEYFRAME_VALUE: SpriteKeyframeValue = {
+  type: 'sprite',
+  opacity: 1,
+  scale: 1,
+  rotation: 0,
+  x: 0,
+  y: 0,
+};
+
+export const DEFAULT_SOUND_KEYFRAME_VALUE: SoundKeyframeValue = {
+  type: 'sound',
+  volume: 1,
+  pan: 0,
+  play: true,
+  stop: false,
+};
+
+export const DEFAULT_EFFECT_KEYFRAME_VALUE: EffectKeyframeValue = {
+  type: 'effect',
+  effectType: 'flash',
+  intensity: 0.5,
+  duration: 200,
+};
+
+export const createDefaultTimelineTrack = (type: TimelineTrackType, name: string): TimelineTrack => ({
+  id: crypto.randomUUID ? crypto.randomUUID() : `track_${Date.now()}`,
+  type,
+  name,
+  keyframes: [],
+  enabled: true,
+  locked: false,
+  muted: false,
+  volume: 1,
+});
+
+export const createDefaultTimelineData = (): SpriteTimelineData => ({
+  duration: 3000, // 3 seconds default
+  tracks: [
+    createDefaultTimelineTrack('sprite', 'Sprite'),
+  ],
+  markers: [],
+  loop: false,
+  autoPlaySounds: true,
+  globalVolume: 1,
+});
+
+export const createDefaultTimelineSprite = (url: string, label: string): TimelineSprite => ({
+  id: crypto.randomUUID ? crypto.randomUUID() : `sprite_${Date.now()}`,
+  label,
+  url,
+  format: 'png',
+  duration: 3000,
+  timeline: createDefaultTimelineData(),
+  triggerKeys: [],
+  triggerRequirePipes: false,
+  triggerCaseSensitive: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+export const createDefaultTimelineCollection = (name: string): SpriteTimelineCollection => ({
+  id: crypto.randomUUID ? crypto.randomUUID() : `collection_${Date.now()}`,
+  name,
+  sprites: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+export const createDefaultTimelineEditorState = (): TimelineEditorState => ({
+  selectedCollectionId: null,
+  selectedSpriteId: null,
+  selectedTrackId: null,
+  selectedKeyframeId: null,
+  zoom: 0.05, // 50 pixels per second
+  scrollX: 0,
+  scrollY: 0,
+  playback: {
+    playheadState: 'stopped',
+    currentTime: 0,
+    startTime: 0,
+    playbackRate: 1,
+    activeSounds: [],
+  },
+  snapEnabled: true,
+  snapInterval: 100, // Snap to 100ms intervals
+  showTimeline: true,
+  showProperties: true,
+  showSoundLibrary: true,
 });

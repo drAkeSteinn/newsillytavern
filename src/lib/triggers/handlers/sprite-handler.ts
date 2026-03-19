@@ -914,6 +914,23 @@ function buildTriggerCollectionResult(
     soundChain = collection.soundChain;
   }
   
+  console.log('[SpriteHandler] buildTriggerCollectionResult chains:', {
+    collectionId: collection.id,
+    collectionName: collection.name,
+    collectionSoundChain: collection.soundChain ? {
+      enabled: collection.soundChain.enabled,
+      steps: collection.soundChain.steps?.length,
+    } : null,
+    spriteConfigSoundChain: spriteConfig?.soundChain ? {
+      enabled: spriteConfig.soundChain.enabled,
+      steps: spriteConfig.soundChain.steps?.length,
+    } : null,
+    finalSoundChain: soundChain ? {
+      enabled: soundChain.enabled,
+      steps: soundChain.steps?.length,
+    } : null,
+  });
+  
   // Determine fallback mode
   const fallbackMode = spriteConfig?.fallbackMode ?? collection.fallbackMode;
   const fallbackSpriteId = spriteConfig?.fallbackSpriteId ?? collection.fallbackSpriteId;
@@ -1027,6 +1044,15 @@ export function executeTriggerCollectionResult(
   // Get characterId from context (not from trigger.data which may be undefined)
   const characterId = context.character?.id;
   
+  console.log('[SpriteHandler] executeTriggerCollectionResult:', {
+    characterId,
+    spriteUrl,
+    hasSoundChain: !!soundChain,
+    soundChainEnabled: soundChain?.enabled,
+    soundChainSteps: soundChain?.steps?.length,
+    hasSpriteChain: !!spriteChain,
+  });
+  
   if (!characterId || !spriteUrl) {
     console.log('[SpriteHandler] executeTriggerCollectionResult: Missing characterId or spriteUrl', { 
       characterId, 
@@ -1038,11 +1064,13 @@ export function executeTriggerCollectionResult(
   }
   
   // Apply the trigger sprite
+  const useTimelineSounds = collection.useTimelineSounds ?? false;
   storeActions.applyTriggerForCharacter(characterId, {
     spriteUrl,
     spriteLabel,
     packId: collection.packId,
     collectionId: collection.id,
+    useTimelineSounds,
   });
   
   // Mark collection as triggered for cooldown
@@ -1050,34 +1078,42 @@ export function executeTriggerCollectionResult(
   
   // Start sprite chain if configured
   if (spriteChain && spriteChain.enabled && spriteChain.steps.length > 0) {
+    console.log('[SpriteHandler] Starting sprite chain:', {
+      characterId,
+      steps: spriteChain.steps.length,
+      loop: spriteChain.loop,
+    });
     storeActions.startSpriteChain(characterId, spriteChain);
     // Don't schedule fallback if chain is active and not looping
     if (!spriteChain.loop) {
       return;
     }
   }
-  
-  // Start sound chain if configured
-  if (soundChain && soundChain.enabled && soundChain.steps.length > 0) {
-    storeActions.startSoundChain(characterId, soundChain);
-  }
+
+  // Note: Timeline sounds are now handled by the useTimelineSpriteSounds hook
+  // which watches for changes to triggerSpriteUrl and checks useTimelineSounds
+  // (useTimelineSounds is already passed to applyTriggerForCharacter above)
   
   // Schedule fallback if configured
   if (fallbackDelayMs && fallbackDelayMs > 0) {
     let returnSpriteUrl: string | null = null;
     let returnSpriteLabel: string | null = null;
-    
+    let returnToMode: 'idle' | 'talk' | 'thinking' | 'clear' = 'idle';
+
     if (fallbackMode === 'custom_sprite' && fallbackSpriteId) {
       // Find fallback sprite in pack
       const fallbackSprite = result.spritePack.sprites.find(s => s.id === fallbackSpriteId);
       if (fallbackSprite) {
         returnSpriteUrl = fallbackSprite.url;
         returnSpriteLabel = fallbackSprite.label;
+        returnToMode = 'idle'; // Apply the custom sprite
       }
     } else if (fallbackMode === 'idle_collection') {
-      // Get idle sprite
-      returnSpriteUrl = getIdleSpriteUrl();
-      returnSpriteLabel = 'idle';
+      // For 'idle_collection', use 'clear' mode to let the normal state logic
+      // (idle state from State Collections V2) determine what to show
+      returnToMode = 'clear';
+      returnSpriteUrl = ''; // Empty is fine for 'clear' mode
+      returnSpriteLabel = null;
     } else if (fallbackMode === 'collection_default') {
       // Use collection's principal sprite or first sprite
       const principalSprite = selectSpriteFromPack(
@@ -1088,31 +1124,34 @@ export function executeTriggerCollectionResult(
       if (principalSprite) {
         returnSpriteUrl = principalSprite.url;
         returnSpriteLabel = principalSprite.label;
+        returnToMode = 'idle'; // Apply the collection default sprite
       } else {
-        // Fallback to idle if no principal sprite
-        returnSpriteUrl = getIdleSpriteUrl();
-        returnSpriteLabel = 'idle';
+        // Fallback to 'clear' mode if no principal sprite
+        returnToMode = 'clear';
+        returnSpriteUrl = '';
+        returnSpriteLabel = null;
       }
     }
-    
+
     console.log('[SpriteHandler] Scheduling fallback:', {
       characterId,
       fallbackMode,
       fallbackDelayMs,
-      returnSpriteUrl,
+      returnToMode,
+      returnSpriteUrl: returnSpriteUrl || '(clear mode)',
       returnSpriteLabel,
     });
-    
-    if (returnSpriteUrl) {
-      storeActions.scheduleReturnToIdleForCharacter(
-        characterId,
-        spriteUrl,
-        'idle',  // Apply the return sprite
-        returnSpriteUrl,
-        returnSpriteLabel,
-        fallbackDelayMs
-      );
-    }
+
+    // Always schedule fallback when delay > 0
+    // For 'clear' mode, returnSpriteUrl can be empty (normal state logic will apply)
+    storeActions.scheduleReturnToIdleForCharacter(
+      characterId,
+      spriteUrl,
+      returnToMode,
+      returnSpriteUrl || '',
+      returnSpriteLabel,
+      fallbackDelayMs
+    );
   }
 }
 

@@ -9,6 +9,7 @@ import { CharacterSprite } from './character-sprite';
 import { useTriggerSystem } from '@/lib/triggers';
 import { useBackgroundTriggers } from '@/hooks/use-background-triggers';
 import { useTTS, useTTSAutoGeneration } from '@/hooks/use-tts';
+import { useTimelineSpriteSounds } from '@/hooks/use-timeline-sprite-sounds';
 import { GroupSprites } from './group-sprites';
 import { HUDDisplay } from './hud-display';
 import { QuestNotifications } from './quest-notifications';
@@ -157,6 +158,9 @@ export function ChatPanel() {
   // Background triggers hook (separate for now, will be integrated later)
   const { scanForBackgroundTriggers, resetDetection: resetBgDetection } = useBackgroundTriggers();
   
+  // Timeline Sprite Sounds - plays sounds when sprites with timeline sounds are activated
+  useTimelineSpriteSounds();
+  
   // TTS hook for text-to-speech functionality
   const { 
     speakWithDualVoice, 
@@ -295,7 +299,8 @@ export function ChatPanel() {
       });
 
       if (!response.ok) {
-        throw new Error('Summary generation failed');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`Summary generation failed: ${errorData.error || response.statusText}`);
       }
 
       const data = await response.json();
@@ -321,9 +326,12 @@ export function ChatPanel() {
           tokens: data.summary.tokens,
           messagesDeleted: messagesToSummarize.length
         });
+      } else if (data.error) {
+        chatLogger.warn('[Memory] Summary generation returned error', { error: data.error });
       }
     } catch (error) {
-      chatLogger.error('[Memory] Summary generation error', { error });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      chatLogger.error('[Memory] Summary generation error', { error: errorMessage });
     }
   }, [
     activeSessionId, 

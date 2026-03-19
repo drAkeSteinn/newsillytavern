@@ -22,6 +22,78 @@
       "questName": "Mision imposible",
       "type": "quest_activated",
       "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1773895257280-w24mpwsh8",
+      "timestamp": "2026-03-19T04:40:57.280Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1773895257232-m81mxscxt",
+      "timestamp": "2026-03-19T04:40:57.232Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1773895103291-bcsgjsfsv",
+      "timestamp": "2026-03-19T04:38:23.291Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1773895103215-nsx05i9y3",
+      "timestamp": "2026-03-19T04:38:23.215Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1773890272087-epao5f5d5",
+      "timestamp": "2026-03-19T03:17:52.087Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1773890272036-fnjcid9xk",
+      "timestamp": "2026-03-19T03:17:52.036Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
+      "id": "notif-1773883845134-qlfhgiqiu",
+      "timestamp": "2026-03-19T01:30:45.134Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questTitle": "Mision imposible",
+      "type": "quest_activated",
+      "message": "¡Nueva misión activada: Mision imposible!",
+      "id": "notif-1773883845095-2dz0snfpe",
+      "timestamp": "2026-03-19T01:30:45.095Z",
+      "read": true
+    },
+    {
+      "questId": "asd",
+      "questName": "Mision imposible",
+      "type": "quest_activated",
+      "message": "Quest \"Mision imposible\" activated",
       "id": "notif-1773747397127-j60m9wj8t",
       "timestamp": "2026-03-17T11:36:37.127Z",
       "read": true
@@ -393,78 +465,6 @@
       "message": "¡Nueva misión activada: Mision imposible!",
       "id": "notif-1773579404533-6yu724cqp",
       "timestamp": "2026-03-15T12:56:44.533Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1773482904659-q508fv803",
-      "timestamp": "2026-03-14T10:08:24.659Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_updated",
-      "message": "Misión desactivada: Mision imposible",
-      "id": "notif-1773482641786-vuzka1ulp",
-      "timestamp": "2026-03-14T10:04:01.786Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1773482603520-jss4udlra",
-      "timestamp": "2026-03-14T10:03:23.520Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1773437884655-ig6v74efd",
-      "timestamp": "2026-03-13T21:38:04.655Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questName": "Mision imposible",
-      "type": "quest_activated",
-      "message": "Quest \"Mision imposible\" activated",
-      "id": "notif-1773419549780-c49c0c8m8",
-      "timestamp": "2026-03-13T16:32:29.780Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1773419549740-s3b6n5mj4",
-      "timestamp": "2026-03-13T16:32:29.740Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1773376231075-njsvzcdrk",
-      "timestamp": "2026-03-13T04:30:31.075Z",
-      "read": true
-    },
-    {
-      "questId": "asd",
-      "questTitle": "Mision imposible",
-      "type": "quest_activated",
-      "message": "¡Nueva misión activada: Mision imposible!",
-      "id": "notif-1773375988479-907ksq1pn",
-      "timestamp": "2026-03-13T04:26:28.479Z",
       "read": true
     }
   ]
