@@ -3,28 +3,52 @@
 // ============================================
 //
 // This hook connects sprite activation with timeline sound playback.
-// When a sprite is activated (via trigger or state change), it checks
-// if the sprite has timeline sounds configured and plays them.
-//
-// Sources for timeline sounds:
-// 1. Timeline Editor collections (state.collections)
-// 2. Sprite Pack entries with embedded timeline data
+// When a sprite is activated (via trigger), it:
+// 1. Extracts the collection name from the sprite URL
+// 2. Loads the metadata.json from that collection
+// 3. Finds the sprite's timeline configuration
+// 4. Plays sounds using the soundTriggerId references
 //
 // ============================================
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useTavernStore } from '@/store';
 import type {
-  TimelineSprite,
-  TimelineTrack,
   SpriteTimelineData,
-  SoundKeyframeValue,
+  TimelineTrack,
+  TimelineKeyframe,
   SoundTrigger,
   SoundCollection,
-  SpriteTimelineCollection,
-  SpritePackV2,
-  SpritePackEntryV2,
 } from '@/types';
+
+// ============================================
+// Types
+// ============================================
+
+interface SpriteMetadata {
+  label?: string;
+  filename: string;
+  duration?: number;
+  timeline?: SpriteTimelineData;
+}
+
+interface CollectionMetadata {
+  version: number;
+  collectionName: string;
+  sprites: Record<string, SpriteMetadata>;
+}
+
+interface ActiveTimelineSound {
+  spriteUrl: string;
+  startTime: number;
+  duration: number;
+  loop: boolean;
+  activeAudios: Map<string, HTMLAudioElement[]>;
+  triggeredKeyframes: Set<string>;
+  timelineData: SpriteTimelineData;
+  soundTriggers: SoundTrigger[];
+  soundCollections: SoundCollection[];
+}
 
 // ============================================
 // Audio Cache
@@ -45,18 +69,109 @@ function getAudio(url: string): HTMLAudioElement {
 // Active Timeline Sounds State
 // ============================================
 
-interface ActiveTimelineSound {
-  spriteUrl: string;
-  startTime: number;
-  duration: number;
-  loop: boolean;
-  activeAudios: Map<string, HTMLAudioElement[]>;
-  triggeredKeyframes: Set<string>;
-  timelineData: SpriteTimelineData;
+const activeTimelines = new Map<string, ActiveTimelineSound>();
+const collectionMetadataCache = new Map<string, CollectionMetadata>();
+
+// Loop checker state
+let loopCheckerRunning = false;
+let loopAnimationId: number | null = null;
+
+// ============================================
+// Loop Checker - Single Global Loop
+// ============================================
+
+function startLoopChecker() {
+  if (loopCheckerRunning) {
+    console.log('[TimelineSounds] Loop checker already running');
+    return;
+  }
+  
+  loopCheckerRunning = true;
+  console.log('[TimelineSounds] 🔄 Starting loop checker');
+  
+  const check = () => {
+    if (activeTimelines.size === 0) {
+      loopCheckerRunning = false;
+      loopAnimationId = null;
+      console.log('[TimelineSounds] ⏹️ Loop checker stopped - no active timelines');
+      return;
+    }
+
+    const now = Date.now();
+    console.log(`[TimelineSounds] 🔄 Loop tick - ${activeTimelines.size} active timelines`);
+
+    for (const [characterId, activeSound] of activeTimelines) {
+      const elapsed = now - activeSound.startTime;
+      const currentTime = elapsed % activeSound.duration;
+
+      console.log(`[TimelineSounds] ⏱️ Character ${characterId.substring(0, 8)}: ${currentTime.toFixed(0)}ms / ${activeSound.duration}ms`);
+
+      // Play sounds at current time using stored timeline data
+      playSoundsAtTime(
+        characterId,
+        activeSound.timelineData,
+        currentTime,
+        activeSound.soundTriggers,
+        activeSound.soundCollections,
+        activeSound
+      );
+    }
+
+    loopAnimationId = requestAnimationFrame(check);
+  };
+
+  loopAnimationId = requestAnimationFrame(check);
 }
 
-const activeTimelines = new Map<string, ActiveTimelineSound>();
-let animationFrameId: number | null = null;
+// ============================================
+// Collection Metadata Loader
+// ============================================
+
+async function loadCollectionMetadata(collectionName: string): Promise<CollectionMetadata | null> {
+  // Check cache first
+  if (collectionMetadataCache.has(collectionName)) {
+    return collectionMetadataCache.get(collectionName)!;
+  }
+
+  try {
+    const response = await fetch(`/sprites/${collectionName}/metadata.json`);
+    if (!response.ok) {
+      console.warn(`[TimelineSounds] No metadata.json found for collection: ${collectionName}`);
+      return null;
+    }
+
+    const metadata: CollectionMetadata = await response.json();
+    collectionMetadataCache.set(collectionName, metadata);
+    console.log(`[TimelineSounds] Loaded metadata for collection: ${collectionName}`, {
+      spriteCount: Object.keys(metadata.sprites).length,
+    });
+    
+    return metadata;
+  } catch (error) {
+    console.error(`[TimelineSounds] Failed to load metadata for ${collectionName}:`, error);
+    return null;
+  }
+}
+
+// ============================================
+// Extract Collection Name from Sprite URL
+// ============================================
+
+function extractCollectionFromUrl(spriteUrl: string): string | null {
+  // URL format: /sprites/CollectionName/filename.webm
+  const match = spriteUrl.match(/\/sprites\/([^/]+)\//);
+  return match ? match[1] : null;
+}
+
+// ============================================
+// Extract Filename from Sprite URL
+// ============================================
+
+function extractFilenameFromUrl(spriteUrl: string): string | null {
+  // URL format: /sprites/CollectionName/filename.webm
+  const parts = spriteUrl.split('/');
+  return parts[parts.length - 1] || null;
+}
 
 // ============================================
 // Sound Playback Functions
@@ -69,7 +184,10 @@ async function playSoundFromTrigger(
 ): Promise<HTMLAudioElement | null> {
   const collection = collections.find(c => c.name === trigger.collection);
   if (!collection || !collection.files || collection.files.length === 0) {
-    console.warn('[TimelineSounds] Collection not found or empty:', trigger.collection);
+    console.warn('[TimelineSounds] ❌ Collection not found or empty:', trigger.collection, {
+      availableCollections: collections.map(c => c.name),
+      requestedCollection: trigger.collection,
+    });
     return null;
   }
 
@@ -80,6 +198,8 @@ async function playSoundFromTrigger(
     const index = trigger.currentIndex || 0;
     soundFile = collection.files[index % collection.files.length];
   }
+
+  console.log('[TimelineSounds] 🔊 Playing sound file:', soundFile);
 
   try {
     const baseAudio = getAudio(soundFile);
@@ -120,51 +240,6 @@ async function playSoundFromUrl(
 }
 
 // ============================================
-// Find Sprite Timeline
-// ============================================
-
-interface SpriteWithTimeline {
-  url: string;
-  label: string;
-  timeline: SpriteTimelineData;
-  source: 'timeline_editor' | 'sprite_pack';
-}
-
-function findSpriteTimelineByUrl(
-  spriteUrl: string,
-  timelineCollections: SpriteTimelineCollection[],
-  spritePacks: SpritePackV2[]
-): SpriteWithTimeline | undefined {
-  // First, search in Timeline Editor collections
-  for (const collection of timelineCollections) {
-    const sprite = collection.sprites.find(s => s.url === spriteUrl);
-    if (sprite) {
-      return {
-        url: sprite.url,
-        label: sprite.label,
-        timeline: sprite.timeline,
-        source: 'timeline_editor',
-      };
-    }
-  }
-
-  // Then, search in Sprite Packs (sprites with embedded timeline)
-  for (const pack of spritePacks) {
-    const sprite = pack.sprites.find(s => s.url === spriteUrl);
-    if (sprite?.timeline) {
-      return {
-        url: sprite.url,
-        label: sprite.label,
-        timeline: sprite.timeline,
-        source: 'sprite_pack',
-      };
-    }
-  }
-
-  return undefined;
-}
-
-// ============================================
 // Timeline Sound Player
 // ============================================
 
@@ -175,15 +250,25 @@ function playSoundsAtTime(
   soundTriggers: SoundTrigger[],
   soundCollections: SoundCollection[],
   activeSound: ActiveTimelineSound,
-  toleranceMs: number = 100
+  toleranceMs: number = 150
 ): void {
   const globalVolume = timeline.globalVolume ?? 1;
 
+  console.log(`[TimelineSounds] 🎵 playSoundsAtTime: currentTime=${currentTime.toFixed(0)}ms, tolerance=${toleranceMs}ms`);
+  console.log(`[TimelineSounds] 📊 Timeline has ${timeline.tracks.length} tracks`);
+
   for (const track of timeline.tracks) {
-    if (track.muted || !track.enabled) continue;
-    if (track.type !== 'sound') continue;
+    if (track.muted || !track.enabled) {
+      console.log(`[TimelineSounds] 🔇 Track "${track.name}" muted or disabled`);
+      continue;
+    }
+    if (track.type !== 'sound') {
+      console.log(`[TimelineSounds] ⏭️ Track "${track.name}" is not sound type (${track.type})`);
+      continue;
+    }
 
     const trackId = track.id;
+    console.log(`[TimelineSounds] 🎸 Processing track "${track.name}" with ${track.keyframes.length} keyframes`);
 
     for (const keyframe of track.keyframes) {
       const keyframeId = keyframe.id;
@@ -192,27 +277,58 @@ function playSoundsAtTime(
       // Check if playhead is crossing this keyframe
       const isCrossing = currentTime >= keyframeTime && currentTime < keyframeTime + toleranceMs;
 
+      console.log(`[TimelineSounds] ⏱️ Keyframe at ${keyframeTime}ms: currentTime=${currentTime.toFixed(0)}, isCrossing=${isCrossing}, alreadyTriggered=${activeSound.triggeredKeyframes.has(keyframeId)}`);
+
       if (isCrossing && !activeSound.triggeredKeyframes.has(keyframeId)) {
         activeSound.triggeredKeyframes.add(keyframeId);
 
-        const soundValue = keyframe.value as SoundKeyframeValue & {
+        const soundValue = keyframe.value as {
           soundTriggerId?: string;
           soundTriggerName?: string;
+          soundUrl?: string;
+          volume?: number;
+          play?: boolean;
+          stop?: boolean;
         };
+
+        console.log(`[TimelineSounds] 🎯 TRIGGERING Keyframe at ${keyframeTime}ms:`, {
+          soundTriggerId: soundValue.soundTriggerId,
+          soundTriggerName: soundValue.soundTriggerName,
+          play: soundValue.play,
+          volume: soundValue.volume,
+        });
 
         if (soundValue.play) {
           (async () => {
             let audioEl: HTMLAudioElement | null = null;
 
-            // Try sound trigger first
+            // Try sound trigger first (by ID)
             if (soundValue.soundTriggerId) {
-              const trigger = soundTriggers.find(t => t.id === soundValue.soundTriggerId);
+              let trigger = soundTriggers.find(t => t.id === soundValue.soundTriggerId);
+              
+              // Fallback: try to find by name if ID not found
+              if (!trigger && soundValue.soundTriggerName) {
+                trigger = soundTriggers.find(t => 
+                  t.name.toLowerCase() === soundValue.soundTriggerName!.toLowerCase()
+                );
+                if (trigger) {
+                  console.log(`[TimelineSounds] ✅ Found trigger by name fallback: ${trigger.name}`);
+                }
+              }
+              
               if (trigger) {
+                console.log(`[TimelineSounds] 🎵 Playing trigger: ${trigger.name} (collection: ${trigger.collection})`);
                 audioEl = await playSoundFromTrigger(
                   trigger,
                   soundCollections,
                   (soundValue.volume || 1) * globalVolume
                 );
+              } else {
+                console.warn(`[TimelineSounds] ⚠️ Sound trigger not found:`, {
+                  searchedId: soundValue.soundTriggerId,
+                  searchedName: soundValue.soundTriggerName,
+                  availableTriggers: soundTriggers.map(t => ({ id: t.id, name: t.name, collection: t.collection })),
+                });
               }
             }
             // Fall back to direct URL
@@ -221,16 +337,6 @@ function playSoundsAtTime(
                 soundValue.soundUrl,
                 (soundValue.volume || 1) * globalVolume
               );
-            }
-            // Try collection + file reference
-            else if (soundValue.soundCollection && soundValue.soundFile) {
-              const collection = soundCollections.find(c => c.name === soundValue.soundCollection);
-              if (collection) {
-                const file = collection.files.find(f => f.includes(soundValue.soundFile!));
-                if (file) {
-                  audioEl = await playSoundFromUrl(file, (soundValue.volume || 1) * globalVolume);
-                }
-              }
             }
 
             if (audioEl) {
@@ -259,7 +365,7 @@ function playSoundsAtTime(
       }
 
       // Reset trigger for keyframes we've passed (for looping)
-      if (currentTime < keyframeTime) {
+      if (currentTime < keyframeTime - toleranceMs) {
         activeSound.triggeredKeyframes.delete(keyframeId);
       }
     }
@@ -279,52 +385,60 @@ function stopTimelineSound(characterId: string) {
   }
 
   activeTimelines.delete(characterId);
-  console.log('[TimelineSounds] Stopped timeline sounds for:', characterId);
+  console.log('[TimelineSounds] ⏹️ Stopped timeline sounds for:', characterId);
 }
 
 function startTimelineSound(
   characterId: string,
-  sprite: SpriteWithTimeline,
+  spriteUrl: string,
+  timeline: SpriteTimelineData,
   soundTriggers: SoundTrigger[],
   soundCollections: SoundCollection[]
 ): void {
   // Stop any existing timeline for this character
   stopTimelineSound(characterId);
 
-  const soundTracks = sprite.timeline.tracks.filter(
+  const soundTracks = timeline.tracks.filter(
     t => t.type === 'sound' && !t.muted && t.enabled
   );
 
   if (soundTracks.length === 0) {
+    console.log('[TimelineSounds] No active sound tracks in timeline');
     return;
   }
 
   const activeSound: ActiveTimelineSound = {
-    spriteUrl: sprite.url,
+    spriteUrl,
     startTime: Date.now(),
-    duration: sprite.timeline.duration,
-    loop: sprite.timeline.loop,
+    duration: timeline.duration || 5000,
+    loop: timeline.loop,
     activeAudios: new Map(),
     triggeredKeyframes: new Set(),
-    timelineData: sprite.timeline,
+    timelineData: timeline,
+    soundTriggers,
+    soundCollections,
   };
 
   activeTimelines.set(characterId, activeSound);
 
-  console.log('[TimelineSounds] Started timeline sounds:', {
+  console.log('[TimelineSounds] ▶️ Started timeline sounds:', {
     characterId,
-    spriteUrl: sprite.url,
-    label: sprite.label,
-    source: sprite.source,
-    duration: sprite.timeline.duration,
-    loop: sprite.timeline.loop,
+    spriteUrl,
+    duration: timeline.duration,
+    loop: timeline.loop,
     soundTracks: soundTracks.length,
+    keyframes: soundTracks.reduce((sum, t) => sum + t.keyframes.length, 0),
+    soundTriggersCount: soundTriggers.length,
+    soundCollectionsCount: soundCollections.length,
   });
+
+  // Start the loop checker if not already running
+  startLoopChecker();
 
   // Play initial sounds at time 0
   playSoundsAtTime(
     characterId,
-    sprite.timeline,
+    timeline,
     0,
     soundTriggers,
     soundCollections,
@@ -338,44 +452,16 @@ function startTimelineSound(
 
 export function useTimelineSpriteSounds() {
   const characterSpriteStates = useTavernStore((state) => state.characterSpriteStates);
-  // Timeline collections are at the root level from createTimelineEditorSlice
-  const timelineCollections = useTavernStore((state) => state.collections ?? []);
   const soundTriggers = useTavernStore((state) => state.soundTriggers ?? []);
   const soundCollections = useTavernStore((state) => state.soundCollections ?? []);
-  // Sprite packs with embedded timeline data
-  const spritePacksV2 = useTavernStore((state) => state.spritePacksV2 ?? []);
 
   const prevSpriteUrlsRef = useRef<Record<string, string>>({});
-  const checkLoopRef = useRef<boolean>(false);
-
-  // Store refs for loop checker
-  const timelineCollectionsRef = useRef(timelineCollections);
-  const spritePacksRef = useRef(spritePacksV2);
-  const soundTriggersRef = useRef(soundTriggers);
-  const soundCollectionsRef = useRef(soundCollections);
-
-  // Update refs
-  useEffect(() => {
-    timelineCollectionsRef.current = timelineCollections;
-    spritePacksRef.current = spritePacksV2;
-    soundTriggersRef.current = soundTriggers;
-    soundCollectionsRef.current = soundCollections;
-  }, [timelineCollections, spritePacksV2, soundTriggers, soundCollections]);
 
   // Start/stop timeline sounds when sprite changes
   useEffect(() => {
     const currentSpriteUrls: Record<string, string> = {};
 
-    // Count sprites with timeline in packs
-    const spritesWithTimelineInPacks = spritePacksV2.reduce((count, pack) => {
-      return count + pack.sprites.filter(s => s.timeline).length;
-    }, 0);
-
-    console.log('[TimelineSounds] Checking sprite changes:', {
-      timelineCollectionsCount: timelineCollections.length,
-      totalSpritesInCollections: timelineCollections.reduce((sum, c) => sum + c.sprites.length, 0),
-      spritePacksCount: spritePacksV2.length,
-      spritesWithTimelineInPacks,
+    console.log('[TimelineSounds] 📋 Checking sprite changes:', {
       soundTriggersCount: soundTriggers.length,
       soundCollectionsCount: soundCollections.length,
       characterSpriteStatesCount: Object.keys(characterSpriteStates).length,
@@ -389,7 +475,7 @@ export function useTimelineSpriteSounds() {
 
       // If sprite changed
       if (currentUrl && currentUrl !== prevUrl) {
-        console.log('[TimelineSounds] Sprite URL changed:', {
+        console.log('[TimelineSounds] 🔄 Sprite URL changed:', {
           characterId,
           currentUrl,
           prevUrl,
@@ -398,65 +484,68 @@ export function useTimelineSpriteSounds() {
 
         // Check if timeline sounds are enabled for this character
         if (!charState.useTimelineSounds) {
-          console.log('[TimelineSounds] Timeline sounds disabled for this character, skipping');
+          console.log('[TimelineSounds] ⏸️ Timeline sounds disabled for this character, skipping');
           continue;
         }
 
-        // Find the sprite with timeline
-        const spriteWithTimeline = findSpriteTimelineByUrl(
-          currentUrl,
-          timelineCollections,
-          spritePacksV2
-        );
+        // Extract collection name and filename from URL
+        const collectionName = extractCollectionFromUrl(currentUrl);
+        const filename = extractFilenameFromUrl(currentUrl);
 
-        console.log('[TimelineSounds] Sprite lookup result:', {
-          found: !!spriteWithTimeline,
-          source: spriteWithTimeline?.source,
-          spriteData: spriteWithTimeline ? {
-            label: spriteWithTimeline.label,
-            tracksCount: spriteWithTimeline.timeline.tracks.length,
-            soundTracksCount: spriteWithTimeline.timeline.tracks.filter(t => t.type === 'sound').length,
-          } : null,
-        });
+        if (!collectionName || !filename) {
+          console.warn('[TimelineSounds] ⚠️ Could not extract collection/filename from URL:', currentUrl);
+          continue;
+        }
 
-        if (spriteWithTimeline) {
-          // Check if sprite has sound tracks
-          const soundTracks = spriteWithTimeline.timeline.tracks.filter(
-            t => t.type === 'sound' && !t.muted && t.enabled
+        console.log('[TimelineSounds] 📁 Extracted from URL:', { collectionName, filename });
+
+        // Load collection metadata and find sprite timeline
+        (async () => {
+          const metadata = await loadCollectionMetadata(collectionName);
+          if (!metadata) {
+            console.warn('[TimelineSounds] ⚠️ No metadata found for collection:', collectionName);
+            return;
+          }
+
+          // Find sprite in metadata by filename
+          const spriteMeta = metadata.sprites[filename];
+          if (!spriteMeta) {
+            console.warn('[TimelineSounds] ⚠️ Sprite not found in metadata:', filename);
+            console.log('[TimelineSounds] Available sprites:', Object.keys(metadata.sprites));
+            return;
+          }
+
+          // Check if sprite has timeline with sound tracks
+          if (!spriteMeta.timeline || !spriteMeta.timeline.tracks) {
+            console.log('[TimelineSounds] ℹ️ Sprite has no timeline:', filename);
+            return;
+          }
+
+          const soundTracks = spriteMeta.timeline.tracks.filter(
+            (t: TimelineTrack) => t.type === 'sound' && !t.muted && t.enabled
           );
 
-          if (soundTracks.length > 0) {
-            console.log('[TimelineSounds] Sprite activated with timeline sounds:', {
-              characterId,
-              spriteUrl: currentUrl,
-              label: spriteWithTimeline.label,
-              source: spriteWithTimeline.source,
-              soundTracks: soundTracks.length,
-              keyframes: soundTracks.reduce((sum, t) => sum + t.keyframes.length, 0),
-            });
-
-            startTimelineSound(
-              characterId,
-              spriteWithTimeline,
-              soundTriggers,
-              soundCollections
-            );
-            checkLoopRef.current = true;
-          } else {
-            console.log('[TimelineSounds] Sprite found but no active sound tracks:', {
-              totalTracks: spriteWithTimeline.timeline.tracks.length,
-              tracks: spriteWithTimeline.timeline.tracks.map(t => ({
-                type: t.type,
-                muted: t.muted,
-                enabled: t.enabled,
-                keyframesCount: t.keyframes.length,
-              })),
-            });
+          if (soundTracks.length === 0) {
+            console.log('[TimelineSounds] ℹ️ Sprite has no active sound tracks:', filename);
+            return;
           }
-        } else {
-          console.warn('[TimelineSounds] Sprite URL not found with timeline data:', currentUrl);
-          console.log('[TimelineSounds] Tip: Configure timeline sounds in the sprite pack or add to Timeline Editor.');
-        }
+
+          console.log('[TimelineSounds] ✅ Found sprite with timeline sounds:', {
+            label: spriteMeta.label,
+            duration: spriteMeta.duration,
+            soundTracks: soundTracks.length,
+            keyframes: soundTracks.reduce((sum: number, t: TimelineTrack) => sum + t.keyframes.length, 0),
+          });
+
+          // Start playing timeline sounds
+          startTimelineSound(
+            characterId,
+            currentUrl,
+            spriteMeta.timeline,
+            soundTriggers,
+            soundCollections
+          );
+        })();
       }
 
       // If sprite was cleared but we had an active timeline
@@ -466,49 +555,7 @@ export function useTimelineSpriteSounds() {
     }
 
     prevSpriteUrlsRef.current = currentSpriteUrls;
-  }, [characterSpriteStates, timelineCollections, spritePacksV2, soundTriggers, soundCollections]);
-
-  // Loop checker - updates timeline sounds for looping sprites
-  useEffect(() => {
-    if (!checkLoopRef.current) return;
-
-    const check = () => {
-      const now = Date.now();
-      let hasActive = false;
-
-      for (const [characterId, activeSound] of activeTimelines) {
-        hasActive = true;
-        const elapsed = now - activeSound.startTime;
-        const currentTime = elapsed % activeSound.duration;
-
-        // Play sounds at current time using stored timeline data
-        playSoundsAtTime(
-          characterId,
-          activeSound.timelineData,
-          currentTime,
-          soundTriggersRef.current,
-          soundCollectionsRef.current,
-          activeSound
-        );
-      }
-
-      if (hasActive) {
-        animationFrameId = requestAnimationFrame(check);
-      } else {
-        checkLoopRef.current = false;
-        animationFrameId = null;
-      }
-    };
-
-    animationFrameId = requestAnimationFrame(check);
-
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-      }
-    };
-  }, []); // No dependencies - uses refs for data
+  }, [characterSpriteStates, soundTriggers, soundCollections]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -516,52 +563,18 @@ export function useTimelineSpriteSounds() {
       for (const characterId of activeTimelines.keys()) {
         stopTimelineSound(characterId);
       }
+      if (loopAnimationId) {
+        cancelAnimationFrame(loopAnimationId);
+        loopAnimationId = null;
+        loopCheckerRunning = false;
+      }
     };
   }, []);
 
   return {
     hasActiveTimeline: (characterId: string) => activeTimelines.has(characterId),
     stopTimeline: stopTimelineSound,
+    clearMetadataCache: () => collectionMetadataCache.clear(),
   };
 }
 
-// ============================================
-// Standalone Functions (for direct use)
-// ============================================
-
-export function playTimelineSoundsForSprite(
-  spriteUrl: string,
-  characterId: string,
-  timelineCollections: SpriteTimelineCollection[],
-  spritePacks: SpritePackV2[],
-  soundTriggers: SoundTrigger[],
-  soundCollections: SoundCollection[]
-): boolean {
-  const sprite = findSpriteTimelineByUrl(spriteUrl, timelineCollections, spritePacks);
-
-  if (!sprite) {
-    return false;
-  }
-
-  const soundTracks = sprite.timeline.tracks.filter(
-    t => t.type === 'sound' && !t.muted && t.enabled
-  );
-
-  if (soundTracks.length === 0) {
-    return false;
-  }
-
-  startTimelineSound(characterId, sprite, soundTriggers, soundCollections);
-  return true;
-}
-
-export function stopAllTimelineSounds(): void {
-  for (const characterId of activeTimelines.keys()) {
-    stopTimelineSound(characterId);
-  }
-
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-}

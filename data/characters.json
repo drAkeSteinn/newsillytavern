@@ -23,7 +23,7 @@
     "voice": null,
     "id": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
     "createdAt": "2026-03-01T21:41:38.289Z",
-    "updatedAt": "2026-03-19T06:01:27.893Z",
+    "updatedAt": "2026-03-19T14:10:48.418Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -192,19 +192,19 @@
         "updatedAt": "2026-03-07T15:33:03.172Z"
       },
       {
-        "id": "3cca864f-331d-452c-80ab-ef811b6be2c9",
-        "name": "Test",
+        "id": "d93822f9-1924-4d4a-bf5b-ca72b16857f6",
+        "name": "test",
         "description": "asd",
         "sprites": [
           {
-            "id": "70344e8e-f4da-4aa4-abd0-a0aedf1a79e8",
+            "id": "ffba6b46-a870-4785-b1a1-384bb6d4ba86",
             "label": "01",
             "url": "/sprites/Moon/1772240870166-656lst.webm",
             "isAnimated": true
           }
         ],
-        "createdAt": "2026-03-19T00:31:48.183Z",
-        "updatedAt": "2026-03-19T00:32:00.145Z"
+        "createdAt": "2026-03-19T14:06:33.737Z",
+        "updatedAt": "2026-03-19T14:06:37.933Z"
       }
     ],
     "stateCollectionsV2": [
@@ -217,28 +217,24 @@
     ],
     "triggerCollections": [
       {
-        "id": "3b77d994-603a-455b-bc02-04f9eba83ecf",
+        "id": "6824edf5-8c3f-42fc-9fee-6b9d50b1b77c",
         "name": "test",
         "active": true,
         "priority": 1,
-        "packId": "3cca864f-331d-452c-80ab-ef811b6be2c9",
+        "packId": "d93822f9-1924-4d4a-bf5b-ca72b16857f6",
         "collectionKey": "sprite:test01",
         "collectionKeys": [],
         "collectionKeyRequirePipes": false,
         "collectionKeyCaseSensitive": false,
         "collectionBehavior": "principal",
-        "principalSpriteId": "70344e8e-f4da-4aa4-abd0-a0aedf1a79e8",
+        "principalSpriteId": "ffba6b46-a870-4785-b1a1-384bb6d4ba86",
         "fallbackMode": "idle_collection",
         "fallbackDelayMs": 6000,
-        "soundChain": {
-          "enabled": true,
-          "steps": [],
-          "stopOnInterrupt": true
-        },
-        "cooldownMs": 0,
+        "useTimelineSounds": true,
+        "cooldownMs": 100,
         "spriteConfigs": {},
-        "createdAt": "2026-03-19T06:01:26.633Z",
-        "updatedAt": "2026-03-19T06:01:26.633Z"
+        "createdAt": "2026-03-19T14:06:58.938Z",
+        "updatedAt": "2026-03-19T14:10:45.607Z"
       }
     ],
     "spriteLibraries": {
