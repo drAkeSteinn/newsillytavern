@@ -746,6 +746,18 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   },
   
   startGenerationForCharacter: (characterId: string) => {
+    // DEBUG: Log all current character states before change
+    const allStates = get().characterSpriteStates;
+    console.log('[SpriteSlice] 🔍 startGenerationForCharacter START:', {
+      targetCharacterId: characterId,
+      allCharacterStates: Object.entries(allStates).map(([id, state]) => ({
+        id: id.substring(0, 8),
+        hasTrigger: !!(state as any).triggerSpriteUrl,
+        triggerUrl: (state as any).triggerSpriteUrl?.substring(0, 30),
+        returnToIdleActive: (state as any).returnToIdle?.active,
+      })),
+    });
+    
     set((state: any) => {
       const currentCharState = state.characterSpriteStates[characterId] || createDefaultCharacterState();
       
@@ -799,9 +811,32 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
         },
       };
     });
+    
+    // DEBUG: Log all states after change
+    const allStatesAfter = get().characterSpriteStates;
+    console.log('[SpriteSlice] 🔍 startGenerationForCharacter END:', {
+      targetCharacterId: characterId,
+      allCharacterStates: Object.entries(allStatesAfter).map(([id, state]) => ({
+        id: id.substring(0, 8),
+        hasTrigger: !!(state as any).triggerSpriteUrl,
+        triggerUrl: (state as any).triggerSpriteUrl?.substring(0, 30),
+      })),
+    });
   },
   
   endGenerationForCharacter: (characterId: string) => {
+    // DEBUG: Log all current character states before change
+    const allStates = get().characterSpriteStates;
+    console.log('[SpriteSlice] 🔍 endGenerationForCharacter START:', {
+      targetCharacterId: characterId,
+      allCharacterStates: Object.entries(allStates).map(([id, state]) => ({
+        id: id.substring(0, 8),
+        hasTrigger: !!(state as any).triggerSpriteUrl,
+        triggerUrl: (state as any).triggerSpriteUrl?.substring(0, 30),
+        returnToIdleActive: (state as any).returnToIdle?.active,
+      })),
+    });
+    
     set((state: any) => {
       const currentCharState = state.characterSpriteStates[characterId];
       if (!currentCharState) return state;
@@ -814,6 +849,7 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
         characterId,
         hasActiveTrigger,
         currentTriggerUrl: currentCharState.triggerSpriteUrl,
+        returnToIdleActive: currentCharState.returnToIdle?.active,
       });
       
       if (hasActiveTrigger) {
@@ -831,6 +867,7 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
       }
       
       // No trigger active, clear everything
+      console.log('[SpriteSlice] endGenerationForCharacter: Clearing trigger for', characterId);
       return {
         characterSpriteStates: {
           ...state.characterSpriteStates,

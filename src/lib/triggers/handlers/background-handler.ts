@@ -2,7 +2,16 @@
 // Background Handler - Handles Background Triggers
 // ============================================
 //
-// Integrates with the unified trigger system.
+// @deprecated Use BackgroundKeyHandler instead. This legacy handler is kept for
+// backward compatibility but will be removed in a future version.
+// The new BackgroundKeyHandler provides:
+// - Unified KeyHandler interface
+// - Per-character cooldown tracking for group chat
+// - Better streaming support
+// - Support for simple keyword triggers without type-indicator format
+//
+// Migration: Use createBackgroundKeyHandler() from './background-key-handler'
+//
 // Phase 3: Supports overlays, variants, and advanced transitions.
 // 
 // Features:

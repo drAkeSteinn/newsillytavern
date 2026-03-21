@@ -101,7 +101,7 @@
     },
     "7203a60f-ee6e-4e4f-930c-f9538a67671f": {
       "sessionId": "7203a60f-ee6e-4e4f-930c-f9538a67671f",
-      "messagesSinceLastSummary": 7,
+      "messagesSinceLastSummary": 1,
       "lastSummaryMessageIndex": 0,
       "isGroupChat": false
     },
@@ -152,6 +152,54 @@
       "messagesSinceLastSummary": 16,
       "lastSummaryMessageIndex": 0,
       "isGroupChat": false
+    },
+    "0039eef7-a824-474f-b248-66a6ee1a4cae": {
+      "sessionId": "0039eef7-a824-474f-b248-66a6ee1a4cae",
+      "messagesSinceLastSummary": 3,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
+    },
+    "f5774ddb-dd1d-4a9e-8077-1e2f6f147ce7": {
+      "sessionId": "f5774ddb-dd1d-4a9e-8077-1e2f6f147ce7",
+      "messagesSinceLastSummary": 2,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
+    },
+    "53e0cade-e727-4770-b240-f8a349b34379": {
+      "sessionId": "53e0cade-e727-4770-b240-f8a349b34379",
+      "messagesSinceLastSummary": 3,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
+    },
+    "a2eebd7d-bd69-4d9d-8e5f-bb3753cda64f": {
+      "sessionId": "a2eebd7d-bd69-4d9d-8e5f-bb3753cda64f",
+      "messagesSinceLastSummary": 16,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
+    },
+    "2ecb58d5-8a3f-43ad-84e7-cdaacadc10a4": {
+      "sessionId": "2ecb58d5-8a3f-43ad-84e7-cdaacadc10a4",
+      "messagesSinceLastSummary": 4,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
+    },
+    "03218192-223c-454f-a054-712832f90d3a": {
+      "sessionId": "03218192-223c-454f-a054-712832f90d3a",
+      "messagesSinceLastSummary": 7,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
+    },
+    "8ff53c79-2603-49a5-a614-697dac8f3e80": {
+      "sessionId": "8ff53c79-2603-49a5-a614-697dac8f3e80",
+      "messagesSinceLastSummary": 18,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
+    },
+    "b7f527af-095f-4267-9d81-4ca1ae36ea18": {
+      "sessionId": "b7f527af-095f-4267-9d81-4ca1ae36ea18",
+      "messagesSinceLastSummary": 19,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": true
     }
   }
 }

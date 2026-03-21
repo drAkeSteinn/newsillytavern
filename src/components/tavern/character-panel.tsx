@@ -427,7 +427,8 @@ export function CharacterPanel() {
             avatar: group.avatar || '',
             systemPrompt: group.systemPrompt || '',
             activationStrategy: group.activationStrategy || 'all',
-            maxResponsesPerTurn: group.maxResponsesPerTurn || 3,
+            minResponsesPerTurn: group.minResponsesPerTurn ?? 1,
+            maxResponsesPerTurn: group.maxResponsesPerTurn ?? 3,
             allowMentions: group.allowMentions ?? true,
             mentionTriggers: group.mentionTriggers || [],
             conversationStyle: group.conversationStyle || 'sequential',
@@ -435,13 +436,8 @@ export function CharacterPanel() {
             hudTemplateId: group.hudTemplateId,
             lorebookIds: group.lorebookIds,
             questTemplateIds: group.questTemplateIds,
-            // Additional fields
-            scenario: group.scenario,
-            firstMes: group.firstMes,
-            tags: group.tags,
-            creatorNotes: group.creatorNotes,
-            alternateGreetings: group.alternateGreetings,
-            characterNote: group.characterNote,
+            // Narrator settings
+            narratorSettings: group.narratorSettings,
           }, true); // preserveId = true
           importedGroups++;
         }

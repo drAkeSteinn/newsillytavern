@@ -2,6 +2,16 @@
 // Stats Handler - Handles Stats Updates Post-LLM
 // ============================================
 //
+// @deprecated Use StatsKeyHandler instead. This legacy handler is kept for
+// backward compatibility but will be removed in a future version.
+// The new StatsKeyHandler provides:
+// - Unified KeyHandler interface
+// - Operator support (+N, -N, =N)
+// - Per-character detection state for group chat
+// - Min/max value constraints
+//
+// Migration: Use createStatsKeyHandler() from './stats-key-handler'
+//
 // This handler detects stat changes in LLM responses
 // using detection keys defined in CharacterStatsConfig.attributes
 //

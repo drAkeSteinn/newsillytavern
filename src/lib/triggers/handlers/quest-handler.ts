@@ -2,6 +2,16 @@
 // Quest Handler - Handles Quest Triggers
 // ============================================
 //
+// @deprecated Use QuestKeyHandler instead. This legacy handler is kept for
+// backward compatibility but will be removed in a future version.
+// The new QuestKeyHandler provides:
+// - Unified KeyHandler interface
+// - Per-character position tracking for group chat
+// - Better streaming support
+// - Keyword-based activation detection
+//
+// Migration: Use createQuestKeyHandler() from './quest-key-handler'
+//
 // Updated to work with the new Quest Template/Instance system
 // Uses quest-detector.ts for key-based detection
 

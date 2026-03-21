@@ -2,6 +2,16 @@
 // Sprite Handler - Handles Sprite Triggers
 // Supports Legacy System and V2 Trigger Collections
 // ============================================
+//
+// @deprecated Use SpriteKeyHandler instead. This legacy handler is kept for
+// backward compatibility but will be removed in a future version.
+// The new SpriteKeyHandler provides:
+// - V2 Trigger Collections support
+// - State Collections V2 (idle/talk/thinking)
+// - Per-character sprite state for group chat
+// - Unified KeyHandler interface
+//
+// Migration: Use createSpriteKeyHandler() from './sprite-key-handler'
 
 import type { TriggerMatch } from '../types';
 import type { DetectedToken } from '../token-detector';

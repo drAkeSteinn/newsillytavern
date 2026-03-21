@@ -148,6 +148,7 @@ export function ChatPanel() {
     processStreamingContent: processTriggers,
     resetForNewMessage: resetTriggers,
     clearAllState: clearAllTriggerState,
+    completePartialMatches: completeTriggersPartialMatches,
   } = useTriggerSystem({
     soundEnabled: settings.sound?.enabled ?? true,
     spriteEnabled: settings.chatLayout.showCharacterSprite,
@@ -522,12 +523,26 @@ export function ChatPanel() {
                     total: parsed.totalResponses
                   });
                   setStreamingContent('');
+                  
+                  // UNIFIED SPRITE SYSTEM: Start sprite generation for this character
+                  // Each character in the group gets independent sprite tracking
+                  if (currentCharacter) {
+                    console.log('[ChatPanel] Group - Starting sprite generation for:', currentCharacter.name);
+                    startSpriteGenerationForCharacter(currentCharacter.id);
+                    
+                    // Create a unique messageKey for this character's triggers
+                    const characterMessageKey = `${streamingMessageKeyRef.current}_${currentCharacter.id}`;
+                    // Reset triggers for this specific character
+                    resetTriggers(characterMessageKey, currentCharacter);
+                  }
                 } else if (parsed.type === 'token' && parsed.content) {
                   currentCharacterContent += parsed.content;
                   setStreamingContent(currentCharacterContent);
                   // UNIFIED TRIGGER SYSTEM: Process sound + sprite triggers in single pass
+                  // CRITICAL: Use unique messageKey per character to avoid position conflicts
+                  const characterMessageKey = `${streamingMessageKeyRef.current}_${currentCharacter?.id || 'unknown'}`;
                   try {
-                    processTriggers(currentCharacterContent, currentCharacter, streamingMessageKeyRef.current, groupCharacters);
+                    processTriggers(currentCharacterContent, currentCharacter, characterMessageKey, groupCharacters);
                   } catch (triggerError) {
                     console.error('[ChatPanel] Group trigger processing error:', triggerError);
                     // Don't throw - continue streaming even if triggers fail
@@ -553,6 +568,23 @@ export function ChatPanel() {
                       }
                     });
                   }
+                  
+                  // UNIFIED SPRITE SYSTEM: End sprite generation for this character
+                  // This properly handles the return to idle if trigger was activated
+                  // IMPORTANT: Only end for the character that just finished, not others
+                  const finishedChar = groupCharacters.find(c => c.id === parsed.characterId);
+                  if (finishedChar) {
+                    console.log('[ChatPanel] Group - Ending sprite generation for:', finishedChar.name);
+                    
+                    // CRITICAL: Complete any pending partial matches (key:value at end of text)
+                    // This ensures trigger sprites like "sprite:test01" are properly detected
+                    // Use unique messageKey per character to avoid position conflicts
+                    const characterMessageKey = `${streamingMessageKeyRef.current}_${finishedChar.id}`;
+                    completeTriggersPartialMatches(characterMessageKey, finishedChar, groupCharacters);
+                    
+                    endSpriteGenerationForCharacter(finishedChar.id);
+                  }
+                  
                   setStreamingContent('');
                   setStreamingCharacter(null);
                 } else if (parsed.type === 'character_error') {
@@ -815,6 +847,10 @@ export function ChatPanel() {
         // End sprite generation for the character
         // If trigger was activated, keeps trigger sprite; otherwise returns to idle
         if (activeCharacter) {
+          // CRITICAL: Complete any pending partial matches (key:value at end of text)
+          // This ensures trigger sprites like "sprite:test01" are properly detected
+          completeTriggersPartialMatches(streamingMessageKeyRef.current, activeCharacter, characters);
+          
           endSpriteGenerationForCharacter(activeCharacter.id);
         }
         
@@ -962,6 +998,9 @@ export function ChatPanel() {
         generationIdRef.current = null;
         // End sprite generation for the character
         if (activeCharacter) {
+          // CRITICAL: Complete any pending partial matches (key:value at end of text)
+          completeTriggersPartialMatches(streamingMessageKeyRef.current, activeCharacter, characters);
+          
           endSpriteGenerationForCharacter(activeCharacter.id);
         }
       }
@@ -1090,6 +1129,9 @@ export function ChatPanel() {
         generationIdRef.current = null;
         // End sprite generation for the character
         if (replayChar) {
+          // CRITICAL: Complete any pending partial matches (key:value at end of text)
+          completeTriggersPartialMatches(streamingMessageKeyRef.current, replayChar, characters);
+          
           endSpriteGenerationForCharacter(replayChar.id);
         }
         

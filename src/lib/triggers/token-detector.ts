@@ -2,6 +2,15 @@
 // Token Detector - Unified Token Detection System
 // ============================================
 // 
+// @deprecated Use KeyDetector instead. This module is kept for backward compatibility
+// but will be removed in a future version. The new KeyDetector provides better
+// detection with support for more formats and better streaming support.
+//
+// Migration guide:
+// - TokenDetector.processIncremental() → KeyDetector.detectKeys()
+// - DetectedToken → DetectedKey
+// - Token type checking → KeyHandler.canHandle() + KeyHandler.handleKey()
+//
 // This module provides a unified token detection system that can be used
 // by multiple trigger types (sounds, sprites, backgrounds, etc.)
 //

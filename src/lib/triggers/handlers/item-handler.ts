@@ -1,6 +1,16 @@
 // ============================================
 // Item Handler - Handles Inventory Triggers
 // ============================================
+//
+// @deprecated Use ItemKeyHandler instead. This legacy handler is kept for
+// backward compatibility but will be removed in a future version.
+// The new ItemKeyHandler provides:
+// - Unified KeyHandler interface
+// - Trigger keyword detection
+// - Context key validation
+// - Per-character position tracking for group chat
+//
+// Migration: Use createItemKeyHandler() from './item-key-handler'
 
 import type { DetectedToken } from '../token-detector';
 import type { TriggerContext } from '../trigger-bus';

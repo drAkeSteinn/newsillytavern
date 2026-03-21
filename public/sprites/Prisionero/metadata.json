@@ -18,7 +18,73 @@
       "label": "talk",
       "filename": "1772241493130-rs6u4h.webm",
       "createdAt": "2026-03-01T01:43:18.516Z",
-      "updatedAt": "2026-03-01T01:43:18.516Z"
+      "updatedAt": "2026-03-20T18:49:43.594Z",
+      "duration": 3000,
+      "timeline": {
+        "duration": 3000,
+        "tracks": [
+          {
+            "id": "765c58db-4522-464d-9f98-929503a0309a",
+            "type": "sound",
+            "name": "Sound Track 1",
+            "keyframes": [
+              {
+                "id": "d4d04d93-2465-418a-aba6-9d3eb141c027",
+                "time": 600,
+                "value": {
+                  "type": "sound",
+                  "soundUrl": "",
+                  "soundTriggerId": "7435a464-45d4-4bb4-bbff-d86215394558",
+                  "soundTriggerName": "gluck",
+                  "volume": 0.8,
+                  "pan": 0,
+                  "play": true,
+                  "stop": false
+                },
+                "interpolation": "hold"
+              },
+              {
+                "id": "7bf8740a-4a62-4bb0-915c-4ad28f028e35",
+                "time": 1500,
+                "value": {
+                  "type": "sound",
+                  "soundUrl": "",
+                  "soundTriggerId": "7435a464-45d4-4bb4-bbff-d86215394558",
+                  "soundTriggerName": "gluck",
+                  "volume": 0.8,
+                  "pan": 0,
+                  "play": true,
+                  "stop": false
+                },
+                "interpolation": "hold"
+              },
+              {
+                "id": "0e8eb117-04d6-49b7-8909-3a0ff9a580b2",
+                "time": 2200,
+                "value": {
+                  "type": "sound",
+                  "soundUrl": "",
+                  "soundTriggerId": "7435a464-45d4-4bb4-bbff-d86215394558",
+                  "soundTriggerName": "gluck",
+                  "volume": 0.8,
+                  "pan": 0,
+                  "play": true,
+                  "stop": false
+                },
+                "interpolation": "hold"
+              }
+            ],
+            "enabled": true,
+            "locked": false,
+            "muted": false,
+            "volume": 1
+          }
+        ],
+        "markers": [],
+        "loop": true,
+        "autoPlaySounds": true,
+        "globalVolume": 1
+      }
     },
     "1eb103ef-538c-4e4f-af0b-485fa77f0178.png": {
       "label": "1eb103ef-538c-4e4f-af0b-485fa77f0178",
@@ -33,5 +99,5 @@
     }
   },
   "createdAt": "2026-03-01T01:43:03.334Z",
-  "updatedAt": "2026-03-01T03:09:54.813Z"
+  "updatedAt": "2026-03-20T18:49:43.594Z"
 }

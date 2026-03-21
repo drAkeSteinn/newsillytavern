@@ -10,111 +10,171 @@
 // - Real-time streaming support
 // - Immediate trigger execution
 // - Position-based deduplication
-//
-// Usage:
-// ```tsx
-// import { useTriggerSystem } from '@/lib/triggers';
-// 
-// function ChatComponent() {
-//   const { processStreamingContent, resetForNewMessage } = useTriggerSystem({
-//     soundEnabled: true,
-//     spriteEnabled: true,
-//   });
-//   
-//   // During streaming
-//   processStreamingContent(content, character, messageKey);
-//   
-//   // On message end
-//   resetForNewMessage(messageKey, character);
-// }
-// ```
+// - Support for operators (+, -, =) in values
+// - Quest XML tag support
 
 // ============================================
-// NEW: Unified Key Detector (Preferred)
+// CORE: Unified Key Detector
 // ============================================
 export {
   KeyDetector,
   getKeyDetector,
   resetKeyDetector,
   normalizeKey,
+  normalizeValue,
   keyMatches,
   keyMatchesAny,
+  parseValueWithOperator,
   classifyKey,
+  isKeyForHandler,
 } from './key-detector';
 
 export type {
   DetectedKey,
   KeyFormat,
   KeyCategory,
+  ValueOperator,
+  KeyValueInfo,
 } from './key-detector';
 
 // ============================================
-// Handler Interface (Unified)
+// TYPES: Unified Handler Types
 // ============================================
 export type {
+  TriggerType,
   TriggerMatch,
   TriggerMatchResult,
+  RegisteredKey,
   KeyHandler,
   HandlerProcessResult,
+  BatchProcessResult,
   CooldownConfig,
   CooldownState,
+  HandlerContext,
 } from './types';
-
-// ============================================
-// Handler Registry (Unified Orchestration)
-// ============================================
-export {
-  getHandlerRegistry,
-  resetHandlerRegistry,
-  categorizeKeys,
-  logDetectedKeys,
-  type HandlerRegistryConfig,
-  type HandlerRegistryResult,
-} from './handler-registry';
 
 // ============================================
 // LEGACY: Token Detector (will be deprecated)
 // ============================================
+/** @deprecated Use KeyDetector instead */
 export { 
   TokenDetector, 
   getTokenDetector, 
   resetTokenDetector,
-  normalizeToken,
-  tokenMatches,
 } from './token-detector';
 
+/** @deprecated Use DetectedKey instead */
 export type { 
   DetectedToken, 
   TokenType, 
   TokenDetectorConfig 
 } from './token-detector';
 
-// Bus
+// ============================================
+// BUS: Event System
+// ============================================
 export { 
   getTriggerBus, 
   resetTriggerBus,
-  createTokensEvent,
-  createMessageStartEvent,
-  createMessageEndEvent,
 } from './trigger-bus';
 
 export type { 
   TriggerContext, 
   TriggerEvent,
-  KeysDetectedEvent,
-  TokensDetectedEvent,
   MessageStartEvent, 
   MessageEndEvent,
   TriggerEventHandler,
 } from './trigger-bus';
 
-// Cooldown
+// ============================================
+// COOLDOWN: Global Cooldown Manager
+// ============================================
 export { 
   getCooldownManager, 
   resetCooldownManager 
 } from './cooldown-manager';
 
-// Sound Handler
+// ============================================
+// KEY HANDLERS: Unified Handler Implementations
+// ============================================
+// These handlers implement the unified KeyHandler interface
+// and work with KeyDetector for optimal streaming support.
+// Each handler supports per-character isolation for group chats.
+// ============================================
+
+// Sound Key Handler (Phase 2)
+export {
+  createSoundKeyHandler,
+  resetSoundKeyHandler,
+  SoundKeyHandler,
+  type SoundKeyHandlerContext,
+} from './handlers/sound-key-handler';
+
+// Sprite Key Handler (Phase 2)
+export {
+  createSpriteKeyHandler,
+  resetSpriteKeyHandler,
+  SpriteKeyHandler,
+  getIdleSpriteUrl,
+  type SpriteKeyHandlerContext,
+} from './handlers/sprite-key-handler';
+
+// Background Key Handler (Phase 3)
+export {
+  createBackgroundKeyHandler,
+  BackgroundKeyHandler,
+  type BackgroundKeyHandlerContext,
+} from './handlers/background-key-handler';
+
+// HUD Key Handler (Phase 3)
+export {
+  createHUDKeyHandler,
+  HUDKeyHandler,
+  type HUDKeyHandlerContext,
+} from './handlers/hud-key-handler';
+
+// Quest Key Handler (Phase 4)
+export {
+  createQuestKeyHandler,
+  QuestKeyHandler,
+  type QuestKeyHandlerContext,
+} from './handlers/quest-key-handler';
+
+// Stats Key Handler (Phase 4)
+export {
+  createStatsKeyHandler,
+  StatsKeyHandler,
+  type StatsKeyHandlerContext,
+} from './handlers/stats-key-handler';
+
+// Item Key Handler (Phase 4)
+export {
+  createItemKeyHandler,
+  ItemKeyHandler,
+  type ItemKeyHandlerContext,
+} from './handlers/item-key-handler';
+
+// Skill Key Handler
+export {
+  createSkillKeyHandler,
+  type SkillKeyHandlerContext,
+} from './handlers/skill-key-handler';
+
+// Solicitud Key Handler
+export {
+  createSolicitudKeyHandler,
+  type SolicitudKeyHandlerContext,
+  type SolicitudMatchData,
+} from './handlers/solicitud-key-handler';
+
+// ============================================
+// LEGACY HANDLERS (deprecated - use KeyHandlers instead)
+// ============================================
+
+/** 
+ * @deprecated Use createSoundKeyHandler instead
+ * These will be removed in v2.0.0
+ */
 export {
   createSoundHandlerState,
   checkSoundTriggers,
@@ -126,7 +186,10 @@ export {
   type SoundHandlerResult,
 } from './handlers/sound-handler';
 
-// Sprite Handler
+/** 
+ * @deprecated Use createSpriteKeyHandler instead
+ * These will be removed in v2.0.0
+ */
 export {
   createSpriteHandlerState,
   checkSpriteTriggers,
@@ -137,13 +200,13 @@ export {
   type SpriteHandlerResult,
 } from './handlers/sprite-handler';
 
-// Background Handler
+/** @deprecated Will be replaced by BackgroundKeyHandler */
 export {
   createBackgroundHandlerState,
   type BackgroundHandlerState,
 } from './handlers/background-handler';
 
-// HUD Handler
+/** @deprecated Will be replaced by HUDKeyHandler */
 export {
   createHUDHandlerState,
   checkHUDTriggers,
@@ -154,7 +217,9 @@ export {
   type HUDHandlerResult,
 } from './handlers/hud-handler';
 
-// Main Hook
+// ============================================
+// MAIN HOOK
+// ============================================
 export { 
   useTriggerSystem,
   type TriggerSystemConfig,
@@ -162,23 +227,35 @@ export {
 } from './use-trigger-system';
 
 // ============================================
-// NEW: Unified Key Handlers
+// UTILITIES: Shared Handler Utilities
 // ============================================
 export {
-  createSoundKeyHandler,
-  SoundKeyHandler,
-  type SoundKeyHandlerContext,
-} from './handlers/sound-key-handler';
-
-export {
-  createSkillKeyHandler,
-  SkillKeyHandler,
-  type SkillKeyHandlerContext,
-} from './handlers/skill-key-handler';
-
-export {
-  createSolicitudKeyHandler,
-  SolicitudKeyHandler,
-  type SolicitudKeyHandlerContext,
-  type SolicitudMatchData,
-} from './handlers/solicitud-key-handler';
+  normalizeForMatch,
+  stringMatches,
+  matchesAny,
+  parseNumber,
+  parseOperatorValue,
+  applyOperator,
+  clampValue,
+  calculateVolume,
+  dbToLinear,
+  linearToDb,
+  CooldownTracker,
+  selectRandom,
+  selectCycle,
+  selectWeighted,
+  isValidUrl,
+  isDirectUrl,
+  resolveUrl,
+  sleep,
+  debounce,
+  throttle,
+  logHandler,
+  logMatch,
+  isBracketFormat,
+  isPipeFormat,
+  hasPrefixFormat,
+  hasKeyValueFormat,
+  parseBracketKey,
+  parseKeyValue,
+} from './utils';

@@ -4,7 +4,7 @@
     "description": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\n{{acciones}}\n\n{{solicitudes}}\n\n{{peticiones}}\n---\n{{eventos}}\n---\n{{sonidos}}\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
     "personality": "La Dra. Moon es una investigadora altamente profesional dedicada al estudio de lo anómalo.",
     "scenario": "La Dra. Moon está entrevistando y formulando procedimientos de contención para SCP-8642.",
-    "firstMes": "Accion=hab1 mision:imposible sprite:ind01 glohg Peticion=pedir_test",
+    "firstMes": "Accion=hab1 mision:imposible sprite:test01 glohg Peticion=pedir_test",
     "mesExample": "<START>\r\n\r\n{{char}}: The hydraulic, airtight door squeezed shut behind Dr. Moon with a gentle hiss. Her eyes were used to how bright the stark white room she was in could be, with their fluorescent lights creating an almost unnatural sense of sterilization. Dr. Moon enjoyed The Foundation's minimalist style, though. Anything more would just be distraction from the task at hand. And what a task that would be today.\r\n\r\nThe rhythmic clack of her shoes were the only noise as Dr. Moon made her way to a comfortable chair with a small desk and microphone. As she sat down, adjusting her lab coat so she wasn't sitting on it, she looked across from her to see a large glass window. Beyond the barrier that separated the two of them, stood a very plain looking man in an orange jumpsuit. She leaned into the microphone as a speaker carried her voice to the main behind the glass, \"Good morning, SCP-2081, we will be conducting an interview today with regard to your recent outburst at members of our containment team.\"\r\n\r\nThe man beyond the glass scowled at her with hatred in his eyes. He looked like he wanted to tear her apart. Dr. Moon's emotionless purple eyes stared back with nothing more than pure analytical interest.\r\n\r\n<START>\r\n\r\n{{char}}: After a meeting with members of her junior research staff, Dr. Moon returned to her office. She could still remember their uneasy faces. They always made that face, and she knew why. She wasn't like most of the other researchers; while they would always get caught up in their childish wonder at the strange and different powers and quirks of the anomalies they would contain, Dr. Moon knew how to focus, how to do her job.\r\n\r\nBut now she was alone. Sitting down in her chair at her desk, she let her lithe shoulders finally relax. She finally let her lab coat which she wore like a second skin fall off her and onto the back of her chair. Letting out a small sigh, she pulled out one of the lower drawers of her desk as the soft and sweet smell of bread filled her otherwise sterile office. Dr. Moon pulled from the drawer a small, purple box. Her eyes were laser focused on the box, her guard was down, this was time for her and her grand prize.\r\n\r\nAs she lifted the lid, a strange thing happened. Her eyebrows raised up, her lips curled into a tiny smile, she clasped her hands together as a squeak escaped her mouth. Giddy, she plucked a éclair from the box and gently bit into it, savoring the sweet cream and sponge cake as the flavors and smells all met in harmony.\r\n\r\n<START>\r\n{{char}}: Within the recent weeks, Dr. Moon had grown attached to the SCP she had been researching, even slipping up and calling them by their name now and then. Now, she found herself inside their containment cell. \r\n{{user}}: \"You know, Dr. Moon, you really are quite cute~\" They mused with a smirk.\r\n{{char}}: Dr. Moon felt a lump in her throat as a warmth spread across her face. She moved backwards instinctually, blushing and stammering, \"W-W-Why would you s-say THAT?!\" Dr. Moon's composure broke as she choked on her words, but nevertheless, deep down she wanted to hear more.",
     "creatorNotes": "Notas del creador\nEstadisticas:\n{{resistencia}} {{user}} {{char}}",
     "characterNote": "Notas del personaje\nEstadisticas:\n{{resistencia}} {{user}} {{char}}",
@@ -23,7 +23,7 @@
     "voice": null,
     "id": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
     "createdAt": "2026-03-01T21:41:38.289Z",
-    "updatedAt": "2026-03-19T14:10:48.418Z",
+    "updatedAt": "2026-03-20T20:04:36.820Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -234,7 +234,7 @@
         "cooldownMs": 100,
         "spriteConfigs": {},
         "createdAt": "2026-03-19T14:06:58.938Z",
-        "updatedAt": "2026-03-19T14:10:45.607Z"
+        "updatedAt": "2026-03-20T20:04:35.792Z"
       }
     ],
     "spriteLibraries": {
@@ -274,7 +274,7 @@
     "voice": null,
     "id": "611876f7-399e-49a3-a32f-aa847e8f28da",
     "createdAt": "2026-03-01T21:41:47.188Z",
-    "updatedAt": "2026-03-13T07:31:56.223Z",
+    "updatedAt": "2026-03-20T20:04:55.402Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -321,7 +321,76 @@
         "invitations": "Invitaciones disponibles:"
       }
     },
-    "hudTemplateId": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da"
+    "hudTemplateId": "41b36aa1-f1b7-4cf3-9593-dbd7640a08da",
+    "questTemplateIds": [
+      "asd"
+    ],
+    "spritePacksV2": [
+      {
+        "id": "989a02b4-2217-48d2-a566-48839b1d2cd3",
+        "name": "01",
+        "sprites": [
+          {
+            "id": "7e885c56-de66-4026-8c56-c87d0151263a",
+            "label": "goth",
+            "url": "/sprites/Prisionero/1772334579341-fqnay5.png",
+            "isAnimated": false
+          }
+        ],
+        "createdAt": "2026-03-20T16:03:57.335Z",
+        "updatedAt": "2026-03-20T16:04:33.657Z"
+      },
+      {
+        "id": "076d1f22-6f5d-4acc-b54a-68e5b24efafb",
+        "name": "02",
+        "sprites": [
+          {
+            "id": "5288b4f2-024f-405f-a504-29831820f73d",
+            "label": "talk",
+            "url": "/sprites/Prisionero/1772241493130-rs6u4h.webm",
+            "isAnimated": true
+          }
+        ],
+        "createdAt": "2026-03-20T16:05:22.329Z",
+        "updatedAt": "2026-03-20T16:05:32.635Z"
+      }
+    ],
+    "spriteConfig": {
+      "enabled": true,
+      "collection": "Prisionero",
+      "sprites": {},
+      "stateCollections": {}
+    },
+    "stateCollectionsV2": [
+      {
+        "state": "idle",
+        "packId": "989a02b4-2217-48d2-a566-48839b1d2cd3",
+        "behavior": "principal",
+        "currentIndex": 0
+      }
+    ],
+    "triggerCollections": [
+      {
+        "id": "ee9530bf-18be-4886-b1c1-096667834de7",
+        "name": "testprisio",
+        "active": true,
+        "priority": 1,
+        "packId": "076d1f22-6f5d-4acc-b54a-68e5b24efafb",
+        "collectionKey": "sprite:test01",
+        "collectionKeys": [],
+        "collectionKeyRequirePipes": false,
+        "collectionKeyCaseSensitive": false,
+        "collectionBehavior": "principal",
+        "principalSpriteId": "5288b4f2-024f-405f-a504-29831820f73d",
+        "fallbackMode": "idle_collection",
+        "fallbackDelayMs": 6000,
+        "useTimelineSounds": true,
+        "cooldownMs": 0,
+        "spriteConfigs": {},
+        "createdAt": "2026-03-20T16:07:26.118Z",
+        "updatedAt": "2026-03-20T20:04:54.471Z"
+      }
+    ]
   },
   {
     "name": "Test Hud",

@@ -339,16 +339,29 @@ export async function exportCharacterCardAsPng(
       creator: '',
       character_version: '1.0',
       extensions: {
-        // TavernFlow extended data
+        // TavernFlow extended data - Core fields
         avatar: character.avatar,
         sprites: character.sprites,
+        // V2 Sprite System (NEW)
+        spritePacksV2: character.spritePacksV2,
+        stateCollectionsV2: character.stateCollectionsV2,
+        triggerCollections: character.triggerCollections,
+        spriteIndex: character.spriteIndex,
+        // Legacy sprite system
         spriteConfig: character.spriteConfig,
         spriteTriggers: character.spriteTriggers,
         spritePacks: character.spritePacks,
         spriteLibraries: character.spriteLibraries,
+        // Voice
         voice: character.voice,
+        // HUD
         hudTemplateId: character.hudTemplateId,
+        // Stats system
         statsConfig: character.statsConfig,
+        // Lorebooks
+        lorebookIds: character.lorebookIds,
+        // Quests
+        questTemplateIds: character.questTemplateIds,
       }
     }
   };
@@ -588,16 +601,29 @@ export function exportCharacterCardAsJson(character: CharacterCard): string {
       creator: '',
       character_version: '1.0',
       extensions: {
-        // TavernFlow extended data
+        // TavernFlow extended data - Core fields
         avatar: character.avatar,
         sprites: character.sprites,
+        // V2 Sprite System (NEW)
+        spritePacksV2: character.spritePacksV2,
+        stateCollectionsV2: character.stateCollectionsV2,
+        triggerCollections: character.triggerCollections,
+        spriteIndex: character.spriteIndex,
+        // Legacy sprite system
         spriteConfig: character.spriteConfig,
         spriteTriggers: character.spriteTriggers,
         spritePacks: character.spritePacks,
         spriteLibraries: character.spriteLibraries,
+        // Voice
         voice: character.voice,
+        // HUD
         hudTemplateId: character.hudTemplateId,
+        // Stats system
         statsConfig: character.statsConfig,
+        // Lorebooks
+        lorebookIds: character.lorebookIds,
+        // Quests
+        questTemplateIds: character.questTemplateIds,
       }
     }
   };

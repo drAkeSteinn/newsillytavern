@@ -1,6 +1,16 @@
 // ============================================
 // Sound Handler - Handles Sound Triggers
 // ============================================
+//
+// @deprecated Use SoundKeyHandler instead. This legacy handler is kept for
+// backward compatibility but will be removed in a future version.
+// The new SoundKeyHandler provides:
+// - Per-character audio queues for group chat
+// - Better cooldown tracking
+// - Unified KeyHandler interface
+// - Better streaming support
+//
+// Migration: Use createSoundKeyHandler() from './sound-key-handler'
 
 import type { TriggerMatch, TriggerMatchResult } from '../types';
 import type { DetectedToken } from '../token-detector';

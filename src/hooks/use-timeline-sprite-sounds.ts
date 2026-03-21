@@ -262,7 +262,17 @@ function playSoundsAtTime(
       console.log(`[TimelineSounds] 🔇 Track "${track.name}" muted or disabled`);
       continue;
     }
-    if (track.type !== 'sound') {
+    
+    // Check if this is a sound track - support both 'sound' and 'sprite' types
+    // (legacy fix: some tracks were saved with type 'sprite' but contain sound keyframes)
+    const isSoundTrack = track.type === 'sound' || (
+      track.type === 'sprite' && track.keyframes.some(kf => {
+        const val = kf.value as Record<string, unknown>;
+        return val?.soundTriggerId || val?.play;
+      })
+    );
+    
+    if (!isSoundTrack) {
       console.log(`[TimelineSounds] ⏭️ Track "${track.name}" is not sound type (${track.type})`);
       continue;
     }
@@ -398,8 +408,16 @@ function startTimelineSound(
   // Stop any existing timeline for this character
   stopTimelineSound(characterId);
 
+  // Filter sound tracks - support both 'sound' and 'sprite' types with sound keyframes
   const soundTracks = timeline.tracks.filter(
-    t => t.type === 'sound' && !t.muted && t.enabled
+    t => !t.muted && t.enabled && (
+      t.type === 'sound' || (
+        t.type === 'sprite' && t.keyframes.some(kf => {
+          const val = kf.value as Record<string, unknown>;
+          return val?.soundTriggerId || val?.play;
+        })
+      )
+    )
   );
 
   if (soundTracks.length === 0) {
@@ -521,8 +539,16 @@ export function useTimelineSpriteSounds() {
             return;
           }
 
+          // Filter sound tracks - support both 'sound' and 'sprite' types with sound keyframes
           const soundTracks = spriteMeta.timeline.tracks.filter(
-            (t: TimelineTrack) => t.type === 'sound' && !t.muted && t.enabled
+            (t: TimelineTrack) => !t.muted && t.enabled && (
+              t.type === 'sound' || (
+                t.type === 'sprite' && t.keyframes.some(kf => {
+                  const val = kf.value as Record<string, unknown>;
+                  return val?.soundTriggerId || val?.play;
+                })
+              )
+            )
           );
 
           if (soundTracks.length === 0) {

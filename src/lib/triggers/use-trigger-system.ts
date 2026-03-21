@@ -50,6 +50,12 @@ import {
   type SoundKeyHandlerContext,
 } from './handlers/sound-key-handler';
 import {
+  createSpriteKeyHandler,
+  SpriteKeyHandler,
+  type SpriteKeyHandlerContext,
+  getIdleSpriteUrl,
+} from './handlers/sprite-key-handler';
+import {
   createSkillKeyHandler,
   SkillKeyHandler,
   type SkillKeyHandlerContext,
@@ -59,6 +65,31 @@ import {
   SolicitudKeyHandler,
   type SolicitudKeyHandlerContext,
 } from './handlers/solicitud-key-handler';
+import {
+  createBackgroundKeyHandler,
+  BackgroundKeyHandler,
+  type BackgroundKeyHandlerContext,
+} from './handlers/background-key-handler';
+import {
+  createHUDKeyHandler,
+  HUDKeyHandler,
+  type HUDKeyHandlerContext,
+} from './handlers/hud-key-handler';
+import {
+  createQuestKeyHandler,
+  QuestKeyHandler,
+  type QuestKeyHandlerContext,
+} from './handlers/quest-key-handler';
+import {
+  createStatsKeyHandler,
+  StatsKeyHandler,
+  type StatsKeyHandlerContext,
+} from './handlers/stats-key-handler';
+import {
+  createItemKeyHandler,
+  ItemKeyHandler,
+  type ItemKeyHandlerContext,
+} from './handlers/item-key-handler';
 
 // ============================================
 // LEGACY: TokenDetector (for handlers not yet migrated)
@@ -207,7 +238,13 @@ export interface TriggerSystemResult {
     characters?: CharacterCard[]
   ) => void;
   
-  resetForNewMessage: (messageKey: string, character: CharacterCard | null) => void;
+  completePartialMatches: (
+    messageKey: string,
+    character: CharacterCard | null,
+    characters?: CharacterCard[]
+  ) => DetectedKey | null;
+  
+  resetForNewMessage: (messageKey: string, character: CharacterCard | null, characters?: CharacterCard[]) => void;
   
   // Clear ALL state - call this when chat is reset
   clearAllState: () => void;
@@ -345,19 +382,35 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     });
 
     // Check if already processed this exact content
-    const lastProcessed = lastProcessedRef.current.get(messageKey);
+    // Use characterMessageKey for cache to avoid cross-character conflicts in group chat
+    // But we need to compute characterMessageKey first
+    let characterMessageKey: string;
+    if (character?.id) {
+      // Check if messageKey already ends with the characterId (group chat case)
+      if (messageKey.endsWith(`_${character.id}`)) {
+        characterMessageKey = messageKey;
+      } else {
+        characterMessageKey = `${messageKey}_${character.id}`;
+      }
+    } else {
+      characterMessageKey = messageKey;
+    }
+    
+    const lastProcessed = lastProcessedRef.current.get(characterMessageKey);
     if (lastProcessed === content) {
-      console.log(`[TriggerSystem] Skipping - same content as last processed`);
+      console.log(`[TriggerSystem] Skipping - same content as last processed for ${characterMessageKey}`);
       return;
     }
-    lastProcessedRef.current.set(messageKey, content);
+    lastProcessedRef.current.set(characterMessageKey, content);
+    
+    console.log(`[TriggerSystem] Using characterMessageKey: ${characterMessageKey}`);
     
     // Create context (needed for both token-based triggers AND solicitud processing)
     const context: TriggerContext = {
       character,
       characters,
       fullText: content,
-      messageKey,
+      messageKey: characterMessageKey,
       isStreaming: true,
       timestamp: Date.now(),
     };
@@ -370,7 +423,8 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     const registry = getHandlerRegistry();
     
     // Detect formatted keys incrementally (only NEW keys since last call)
-    const newKeys = keyDetector.detectKeys(content, messageKey);
+    // Use characterMessageKey for independent tracking per character
+    const newKeys = keyDetector.detectKeys(content, characterMessageKey);
     
     // Also detect plain word keys for registered sound triggers
     // This is needed because "glohg" and "gluck" are plain words without special format
@@ -387,10 +441,91 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         ...(s.activationKeys || [])
       ].filter(Boolean)) || [];
     
-    // Combine all keywords to detect as plain words
-    const allKeywords = [...soundKeywords, ...skillActivationKeys];
+    // Also detect background trigger keys as plain words
+    // This is needed because "sofa", "cama", etc. are plain words without special format
+    const backgroundKeywords = store.backgroundTriggerPacks
+      ?.filter(p => p.active)
+      ?.flatMap(p => p.items.filter(i => i.enabled).flatMap(i => i.triggerKeys)) || [];
     
-    const wordKeys = keyDetector.detectWordKeys(content, messageKey, allKeywords);
+    // Also detect quest activation and objective completion keys as plain words
+    // Quest activation keys from available quests
+    const activeSession = store.getActiveSession?.();
+    const sessionQuests = activeSession?.sessionQuests || [];
+    
+    // Get quest templates for looking up activation/completion keys
+    const questTemplates = store.questTemplates || [];
+    
+    // Activation keys from available quests
+    const questActivationKeys = sessionQuests
+      .filter(q => q.status === 'available')
+      .flatMap(q => {
+        const template = questTemplates.find(t => t.id === q.templateId);
+        if (template?.activation?.method === 'keyword') {
+          return [
+            template.activation.key,
+            ...(template.activation.keys || [])
+          ].filter(Boolean);
+        }
+        return [];
+      });
+    
+    // Objective completion keys from active quests
+    const questObjectiveKeys = sessionQuests
+      .filter(q => q.status === 'active')
+      .flatMap(q => {
+        const template = questTemplates.find(t => t.id === q.templateId);
+        if (!template) return [];
+        return template.objectives.flatMap(obj => {
+          const sessionObj = q.objectives.find(o => o.templateId === obj.id);
+          if (sessionObj?.isCompleted) return [];
+          return [
+            obj.completion?.key,
+            ...(obj.completion?.keys || [])
+          ].filter(Boolean);
+        });
+      });
+    
+    // Quest completion keys from active quests
+    const questCompletionKeys = sessionQuests
+      .filter(q => q.status === 'active')
+      .flatMap(q => {
+        const template = questTemplates.find(t => t.id === q.templateId);
+        if (!template) return [];
+        return [
+          template.completion?.key,
+          ...(template.completion?.keys || [])
+        ].filter(Boolean);
+      });
+    
+    // Combine all keywords to detect as plain words
+    const allKeywords = [
+      ...soundKeywords,
+      ...skillActivationKeys,
+      ...backgroundKeywords,
+      ...questActivationKeys,
+      ...questObjectiveKeys,
+      ...questCompletionKeys,
+    ];
+    
+    // DEBUG: Log keyword detection setup
+    console.log(`[TriggerSystem] Keyword detection setup:`, {
+      soundKeywordsCount: soundKeywords.length,
+      skillActivationKeysCount: skillActivationKeys.length,
+      backgroundKeywordsCount: backgroundKeywords.length,
+      questActivationKeysCount: questActivationKeys.length,
+      questObjectiveKeysCount: questObjectiveKeys.length,
+      questCompletionKeysCount: questCompletionKeys.length,
+      allKeywordsCount: allKeywords.length,
+      // Show actual quest keywords for debugging
+      questActivationKeys,
+      questObjectiveKeys,
+      questCompletionKeys,
+      sessionQuestsCount: sessionQuests.length,
+      sessionQuestsStatuses: sessionQuests.map(q => q.status),
+    });
+    
+    // Use characterMessageKey for independent tracking per character
+    const wordKeys = keyDetector.detectWordKeys(content, characterMessageKey, allKeywords);
     
     // Combine all detected keys (formatted + plain words)
     const allDetectedKeys = [...newKeys, ...wordKeys];
@@ -415,42 +550,202 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
         }] as CharacterCard[] : []),
       ];
       
+      // ============================================
+      // UNIFIED HANDLER REGISTRY PROCESSING
+      // Register all handlers and process keys through registry
+      // This replaces the manual loop with a unified handler system
+      // ============================================
+      
+      // Build context for handlers
+      const soundKeyHandlerContext: SoundKeyHandlerContext = {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        soundTriggers: store.soundTriggers,
+        soundCollections: store.soundCollections,
+        soundSequenceTriggers: store.soundSequenceTriggers,
+        soundSettings: {
+          enabled: settings.sound?.enabled ?? false,
+          globalVolume: settings.sound?.globalVolume ?? 0.85,
+          globalCooldown: settings.sound?.globalCooldown ?? 0,
+        },
+        cooldownContextKey: character?.id || 'default',
+        playSound: store.playSound?.bind(store),
+      };
+      
+      const spriteKeyHandlerContext: SpriteKeyHandlerContext = {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        character,
+        allCharacters: characters,
+        triggerCollections: character?.triggerCollections ?? [],
+        spritePacksV2: character?.spritePacksV2 ?? store.spritePacksV2 ?? [],
+        stateCollectionsV2: character?.stateCollectionsV2,
+        spritePacks: character?.spritePacks ?? store.spritePacks ?? [],
+        spriteTriggers: character?.spriteTriggers ?? [],
+        spriteIndex: store.spriteIndex,
+        isSpriteLocked: store.isSpriteLocked?.() ?? false,
+        applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+        scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+        addTriggerToQueue: store.addTriggerToQueue?.bind(store),
+        startSpriteChain: store.startSpriteChain?.bind(store),
+        startSoundChain: store.startSoundChain?.bind(store),
+      };
+      
+      const skillHandlerContext: SkillKeyHandlerContext = {
+        ...context,
+        characterId: character?.id || '',
+        characterName: character?.name || '',
+        statsConfig: character?.statsConfig,
+        sessionStats: activeSession?.sessionStats,
+        sessionId,
+        storeActions: {
+          updateCharacterStat: store.updateCharacterStat.bind(store),
+          updateSessionEvent: store.updateSessionEvent?.bind(store),
+        },
+      };
+      
+      const solicitudHandlerContext: SolicitudKeyHandlerContext = {
+        ...context,
+        characterId: character?.id || '',
+        characterName: character?.name || '',
+        statsConfig: character?.statsConfig,
+        sessionStats: activeSession?.sessionStats,
+        sessionId,
+        allCharacters: allCharactersWithPersona,
+        activePersona: config.activePersona,
+        storeActions: {
+          createSolicitud: store.createSolicitud.bind(store),
+          completeSolicitud: store.completeSolicitud.bind(store),
+          getSessionStats: (sid: string) => {
+            const session = store.sessions?.find((s: any) => s.id === sid);
+            return session?.sessionStats || null;
+          },
+        },
+      };
+      
+      // Create handler instances (outside the loop to maintain state)
+      const soundHandler = createSoundKeyHandler(config.maxSoundsPerMessage ?? 10);
+      const spriteHandler = createSpriteKeyHandler();
+      const skillHandler = createSkillKeyHandler();
+      const solicitudHandler = createSolicitudKeyHandler();
+      const backgroundHandler = createBackgroundKeyHandler();
+      const hudHandler = createHUDKeyHandler();
+      const questHandler = createQuestKeyHandler();
+      const statsHandler = createStatsKeyHandler();
+      const itemHandler = createItemKeyHandler();
+
+      // Build handler contexts (outside the loop for efficiency)
+      const backgroundKeyHandlerContext: BackgroundKeyHandlerContext = {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        backgroundPacks: store.backgroundTriggerPacks ?? [],
+        backgroundSettings: {
+          enabled: settings.backgroundTriggers?.enabled ?? false,
+          globalCooldown: settings.backgroundTriggers?.globalCooldown ?? 0,
+          transitionDuration: settings.backgroundTriggers?.transitionDuration ?? 500,
+          defaultTransitionType: settings.backgroundTriggers?.defaultTransitionType ?? 'fade',
+          returnToDefaultEnabled: settings.backgroundTriggers?.returnToDefaultEnabled ?? false,
+          returnToDefaultAfter: settings.backgroundTriggers?.returnToDefaultAfter ?? 300000,
+          defaultBackgroundUrl: settings.backgroundTriggers?.defaultBackgroundUrl ?? '',
+          globalOverlays: settings.backgroundTriggers?.globalOverlays ?? [],
+        },
+        cooldownContextKey: character?.id || 'default',
+        setBackground: store.setBackground?.bind(store),
+        setOverlays: store.setActiveOverlays?.bind(store),
+      };
+
+      const activeHUDTemplate = getActiveHUDTemplate();
+      const hudKeyHandlerContext: HUDKeyHandlerContext | null = activeHUDTemplate ? {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        activeHUDTemplate,
+        currentHUDValues: store.hudSessionState.fieldValues,
+        updateHUDFieldValue: store.updateHUDFieldValue.bind(store),
+      } : null;
+
+      // Quest handler context
+      const questKeyHandlerContext: QuestKeyHandlerContext = {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        questTemplates: store.questTemplates ?? [],
+        sessionQuests: activeSession?.sessionQuests ?? [],
+        questSettings: store.questSettings ?? { enabled: false },
+        turnCount: activeSession?.turnCount ?? 0,
+        activateQuest: store.activateQuest?.bind(store),
+        progressQuestObjective: store.progressQuestObjective?.bind(store),
+        completeQuest: store.completeQuest?.bind(store),
+      };
+
+      // Stats handler context
+      const statsKeyHandlerContext: StatsKeyHandlerContext = {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        characterName: character?.name,
+        statsConfig: character?.statsConfig,
+        sessionStats: activeSession?.sessionStats,
+        updateCharacterStat: store.updateCharacterStat.bind(store),
+      };
+
+      // Item handler context
+      const itemKeyHandlerContext: ItemKeyHandlerContext = {
+        ...context,
+        sessionId,
+        characterId: character?.id,
+        items: store.items ?? [],
+        inventoryEntries: store.inventoryEntries ?? [],
+        inventorySettings: store.inventorySettings ?? { enabled: false },
+        defaultContainerId: store.defaultContainerId,
+        addToInventory: store.addToInventory?.bind(store),
+        removeFromInventory: store.removeFromInventory?.bind(store),
+        equipItem: store.equipItem?.bind(store),
+        unequipItem: store.unequipItem?.bind(store),
+        addNotification: store.addInventoryNotification?.bind(store),
+      };
+
       // Process keys through unified handlers
       for (const detectedKey of allDetectedKeys) {
-        // NOTE: Sound handling is done by the legacy system below (token-based)
-        // This avoids double-processing sounds through both systems
-        // The KeyHandler system is kept for skills and solicitudes only
+        // 1. Sound Handler (highest priority for audio)
+        if (config.soundEnabled !== false && settings.sound?.enabled) {
+          if (soundHandler.canHandle(detectedKey, soundKeyHandlerContext)) {
+            const result = soundHandler.handleKey(detectedKey, soundKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Sound key matched: ${detectedKey.key}`);
+              soundHandler.execute(result.trigger, soundKeyHandlerContext);
+            }
+          }
+        }
         
-        // Skill handler (for skill activations)
+        // 2. Sprite Handler
+        if (config.spriteEnabled !== false) {
+          if (spriteHandler.canHandle(detectedKey, spriteKeyHandlerContext)) {
+            const result = spriteHandler.handleKey(detectedKey, spriteKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Sprite key matched: ${detectedKey.key}`);
+              spriteHandler.execute(result.trigger, spriteKeyHandlerContext);
+            }
+          }
+        }
+        
+        // 3. Skill Handler (for skill activations)
         if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
-          const skillHandlerContext: SkillKeyHandlerContext = {
-            ...context,
-            characterId: character.id,
-            characterName: character.name,  // For ultima_accion_realizada format
-            statsConfig: character.statsConfig,
-            sessionStats: activeSession?.sessionStats,
-            sessionId,
-            storeActions: {
-              updateCharacterStat: store.updateCharacterStat.bind(store),
-              updateSessionEvent: store.updateSessionEvent?.bind(store),
-            },
-          };
-          
-          const skillHandler = createSkillKeyHandler();
           if (skillHandler.canHandle(detectedKey, skillHandlerContext)) {
             const result = skillHandler.handleKey(detectedKey, skillHandlerContext);
             if (result?.matched) {
-              console.log(`[TriggerSystem] Skill key matched: ${detectedKey.key} (format: ${detectedKey.format}, value: ${detectedKey.value || 'none'})`);
+              console.log(`[TriggerSystem] Skill key matched: ${detectedKey.key}`);
               skillHandler.execute(result.trigger, skillHandlerContext);
               
               // Execute activation rewards (sounds, sprites, etc.)
               const rewards = result.trigger.data?.activationRewards || [];
-              console.log(`[TriggerSystem] Skill has ${rewards.length} activation rewards`);
               if (rewards.length > 0) {
-                console.log(`[TriggerSystem] Executing ${rewards.length} skill activation rewards for skill "${result.trigger.data?.skillName || 'unknown'}"`);
+                console.log(`[TriggerSystem] Executing ${rewards.length} skill activation rewards`);
                 for (const reward of rewards) {
                   try {
-                    console.log(`[TriggerSystem] Executing reward:`, reward.type, reward.key || reward.category);
                     executeTriggerRewardFromQuest(reward, {
                       sessionId,
                       characterId: character.id,
@@ -487,33 +782,13 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
           }
         }
         
-        // Solicitud handler (for peticiones/solicitudes)
+        // 4. Solicitud Handler (for peticiones/solicitudes)
         if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
           const hasPeticiones = character.statsConfig.invitations && character.statsConfig.invitations.length > 0;
           const hasPendingSolicitudes = activeSession?.sessionStats?.solicitudes?.characterSolicitudes?.[character.id]
             ?.some(s => s.status === 'pending');
           
           if (hasPeticiones || hasPendingSolicitudes) {
-            const solicitudHandlerContext: SolicitudKeyHandlerContext = {
-              ...context,
-              characterId: character.id,
-              characterName: character.name,
-              statsConfig: character.statsConfig,
-              sessionStats: activeSession?.sessionStats,
-              sessionId,
-              allCharacters: allCharactersWithPersona,
-              activePersona: config.activePersona,
-              storeActions: {
-                createSolicitud: store.createSolicitud.bind(store),
-                completeSolicitud: store.completeSolicitud.bind(store),
-                getSessionStats: (sid: string) => {
-                  const session = store.sessions?.find((s: any) => s.id === sid);
-                  return session?.sessionStats || null;
-                },
-              },
-            };
-            
-            const solicitudHandler = createSolicitudKeyHandler();
             if (solicitudHandler.canHandle(detectedKey, solicitudHandlerContext)) {
               const result = solicitudHandler.handleKey(detectedKey, solicitudHandlerContext);
               if (result?.matched) {
@@ -523,7 +798,71 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
             }
           }
         }
+
+        // 5. Background Handler
+        if (config.backgroundEnabled !== false && settings.backgroundTriggers?.enabled) {
+          if (backgroundHandler.canHandle(detectedKey, backgroundKeyHandlerContext)) {
+            const result = backgroundHandler.handleKey(detectedKey, backgroundKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Background key matched: ${detectedKey.key}`);
+              backgroundHandler.execute(result.trigger, backgroundKeyHandlerContext);
+            }
+          }
+        }
+
+        // 6. HUD Handler
+        if (config.hudEnabled !== false && hudKeyHandlerContext) {
+          if (hudHandler.canHandle(detectedKey, hudKeyHandlerContext)) {
+            const result = hudHandler.handleKey(detectedKey, hudKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] HUD key matched: ${detectedKey.key}`);
+              hudHandler.execute(result.trigger, hudKeyHandlerContext);
+            }
+          }
+        }
+
+        // 7. Quest Handler
+        if (config.questEnabled !== false && store.questSettings?.enabled) {
+          if (questHandler.canHandle(detectedKey, questKeyHandlerContext)) {
+            const result = questHandler.handleKey(detectedKey, questKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Quest key matched: ${detectedKey.key}`);
+              questHandler.execute(result.trigger, questKeyHandlerContext);
+            }
+          }
+        }
+
+        // 8. Stats Handler
+        if (config.statsEnabled !== false && character?.statsConfig?.enabled) {
+          if (statsHandler.canHandle(detectedKey, statsKeyHandlerContext)) {
+            const result = statsHandler.handleKey(detectedKey, statsKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Stats key matched: ${detectedKey.key}`);
+              statsHandler.execute(result.trigger, statsKeyHandlerContext);
+            }
+          }
+        }
+
+        // 9. Item Handler
+        if (config.inventoryEnabled !== false && store.inventorySettings?.enabled) {
+          if (itemHandler.canHandle(detectedKey, itemKeyHandlerContext)) {
+            const result = itemHandler.handleKey(detectedKey, itemKeyHandlerContext);
+            if (result?.matched) {
+              console.log(`[TriggerSystem] Item key matched: ${detectedKey.key}`);
+              itemHandler.execute(result.trigger, itemKeyHandlerContext);
+            }
+          }
+        }
       }
+
+      // Reset handlers for next message (use characterMessageKey for correct tracking)
+      soundHandler.reset(characterMessageKey);
+      spriteHandler.reset(characterMessageKey);
+      backgroundHandler.reset(characterMessageKey);
+      hudHandler.reset(characterMessageKey);
+      questHandler.reset(characterMessageKey);
+      statsHandler.reset(characterMessageKey);
+      itemHandler.reset(characterMessageKey);
     }
     
     // ============================================
@@ -618,209 +957,10 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
       return;
     }
     
-    // Process sound triggers
-    if (config.soundEnabled !== false && settings.sound?.enabled) {
-      const soundContext: SoundTriggerContext = {
-        ...context,
-        soundTriggers: store.soundTriggers,
-        soundCollections: store.soundCollections,
-        soundSettings: {
-          enabled: settings.sound?.enabled ?? false,
-          globalVolume: settings.sound?.globalVolume ?? 0.85,
-          globalCooldown: settings.sound?.globalCooldown ?? 0,
-        },
-        cooldownContextKey: character?.id || 'default',
-      };
-      
-      const soundResult = checkSoundTriggers(
-        newTokens, 
-        soundContext, 
-        soundHandlerState,
-        settings.sound?.maxSoundsPerMessage ?? config.maxSoundsPerMessage ?? 10
-      );
-      
-      // Execute ALL matched sound triggers (they queue up automatically)
-      if (soundResult?.matched && soundResult.triggers.length > 0) {
-        executeAllSoundTriggers(soundResult, context);
-      }
-      
-      // Process sound sequence triggers (activation key detection)
-      if (store.soundSequenceTriggers && store.soundSequenceTriggers.length > 0) {
-        const sequenceContext: SoundSequenceContext = {
-          ...context,
-          soundSequenceTriggers: store.soundSequenceTriggers,
-          soundTriggers: store.soundTriggers,
-          soundCollections: store.soundCollections,
-          soundSettings: {
-            enabled: settings.sound?.enabled ?? false,
-            globalVolume: settings.sound?.globalVolume ?? 0.85,
-            globalCooldown: settings.sound?.globalCooldown ?? 0,
-          },
-          cooldownContextKey: character?.id || 'default',
-        };
-        
-        const sequenceResult = checkSoundSequenceTriggers(newTokens, sequenceContext);
-        
-        if (sequenceResult.matched && sequenceResult.sequences.length > 0) {
-          console.log(`[TriggerSystem] Sound sequences matched: ${sequenceResult.sequences.map(s => s.sequence.name).join(', ')}`);
-          executeAllSoundSequenceTriggers(sequenceResult, sequenceContext);
-        }
-      }
-    }
-    
-    // Process sprite triggers
-    // Priority: V2 Trigger Collections > Legacy Sprite Packs > Simple Triggers
-    if (config.spriteEnabled !== false) {
-      // Get idle sprite URL helper (used by both V2 and legacy)
-      const getIdleSpriteUrl = (): string | null => {
-        if (!character) return null;
-        
-        // Try V2 state collections first
-        const idleCollectionV2 = character.stateCollectionsV2?.find(c => c.state === 'idle');
-        if (idleCollectionV2) {
-          const pack = character.spritePacksV2?.find(p => p.id === idleCollectionV2.packId);
-          if (pack && idleCollectionV2.principalSpriteId) {
-            const sprite = pack.sprites.find(s => s.id === idleCollectionV2.principalSpriteId);
-            if (sprite) return sprite.url;
-          }
-          if (pack && pack.sprites.length > 0) {
-            return pack.sprites[0].url;
-          }
-        }
-        
-        // Fall back to legacy state collections
-        const idleCollection = character.spriteConfig?.stateCollections?.['idle'];
-        if (idleCollection?.entries.length) {
-          const entry = idleCollection.entries.find(e => e.role === 'principal') || idleCollection.entries[0];
-          if (entry?.spriteUrl) return entry.spriteUrl;
-        }
-        if (character.spriteConfig?.sprites?.['idle']) {
-          return character.spriteConfig.sprites['idle'];
-        }
-        if (character.avatar) {
-          return character.avatar;
-        }
-        return null;
-      };
-      
-      // Try V2 Trigger Collections first (highest priority)
-      const hasV2Data = (character?.triggerCollections && character.triggerCollections.length > 0) ||
-                        (character?.spritePacksV2 && character.spritePacksV2.length > 0);
-      
-      if (hasV2Data) {
-        const v2Context: SpriteTriggerContextV2 = {
-          ...context,
-          triggerCollections: character?.triggerCollections ?? [],
-          spritePacksV2: character?.spritePacksV2 ?? store.spritePacksV2 ?? [],
-          spriteIndex: store.spriteIndex,
-          character: character,
-          isSpriteLocked: store.isSpriteLocked(),
-        };
-        
-        const v2Results = checkTriggerCollections(
-          newTokens,
-          v2Context,
-          spriteHandlerState
-        );
-        
-        // Process ALL matched triggers
-        if (v2Results.length > 0) {
-          console.log('[TriggerSystem] V2 triggers matched:', v2Results.length, v2Results.map(r => ({
-            collectionId: r.collection.id,
-            collectionName: r.collection.name,
-            spriteUrl: r.selectedSprite.url,
-            spriteLabel: r.selectedSprite.label,
-            matchSource: r.matchSource,
-          })));
-          
-          // Process each result
-          for (let i = 0; i < v2Results.length; i++) {
-            const v2Result = v2Results[i];
-            
-            // Mark collection as triggered for cooldown
-            markCollectionTriggered(v2Result.collection.id, spriteHandlerState);
-            
-            if (i === 0) {
-              // First trigger - apply immediately
-              console.log('[TriggerSystem] Applying first trigger immediately:', v2Result.selectedSprite.label);
-              executeTriggerCollectionResult(v2Result, v2Context, {
-                applyTriggerForCharacter: store.applyTriggerForCharacter.bind(store),
-                scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter.bind(store),
-                addTriggerToQueue: store.addTriggerToQueue.bind(store),
-                startSpriteChain: store.startSpriteChain.bind(store),
-                startSoundChain: store.startSoundChain.bind(store),
-              }, getIdleSpriteUrl);
-            } else {
-              // Subsequent triggers - add to queue
-              console.log('[TriggerSystem] Adding trigger to queue:', v2Result.selectedSprite.label);
-              
-              // Resolve fallback sprite URL based on mode
-              const fallbackMode = v2Result.spriteConfig?.fallbackMode ?? v2Result.collection.fallbackMode;
-              const fallbackSpriteId = v2Result.spriteConfig?.fallbackSpriteId ?? v2Result.collection.fallbackSpriteId;
-              let fallbackSpriteUrl: string | undefined;
-              
-              if (fallbackMode === 'custom_sprite' && fallbackSpriteId) {
-                const fallbackSprite = v2Result.spritePack.sprites.find(s => s.id === fallbackSpriteId);
-                if (fallbackSprite) {
-                  fallbackSpriteUrl = fallbackSprite.url;
-                }
-              } else if (fallbackMode === 'idle_collection') {
-                fallbackSpriteUrl = getIdleSpriteUrl() ?? undefined;
-              } else if (fallbackMode === 'collection_default') {
-                // Use collection's principal sprite or first sprite
-                const principalSprite = v2Result.spritePack.sprites.find(
-                  s => s.id === v2Result.collection.principalSpriteId
-                ) ?? v2Result.spritePack.sprites[0];
-                if (principalSprite) {
-                  fallbackSpriteUrl = principalSprite.url;
-                } else {
-                  fallbackSpriteUrl = getIdleSpriteUrl() ?? undefined;
-                }
-              }
-              
-              store.addTriggerToQueue(character!.id, {
-                triggerCollectionId: v2Result.collection.id,
-                spriteId: v2Result.selectedSprite.id,
-                spriteUrl: v2Result.selectedSprite.url,
-                spriteLabel: v2Result.selectedSprite.label,
-                source: v2Result.matchSource,
-                fallbackMode,
-                fallbackDelayMs: v2Result.spriteConfig?.fallbackDelayMs ?? v2Result.collection.fallbackDelayMs,
-                fallbackSpriteId,
-                fallbackSpriteUrl,
-              });
-            }
-          }
-          
-          // V2 matched, don't check legacy
-          return;
-        }
-      }
-      
-      // Fall back to legacy sprite system
-      const spriteContext: SpriteTriggerContext = {
-        ...context,
-        spritePacks: character?.spritePacks ?? store.spritePacks ?? [],
-        spriteTriggers: character?.spriteTriggers ?? [],
-        spriteIndex: store.spriteIndex,
-        spriteLibraries: store.spriteLibraries,
-        isSpriteLocked: store.isSpriteLocked(),
-      };
-      
-      const spriteResult = checkSpriteTriggers(
-        newTokens, 
-        spriteContext, 
-        spriteHandlerState
-      );
-      
-      if (spriteResult?.matched && spriteResult.trigger) {
-        // Execute sprite trigger using the handler function
-        executeSpriteTrigger(spriteResult.trigger, context, {
-          applyTriggerForCharacter: store.applyTriggerForCharacter.bind(store),
-          scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter.bind(store),
-        }, getIdleSpriteUrl);
-      }
-    }
+    // ============================================
+    // NOTE: Sound and Sprite are now handled by the UNIFIED KeyHandlers above
+    // The legacy processing below has been removed to avoid double-processing
+    // ============================================
     
     // Process HUD triggers
     if (config.hudEnabled !== false) {
@@ -1308,12 +1448,155 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   }, [processStreamingContent]);
   
   /**
+   * Complete any pending partial matches and process them
+   * This should be called when streaming ends to capture key:value pairs at end of text
+   */
+  const completePartialMatches = useCallback((
+    messageKey: string, 
+    character: CharacterCard | null,
+    characters?: CharacterCard[]
+  ): DetectedKey | null => {
+    const keyDetector = getKeyDetector();
+    
+    // Create characterMessageKey with same logic as processStreamingContent
+    let characterMessageKey: string;
+    if (character?.id) {
+      // Check if messageKey already ends with the characterId (group chat case)
+      if (messageKey.endsWith(`_${character.id}`)) {
+        characterMessageKey = messageKey;
+      } else {
+        characterMessageKey = `${messageKey}_${character.id}`;
+      }
+    } else {
+      characterMessageKey = messageKey;
+    }
+    
+    // Complete any pending partial match
+    const completedKey = keyDetector.completePartialMatch(characterMessageKey);
+    
+    if (completedKey) {
+      console.log(`[TriggerSystem] Completed partial match:`, {
+        key: completedKey.key,
+        value: completedKey.value,
+        format: completedKey.format,
+        characterId: character?.id,
+      });
+      
+      // Process the completed key through handlers
+      const sessionId = store.activeSessionId || '';
+      const activeSession = store.getActiveSession?.();
+      
+      // Include persona as pseudo-character for peticiones targeting __user__
+      const allCharactersWithPersona = [
+        ...(characters || []),
+        ...(config.activePersona?.statsConfig?.enabled ? [{
+          id: '__user__',
+          name: config.activePersona.name || 'User',
+          statsConfig: config.activePersona.statsConfig,
+        }] as CharacterCard[] : []),
+      ];
+      
+      // Build context for sprite handler (most common case for key:value)
+      const spriteKeyHandlerContext: SpriteKeyHandlerContext = {
+        character,
+        characters,
+        characterId: character?.id,
+        messageKey,
+        fullText: '',
+        isStreaming: false,
+        timestamp: Date.now(),
+        sessionId,
+        allCharacters: characters,
+        triggerCollections: character?.triggerCollections ?? [],
+        spritePacksV2: character?.spritePacksV2 ?? store.spritePacksV2 ?? [],
+        stateCollectionsV2: character?.stateCollectionsV2,
+        spritePacks: character?.spritePacks ?? store.spritePacks ?? [],
+        spriteTriggers: character?.spriteTriggers ?? [],
+        spriteIndex: store.spriteIndex,
+        isSpriteLocked: store.isSpriteLocked?.() ?? false,
+        applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+        scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+        addTriggerToQueue: store.addTriggerToQueue?.bind(store),
+        startSpriteChain: store.startSpriteChain?.bind(store),
+        startSoundChain: store.startSoundChain?.bind(store),
+      };
+      
+      const soundKeyHandlerContext: SoundKeyHandlerContext = {
+        character,
+        characters,
+        characterId: character?.id,
+        messageKey,
+        fullText: '',
+        isStreaming: false,
+        timestamp: Date.now(),
+        sessionId,
+        soundTriggers: store.soundTriggers,
+        soundCollections: store.soundCollections,
+        soundSequenceTriggers: store.soundSequenceTriggers,
+        soundSettings: {
+          enabled: settings.sound?.enabled ?? false,
+          globalVolume: settings.sound?.globalVolume ?? 0.85,
+          globalCooldown: settings.sound?.globalCooldown ?? 0,
+        },
+        cooldownContextKey: character?.id || 'default',
+        playSound: store.playSound?.bind(store),
+      };
+      
+      // Process through handlers
+      const spriteHandler = createSpriteKeyHandler();
+      const soundHandler = createSoundKeyHandler(config.maxSoundsPerMessage ?? 10);
+      
+      // Try sprite handler first
+      if (config.spriteEnabled !== false) {
+        if (spriteHandler.canHandle(completedKey, spriteKeyHandlerContext)) {
+          const result = spriteHandler.handleKey(completedKey, spriteKeyHandlerContext);
+          if (result?.matched) {
+            console.log(`[TriggerSystem] Completed partial match - Sprite key matched: ${completedKey.key}=${completedKey.value}`);
+            spriteHandler.execute(result.trigger, spriteKeyHandlerContext);
+          }
+        }
+      }
+      
+      // Try sound handler
+      if (config.soundEnabled !== false && settings.sound?.enabled) {
+        if (soundHandler.canHandle(completedKey, soundKeyHandlerContext)) {
+          const result = soundHandler.handleKey(completedKey, soundKeyHandlerContext);
+          if (result?.matched) {
+            console.log(`[TriggerSystem] Completed partial match - Sound key matched: ${completedKey.key}=${completedKey.value}`);
+            soundHandler.execute(result.trigger, soundKeyHandlerContext);
+          }
+        }
+      }
+    }
+    
+    return completedKey;
+  }, [config, store, settings]);
+  
+  /**
    * Reset for new message
    */
-  const resetForNewMessage = useCallback((messageKey: string, character: CharacterCard | null) => {
+  const resetForNewMessage = useCallback((messageKey: string, character: CharacterCard | null, characters?: CharacterCard[]) => {
+    // First, complete any pending partial matches
+    completePartialMatches(messageKey, character, characters);
+    
+    // Create characterMessageKey for resetting with same logic as processStreamingContent
+    let characterMessageKey: string;
+    if (character?.id) {
+      // Check if messageKey already ends with the characterId (group chat case)
+      if (messageKey.endsWith(`_${character.id}`)) {
+        characterMessageKey = messageKey;
+      } else {
+        characterMessageKey = `${messageKey}_${character.id}`;
+      }
+    } else {
+      characterMessageKey = messageKey;
+    }
+    
+    console.log(`[TriggerSystem] resetForNewMessage using characterMessageKey: ${characterMessageKey}`);
+    
     // Reset unified KeyDetector
     const keyDetector = getKeyDetector();
-    keyDetector.reset(messageKey);
+    keyDetector.reset(characterMessageKey);
     
     // Reset legacy TokenDetector
     const tokenDetector = getTokenDetector();
@@ -1339,7 +1622,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     // Emit message end event
     const bus = getTriggerBus();
     bus.emit(createMessageEndEvent(messageKey, character, ''));
-  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, store.activeSessionId]);
+  }, [soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, store.activeSessionId, completePartialMatches]);
   
   /**
    * Clear ALL trigger state - call this when chat is reset
@@ -1369,6 +1652,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   return {
     processStreamingContent,
     processFullContent,
+    completePartialMatches,
     resetForNewMessage,
     clearAllState,
     isEnabled: true,
