@@ -2954,6 +2954,17 @@ export interface AttributeDefinition {
   min?: number;
   max?: number;
   
+  // Threshold Effects - Efectos al alcanzar mínimo o máximo
+  // Se ejecutan cuando el valor llega al límite después de clamping
+  onMinReached?: {
+    enabled: boolean;        // Activar efectos al llegar al mínimo
+    rewards: QuestReward[];  // Recompensas a ejecutar (atributos, sprites, sonidos, backgrounds)
+  };
+  onMaxReached?: {
+    enabled: boolean;        // Activar efectos al llegar al máximo
+    rewards: QuestReward[];  // Recompensas a ejecutar (atributos, sprites, sonidos, backgrounds)
+  };
+  
   // Para detección Post-LLM (detección automática de cambios)
   // Sistema similar a HUD: key es la key principal, keys son alternativas
   keys?: string[];           // Alternative detection keys: ["HP:", "hp:", "❤️"] - key is always checked first

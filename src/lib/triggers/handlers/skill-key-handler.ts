@@ -9,6 +9,7 @@ import type { DetectedKey } from '../key-detector';
 import type { KeyHandler, TriggerMatch, TriggerMatchResult } from '../types';
 import type { TriggerContext } from '../trigger-bus';
 import type { CharacterStatsConfig, SessionStats, SkillDefinition } from '@/types';
+import type { UpdateCharacterStatResult, ThresholdReachedInfo } from '@/store/slices/statsSlice';
 import { normalizeKey, keyMatches } from '../key-detector';
 import {
   createSkillActivationHandlerState,
@@ -35,13 +36,27 @@ export interface SkillKeyHandlerContext extends TriggerContext {
       attributeKey: string,
       value: number | string,
       reason?: 'llm_detection' | 'manual' | 'trigger'
-    ) => void;
+    ) => UpdateCharacterStatResult;
     updateSessionEvent?: (
       sessionId: string,
       eventType: 'ultimo_objetivo_completado' | 'ultima_solicitud_completada' | 'ultima_solicitud_realizada' | 'ultima_accion_realizada',
       description: string
     ) => void;
   };
+}
+
+// Track activated skill positions to prevent duplicates
+interface SkillActivationPosition {
+  skillId: string;
+  position: number;
+  length: number;
+}
+
+// Check if two position ranges overlap
+function positionsOverlap(pos1: { position: number; length: number }, pos2: { position: number; length: number }): boolean {
+  const end1 = pos1.position + pos1.length;
+  const end2 = pos2.position + pos2.length;
+  return pos1.position < end2 && pos2.position < end1;
 }
 
 // ============================================
@@ -55,8 +70,34 @@ export class SkillKeyHandler implements KeyHandler {
   
   private state: SkillActivationHandlerState;
   
+  // Track activation positions per message to prevent duplicate activations
+  // when the same skill is detected via different formats (word vs key:value)
+  private activationPositions: Map<string, SkillActivationPosition[]> = new Map();
+  
   constructor() {
     this.state = createSkillActivationHandlerState();
+  }
+  
+  /**
+   * Check if a skill has already been activated at an overlapping position
+   */
+  private isAlreadyActivatedAtPosition(messageKey: string, skillId: string, position: number, length: number): boolean {
+    const positions = this.activationPositions.get(messageKey) || [];
+    for (const pos of positions) {
+      if (pos.skillId === skillId && positionsOverlap(pos, { position, length })) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  /**
+   * Record a skill activation position
+   */
+  private recordActivation(messageKey: string, skillId: string, position: number, length: number): void {
+    const positions = this.activationPositions.get(messageKey) || [];
+    positions.push({ skillId, position, length });
+    this.activationPositions.set(messageKey, positions);
   }
   
   /**
@@ -134,8 +175,15 @@ export class SkillKeyHandler implements KeyHandler {
           (key.value && keyMatches(normalizeKey(key.value), normalizedActivationKey));
         
         if (keyMatchesActivation) {
-          // Allow multiple activations of the same skill in the same message
-          // Each occurrence triggers the skill independently
+          // Check if this skill was already activated at this position (prevent duplicates)
+          const messageKey = context.messageKey || 'default';
+          if (this.isAlreadyActivatedAtPosition(messageKey, skill.id, key.position, key.length)) {
+            console.log(`[SkillKeyHandler] Skill ${skill.name} already activated at position ${key.position}, skipping duplicate`);
+            return null;
+          }
+          
+          // Record this activation position
+          this.recordActivation(messageKey, skill.id, key.position, key.length);
           
           return {
             matched: true,
@@ -151,6 +199,9 @@ export class SkillKeyHandler implements KeyHandler {
                 matchedKey: key.key,
                 activationCosts: skill.activationCosts || [],
                 activationRewards: skill.activationRewards || [],
+                // Track position for deduplication
+                position: key.position,
+                length: key.length,
               },
             },
             key,
@@ -164,8 +215,9 @@ export class SkillKeyHandler implements KeyHandler {
   
   /**
    * Execute the trigger action
+   * Returns thresholds reached so the caller can execute the effects
    */
-  execute(match: TriggerMatch, context: TriggerContext): void {
+  execute(match: TriggerMatch, context: TriggerContext): { thresholdsReached: ThresholdReachedInfo[] } {
     const skillContext = context as SkillKeyHandlerContext;
     const { skillId, skillName, skillDescription, activationCosts, activationRewards } = match.data as {
       skillId: string;
@@ -176,6 +228,9 @@ export class SkillKeyHandler implements KeyHandler {
     };
     
     console.log(`[SkillKeyHandler] Executing skill: ${skillName}`);
+    
+    // Collect all thresholds reached
+    const allThresholdsReached: ThresholdReachedInfo[] = [];
     
     // Save ultima_accion_realizada for {{eventos}} key
     if (skillContext.storeActions?.updateSessionEvent) {
@@ -193,36 +248,50 @@ export class SkillKeyHandler implements KeyHandler {
     if (skillContext.storeActions && activationCosts.length > 0) {
       const charStats = skillContext.sessionStats?.characterStats?.[skillContext.characterId];
       const currentValues = charStats?.attributeValues || {};
-      
+
       for (const cost of activationCosts) {
         if (!cost.attributeKey) continue;
-        
+
         const attribute = skillContext.statsConfig?.attributes.find(a => a.key === cost.attributeKey);
-        if (!attribute) continue;
-        
+        if (!attribute) {
+          console.warn(`[SkillKeyHandler] Attribute not found for cost: ${cost.attributeKey}`);
+          continue;
+        }
+
         const oldValue = currentValues[cost.attributeKey] ?? attribute.defaultValue ?? 0;
         let newValue = this.applyCost(oldValue, cost);
-        
+
         // Apply min/max constraints
         if (typeof newValue === 'number') {
           if (attribute.min !== undefined) newValue = Math.max(newValue, attribute.min);
           if (attribute.max !== undefined) newValue = Math.min(newValue, attribute.max);
         }
-        
-        skillContext.storeActions.updateCharacterStat(
+
+        // Call updateCharacterStat and handle threshold effects
+        const result = skillContext.storeActions.updateCharacterStat(
           skillContext.sessionId,
           skillContext.characterId,
           cost.attributeKey,
           newValue,
           'trigger'
         );
-        
-        console.log(`[SkillKeyHandler] Applied cost: ${cost.attributeKey} ${oldValue} -> ${newValue}`);
+
+        console.log(`[SkillKeyHandler] Applied cost: ${cost.attributeKey} ${oldValue} -> ${result.newValue}`);
+
+        // Collect thresholds reached
+        if (result.thresholdsReached.length > 0) {
+          allThresholdsReached.push(...result.thresholdsReached);
+          for (const threshold of result.thresholdsReached) {
+            console.log(`[SkillKeyHandler] Threshold reached: ${threshold.attributeName} ${threshold.thresholdType} (${threshold.thresholdValue}), ${threshold.rewards.length} effects to execute`);
+          }
+        }
       }
     }
     
     // Note: activationRewards should be processed by the unified reward executor
     // This is handled by the caller (useTriggerSystem)
+    
+    return { thresholdsReached: allThresholdsReached };
   }
   
   /**
@@ -271,6 +340,8 @@ export class SkillKeyHandler implements KeyHandler {
   reset(messageKey: string): void {
     this.state.processedMessages.delete(messageKey);
     this.state.activatedSkillsPerMessage.delete(messageKey);
+    // Clear activation positions for this message
+    this.activationPositions.delete(messageKey);
   }
   
   /**

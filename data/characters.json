@@ -1,6 +1,6 @@
 [
   {
-    "name": "Dra. Moon",
+    "name": "Moon",
     "description": "Nombre: Doctora Moon\nTipo: personaje\nTrabajo: Investigadora Senior\nEspecie: Humana\nGénero: Femenino\nEdad: 24\nAltura: 5' 7\"\nPeso: 152 libras\n\n{{acciones}}\n\n{{solicitudes}}\n\n{{peticiones}}\n---\n{{eventos}}\n---\n{{sonidos}}\n---\nApariencia: Cabello largo, cabello blanco, ojos púrpura calmados, expresión sin emociones, complexión delgada\n\nRopa: Bata de laboratorio estándar de investigadora SCP y vestimenta profesional\n\nAtuendo: Bata de laboratorio, suéter negro\n\nPersonalidad: Seria, fría, calmada, lógica, escéptica, decisiva\n\nLe gusta: El orden, la calma, estudiar anomalías, los pasteles\n\nNo le gusta: El caos, la falta de profesionalismo, dar trato especial a anomalías, las arañas\n\nPeculiaridades: Sarah Moon es un personaje muy reservado. Habla con un diálogo profesional y distante, y utiliza términos excesivamente técnicos, independientemente de si la persona con la que habla comprende su significado.\n\nDescripción: La doctora Sarah Moon se unió a la Fundación SCP justo después de terminar la universidad. Reclutada desde joven debido a su interés en la psicología anormal y su comportamiento profesional y calmado, la Fundación vio en Sarah Moon una candidata prometedora para estudiar los estados mentales de las peligrosas anomalías que contienen. Sus métodos son considerados por algunos como la cúspide de la misión de la Fundación de estudiar anomalías mientras mantienen una contención adecuada y segura, y por otros como una cruel y fría disección mental de humanos que de otro modo serían mentalmente normales.",
     "personality": "La Dra. Moon es una investigadora altamente profesional dedicada al estudio de lo anómalo.",
     "scenario": "La Dra. Moon está entrevistando y formulando procedimientos de contención para SCP-8642.",
@@ -23,7 +23,7 @@
     "voice": null,
     "id": "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
     "createdAt": "2026-03-01T21:41:38.289Z",
-    "updatedAt": "2026-03-20T20:04:36.820Z",
+    "updatedAt": "2026-03-21T20:23:40.530Z",
     "statsConfig": {
       "enabled": true,
       "attributes": [
@@ -36,9 +36,46 @@
           "showInHUD": true,
           "caseSensitive": false,
           "max": 100,
-          "min": 1,
+          "min": 0,
           "hudStyle": "progress",
-          "detectionTags": "resistencia:, Resistencia:"
+          "detectionTags": "resistencia:, Resistencia:",
+          "onMinReached": {
+            "enabled": true,
+            "rewards": []
+          },
+          "onMaxReached": {
+            "enabled": true,
+            "rewards": [
+              {
+                "id": "attr-max-reward-mn0nu8su",
+                "type": "attribute",
+                "attribute": {
+                  "key": "nero",
+                  "value": 1,
+                  "action": "add"
+                }
+              },
+              {
+                "id": "attr-max-reward-mn0olyy5",
+                "type": "trigger",
+                "trigger": {
+                  "category": "sprite",
+                  "key": "sprite:test01",
+                  "targetMode": "self"
+                }
+              },
+              {
+                "id": "attr-max-reward-mn0oot59",
+                "type": "trigger",
+                "trigger": {
+                  "category": "background",
+                  "key": "sofa",
+                  "targetMode": "self"
+                }
+              }
+            ]
+          },
+          "color": "purple"
         },
         {
           "id": "attr-1772530312975",
@@ -48,7 +85,33 @@
           "defaultValue": 0,
           "showInHUD": true,
           "caseSensitive": false,
-          "max": 100
+          "max": 100,
+          "min": 0,
+          "onMinReached": {
+            "enabled": true,
+            "rewards": [
+              {
+                "id": "attr-min-reward-mn0ojjxa",
+                "type": "attribute",
+                "attribute": {
+                  "key": "nero",
+                  "value": 1,
+                  "action": "add"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "attr-1774117272675",
+          "name": "nero",
+          "key": "nero",
+          "type": "number",
+          "defaultValue": 0,
+          "showInHUD": true,
+          "caseSensitive": false,
+          "min": 0,
+          "max": 96
         }
       ],
       "skills": [
@@ -72,7 +135,17 @@
           ],
           "activationKey": "hab1",
           "type": "ejecucion",
-          "activationRewards": []
+          "activationRewards": [
+            {
+              "id": "skill-reward-mn0n73ih",
+              "type": "trigger",
+              "trigger": {
+                "category": "sprite",
+                "key": "",
+                "targetMode": "self"
+              }
+            }
+          ]
         }
       ],
       "intentions": [],
@@ -234,7 +307,7 @@
         "cooldownMs": 100,
         "spriteConfigs": {},
         "createdAt": "2026-03-19T14:06:58.938Z",
-        "updatedAt": "2026-03-20T20:04:35.792Z"
+        "updatedAt": "2026-03-21T18:48:48.444Z"
       }
     ],
     "spriteLibraries": {
@@ -488,6 +561,6 @@
     },
     "id": "41df701c-9d1a-430f-9759-bbf29a31dafd",
     "createdAt": "2026-03-16T22:55:40.416Z",
-    "updatedAt": "2026-03-17T11:27:49.240Z"
+    "updatedAt": "2026-03-21T16:30:36.940Z"
   }
 ]

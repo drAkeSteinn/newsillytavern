@@ -1175,18 +1175,26 @@ export function NovelChatBox({
                           borderStyle: 'solid',
                         }}
                       >
-                        {isGroupMode && streamingCharacter ? (
-                          streamingCharacter.avatar ? (
-                            <img 
-                              src={streamingCharacter.avatar} 
-                              alt={streamingCharacter.name}
-                              className="w-full h-full object-cover"
-                            />
+                        {isGroupMode ? (
+                          // In group mode, only show avatar when we know which character is responding
+                          streamingCharacter ? (
+                            streamingCharacter.avatar ? (
+                              <img 
+                                src={streamingCharacter.avatar} 
+                                alt={streamingCharacter.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+                                <span className="text-white font-bold text-xs">
+                                  {streamingCharacter.name?.[0]?.toUpperCase() || '?'}
+                                </span>
+                              </div>
+                            )
                           ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
-                              <span className="text-white font-bold text-xs">
-                                {streamingCharacter.name?.[0]?.toUpperCase() || '?'}
-                              </span>
+                            // Waiting for character_start event - show loading indicator
+                            <div className="w-full h-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center">
+                              <span className="text-white font-bold text-xs animate-pulse">?</span>
                             </div>
                           )
                         ) : activeCharacter?.avatar ? (
@@ -1208,8 +1216,8 @@ export function NovelChatBox({
                         {/* Name above bubble */}
                         <div className="flex items-center gap-1 mb-1">
                           <span className="text-xs font-medium">
-                            {isGroupMode && streamingCharacter 
-                              ? streamingCharacter.name 
+                            {isGroupMode 
+                              ? (streamingCharacter?.name || 'Preparando...')
                               : activeCharacter?.name || 'Assistant'}
                           </span>
                           {streamingProgress && (
@@ -1403,21 +1411,25 @@ export function NovelChatBox({
                   {/* KWS Transcript Preview - Shows what KWS is detecting in real-time */}
                   {kwsListening && kwsTranscript && (
                     <div className={cn(
-                      "flex items-center gap-1 px-2 py-0.5 rounded-full border max-w-[200px]",
-                      kwsCapturing 
-                        ? "bg-amber-500/10 border-amber-500/30" 
+                      "flex items-center gap-1 px-2 py-0.5 rounded-full border max-w-[200px] overflow-hidden",
+                      kwsCapturing
+                        ? "bg-amber-500/10 border-amber-500/30"
                         : "bg-green-500/10 border-green-500/20"
                     )}>
                       <span className={cn(
                         "w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0",
                         kwsCapturing ? "bg-amber-500" : "bg-green-500"
                       )} />
-                      <span className={cn(
-                        "text-[10px] truncate italic",
-                        kwsCapturing ? "text-amber-300" : "text-green-400"
-                      )}>
-                        &quot;{kwsTranscript}&quot;
-                      </span>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex justify-end">
+                          <span className={cn(
+                            "text-[10px] italic whitespace-nowrap",
+                            kwsCapturing ? "text-amber-300" : "text-green-400"
+                          )}>
+                            &quot;{kwsTranscript.length > 35 ? '...' + kwsTranscript.slice(-35) : kwsTranscript}&quot;
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   {/* Wake Word Detected Indicator */}
@@ -1431,11 +1443,15 @@ export function NovelChatBox({
                   )}
                   {/* Message being captured - will be sent on silence */}
                   {kwsCapturing && kwsCapturedMessage && (
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/30 max-w-[200px]">
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/30 max-w-[200px] overflow-hidden">
                       <Send className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                      <span className="text-[10px] text-blue-300 truncate">
-                        {kwsCapturedMessage}
-                      </span>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex justify-end">
+                          <span className="text-[10px] text-blue-300 whitespace-nowrap">
+                            {kwsCapturedMessage.length > 35 ? '...' + kwsCapturedMessage.slice(-35) : kwsCapturedMessage}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   {/* Permission denied warning - now clickable */}

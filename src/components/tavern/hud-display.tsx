@@ -14,11 +14,19 @@
  * - Color-coded badges for enum fields
  * - Automatic integration with character stats system
  * - Group chat support: shows attributes for all group members
+ * - Animated visual effects (value change, shine, glow, particles)
  */
 
 import { useTavernStore } from '@/store';
 import type { HUDTemplate, HUDField, HUDPosition, HUDStyle, HUDFieldStyle, AttributeDefinition, CharacterCard } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+  AnimatedProgress,
+  AnimatedGauge,
+  AnimatedMeter,
+  AnimatedDots,
+  AnimatedBadge,
+} from './hud-effects';
 
 interface HUDDisplayProps {
   position?: HUDPosition;
@@ -812,79 +820,33 @@ function DefaultField({ field, value, color, compact, style }: FieldProps & { st
 }
 
 function ProgressField({ field, value, color, compact }: FieldProps) {
-  const progressColor = progressColorClasses[color] || progressColorClasses.default;
-  const min = field.min ?? 0;
-  const max = field.max ?? 100;
-  const percentage = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
-  
   return (
-    <div className={cn('flex flex-col gap-1', compact && 'gap-0.5')}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {field.icon && <span className={cn('text-sm', compact && 'text-xs')}>{field.icon}</span>}
-          {field.showLabel !== false && (
-            <span className={cn(
-              'text-xs text-white/50',
-              compact && 'text-[10px]'
-            )}>
-              {field.name}
-            </span>
-          )}
-        </div>
-        {field.showValue !== false && (
-          <span className={cn(
-            'font-medium text-white/80',
-            compact ? 'text-[10px]' : 'text-xs'
-          )}>
-            {value}
-            {field.unit && <span className="text-white/40 ml-0.5">{field.unit}</span>}
-          </span>
-        )}
-      </div>
-      <div
-        className={cn(
-          'w-full bg-white/10 rounded-full overflow-hidden',
-          compact ? 'h-1.5' : 'h-2'
-        )}
-        style={{ minWidth: compact ? 80 : 120 }}
-      >
-        <div
-          className={cn(
-            'h-full rounded-full transition-all duration-300',
-            progressColor
-          )}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
+    <AnimatedProgress
+      value={Number(value)}
+      min={field.min ?? 0}
+      max={field.max ?? 100}
+      color={color}
+      label={field.showLabel !== false ? field.name : undefined}
+      icon={field.icon}
+      unit={field.unit}
+      showValue={field.showValue !== false}
+      compact={compact}
+      height={compact ? 'sm' : 'md'}
+      animated={true}
+    />
   );
 }
 
 function BadgeField({ field, value, color, compact }: FieldProps) {
-  const textColor = colorClasses[color] || colorClasses.default;
-  const bgColor = bgColorClasses[color] || bgColorClasses.default;
-  
   return (
-    <div className={cn('flex items-center gap-2', compact && 'gap-1')}>
-      {field.icon && (
-        <span className="text-sm" title={field.name}>
-          {field.icon}
-        </span>
-      )}
-      {field.showLabel !== false && !compact && (
-        <span className="text-xs text-white/50">{field.name}:</span>
-      )}
-      <span
-        className={cn(
-          'inline-flex items-center rounded-full border font-medium',
-          compact ? 'text-xs px-2 py-0.5' : 'text-sm px-3 py-1',
-          bgColor,
-          textColor
-        )}
-      >
-        {value}
-      </span>
-    </div>
+    <AnimatedBadge
+      value={String(value)}
+      color={color}
+      label={field.showLabel !== false ? field.name : undefined}
+      icon={field.icon}
+      compact={compact}
+      animated={true}
+    />
   );
 }
 
@@ -961,44 +923,20 @@ function StatusField({ field, value, color, compact }: FieldProps) {
 }
 
 function GaugeField({ field, value, color, compact }: FieldProps) {
-  const textColor = colorClasses[color] || colorClasses.default;
-  const min = field.min ?? 0;
-  const max = field.max ?? 100;
-  const percentage = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
-  const circumference = 2 * Math.PI * 28;
-  const offset = circumference - (percentage / 100) * circumference;
-  
   return (
-    <div className={cn('flex items-center gap-2', compact && 'gap-1')}>
-      <div className={cn('relative', compact ? 'w-10 h-10' : 'w-12 h-12')}>
-        <svg className="w-full h-full transform -rotate-90">
-          <circle cx="50%" cy="50%" r="40%" stroke="rgba(255,255,255,0.1)" strokeWidth="10%" fill="none" />
-          <circle 
-            cx="50%" 
-            cy="50%" 
-            r="40%" 
-            stroke="currentColor" 
-            strokeWidth="10%" 
-            fill="none"
-            strokeDasharray={circumference} 
-            strokeDashoffset={offset}
-            className={textColor} 
-            style={{ transition: 'stroke-dashoffset 0.5s' }} 
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className={cn('font-bold text-white', compact ? 'text-[10px]' : 'text-xs')}>
-            {value}
-          </span>
-        </div>
-      </div>
-      {field.showLabel !== false && (
-        <div className="flex flex-col">
-          <span className={cn('text-xs text-white/50', compact && 'text-[10px]')}>{field.name}</span>
-          {field.unit && <span className="text-[10px] text-white/30">{field.unit}</span>}
-        </div>
-      )}
-    </div>
+    <AnimatedGauge
+      value={Number(value)}
+      min={field.min ?? 0}
+      max={field.max ?? 100}
+      color={color}
+      label={field.showLabel !== false ? field.name : undefined}
+      unit={field.unit}
+      showValue={true}
+      compact={compact}
+      size={compact ? 'sm' : 'md'}
+      animated={true}
+      showParticles={false}
+    />
   );
 }
 
@@ -1043,56 +981,36 @@ function PillField({ field, value, color, compact }: FieldProps) {
 }
 
 function MeterField({ field, value, color, compact }: FieldProps) {
-  const progressColor = progressColorClasses[color] || progressColorClasses.default;
-  const min = field.min ?? 0;
-  const max = field.max ?? 100;
-  const percentage = Math.max(0, Math.min(100, ((Number(value) - min) / (max - min)) * 100));
-  
   return (
-    <div className={cn('flex items-end gap-2', compact ? 'h-8' : 'h-12')}>
-      <div className={cn('relative bg-white/10 rounded-sm overflow-hidden', compact ? 'w-4 h-full' : 'w-6 h-full')}>
-        <div 
-          className={cn('absolute bottom-0 w-full transition-all', progressColor)}
-          style={{ height: `${percentage}%` }} 
-        />
-      </div>
-      <div className="flex flex-col justify-end">
-        {field.showLabel !== false && (
-          <span className={cn('text-white/50', compact ? 'text-[8px]' : 'text-[10px]')}>{field.name}</span>
-        )}
-        <span className={cn('font-bold', compact ? 'text-[10px]' : 'text-xs', progressColorClasses[color] || 'text-white/80')}>
-          {value}
-        </span>
-      </div>
-    </div>
+    <AnimatedMeter
+      value={Number(value)}
+      min={field.min ?? 0}
+      max={field.max ?? 100}
+      color={color}
+      label={field.showLabel !== false ? field.name : undefined}
+      showValue={true}
+      compact={compact}
+      height={compact ? 32 : 48}
+      animated={true}
+    />
   );
 }
 
 function DotsField({ field, value, color, compact }: FieldProps) {
-  const progressColor = progressColorClasses[color] || progressColorClasses.default;
   const numDots = typeof value === 'boolean' 
     ? (value ? 5 : 0) 
     : Math.min(5, Math.max(0, Number(value)));
   
   return (
-    <div className="flex items-center gap-2">
-      {field.icon && <span className="text-sm">{field.icon}</span>}
-      {field.showLabel !== false && (
-        <span className={cn('text-xs text-white/50', compact && 'text-[10px]')}>{field.name}:</span>
-      )}
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div 
-            key={i} 
-            className={cn(
-              'rounded-full',
-              compact ? 'w-1.5 h-1.5' : 'w-2 h-2',
-              i <= numDots ? progressColor : 'bg-white/20'
-            )} 
-          />
-        ))}
-      </div>
-    </div>
+    <AnimatedDots
+      value={numDots}
+      max={5}
+      color={color}
+      label={field.showLabel !== false ? field.name : undefined}
+      icon={field.icon}
+      compact={compact}
+      animated={true}
+    />
   );
 }
 

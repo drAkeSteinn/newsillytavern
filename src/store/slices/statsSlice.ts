@@ -20,6 +20,21 @@ import type {
 // Types
 // ============================================
 
+export interface ThresholdReachedInfo {
+  attributeKey: string;
+  attributeName: string;
+  thresholdType: 'min' | 'max';
+  thresholdValue: number;
+  rewards: import('@/types').QuestReward[];
+}
+
+export interface UpdateCharacterStatResult {
+  oldValue: number | string | undefined;
+  newValue: number | string;
+  clamped: boolean;
+  thresholdsReached: ThresholdReachedInfo[];
+}
+
 export interface StatsSlice {
   // Session stats state (values per session)
   sessionStats: SessionStats | null;
@@ -36,7 +51,7 @@ export interface StatsSlice {
     attributeKey: string,
     value: number | string,
     reason?: 'llm_detection' | 'manual' | 'trigger' | 'initialization'
-  ) => void;
+  ) => UpdateCharacterStatResult;
   
   batchUpdateCharacterStats: (
     sessionId: string,
@@ -112,6 +127,51 @@ export interface StatsSlice {
 // ============================================
 // Helper Functions
 // ============================================
+
+/**
+ * Clamp a numeric value to the attribute's min/max bounds
+ * Returns the clamped value, or the original value if not numeric or no bounds defined
+ */
+function clampAttributeValue(
+  value: number | string,
+  attributeDef: AttributeDefinition | undefined
+): number | string {
+  // Only clamp numeric values
+  if (typeof value !== 'number') {
+    return value;
+  }
+
+  // If no attribute definition, return as-is
+  if (!attributeDef) {
+    return value;
+  }
+
+  let clampedValue = value;
+
+  // Apply min bound - handle both number and string min values
+  if (attributeDef.min !== undefined) {
+    const minVal = typeof attributeDef.min === 'number'
+      ? attributeDef.min
+      : parseFloat(String(attributeDef.min));
+
+    if (!isNaN(minVal)) {
+      clampedValue = Math.max(clampedValue, minVal);
+    }
+  }
+
+  // Apply max bound - handle both number and string max values
+  if (attributeDef.max !== undefined) {
+    const maxVal = typeof attributeDef.max === 'number'
+      ? attributeDef.max
+      : parseFloat(String(attributeDef.max));
+
+    if (!isNaN(maxVal)) {
+      clampedValue = Math.min(clampedValue, maxVal);
+    }
+  }
+
+  return clampedValue;
+}
 
 /**
  * Create default character stats from config
@@ -215,104 +275,163 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
   },
 
   updateCharacterStat: (sessionId, characterId, attributeKey, value, reason = 'manual') => {
-    set((state: any) => {
-      const sessions = state.sessions as Array<{ 
-        id: string; 
-        sessionStats?: SessionStats;
-        characterId?: string;
-        groupId?: string;
-      }>;
-      const sessionIndex = sessions.findIndex(s => s.id === sessionId);
-      
-      if (sessionIndex === -1) return state;
-      
-      const session = sessions[sessionIndex];
-      let sessionStats = session.sessionStats;
-      
-      // Auto-initialize sessionStats if missing (includes event fields reset)
-      if (!sessionStats) {
-        sessionStats = {
-          characterStats: {},
-          solicitudes: {
-            characterSolicitudes: {},
-            lastModified: Date.now(),
-          },
-          ultimo_objetivo_completado: undefined,
-          ultima_solicitud_completada: undefined,
-          ultima_solicitud_realizada: undefined,
-          ultima_accion_realizada: undefined,
-          initialized: true,
+    // Default result
+    const defaultResult: UpdateCharacterStatResult = {
+      oldValue: undefined,
+      newValue: typeof value === 'number' ? value : value,
+      clamped: false,
+      thresholdsReached: [],
+    };
+
+    // Read current state
+    const state = get();
+    const sessions = state.sessions as Array<{ 
+      id: string; 
+      sessionStats?: SessionStats;
+      characterId?: string;
+      groupId?: string;
+    }>;
+    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
+    
+    if (sessionIndex === -1) return defaultResult;
+    
+    const session = sessions[sessionIndex];
+    let sessionStats = session.sessionStats;
+    
+    // Auto-initialize sessionStats if missing
+    if (!sessionStats) {
+      sessionStats = {
+        characterStats: {},
+        solicitudes: {
+          characterSolicitudes: {},
           lastModified: Date.now(),
-        };
-      }
-      
-      // Auto-initialize character stats if missing
-      if (!sessionStats.characterStats[characterId]) {
-        const character = state.characters.find((c: any) => c.id === characterId);
-        sessionStats = {
-          ...sessionStats,
-          characterStats: {
-            ...sessionStats.characterStats,
-            [characterId]: createDefaultCharacterStats(character?.statsConfig),
-          },
-        };
-      }
-      
-      const stats = sessionStats.characterStats[characterId];
-      if (!stats) return state;
-      
-      const oldValue = stats.attributeValues[attributeKey];
-      
-      // Find attribute definition for logging
-      const character = state.characters.find((c: any) => c.id === characterId);
-      const attributeDef = character?.statsConfig?.attributes?.find(
-        (a: AttributeDefinition) => a.key === attributeKey
-      );
-      
-      // Update the value
-      const updatedCharacterStats = {
-        ...sessionStats.characterStats,
-        [characterId]: {
-          ...stats,
-          attributeValues: {
-            ...stats.attributeValues,
-            [attributeKey]: value,
-          },
-          lastUpdated: {
-            ...stats.lastUpdated,
-            [attributeKey]: Date.now(),
-          },
         },
-      };
-      
-      // Add to change log
-      addChangeLogEntry(
-        updatedCharacterStats[characterId],
-        attributeDef,
-        attributeKey,
-        oldValue,
-        value,
-        reason
-      );
-      
-      const newSessionStats: SessionStats = {
-        ...sessionStats,
-        characterStats: updatedCharacterStats,
+        ultimo_objetivo_completado: undefined,
+        ultima_solicitud_completada: undefined,
+        ultima_solicitud_realizada: undefined,
+        ultima_accion_realizada: undefined,
+        initialized: true,
         lastModified: Date.now(),
       };
-      
-      return {
-        sessions: state.sessions.map((s: any) =>
-          s.id === sessionId
-            ? { 
-                ...s, 
-                sessionStats: newSessionStats,
-                updatedAt: new Date().toISOString() 
-              }
-            : s
-        ),
+    }
+    
+    // Auto-initialize character stats if missing
+    if (!sessionStats.characterStats[characterId]) {
+      const character = state.characters.find((c: any) => c.id === characterId);
+      sessionStats = {
+        ...sessionStats,
+        characterStats: {
+          ...sessionStats.characterStats,
+          [characterId]: createDefaultCharacterStats(character?.statsConfig),
+        },
       };
+    }
+    
+    const stats = sessionStats.characterStats[characterId];
+    if (!stats) return defaultResult;
+
+    const oldValue = stats.attributeValues[attributeKey];
+
+    // Find attribute definition for logging and clamping
+    const character = state.characters.find((c: any) => c.id === characterId);
+    const attributeDef = character?.statsConfig?.attributes?.find(
+      (a: AttributeDefinition) => a.key === attributeKey
+    );
+
+    // Clamp value to min/max bounds
+    const clampedValue = clampAttributeValue(value, attributeDef);
+    const clamped = clampedValue !== value;
+
+    // Log if clamping occurred
+    if (clamped) {
+      console.log(`[StatsSlice] Clamped ${attributeKey}: ${value} → ${clampedValue} (min: ${attributeDef?.min}, max: ${attributeDef?.max})`);
+    }
+
+    // Detect threshold reached
+    const thresholdsReached: ThresholdReachedInfo[] = [];
+    
+    if (attributeDef && typeof clampedValue === 'number') {
+      // Check if reached minimum
+      if (attributeDef.min !== undefined && clampedValue === attributeDef.min) {
+        if (attributeDef.onMinReached?.enabled && attributeDef.onMinReached.rewards.length > 0) {
+          thresholdsReached.push({
+            attributeKey: attributeDef.key,
+            attributeName: attributeDef.name,
+            thresholdType: 'min',
+            thresholdValue: attributeDef.min,
+            rewards: attributeDef.onMinReached.rewards,
+          });
+          console.log(`[StatsSlice] Threshold reached: ${attributeDef.name} hit minimum (${attributeDef.min})`);
+        }
+      }
+      
+      // Check if reached maximum
+      if (attributeDef.max !== undefined && clampedValue === attributeDef.max) {
+        if (attributeDef.onMaxReached?.enabled && attributeDef.onMaxReached.rewards.length > 0) {
+          thresholdsReached.push({
+            attributeKey: attributeDef.key,
+            attributeName: attributeDef.name,
+            thresholdType: 'max',
+            thresholdValue: attributeDef.max,
+            rewards: attributeDef.onMaxReached.rewards,
+          });
+          console.log(`[StatsSlice] Threshold reached: ${attributeDef.name} hit maximum (${attributeDef.max})`);
+        }
+      }
+    }
+
+    // Build the updated state
+    const updatedCharacterStats = {
+      ...sessionStats.characterStats,
+      [characterId]: {
+        ...stats,
+        attributeValues: {
+          ...stats.attributeValues,
+          [attributeKey]: clampedValue,
+        },
+        lastUpdated: {
+          ...stats.lastUpdated,
+          [attributeKey]: Date.now(),
+        },
+      },
+    };
+
+    // Add to change log
+    addChangeLogEntry(
+      updatedCharacterStats[characterId],
+      attributeDef,
+      attributeKey,
+      oldValue,
+      clampedValue,
+      reason
+    );
+    
+    const newSessionStats: SessionStats = {
+      ...sessionStats,
+      characterStats: updatedCharacterStats,
+      lastModified: Date.now(),
+    };
+    
+    // Update the store
+    set({
+      sessions: state.sessions.map((s: any) =>
+        s.id === sessionId
+          ? { 
+              ...s, 
+              sessionStats: newSessionStats,
+              updatedAt: new Date().toISOString() 
+            }
+          : s
+      ),
     });
+
+    // Return result with threshold info
+    return {
+      oldValue,
+      newValue: clampedValue,
+      clamped,
+      thresholdsReached,
+    };
   },
 
   batchUpdateCharacterStats: (sessionId, characterId, updates, reason = 'llm_detection') => {
@@ -367,22 +486,30 @@ export const createStatsSlice = (set: any, get: any): StatsSlice => ({
       const newAttributeValues = { ...stats.attributeValues };
       const newLastUpdated = { ...stats.lastUpdated };
       const newChangeLog = [...(stats.changeLog || [])];
-      
+
       for (const update of updates) {
         const oldValue = newAttributeValues[update.attributeKey];
         const attributeDef = character?.statsConfig?.attributes?.find(
           (a: AttributeDefinition) => a.key === update.attributeKey
         );
-        
-        newAttributeValues[update.attributeKey] = update.value;
+
+        // Clamp value to min/max bounds
+        const clampedValue = clampAttributeValue(update.value, attributeDef);
+
+        // Log if clamping occurred
+        if (clampedValue !== update.value) {
+          console.log(`[StatsSlice] Clamped ${update.attributeKey}: ${update.value} → ${clampedValue} (min: ${attributeDef?.min}, max: ${attributeDef?.max})`);
+        }
+
+        newAttributeValues[update.attributeKey] = clampedValue;
         newLastUpdated[update.attributeKey] = now;
-        
+
         newChangeLog.push({
           attributeId: attributeDef?.id || update.attributeKey,
           attributeKey: update.attributeKey,
           attributeName: attributeDef?.name || update.attributeKey,
           oldValue: oldValue ?? '',
-          newValue: update.value,
+          newValue: clampedValue,
           reason,
           timestamp: now,
         });

@@ -62,6 +62,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
   const messageBufferRef = useRef('');
   const lastDetectionTimeRef = useRef(0);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clearTranscriptTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Timeout to clear transcript if no wake word detected
   const wakeWordsRef = useRef(wakeWords);
   const currentWakeWordRef = useRef<string | null>(null); // Track current wake word for callback
   const onMessageReadyRef = useRef(onMessageReady);
@@ -112,12 +113,21 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
     }
   }, []);
 
+  // Clear transcript timeout (for when no wake word detected)
+  const clearTranscriptTimeout = useCallback(() => {
+    if (clearTranscriptTimeoutRef.current) {
+      clearTimeout(clearTranscriptTimeoutRef.current);
+      clearTranscriptTimeoutRef.current = null;
+    }
+  }, []);
+
   // Stop listening
   const stopListening = useCallback(() => {
     console.log('[KWS] Stopping...');
     
     isListeningRef.current = false;
     clearSilenceTimeout();
+    clearTranscriptTimeout();
     
     if (recognitionRef.current) {
       try {
@@ -136,7 +146,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
     setIsCapturing(false);
     setTranscript('');
     messageBufferRef.current = '';
-  }, [clearSilenceTimeout]);
+  }, [clearSilenceTimeout, clearTranscriptTimeout]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -228,8 +238,9 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
         setTranscript(fullTranscript);
         onTranscriptUpdateRef.current?.(fullTranscript, isCapturingRef.current);
         
-        // Clear existing silence timeout
+        // Clear existing timeouts
         clearSilenceTimeout();
+        clearTranscriptTimeout();
         
         // Check for wake word in current segment first, then full transcript
         const detectedWordInSegment = findWakeWord(currentSegment);
@@ -244,6 +255,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
               
               console.log('[KWS] Wake word detected:', detectedWord);
               setLastDetectedWord(detectedWord);
+              currentWakeWordRef.current = detectedWord; // Store for callback
               isCapturingRef.current = true;
               setIsCapturing(true);
               
@@ -257,6 +269,21 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
                 console.log('[KWS] Initial message:', message);
               }
             }
+          } else {
+            // No wake word detected - set timeout to clear transcript after silence
+            // This prevents old text from showing when user speaks but doesn't say the wake word
+            clearTranscriptTimeoutRef.current = setTimeout(() => {
+              console.log('[KWS] Silence without wake word - clearing transcript');
+              setTranscript('');
+              
+              // Restart recognition to clear the internal buffer
+              if (recognitionRef.current && isListeningRef.current) {
+                try {
+                  recognitionRef.current.stop();
+                  // onend will auto-restart because isListeningRef.current is true
+                } catch {}
+              }
+            }, silenceDurationMs);
           }
         } else {
           // Already capturing - append current segment to buffer
@@ -292,10 +319,11 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
           // Set silence timeout to send message
           silenceTimeoutRef.current = setTimeout(() => {
             const finalMessage = messageBufferRef.current.trim();
-            console.log('[KWS] Silence detected! Sending message:', finalMessage);
+            console.log('[KWS] Silence detected! Sending message:', finalMessage, 'wake word:', currentWakeWordRef.current);
             
             if (finalMessage) {
-              onMessageReadyRef.current?.(finalMessage);
+              // Pass both message and detected wake word
+              onMessageReadyRef.current?.(finalMessage, currentWakeWordRef.current || undefined);
             }
             
             // Reset capture state
@@ -304,6 +332,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
             messageBufferRef.current = '';
             setCapturedMessage('');
             setLastDetectedWord(null);
+            currentWakeWordRef.current = null; // Reset wake word
             setTranscript('');
             
             // CRITICAL: Stop and restart recognition to clear the buffer
@@ -344,11 +373,12 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
         
         // If we were capturing and have a message, send it
         if (isCapturingRef.current && messageBufferRef.current.trim()) {
-          console.log('[KWS] Sending on end:', messageBufferRef.current.trim());
-          onMessageReadyRef.current?.(messageBufferRef.current.trim());
+          console.log('[KWS] Sending on end:', messageBufferRef.current.trim(), 'wake word:', currentWakeWordRef.current);
+          onMessageReadyRef.current?.(messageBufferRef.current.trim(), currentWakeWordRef.current || undefined);
           isCapturingRef.current = false;
           setIsCapturing(false);
           messageBufferRef.current = '';
+          currentWakeWordRef.current = null; // Reset wake word
         }
         
         // Auto-restart if supposed to be listening
@@ -382,7 +412,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
       
       return false;
     }
-  }, [language, cooldownMs, silenceDurationMs, findWakeWord, extractMessageAfterWakeWord, clearSilenceTimeout]);
+  }, [language, cooldownMs, silenceDurationMs, findWakeWord, extractMessageAfterWakeWord, clearSilenceTimeout, clearTranscriptTimeout]);
 
   return {
     isListening,

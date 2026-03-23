@@ -162,6 +162,7 @@ import {
   executeQuestCompletionRewards,
   executeObjectiveRewards,
   executeTriggerRewardFromQuest,
+  executeReward,
   type RewardStoreActions,
 } from '@/lib/quest/quest-reward-executor';
 import {
@@ -270,7 +271,20 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
   const statsHandlerState = useMemo(() => createStatsHandlerState(), []);
   const skillActivationHandlerState = useMemo(() => createSkillActivationHandlerState(), []);
   const solicitudHandlerState = useMemo(() => createSolicitudHandlerState(), []);
-  
+
+  // Key handlers (created once to preserve deduplication state)
+  // IMPORTANT: These must be created once and reused, otherwise the position tracking
+  // for deduplication is reset on every call, causing double activations
+  const soundHandler = useMemo(() => createSoundKeyHandler(config.maxSoundsPerMessage ?? 10), [config.maxSoundsPerMessage]);
+  const spriteHandler = useMemo(() => createSpriteKeyHandler(), []);
+  const skillHandler = useMemo(() => createSkillKeyHandler(), []);
+  const solicitudHandler = useMemo(() => createSolicitudKeyHandler(), []);
+  const backgroundHandler = useMemo(() => createBackgroundKeyHandler(), []);
+  const hudHandler = useMemo(() => createHUDKeyHandler(), []);
+  const questHandler = useMemo(() => createQuestKeyHandler(), []);
+  const statsHandler = useMemo(() => createStatsKeyHandler(), []);
+  const itemHandler = useMemo(() => createItemKeyHandler(), []);
+
   // Track last processed content per message
   const lastProcessedRef = useRef<Map<string, string>>(new Map());
   
@@ -624,17 +638,6 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
           },
         },
       };
-      
-      // Create handler instances (outside the loop to maintain state)
-      const soundHandler = createSoundKeyHandler(config.maxSoundsPerMessage ?? 10);
-      const spriteHandler = createSpriteKeyHandler();
-      const skillHandler = createSkillKeyHandler();
-      const solicitudHandler = createSolicitudKeyHandler();
-      const backgroundHandler = createBackgroundKeyHandler();
-      const hudHandler = createHUDKeyHandler();
-      const questHandler = createQuestKeyHandler();
-      const statsHandler = createStatsKeyHandler();
-      const itemHandler = createItemKeyHandler();
 
       // Build handler contexts (outside the loop for efficiency)
       const backgroundKeyHandlerContext: BackgroundKeyHandlerContext = {
@@ -738,7 +741,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
             const result = skillHandler.handleKey(detectedKey, skillHandlerContext);
             if (result?.matched) {
               console.log(`[TriggerSystem] Skill key matched: ${detectedKey.key}`);
-              skillHandler.execute(result.trigger, skillHandlerContext);
+              const executeResult = skillHandler.execute(result.trigger, skillHandlerContext);
               
               // Execute activation rewards (sounds, sprites, etc.)
               const rewards = result.trigger.data?.activationRewards || [];
@@ -775,6 +778,47 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
                     });
                   } catch (err) {
                     console.error('[TriggerSystem] Failed to execute skill activation reward:', err);
+                  }
+                }
+              }
+              
+              // Execute threshold effects (when attribute reaches min/max)
+              if (executeResult.thresholdsReached.length > 0) {
+                console.log(`[TriggerSystem] Executing ${executeResult.thresholdsReached.length} threshold effects`);
+                for (const threshold of executeResult.thresholdsReached) {
+                  for (const reward of threshold.rewards) {
+                    try {
+                      executeReward(reward, {
+                        sessionId,
+                        characterId: character.id,
+                        character,
+                        allCharacters: allCharactersWithPersona,
+                        sessionStats: activeSession?.sessionStats,
+                        timestamp: Date.now(),
+                        soundCollections: store.soundCollections,
+                        soundTriggers: store.soundTriggers,
+                        backgroundPacks: store.backgroundTriggerPacks,
+                        soundSettings: {
+                          enabled: settings.sound?.enabled ?? false,
+                          globalVolume: settings.sound?.globalVolume ?? 0.85,
+                        },
+                        backgroundSettings: {
+                          transitionDuration: settings.backgroundTriggers?.transitionDuration ?? 500,
+                          defaultTransitionType: settings.backgroundTriggers?.defaultTransitionType ?? 'fade',
+                        },
+                      }, {
+                        updateCharacterStat: store.updateCharacterStat.bind(store),
+                        applyTriggerForCharacter: store.applyTriggerForCharacter?.bind(store),
+                        scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter?.bind(store),
+                        isSpriteLocked: store.isSpriteLocked?.bind(store),
+                        playSound: store.playSound?.bind(store),
+                        setBackground: store.setBackground?.bind(store),
+                        setActiveOverlays: store.setActiveOverlays?.bind(store),
+                      });
+                      console.log(`[TriggerSystem] Executed threshold effect for ${threshold.attributeName}`);
+                    } catch (err) {
+                      console.error(`[TriggerSystem] Failed to execute threshold effect:`, err);
+                    }
                   }
                 }
               }
@@ -1426,7 +1470,7 @@ export function useTriggerSystem(config: TriggerSystemConfig = {}): TriggerSyste
     // if (config.statsEnabled !== false) {
     //   ... legacy skill activation code removed ...
     // }
-  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, getActiveHUDTemplate]);
+  }, [config, settings, store, soundHandlerState, spriteHandlerState, hudHandlerState, backgroundHandlerState, questHandlerState, itemHandlerState, statsHandlerState, skillActivationHandlerState, solicitudHandlerState, getActiveHUDTemplate, soundHandler, spriteHandler, skillHandler, solicitudHandler, backgroundHandler, hudHandler, questHandler, statsHandler, itemHandler]);
   
   /**
    * Process full content at once (non-streaming)

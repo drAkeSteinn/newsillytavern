@@ -764,3 +764,454 @@
     animation: none !important;
   }
 }
+
+/* ============================================
+   HUD Enhanced Visual Effects
+   ============================================ */
+
+/* Value Change Flash Effect */
+@keyframes hud-flash {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
+.animate-hud-flash {
+  animation: hud-flash 0.3s ease-out;
+}
+
+/* Flash Overlay */
+@keyframes flash-overlay {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+.animate-flash-overlay {
+  animation: flash-overlay 0.4s ease-out forwards;
+}
+
+/* Shake Effect for Damage/Decrease */
+@keyframes hud-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-2px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(2px);
+  }
+}
+
+.animate-hud-shake {
+  animation: hud-shake 0.4s ease-in-out;
+}
+
+/* Number Pulse Animation */
+@keyframes number-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.animate-number-pulse {
+  animation: number-pulse 0.3s ease-out;
+}
+
+/* Progress Bar Pulse */
+@keyframes bar-pulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+
+.animate-bar-pulse {
+  animation: bar-pulse 0.5s ease-out;
+}
+
+/* Critical State Pulse */
+@keyframes critical-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.02);
+  }
+}
+
+.animate-critical-pulse {
+  animation: critical-pulse 1s ease-in-out infinite;
+}
+
+/* Gradient Shift Animation - subtle, no interference */
+@keyframes gradient-shift {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.05);
+  }
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Ripple Out Effect */
+@keyframes ripple-out {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.8;
+  }
+  100% {
+    width: 20px;
+    height: 20px;
+    opacity: 0;
+    margin: -10px;
+  }
+}
+
+.animate-ripple-out {
+  animation: ripple-out 0.5s ease-out forwards;
+}
+
+/* Ripple Expand (for gauges) */
+@keyframes ripple-expand {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-ripple-expand {
+  animation: ripple-expand 0.6s ease-out forwards;
+}
+
+/* Gauge Pulse Effect */
+@keyframes gauge-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+.animate-gauge-pulse {
+  animation: gauge-pulse 0.5s ease-out;
+}
+
+/* Particle Float */
+@keyframes particle-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-4px) scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.animate-particle-float {
+  animation: particle-float 2s ease-in-out infinite;
+}
+
+/* Ripple Wave (SVG) */
+@keyframes ripple-wave {
+  0% {
+    r: 10;
+    opacity: 0.8;
+  }
+  100% {
+    r: 50;
+    opacity: 0;
+  }
+}
+
+.animate-ripple-wave {
+  animation: ripple-wave 1s ease-out forwards;
+}
+
+/* Sparkle Animation */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Energy Wave */
+@keyframes energy-wave {
+  0% {
+    d: path("M0,50 Q25,30 50,50 T100,50 V100 H0 Z");
+  }
+  50% {
+    d: path("M0,50 Q25,70 50,50 T100,50 V100 H0 Z");
+  }
+  100% {
+    d: path("M0,50 Q25,30 50,50 T100,50 V100 H0 Z");
+  }
+}
+
+.animate-energy-wave {
+  animation: energy-wave 3s ease-in-out infinite;
+}
+
+/* Scanline Move */
+@keyframes scanline-move {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.animate-scanline-move {
+  animation: scanline-move 8s linear infinite;
+}
+
+/* Neon Flicker */
+@keyframes neon-flicker {
+  0%, 100% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.8;
+  }
+  94% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.9;
+  }
+  97% {
+    opacity: 1;
+  }
+}
+
+.animate-neon-flicker {
+  animation: neon-flicker 4s ease-in-out infinite;
+}
+
+/* Rune Glow */
+@keyframes rune-glow {
+  0%, 100% {
+    opacity: 0.4;
+    text-shadow: 0 0 5px currentColor;
+  }
+  50% {
+    opacity: 0.8;
+    text-shadow: 0 0 15px currentColor, 0 0 25px currentColor;
+  }
+}
+
+.animate-rune-glow {
+  animation: rune-glow 3s ease-in-out infinite;
+}
+
+/* Retro Flicker */
+@keyframes retro-flicker {
+  0%, 100% {
+    opacity: 0.05;
+  }
+  50% {
+    opacity: 0.1;
+  }
+}
+
+.animate-retro-flicker {
+  animation: retro-flicker 0.1s ease-in-out infinite;
+}
+
+/* Chromatic Shift (Holographic) */
+@keyframes chromatic-shift {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(1px);
+  }
+  75% {
+    transform: translateX(-1px);
+  }
+}
+
+.animate-chromatic-shift {
+  animation: chromatic-shift 0.3s ease-in-out infinite;
+}
+
+/* Holo Scan */
+@keyframes holo-scan {
+  0% {
+    top: -10%;
+  }
+  100% {
+    top: 110%;
+  }
+}
+
+.animate-holo-scan {
+  animation: holo-scan 2s linear infinite;
+}
+
+/* Holo Color Shift */
+@keyframes holo-color-shift {
+  0%, 100% {
+    background: linear-gradient(45deg, 
+      rgba(6, 182, 212, 0.1), 
+      rgba(168, 85, 247, 0.1), 
+      rgba(236, 72, 153, 0.1)
+    );
+  }
+  33% {
+    background: linear-gradient(45deg, 
+      rgba(168, 85, 247, 0.1), 
+      rgba(236, 72, 153, 0.1), 
+      rgba(6, 182, 212, 0.1)
+    );
+  }
+  66% {
+    background: linear-gradient(45deg, 
+      rgba(236, 72, 153, 0.1), 
+      rgba(6, 182, 212, 0.1), 
+      rgba(168, 85, 247, 0.1)
+    );
+  }
+}
+
+.animate-holo-color-shift {
+  animation: holo-color-shift 4s ease-in-out infinite;
+}
+
+/* Dots Pulse */
+@keyframes dots-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-dots-pulse {
+  animation: dots-pulse 0.3s ease-out;
+}
+
+/* Dot Fill Animation */
+@keyframes dot-fill {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-dot-fill {
+  animation: dot-fill 0.3s ease-out;
+}
+
+/* Dot Empty Animation */
+@keyframes dot-empty {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.8);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-dot-empty {
+  animation: dot-empty 0.3s ease-out;
+}
+
+/* Badge Pop Effect */
+@keyframes badge-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-badge-pop {
+  animation: badge-pop 0.3s ease-out;
+}
+
+/* Reduced motion for HUD effects */
+@media (prefers-reduced-motion: reduce) {
+  .animate-hud-flash,
+  .animate-flash-overlay,
+  .animate-hud-shake,
+  .animate-number-pulse,
+  .animate-bar-pulse,
+  .animate-critical-pulse,
+  .animate-gradient-shift,
+  .animate-ripple-out,
+  .animate-ripple-expand,
+  .animate-gauge-pulse,
+  .animate-particle-float,
+  .animate-ripple-wave,
+  .animate-sparkle,
+  .animate-energy-wave,
+  .animate-scanline-move,
+  .animate-neon-flicker,
+  .animate-rune-glow,
+  .animate-retro-flicker,
+  .animate-chromatic-shift,
+  .animate-holo-scan,
+  .animate-holo-color-shift,
+  .animate-dots-pulse,
+  .animate-dot-fill,
+  .animate-dot-empty,
+  .animate-badge-pop {
+    animation: none !important;
+  }
+}

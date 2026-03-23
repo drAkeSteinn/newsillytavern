@@ -3,7 +3,7 @@
     "name": "123",
     "description": "",
     "systemPrompt": "",
-    "activationStrategy": "all",
+    "activationStrategy": "reactive",
     "minResponsesPerTurn": 1,
     "maxResponsesPerTurn": 3,
     "allowMentions": true,
@@ -11,7 +11,8 @@
     "conversationStyle": "sequential",
     "characterIds": [
       "fbbdc8e8-12e1-421b-8a38-d4a37231de2a",
-      "611876f7-399e-49a3-a32f-aa847e8f28da"
+      "611876f7-399e-49a3-a32f-aa847e8f28da",
+      "41df701c-9d1a-430f-9759-bbf29a31dafd"
     ],
     "members": [
       {
@@ -27,6 +28,13 @@
         "isPresent": true,
         "isNarrator": false,
         "joinOrder": 1
+      },
+      {
+        "characterId": "41df701c-9d1a-430f-9759-bbf29a31dafd",
+        "isActive": true,
+        "isPresent": true,
+        "isNarrator": false,
+        "joinOrder": 2
       }
     ],
     "avatar": "",
@@ -37,6 +45,6 @@
     ],
     "id": "202cf65f-8872-4c59-aa31-4fcdcbd3f692",
     "createdAt": "2026-03-20T18:34:08.076Z",
-    "updatedAt": "2026-03-20T21:20:26.936Z"
+    "updatedAt": "2026-03-21T16:42:37.351Z"
   }
 ]

@@ -88,9 +88,10 @@ interface AttributeEditorProps {
   index: number;
   onChange: (index: number, updates: Partial<AttributeDefinition>) => void;
   onDelete: (index: number) => void;
+  allAttributes: AttributeDefinition[];
 }
 
-function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEditorProps) {
+function AttributeEditor({ attribute, index, onChange, onDelete, allAttributes }: AttributeEditorProps) {
   const [expanded, setExpanded] = useState(false);
   
   // Get display info
@@ -250,7 +251,10 @@ function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEdit
                 <Input
                   type="number"
                   value={attribute.min ?? ''}
-                  onChange={(e) => onChange(index, { min: parseFloat(e.target.value) || undefined })}
+                  onChange={(e) => {
+                    const parsed = parseFloat(e.target.value);
+                    onChange(index, { min: isNaN(parsed) ? undefined : parsed });
+                  }}
                   placeholder="0"
                   className="h-8"
                 />
@@ -260,11 +264,514 @@ function AttributeEditor({ attribute, index, onChange, onDelete }: AttributeEdit
                 <Input
                   type="number"
                   value={attribute.max ?? ''}
-                  onChange={(e) => onChange(index, { max: parseFloat(e.target.value) || undefined })}
+                  onChange={(e) => {
+                    const parsed = parseFloat(e.target.value);
+                    onChange(index, { max: isNaN(parsed) ? undefined : parsed });
+                  }}
                   placeholder="100"
                   className="h-8"
                 />
               </div>
+            </div>
+          )}
+
+          {/* Threshold Effects - Efectos al alcanzar min/max */}
+          {attribute.type === 'number' && (attribute.min !== undefined || attribute.max !== undefined) && (
+            <div className="space-y-3 p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <Label className="text-xs font-medium text-purple-400">Efectos de Umbral</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Efectos que se ejecutan cuando el atributo alcanza su valor mínimo o máximo.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">• Triggers: Sprites, sonidos, fondos</p>
+                    <p className="text-xs text-muted-foreground">• Atributos: Modificar otros atributos</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* On Min Reached */}
+              {attribute.min !== undefined && (
+                <div className="space-y-2 p-2 bg-red-500/5 rounded border border-red-500/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={attribute.onMinReached?.enabled ?? false}
+                        onCheckedChange={(checked) => onChange(index, {
+                          onMinReached: {
+                            enabled: checked,
+                            rewards: attribute.onMinReached?.rewards || []
+                          }
+                        })}
+                      />
+                      <Label className="text-xs font-medium text-red-400">
+                        Al llegar al mínimo ({attribute.min})
+                      </Label>
+                    </div>
+                    {attribute.onMinReached?.enabled && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-5 text-[10px] border-purple-500/30 hover:bg-purple-500/10"
+                        onClick={() => {
+                          const newReward = {
+                            id: `attr-min-reward-${Date.now().toString(36)}`,
+                            type: 'trigger' as const,
+                            trigger: {
+                              category: 'sprite' as const,
+                              key: '',
+                              targetMode: 'self' as const,
+                            }
+                          };
+                          onChange(index, {
+                            onMinReached: {
+                              enabled: true,
+                              rewards: [...(attribute.onMinReached?.rewards || []), newReward]
+                            }
+                          });
+                        }}
+                      >
+                        <Plus className="w-2.5 h-2.5 mr-0.5" /> Efecto
+                      </Button>
+                    )}
+                  </div>
+
+                  {attribute.onMinReached?.enabled && (
+                    <div className="space-y-1">
+                      {(attribute.onMinReached?.rewards || []).map((reward, rewardIdx) => {
+                        const normalized = normalizeReward(reward);
+                        const isTrig = normalized.type === 'trigger';
+                        const isAttr = normalized.type === 'attribute';
+
+                        return (
+                          <div key={reward.id} className={`p-1.5 rounded border ${isAttr ? 'bg-amber-500/5 border-amber-500/10' : 'bg-purple-500/5 border-purple-500/10'}`}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Badge variant="outline" className={`text-[9px] ${isAttr ? 'text-amber-400 border-amber-500/30' : 'text-purple-400 border-purple-500/30'}`}>
+                                {isAttr ? '📊 Atributo' : '⚡ Trigger'}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
+                                onClick={() => {
+                                  const updatedRewards = (attribute.onMinReached?.rewards || []).filter((_, i) => i !== rewardIdx);
+                                  onChange(index, {
+                                    onMinReached: {
+                                      enabled: true,
+                                      rewards: updatedRewards
+                                    }
+                                  });
+                                }}
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </Button>
+                            </div>
+
+                            {isTrig && normalized.trigger && (
+                              <div className="grid grid-cols-3 gap-1">
+                                <Select
+                                  value={normalized.trigger.category}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMinReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      trigger: { ...normalized.trigger!, category: v as TriggerCategory }
+                                    };
+                                    onChange(index, {
+                                      onMinReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                                    <SelectItem value="sound">🔊 Sonido</SelectItem>
+                                    <SelectItem value="background">🌄 Fondo</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  value={normalized.trigger.key}
+                                  onChange={(e) => {
+                                    const updatedRewards = [...(attribute.onMinReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      trigger: { ...normalized.trigger!, key: e.target.value }
+                                    };
+                                    onChange(index, {
+                                      onMinReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                  placeholder="Key"
+                                  className="bg-background h-5 text-[10px]"
+                                />
+                                <Select
+                                  value={normalized.trigger.targetMode}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMinReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
+                                    };
+                                    onChange(index, {
+                                      onMinReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="self">👤 Self</SelectItem>
+                                    <SelectItem value="all">👥 Todos</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
+                            {isAttr && normalized.attribute && (
+                              <div className="grid grid-cols-3 gap-1">
+                                <Select
+                                  value={normalized.attribute.key}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMinReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      attribute: { ...normalized.attribute!, key: v }
+                                    };
+                                    onChange(index, {
+                                      onMinReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue placeholder="Atributo" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {allAttributes.map((attr) => (
+                                      <SelectItem key={attr.key} value={attr.key}>
+                                        {attr.name} ({attr.key})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={normalized.attribute.action}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMinReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      attribute: { ...normalized.attribute!, action: v as any }
+                                    };
+                                    onChange(index, {
+                                      onMinReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="set">= Set</SelectItem>
+                                    <SelectItem value="add">+ Add</SelectItem>
+                                    <SelectItem value="subtract">- Sub</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="number"
+                                  value={normalized.attribute.value}
+                                  onChange={(e) => {
+                                    const updatedRewards = [...(attribute.onMinReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      attribute: { ...normalized.attribute!, value: Number(e.target.value) }
+                                    };
+                                    onChange(index, {
+                                      onMinReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                  placeholder="Valor"
+                                  className="bg-background h-5 text-[10px]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Add attribute reward button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-full text-[10px] text-amber-400 hover:bg-amber-500/10 border border-dashed border-amber-500/30"
+                        onClick={() => {
+                          const newReward = {
+                            id: `attr-min-reward-${Date.now().toString(36)}`,
+                            type: 'attribute' as const,
+                            attribute: {
+                              key: '',
+                              value: 0,
+                              action: 'set' as const
+                            }
+                          };
+                          onChange(index, {
+                            onMinReached: {
+                              enabled: true,
+                              rewards: [...(attribute.onMinReached?.rewards || []), newReward]
+                            }
+                          });
+                        }}
+                      >
+                        <Plus className="w-2.5 h-2.5 mr-0.5" /> Atributo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* On Max Reached */}
+              {attribute.max !== undefined && (
+                <div className="space-y-2 p-2 bg-green-500/5 rounded border border-green-500/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={attribute.onMaxReached?.enabled ?? false}
+                        onCheckedChange={(checked) => onChange(index, {
+                          onMaxReached: {
+                            enabled: checked,
+                            rewards: attribute.onMaxReached?.rewards || []
+                          }
+                        })}
+                      />
+                      <Label className="text-xs font-medium text-green-400">
+                        Al llegar al máximo ({attribute.max})
+                      </Label>
+                    </div>
+                    {attribute.onMaxReached?.enabled && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-5 text-[10px] border-purple-500/30 hover:bg-purple-500/10"
+                        onClick={() => {
+                          const newReward = {
+                            id: `attr-max-reward-${Date.now().toString(36)}`,
+                            type: 'trigger' as const,
+                            trigger: {
+                              category: 'sprite' as const,
+                              key: '',
+                              targetMode: 'self' as const,
+                            }
+                          };
+                          onChange(index, {
+                            onMaxReached: {
+                              enabled: true,
+                              rewards: [...(attribute.onMaxReached?.rewards || []), newReward]
+                            }
+                          });
+                        }}
+                      >
+                        <Plus className="w-2.5 h-2.5 mr-0.5" /> Efecto
+                      </Button>
+                    )}
+                  </div>
+
+                  {attribute.onMaxReached?.enabled && (
+                    <div className="space-y-1">
+                      {(attribute.onMaxReached?.rewards || []).map((reward, rewardIdx) => {
+                        const normalized = normalizeReward(reward);
+                        const isTrig = normalized.type === 'trigger';
+                        const isAttr = normalized.type === 'attribute';
+
+                        return (
+                          <div key={reward.id} className={`p-1.5 rounded border ${isAttr ? 'bg-amber-500/5 border-amber-500/10' : 'bg-green-500/5 border-green-500/10'}`}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Badge variant="outline" className={`text-[9px] ${isAttr ? 'text-amber-400 border-amber-500/30' : 'text-green-400 border-green-500/30'}`}>
+                                {isAttr ? '📊 Atributo' : '⚡ Trigger'}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 text-red-500 hover:bg-red-500/10 ml-auto"
+                                onClick={() => {
+                                  const updatedRewards = (attribute.onMaxReached?.rewards || []).filter((_, i) => i !== rewardIdx);
+                                  onChange(index, {
+                                    onMaxReached: {
+                                      enabled: true,
+                                      rewards: updatedRewards
+                                    }
+                                  });
+                                }}
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </Button>
+                            </div>
+
+                            {isTrig && normalized.trigger && (
+                              <div className="grid grid-cols-3 gap-1">
+                                <Select
+                                  value={normalized.trigger.category}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMaxReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      trigger: { ...normalized.trigger!, category: v as TriggerCategory }
+                                    };
+                                    onChange(index, {
+                                      onMaxReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="sprite">🖼️ Sprite</SelectItem>
+                                    <SelectItem value="sound">🔊 Sonido</SelectItem>
+                                    <SelectItem value="background">🌄 Fondo</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  value={normalized.trigger.key}
+                                  onChange={(e) => {
+                                    const updatedRewards = [...(attribute.onMaxReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      trigger: { ...normalized.trigger!, key: e.target.value }
+                                    };
+                                    onChange(index, {
+                                      onMaxReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                  placeholder="Key"
+                                  className="bg-background h-5 text-[10px]"
+                                />
+                                <Select
+                                  value={normalized.trigger.targetMode}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMaxReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      trigger: { ...normalized.trigger!, targetMode: v as TriggerTargetMode }
+                                    };
+                                    onChange(index, {
+                                      onMaxReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="self">👤 Self</SelectItem>
+                                    <SelectItem value="all">👥 Todos</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
+                            {isAttr && normalized.attribute && (
+                              <div className="grid grid-cols-3 gap-1">
+                                <Select
+                                  value={normalized.attribute.key}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMaxReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      attribute: { ...normalized.attribute!, key: v }
+                                    };
+                                    onChange(index, {
+                                      onMaxReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue placeholder="Atributo" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {allAttributes.map((attr) => (
+                                      <SelectItem key={attr.key} value={attr.key}>
+                                        {attr.name} ({attr.key})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={normalized.attribute.action}
+                                  onValueChange={(v) => {
+                                    const updatedRewards = [...(attribute.onMaxReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      attribute: { ...normalized.attribute!, action: v as any }
+                                    };
+                                    onChange(index, {
+                                      onMaxReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background h-5 text-[10px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="set">= Set</SelectItem>
+                                    <SelectItem value="add">+ Add</SelectItem>
+                                    <SelectItem value="subtract">- Sub</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="number"
+                                  value={normalized.attribute.value}
+                                  onChange={(e) => {
+                                    const updatedRewards = [...(attribute.onMaxReached?.rewards || [])];
+                                    updatedRewards[rewardIdx] = {
+                                      ...reward,
+                                      attribute: { ...normalized.attribute!, value: Number(e.target.value) }
+                                    };
+                                    onChange(index, {
+                                      onMaxReached: { enabled: true, rewards: updatedRewards }
+                                    });
+                                  }}
+                                  placeholder="Valor"
+                                  className="bg-background h-5 text-[10px]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Add attribute reward button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-full text-[10px] text-amber-400 hover:bg-amber-500/10 border border-dashed border-amber-500/30"
+                        onClick={() => {
+                          const newReward = {
+                            id: `attr-max-reward-${Date.now().toString(36)}`,
+                            type: 'attribute' as const,
+                            attribute: {
+                              key: '',
+                              value: 0,
+                              action: 'set' as const
+                            }
+                          };
+                          onChange(index, {
+                            onMaxReached: {
+                              enabled: true,
+                              rewards: [...(attribute.onMaxReached?.rewards || []), newReward]
+                            }
+                          });
+                        }}
+                      >
+                        <Plus className="w-2.5 h-2.5 mr-0.5" /> Atributo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           
@@ -756,7 +1263,10 @@ function RequirementEditor({ requirement, availableAttributes, onChange, onDelet
           <Input
             type="number"
             value={requirement.valueMax ?? ''}
-            onChange={(e) => onChange({ valueMax: parseFloat(e.target.value) || undefined })}
+            onChange={(e) => {
+              const parsed = parseFloat(e.target.value);
+              onChange({ valueMax: isNaN(parsed) ? undefined : parsed });
+            }}
             placeholder="max"
             className="h-7 w-16 text-xs"
           />
@@ -2274,6 +2784,7 @@ export function StatsEditor({ statsConfig, onChange, allCharacters = [] }: Stats
                       index={index}
                       onChange={updateAttribute}
                       onDelete={deleteAttribute}
+                      allAttributes={config.attributes}
                     />
                   ))}
                   <Button variant="outline" size="sm" onClick={addAttribute} className="w-full">

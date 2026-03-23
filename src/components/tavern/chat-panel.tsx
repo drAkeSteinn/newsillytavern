@@ -510,7 +510,7 @@ export function ChatPanel() {
                   chatLogger.info('Turn stopped for user response', { reason: parsed.reason });
                   setStreamingProgress(null);
                   setStreamingCharacter(null);
-                  setIsGenerating(false);
+                  setGenerating(false);
                   // Optionally show a toast notification
                   return;
                 } else if (parsed.type === 'character_start') {

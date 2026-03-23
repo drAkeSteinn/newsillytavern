@@ -237,6 +237,7 @@ export const createDefaultCharacterState = (): CharacterSpriteState => ({
   triggerSpriteLabel: null,
   triggerCollectionId: null,
   triggerPackId: null,
+  useTimelineSounds: true,  // Enable timeline sounds by default
   returnToIdle: {
     active: false,
     scheduledAt: 0,
@@ -550,7 +551,7 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
             triggerSpriteLabel: hit.spriteLabel,
             triggerCollectionId: hit.collectionId || null,
             triggerPackId: hit.packId || null,
-            useTimelineSounds: hit.useTimelineSounds ?? false,
+            useTimelineSounds: hit.useTimelineSounds ?? true,  // Enable timeline sounds by default
             triggerActivatedDuringGeneration: true,
             spriteState: 'idle', // Triggers set state to idle
             returnToIdle: {

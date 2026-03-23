@@ -152,11 +152,11 @@ export class StatsKeyHandler implements KeyHandler {
     
     // Apply min/max constraints for numeric values
     if (typeof newValue === 'number') {
-      if (matchedAttr.minValue !== undefined) {
-        newValue = Math.max(matchedAttr.minValue, newValue);
+      if (matchedAttr.min !== undefined) {
+        newValue = Math.max(matchedAttr.min, newValue);
       }
-      if (matchedAttr.maxValue !== undefined) {
-        newValue = Math.min(matchedAttr.maxValue, newValue);
+      if (matchedAttr.max !== undefined) {
+        newValue = Math.min(matchedAttr.max, newValue);
       }
     }
     
@@ -227,8 +227,8 @@ export class StatsKeyHandler implements KeyHandler {
           config: {
             attributeId: attr.id,
             attributeKey: attr.key,
-            minValue: attr.minValue,
-            maxValue: attr.maxValue,
+            min: attr.min,
+            max: attr.max,
           },
         });
       }
