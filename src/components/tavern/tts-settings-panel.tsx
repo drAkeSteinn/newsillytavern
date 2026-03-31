@@ -26,6 +26,11 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Volume2,
   Mic,
   Upload,
@@ -44,6 +49,7 @@ import {
   Activity,
   Radio,
   Zap,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TTSWebUIConfig, ASRConfig, WakeWordConfig, VADConfig } from '@/types';
@@ -449,13 +455,19 @@ export function TTSSettingsPanel() {
               </div>
 
               {/* Text Filtering Section */}
-              <div className="space-y-3 pt-2 border-t">
-                <Label className="text-sm font-medium">Qué Generar</Label>
-                <p className="text-xs text-muted-foreground -mt-2">
-                  Selecciona qué tipos de texto convertir a voz
-                </p>
+              <Collapsible defaultOpen>
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <Label className="text-sm font-medium">Qué Generar</Label>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                      <ChevronDown className="w-3.5 h-3.5 transition-transform [[data-state=open]>rotate-180]" />
+                      {ttsConfig.enabled ? 'Mostrando' : 'Colapsado'}
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
                 
-                {/* Generate Dialogues */}
+                <CollapsibleContent>
+                <div className="space-y-3 pt-3">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="generate-dialogues" className="text-xs">
@@ -510,7 +522,9 @@ export function TTSSettingsPanel() {
                     <p className="text-orange-600">✓ Texto plano: y sonríe.</p>
                   </div>
                 </div>
-              </div>
+                </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               {/* Endpoint */}
               <div className="space-y-2">
@@ -663,69 +677,83 @@ export function TTSSettingsPanel() {
             </CardContent>
           </Card>
 
-          {/* Advanced TTS Parameters */}
+          {/* Advanced TTS Parameters - Collapsible */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Parámetros Avanzados</CardTitle>
-              <CardDescription>
-                Controla la expresividad y variabilidad de la voz
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Exaggeration */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Label>Exageración</Label>
-                  <span className="text-sm text-muted-foreground">{ttsConfig.exaggeration.toFixed(2)}</span>
+            <Collapsible>
+              <CardHeader className="pb-0">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-sm">Parámetros Avanzados</CardTitle>
+                    <CardDescription>
+                      Controla la expresividad y variabilidad de la voz
+                    </CardDescription>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 shrink-0">
+                      <ChevronDown className="w-3.5 h-3.5 transition-transform [[data-state=open]>rotate-180]" />
+                      Ajustes
+                    </Button>
+                  </CollapsibleTrigger>
                 </div>
-                <Slider
-                  value={[ttsConfig.exaggeration]}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  onValueChange={([value]) => updateTtsConfig({ exaggeration: value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Controla la expresividad de la voz (0 = neutral, 1 = muy expresivo)
-                </p>
-              </div>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-4 pt-4">
+                  {/* Exaggeration */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>Exageración</Label>
+                      <span className="text-sm text-muted-foreground">{ttsConfig.exaggeration.toFixed(2)}</span>
+                    </div>
+                    <Slider
+                      value={[ttsConfig.exaggeration]}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      onValueChange={([value]) => updateTtsConfig({ exaggeration: value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Controla la expresividad de la voz (0 = neutral, 1 = muy expresivo)
+                    </p>
+                  </div>
 
-              {/* CFG Weight */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Label>Peso CFG</Label>
-                  <span className="text-sm text-muted-foreground">{ttsConfig.cfgWeight.toFixed(2)}</span>
-                </div>
-                <Slider
-                  value={[ttsConfig.cfgWeight]}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  onValueChange={([value]) => updateTtsConfig({ cfgWeight: value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Guía de flujo libre del clasificador (mayor = más adherencia al texto)
-                </p>
-              </div>
+                  {/* CFG Weight */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>Peso CFG</Label>
+                      <span className="text-sm text-muted-foreground">{ttsConfig.cfgWeight.toFixed(2)}</span>
+                    </div>
+                    <Slider
+                      value={[ttsConfig.cfgWeight]}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      onValueChange={([value]) => updateTtsConfig({ cfgWeight: value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Guía de flujo libre del clasificador (mayor = más adherencia al texto)
+                    </p>
+                  </div>
 
-              {/* Temperature */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Label>Temperatura</Label>
-                  <span className="text-sm text-muted-foreground">{ttsConfig.temperature.toFixed(2)}</span>
-                </div>
-                <Slider
-                  value={[ttsConfig.temperature]}
-                  min={0.1}
-                  max={2}
-                  step={0.1}
-                  onValueChange={([value]) => updateTtsConfig({ temperature: value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Variabilidad de la muestra (menor = más consistente, mayor = más variado)
-                </p>
-              </div>
-            </CardContent>
+                  {/* Temperature */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>Temperatura</Label>
+                      <span className="text-sm text-muted-foreground">{ttsConfig.temperature.toFixed(2)}</span>
+                    </div>
+                    <Slider
+                      value={[ttsConfig.temperature]}
+                      min={0.1}
+                      max={2}
+                      step={0.1}
+                      onValueChange={([value]) => updateTtsConfig({ temperature: value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Variabilidad de la muestra (menor = más consistente, mayor = más variado)
+                    </p>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
 
           {/* Test TTS */}

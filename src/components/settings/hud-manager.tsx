@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTavernStore } from '@/store';
+import { motion } from 'framer-motion';
 import type { HUDTemplate, HUDField, HUDFieldType, HUDPosition, HUDStyle, HUDFieldStyle } from '@/types';
 import { cn, generateId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ArrowLeft, Save } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -161,228 +163,227 @@ export function HUDManager() {
   };
   
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
-              <Layers className="w-5 h-5 text-emerald-500" />
-            </div>
-            HUD Templates
-          </h2>
-          <p className="text-muted-foreground text-sm ml-12">
-            Crea plantillas de HUD para mostrar información durante el chat
-          </p>
-        </div>
-        <Button 
-          onClick={handleCreate}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200 hover:shadow-emerald-500/40"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Crear Template
-        </Button>
-      </div>
-      
-      {/* Template List */}
-      {hudTemplates.length === 0 ? (
-        <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-500/10 to-slate-600/10 mb-4">
-              <Layers className="w-12 h-12 text-slate-400" />
-            </div>
-            <p className="text-muted-foreground text-center mb-2 font-medium">
-              No hay templates de HUD creados
-            </p>
-            <p className="text-muted-foreground/60 text-sm text-center max-w-xs mb-6">
-              Los templates te permiten definir qué información mostrar en el chat y cómo visualizarla
-            </p>
-            <Button variant="outline" className="gap-2" onClick={handleCreate}>
-              <Sparkles className="w-4 h-4" />
-              Crear primer template
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {hudTemplates.map((template) => {
-            const isActive = template.id === activeHUDTemplateId;
-            return (
-              <Card 
-                key={template.id} 
-                className={cn(
-                  "group relative overflow-hidden transition-all duration-300",
-                  "hover:shadow-xl hover:shadow-slate-500/10 hover:-translate-y-1",
-                  "border",
-                  isActive 
-                    ? "border-emerald-500/50 bg-gradient-to-br from-emerald-500/5 to-teal-500/5" 
-                    : "border-border/60 bg-gradient-to-br from-card to-muted/30 hover:border-emerald-500/30"
-                )}
-              >
-                {/* Active indicator */}
-                {isActive && (
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
-                )}
-                
-                {/* Background decoration */}
-                <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500/5 to-teal-500/5 group-hover:scale-150 transition-transform duration-500" />
-                
-                <CardHeader className="pb-3 relative">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-lg truncate">{template.name}</CardTitle>
-                        {isActive && (
-                          <Badge className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shrink-0">
-                            <Zap className="w-3 h-3 mr-1" />
-                            Activo
-                          </Badge>
-                        )}
-                      </div>
-                      {template.description && (
-                        <CardDescription className="mt-1.5 line-clamp-2">
-                          {template.description}
-                        </CardDescription>
-                      )}
-                    </div>
-                    <Badge 
-                      variant="secondary" 
-                      className={cn(
-                        "ml-2 shrink-0 font-mono",
-                        "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
-                      )}
-                    >
-                      {template.fields.length}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4 relative">
-                  {/* Preview of fields */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {template.fields.slice(0, 4).map((field) => (
-                      <Badge
-                        key={field.id}
-                        variant="outline"
-                        className="text-xs bg-background/50 border-border/50 hover:bg-background transition-colors"
-                      >
-                        {field.icon && <span className="mr-1">{field.icon}</span>}
-                        {field.name}
-                      </Badge>
-                    ))}
-                    {template.fields.length > 4 && (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-muted/50 border-border/50"
-                      >
-                        +{template.fields.length - 4}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Template info with visual style preview */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Position indicator */}
-                    <Badge
-                      variant="secondary"
-                      className="text-xs gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
-                    >
-                      <span className="font-mono text-sm">{positionLabels[template.position]}</span>
-                      {template.position.replace('-', ' ')}
-                    </Badge>
-                    {/* Style with mini preview */}
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn(
-                        "w-4 h-4 rounded-sm border",
-                        stylePreviewClasses[template.style]
-                      )} />
-                      <Badge
-                        variant="secondary"
-                        className="text-xs gap-1 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
-                      >
-                        {styleIcons[template.style]}
-                        {template.style}
-                      </Badge>
-                    </div>
-                    {template.compact && (
-                      <Badge
-                        variant="secondary"
-                        className="text-xs gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
-                      >
-                        <Grid3X3 className="w-3 h-3" />
-                        compacto
-                      </Badge>
-                    )}
-                    <Badge
-                      variant="secondary"
-                      className="text-xs gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20 ml-auto"
-                    >
-                      <Eye className="w-3 h-3" />
-                      {Math.round(template.opacity * 100)}%
-                    </Badge>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2 border-t border-border/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30 transition-colors"
-                      onClick={() => handleEdit(template)}
-                    >
-                      <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 hover:bg-slate-500/10 hover:text-slate-600 hover:border-slate-500/30 transition-colors"
-                      onClick={() => handleDuplicate(template)}
-                    >
-                      <Copy className="w-3.5 h-3.5 mr-1.5" />
-                      Duplicar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30 transition-colors"
-                      onClick={() => handleDelete(template)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-      
-      {/* Editor Dialog */}
-      {(editingTemplate || isCreating) && (
-        <HUDEditorDialog
+    <div className={(editingTemplate || isCreating) ? "h-full flex flex-col" : "h-full overflow-y-auto p-6"}>
+      {(editingTemplate || isCreating) ? (
+        <HUDEditorPanel
           template={editingTemplate}
           isNew={isCreating}
           onSave={handleSave}
           onClose={handleClose}
         />
+      ) : (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-bold flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+                  <Layers className="w-5 h-5 text-emerald-500" />
+                </div>
+                HUD Templates
+              </h2>
+              <p className="text-muted-foreground text-sm ml-12">
+                Crea plantillas de HUD para mostrar información durante el chat
+              </p>
+            </div>
+            <Button 
+              onClick={handleCreate}
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200 hover:shadow-emerald-500/40"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Crear Template
+            </Button>
+          </div>
+          
+          {/* Template List */}
+          {hudTemplates.length === 0 ? (
+            <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-500/10 to-slate-600/10 mb-4">
+                  <Layers className="w-12 h-12 text-slate-400" />
+                </div>
+                <p className="text-muted-foreground text-center mb-2 font-medium">
+                  No hay templates de HUD creados
+                </p>
+                <p className="text-muted-foreground/60 text-sm text-center max-w-xs mb-6">
+                  Los templates te permiten definir qué información mostrar en el chat y cómo visualizarla
+                </p>
+                <Button variant="outline" className="gap-2" onClick={handleCreate}>
+                  <Sparkles className="w-4 h-4" />
+                  Crear primer template
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+              {hudTemplates.map((template) => {
+                const isActive = template.id === activeHUDTemplateId;
+                return (
+                  <Card 
+                    key={template.id} 
+                    className={cn(
+                      "group relative overflow-hidden transition-all duration-300",
+                      "hover:shadow-xl hover:shadow-slate-500/10 hover:-translate-y-1",
+                      "border",
+                      isActive 
+                        ? "border-emerald-500/50 bg-gradient-to-br from-emerald-500/5 to-teal-500/5" 
+                        : "border-border/60 bg-gradient-to-br from-card to-muted/30 hover:border-emerald-500/30"
+                    )}
+                  >
+                    {/* Active indicator */}
+                    {isActive && (
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                    )}
+                    
+                    {/* Background decoration */}
+                    <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500/5 to-teal-500/5 group-hover:scale-150 transition-transform duration-500" />
+                    
+                    <CardHeader className="pb-3 relative">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg truncate">{template.name}</CardTitle>
+                            {isActive && (
+                              <Badge className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shrink-0">
+                                <Zap className="w-3 h-3 mr-1" />
+                                Activo
+                              </Badge>
+                            )}
+                          </div>
+                          {template.description && (
+                            <CardDescription className="mt-1.5 line-clamp-2">
+                              {template.description}
+                            </CardDescription>
+                          )}
+                        </div>
+                        <Badge 
+                          variant="secondary" 
+                          className={cn(
+                            "ml-2 shrink-0 font-mono",
+                            "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
+                          )}
+                        >
+                          {template.fields.length}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="space-y-4 relative">
+                      {/* Preview of fields */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {template.fields.slice(0, 4).map((field) => (
+                          <Badge
+                            key={field.id}
+                            variant="outline"
+                            className="text-xs bg-background/50 border-border/50 hover:bg-background transition-colors"
+                          >
+                            {field.icon && <span className="mr-1">{field.icon}</span>}
+                            {field.name}
+                          </Badge>
+                        ))}
+                        {template.fields.length > 4 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-muted/50 border-border/50"
+                          >
+                            +{template.fields.length - 4}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Template info with visual style preview */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="secondary"
+                          className="text-xs gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
+                        >
+                          <span className="font-mono text-sm">{positionLabels[template.position]}</span>
+                          {template.position.replace('-', ' ')}
+                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <div className={cn(
+                            "w-4 h-4 rounded-sm border",
+                            stylePreviewClasses[template.style]
+                          )} />
+                          <Badge
+                            variant="secondary"
+                            className="text-xs gap-1 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
+                          >
+                            {styleIcons[template.style]}
+                            {template.style}
+                          </Badge>
+                        </div>
+                        {template.compact && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20"
+                          >
+                            <Grid3X3 className="w-3 h-3" />
+                            compacto
+                          </Badge>
+                        )}
+                        <Badge
+                          variant="secondary"
+                          className="text-xs gap-1.5 bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20 ml-auto"
+                        >
+                          <Eye className="w-3 h-3" />
+                          {Math.round(template.opacity * 100)}%
+                        </Badge>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-border/50">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 hover:bg-emerald-500/10 hover:text-emerald-600 hover:border-emerald-500/30 transition-colors"
+                          onClick={() => handleEdit(template)}
+                        >
+                          <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                          Editar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 hover:bg-slate-500/10 hover:text-slate-600 hover:border-slate-500/30 transition-colors"
+                          onClick={() => handleDuplicate(template)}
+                        >
+                          <Copy className="w-3.5 h-3.5 mr-1.5" />
+                          Duplicar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30 transition-colors"
+                          onClick={() => handleDelete(template)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
 // ============================================
-// HUD Editor Dialog
+// HUD Editor Panel (Full-Screen)
 // ============================================
 
-interface HUDEditorDialogProps {
+interface HUDEditorPanelProps {
   template: HUDTemplate | null;
   isNew: boolean;
   onSave: (template: Partial<HUDTemplate>) => void;
   onClose: () => void;
 }
 
-function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogProps) {
+function HUDEditorPanel({ template, isNew, onSave, onClose }: HUDEditorPanelProps) {
   const [name, setName] = useState(template?.name || '');
   const [description, setDescription] = useState(template?.description || '');
   const [fields, setFields] = useState<HUDField[]>(template?.fields || []);
@@ -519,19 +520,48 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
   ];
   
   return (
-    <>
-      <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="pb-4 border-b border-border/50">
-            <DialogTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
-                {isNew ? <Plus className="w-5 h-5 text-emerald-500" /> : <Pencil className="w-5 h-5 text-emerald-500" />}
-              </div>
-              {isNew ? 'Crear Nuevo Template' : 'Editar Template'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-y-auto py-6 space-y-6">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
+      className="h-full flex flex-col"
+    >
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border/50 bg-background/95 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+              {isNew ? <Plus className="w-5 h-5 text-emerald-500" /> : <Pencil className="w-5 h-5 text-emerald-500" />}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{isNew ? 'Crear Nuevo Template' : 'Editar Template'}</h2>
+              <p className="text-xs text-muted-foreground">Configura los campos y la apariencia del HUD</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={!name.trim()}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Guardar
+          </Button>
+        </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="grid grid-cols-1 2xl:grid-cols-[1fr_300px] gap-6 p-6">
+          {/* Left Column - Editor Sections */}
+          <div className="space-y-6">
             {/* Section: Información básica */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -540,7 +570,7 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
                 </div>
                 Información básica
               </div>
-              <div className="grid grid-cols-2 gap-4 pl-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-8">
                 <div className="space-y-2">
                   <Label htmlFor="template-name" className="text-xs text-muted-foreground">Nombre del template</Label>
                   <Input
@@ -661,7 +691,7 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
                 </div>
 
                 {/* Opacity & Compact */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-6">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs text-muted-foreground">Opacidad</Label>
@@ -928,23 +958,71 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
               </div>
             </div>
           </div>
-          
-          <DialogFooter className="pt-4 border-t border-border/50">
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              disabled={!name.trim()}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
-            >
-              {isNew ? 'Crear Template' : 'Guardar Cambios'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Field Editor */}
+
+          {/* Right Sidebar - Preview (visible on 2xl) */}
+          <div className="hidden 2xl:block space-y-4">
+            <div className="sticky top-0 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <div className="p-1.5 rounded-md bg-slate-500/10">
+                  <Eye className="w-4 h-4 text-slate-500" />
+                </div>
+                Resumen del Template
+              </div>
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-muted/10">
+                  <h4 className="font-medium text-sm mb-3">{name || 'Sin nombre'}</h4>
+                  {description && (
+                    <p className="text-xs text-muted-foreground mb-3">{description}</p>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Campos</span>
+                      <Badge variant="secondary" className="text-xs">{fields.length}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Posición</span>
+                      <span className="font-medium">{position.replace('-', ' ')}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Estilo</span>
+                      <span className="font-medium capitalize">{style}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Opacidad</span>
+                      <span className="font-medium">{Math.round(opacity * 100)}%</span>
+                    </div>
+                    {contextEnabled && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Contexto</span>
+                        <Badge variant="outline" className="text-[10px] bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20">Activo</Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Field summary */}
+                {fields.length > 0 && (
+                  <div className="p-4 rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-muted/10">
+                    <h4 className="font-medium text-xs text-muted-foreground mb-2">Campos ({fields.length})</h4>
+                    <div className="space-y-1.5">
+                      {fields.map((field, i) => (
+                        <div key={field.id} className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground w-4 text-center">{i + 1}</span>
+                          {field.icon && <span className="w-4 text-center">{field.icon}</span>}
+                          <span className="font-medium truncate">{field.name}</span>
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-muted/50 ml-auto">{field.type}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Field Editor Dialog */}
       {showFieldEditor && (
         <HUDFieldEditorDialog
           field={editingField}
@@ -955,7 +1033,7 @@ function HUDEditorDialog({ template, isNew, onSave, onClose }: HUDEditorDialogPr
           }}
         />
       )}
-    </>
+    </motion.div>
   );
 }
 

@@ -242,7 +242,7 @@ export function ItemEditor({ open, onOpenChange, item, onSave, onDelete }: ItemE
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange} key={itemKey}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {item ? 'Editar Item' : 'Crear Nuevo Item'}
@@ -252,13 +252,14 @@ export function ItemEditor({ open, onOpenChange, item, onSave, onDelete }: ItemE
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid grid-cols-3 w-full">
+        <Tabs defaultValue="basic" className="w-full flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid grid-cols-3 w-full shrink-0">
             <TabsTrigger value="basic">Básico</TabsTrigger>
             <TabsTrigger value="stats">Stats</TabsTrigger>
             <TabsTrigger value="triggers">Triggers</TabsTrigger>
           </TabsList>
           
+          <div className="flex-1 overflow-y-auto mt-4">
           {/* Basic Tab */}
           <TabsContent value="basic" className="space-y-4 mt-4">
             {/* Name */}
@@ -285,7 +286,7 @@ export function ItemEditor({ open, onOpenChange, item, onSave, onDelete }: ItemE
             </div>
             
             {/* Category & Rarity */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Categoría</Label>
                 <Select value={category} onValueChange={handleCategoryChange}>
@@ -613,9 +614,11 @@ export function ItemEditor({ open, onOpenChange, item, onSave, onDelete }: ItemE
               />
             </div>
           </TabsContent>
+          </div>
+          {/* End scrollable content */}
         </Tabs>
         
-        <DialogFooter className="gap-2 mt-4">
+        <DialogFooter className="gap-2 mt-auto pt-4 border-t border-border/50 shrink-0">
           {item && onDelete && (
             <Button variant="destructive" onClick={onDelete}>
               Eliminar

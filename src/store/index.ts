@@ -189,6 +189,16 @@ export const useTavernStore = create<TavernState>()(
             ...currentState.settings.chatLayout,
             ...((persistedSettings?.chatLayout as Record<string, unknown>) || {})
           },
+          // Ensure context settings exist with defaults
+          context: {
+            ...currentState.settings.context,
+            ...((persistedSettings?.context as Record<string, unknown>) || {})
+          },
+          // Ensure embeddingsChat settings exist with defaults
+          embeddingsChat: {
+            ...currentState.settings.embeddingsChat,
+            ...((persistedSettings?.embeddingsChat as Record<string, unknown>) || {})
+          },
           // Ensure chatboxAppearance settings exist with defaults
           chatboxAppearance: {
             ...DEFAULT_CHATBOX_APPEARANCE,

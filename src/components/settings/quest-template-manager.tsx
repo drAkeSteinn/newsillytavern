@@ -48,13 +48,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Save } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -171,7 +166,7 @@ export function QuestTemplateManager() {
   const handleDuplicate = async (template: QuestTemplate) => {
     const newId = `${template.id}-copy-${Date.now().toString(36)}`;
     try {
-      duplicateTemplate(template.id, newId);
+      await duplicateTemplate(template.id, newId);
     } catch (error) {
       console.error('Error duplicating template:', error);
     }
@@ -217,185 +212,10 @@ export function QuestTemplateManager() {
   };
   
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-              <ScrollText className="w-5 h-5 text-amber-500" />
-            </div>
-            Quest Templates
-          </h2>
-          <p className="text-muted-foreground text-sm ml-12">
-            Crea plantillas de misiones para usar en las sesiones de rol
-          </p>
-        </div>
-        <Button 
-          onClick={handleCreate}
-          className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:shadow-amber-500/40"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Crear Template
-        </Button>
-      </div>
-
-      {/* Loading State */}
-      {isLoading && (
-        <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
-            <p className="text-muted-foreground text-sm mt-4">Cargando templates...</p>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Template List */}
-      {!isLoading && questTemplates.length === 0 ? (
-        <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 mb-4">
-              <ScrollText className="w-12 h-12 text-amber-400" />
-            </div>
-            <p className="text-muted-foreground text-center mb-2 font-medium">
-              No hay templates de quest creados
-            </p>
-            <p className="text-muted-foreground/60 text-sm text-center max-w-xs mb-6">
-              Los templates definen misiones que pueden activarse automáticamente durante el rol
-            </p>
-            <Button variant="outline" className="gap-2" onClick={handleCreate}>
-              <Sparkles className="w-4 h-4" />
-              Crear primer template
-            </Button>
-          </CardContent>
-        </Card>
-      ) : !isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {questTemplates.map((template) => (
-            <Card 
-              key={template.id} 
-              className={cn(
-                "group relative overflow-hidden transition-all duration-300",
-                "hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1",
-                "border border-border/60 bg-gradient-to-br from-card to-muted/30 hover:border-amber-500/30"
-              )}
-            >
-              {/* Background decoration */}
-              <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/5 to-orange-500/5 group-hover:scale-150 transition-transform duration-500" />
-              
-              <CardHeader className="pb-3 relative">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{template.icon || '📜'}</span>
-                      <CardTitle className="text-lg truncate">{template.name}</CardTitle>
-                    </div>
-                    {template.description && (
-                      <CardDescription className="mt-1.5 line-clamp-2">
-                        {template.description}
-                      </CardDescription>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-4 relative">
-                {/* Priority & Stats */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={priorityColors[template.priority]}>
-                    {priorityLabels[template.priority]}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs bg-muted/50">
-                    <Target className="w-3 h-3 mr-1" />
-                    {template.objectives.length} objetivos
-                  </Badge>
-                  <Badge variant="outline" className="text-xs bg-muted/50">
-                    <Gift className="w-3 h-3 mr-1" />
-                    {template.rewards.length} recompensas
-                  </Badge>
-                </div>
-
-                {/* Activation Info */}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {template.activation.method === 'keyword' && (
-                    <>
-                      <Zap className="w-3.5 h-3.5" />
-                      <span>Key: <code className="bg-muted px-1 rounded">{template.activation.key}</code></span>
-                    </>
-                  )}
-                  {template.activation.method === 'turn' && (
-                    <>
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Cada {template.activation.turnInterval} turnos</span>
-                    </>
-                  )}
-                  {template.activation.method === 'manual' && (
-                    <>
-                      <ToggleRight className="w-3.5 h-3.5" />
-                      <span>Activación manual</span>
-                    </>
-                  )}
-                  {template.activation.method === 'chain' && (
-                    <>
-                      <Link2 className="w-3.5 h-3.5" />
-                      <span>En cadena</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Behavior badges */}
-                <div className="flex items-center gap-2">
-                  {template.isRepeatable && (
-                    <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600 dark:text-green-400">
-                      Repetible
-                    </Badge>
-                  )}
-                  {template.isHidden && (
-                    <Badge variant="secondary" className="text-xs bg-slate-500/10 text-slate-600 dark:text-slate-400">
-                      <EyeOff className="w-3 h-3 mr-1" />
-                      Oculta
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t border-border/50">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 hover:bg-amber-500/10 hover:text-amber-600 hover:border-amber-500/30 transition-colors"
-                    onClick={() => handleEdit(template)}
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 hover:bg-slate-500/10 hover:text-slate-600 hover:border-slate-500/30 transition-colors"
-                    onClick={() => handleDuplicate(template)}
-                  >
-                    <Copy className="w-3.5 h-3.5 mr-1.5" />
-                    Duplicar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30 transition-colors"
-                    onClick={() => handleDelete(template)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-      
-      {/* Editor Dialog */}
-      {(editingTemplate || isCreating) && (
+    <div className={(editingTemplate || isCreating) ? "h-full flex flex-col" : "h-full relative"}>
+      {(editingTemplate || isCreating) ? (
         <QuestTemplateEditorDialog
+          key={editingTemplate?.id || 'new'}
           template={editingTemplate}
           isNew={isCreating}
           onSave={handleSave}
@@ -403,6 +223,175 @@ export function QuestTemplateManager() {
           existingIds={questTemplates.map(t => t.id)}
           objectivePrefix={objectivePrefix}
         />
+      ) : (
+        <div className="h-full overflow-y-auto p-6">
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
+                    <ScrollText className="w-5 h-5 text-amber-500" />
+                  </div>
+                  Quest Templates
+                </h2>
+                <p className="text-muted-foreground text-sm ml-12">
+                  Crea plantillas de misiones para usar en las sesiones de rol
+                </p>
+              </div>
+              <Button 
+                onClick={handleCreate}
+                className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/25 transition-all duration-200 hover:shadow-amber-500/40"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Template
+              </Button>
+            </div>
+
+            {/* Loading State */}
+            {isLoading && (
+              <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+                  <p className="text-muted-foreground text-sm mt-4">Cargando templates...</p>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Template List */}
+            {!isLoading && questTemplates.length === 0 ? (
+              <Card className="border-dashed border-2 bg-gradient-to-br from-muted/50 to-muted/30">
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 mb-4">
+                    <ScrollText className="w-12 h-12 text-amber-400" />
+                  </div>
+                  <p className="text-muted-foreground text-center mb-2 font-medium">
+                    No hay templates de quest creados
+                  </p>
+                  <p className="text-muted-foreground/60 text-sm text-center max-w-xs mb-6">
+                    Los templates definen misiones que pueden activarse automáticamente durante el rol
+                  </p>
+                  <Button variant="outline" className="gap-2" onClick={handleCreate}>
+                    <Sparkles className="w-4 h-4" />
+                    Crear primer template
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : !isLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {questTemplates.map((template) => (
+                  <Card 
+                    key={template.id} 
+                    className={cn(
+                      "group relative overflow-hidden transition-all duration-300",
+                      "hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1",
+                      "border border-border/60 bg-gradient-to-br from-card to-muted/30 hover:border-amber-500/30"
+                    )}
+                  >
+                    <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/5 to-orange-500/5 group-hover:scale-150 transition-transform duration-500" />
+                    <CardHeader className="pb-3 relative">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{template.icon || '📜'}</span>
+                            <CardTitle className="text-lg truncate">{template.name}</CardTitle>
+                          </div>
+                          {template.description && (
+                            <CardDescription className="mt-1.5 line-clamp-2">
+                              {template.description}
+                            </CardDescription>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 relative">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className={priorityColors[template.priority]}>
+                          {priorityLabels[template.priority]}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs bg-muted/50">
+                          <Target className="w-3 h-3 mr-1" />
+                          {template.objectives.length} objetivos
+                        </Badge>
+                        <Badge variant="outline" className="text-xs bg-muted/50">
+                          <Gift className="w-3 h-3 mr-1" />
+                          {template.rewards.length} recompensas
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {template.activation.method === 'keyword' && (
+                          <>
+                            <Zap className="w-3.5 h-3.5" />
+                            <span>Key: <code className="bg-muted px-1 rounded">{template.activation.key}</code></span>
+                          </>
+                        )}
+                        {template.activation.method === 'turn' && (
+                          <>
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Cada {template.activation.turnInterval} turnos</span>
+                          </>
+                        )}
+                        {template.activation.method === 'manual' && (
+                          <>
+                            <ToggleRight className="w-3.5 h-3.5" />
+                            <span>Activación manual</span>
+                          </>
+                        )}
+                        {template.activation.method === 'chain' && (
+                          <>
+                            <Link2 className="w-3.5 h-3.5" />
+                            <span>En cadena</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {template.isRepeatable && (
+                          <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600 dark:text-green-400">
+                            Repetible
+                          </Badge>
+                        )}
+                        {template.isHidden && (
+                          <Badge variant="secondary" className="text-xs bg-slate-500/10 text-slate-600 dark:text-slate-400">
+                            <EyeOff className="w-3 h-3 mr-1" />
+                            Oculta
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t border-border/50">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 hover:bg-amber-500/10 hover:text-amber-600 hover:border-amber-500/30 transition-colors"
+                          onClick={() => handleEdit(template)}
+                        >
+                          <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                          Editar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 hover:bg-slate-500/10 hover:text-slate-600 hover:border-slate-500/30 transition-colors"
+                          onClick={() => handleDuplicate(template)}
+                        >
+                          <Copy className="w-3.5 h-3.5 mr-1.5" />
+                          Duplicar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/30 transition-colors"
+                          onClick={() => handleDelete(template)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1490,22 +1479,37 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="pb-4 border-b border-border/50">
-          <DialogTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-              {isNew ? <Plus className="w-5 h-5 text-amber-500" /> : <Pencil className="w-5 h-5 text-amber-500" />}
-            </div>
-            <div>
-              <span>{isNew ? 'Crear Nuevo Template' : 'Editar Template'}</span>
-              {name && <p className="text-sm font-normal text-muted-foreground mt-0.5">{name}</p>}
-            </div>
-          </DialogTitle>
-        </DialogHeader>
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="h-full flex flex-col"
+    >
+      {/* Header */}
+      <div className="flex items-center gap-4 px-6 py-3 border-b border-border/50 flex-shrink-0">
+        <Button variant="ghost" size="icon" onClick={onClose}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 shrink-0">
+            {isNew ? <Plus className="w-5 h-5 text-amber-500" /> : <Pencil className="w-5 h-5 text-amber-500" />}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold truncate">{isNew ? 'Crear Nuevo Template' : 'Editar Template'}</h2>
+            {name && <p className="text-xs text-muted-foreground truncate">{name}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={!id.trim() || !name.trim()}>
+            <Save className="w-4 h-4 mr-2" />
+            {isNew ? 'Crear' : 'Guardar'}
+          </Button>
+        </div>
+      </div>
 
-        {/* Section Tabs with themed colors */}
-        <div className="flex gap-2 py-2 overflow-x-auto border-b border-border/50 px-1">
+      {/* Section Tabs with themed colors */}
+      <div className="flex gap-2 py-2 border-b border-border/50 px-6 flex-shrink-0">
           {sections.map((section) => {
             const colors = sectionColors[section.color];
             return (
@@ -1541,7 +1545,10 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-hidden">
+          <div className="grid grid-cols-1 2xl:grid-cols-[1fr_380px] h-full">
+            {/* Left: Form sections */}
+            <div className="overflow-y-auto p-6">
           {/* Basic Info Section */}
           {activeSection === 'basic' && (
             <div className="space-y-6">
@@ -1570,7 +1577,7 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                   </div>
                   Identificación
                 </div>
-                <div className="grid grid-cols-2 gap-4 pl-8">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pl-8">
                   <div className="space-y-2">
                     <Label htmlFor="template-id" className="text-xs text-muted-foreground">ID del Template</Label>
                     <Input
@@ -1628,7 +1635,7 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
                   </div>
                   Propiedades
                 </div>
-                <div className="grid grid-cols-3 gap-4 pl-8">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 pl-8">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Prioridad</Label>
                     <Select value={priority} onValueChange={(v) => setPriority(v as QuestPriority)}>
@@ -2502,21 +2509,89 @@ function QuestTemplateEditorDialog({ template, isNew, onSave, onClose, existingI
               )}
             </div>
           )}
-        </div>
+          </div>
+          {/* End left column */}
 
-        <DialogFooter className="pt-4 border-t border-border/50">
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleSave}
-            className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
-          >
-            <Check className="w-4 h-4 mr-2" />
-            Guardar Template
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Right: Live Preview - visible on wide screens */}
+          <div className="hidden 2xl:block border-l border-border/50 overflow-y-auto p-6 bg-muted/20">
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">Vista Previa</h3>
+            <Card className="border border-border/60 bg-gradient-to-br from-card to-muted/30">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{icon || '📜'}</span>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base truncate">{name || 'Sin nombre'}</CardTitle>
+                    {description && (
+                      <CardDescription className="line-clamp-2 mt-1">{description}</CardDescription>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge className={sectionColors[priority === 'main' ? 'amber' : priority === 'side' ? 'slate' : 'slate']?.bg || 'bg-muted/50'}>
+                    {priority === 'main' ? 'Principal' : priority === 'side' ? 'Secundaria' : 'Oculta'}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    <Target className="w-3 h-3 mr-1" />
+                    {objectives.length} objetivos
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    <Gift className="w-3 h-3 mr-1" />
+                    {rewards.length} recompensas
+                  </Badge>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Activación</p>
+                  <p className="text-xs">
+                    {activationMethod === 'keyword' && `Key: ${activationKey || '—'}`}
+                    {activationMethod === 'turn' && `Cada ${turnInterval} turnos`}
+                    {activationMethod === 'manual' && 'Manual'}
+                    {activationMethod === 'chain' && 'En cadena'}
+                  </p>
+                </div>
+
+                {objectives.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">Objetivos</p>
+                    {objectives.map((obj, i) => (
+                      <div key={obj.id || i} className="flex items-center gap-2 text-xs">
+                        <div className="w-4 h-4 rounded bg-primary/10 text-primary text-[10px] flex items-center justify-center">
+                          {i + 1}
+                        </div>
+                        <span className="truncate">{obj.description || obj.id || 'Sin configurar'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {rewards.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">Recompensas</p>
+                    {rewards.slice(0, 5).map((reward, i) => (
+                      <div key={reward.id || i} className="text-xs text-muted-foreground">
+                        {describeReward(reward)}
+                      </div>
+                    ))}
+                    {rewards.length > 5 && (
+                      <p className="text-xs text-muted-foreground/60">+{rewards.length - 5} más...</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          {/* End right column */}
+
+        </div>
+        {/* End grid */}
+
+      </div>
+      {/* End flex-1 overflow-hidden */}
+
+    </motion.div>
   );
 }

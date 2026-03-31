@@ -428,7 +428,7 @@ export function InventoryPanel() {
         {/* Settings Tab */}
         <TabsContent value="settings" className="flex-1 overflow-hidden m-0">
           <ScrollArea className="h-full p-4">
-            <div className="space-y-6 max-w-md">
+            <div className="space-y-6">
               <div className="space-y-4">
                 <h3 className="font-semibold">Detección Automática</h3>
                 

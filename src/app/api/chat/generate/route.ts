@@ -30,6 +30,8 @@ import {
   selectContextMessages,
   type ContextConfig
 } from '@/lib/context-manager';
+import { retrieveEmbeddingsContext } from '@/lib/embeddings/chat-context';
+import type { EmbeddingsChatSettings } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,6 +64,11 @@ export async function POST(request: NextRequest) {
 
     // Extract HUD context from body
     const hudContext: HUDContextConfig | undefined = body.hudContext;
+
+    // Extract embeddings chat settings
+    const embeddingsChat: Partial<EmbeddingsChatSettings> = body.embeddingsChat || {};
+    const sessionId: string | undefined = body.sessionId;
+    const characterId: string | undefined = body.characterId;
 
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
@@ -111,6 +118,17 @@ export async function POST(request: NextRequest) {
       allCharacters       // Pass all characters for peticiones/solicitudes resolution
     );
 
+    // Retrieve embeddings context
+    const embeddingsResult = await retrieveEmbeddingsContext(
+      sanitizedMessage,
+      characterId || effectiveCharacter.id,
+      sessionId,
+      embeddingsChat
+    );
+    const finalSystemPrompt = embeddingsResult.section
+      ? systemPrompt + `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`
+      : systemPrompt;
+
     // Build HUD context section if enabled
     const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
 
@@ -124,7 +142,7 @@ export async function POST(request: NextRequest) {
       case 'z-ai': {
         // Z.ai uses its own SDK
         let chatMessages = buildChatMessages(
-          systemPrompt,
+          finalSystemPrompt,
           allMessages,
           processedCharacter,
           effectiveUserName,
@@ -146,7 +164,7 @@ export async function POST(request: NextRequest) {
           throw new Error(`${llmConfig.provider} requires an endpoint URL. Please configure it in settings.`);
         }
         let chatMessages = buildChatMessages(
-          systemPrompt,
+          finalSystemPrompt,
           allMessages,
           processedCharacter,
           effectiveUserName,
@@ -166,7 +184,7 @@ export async function POST(request: NextRequest) {
           throw new Error('Anthropic requires an API key. Please configure it in settings.');
         }
         let chatMessages = buildChatMessages(
-          systemPrompt,
+          finalSystemPrompt,
           allMessages,
           processedCharacter,
           effectiveUserName,
@@ -183,7 +201,7 @@ export async function POST(request: NextRequest) {
 
       case 'ollama': {
         const prompt = buildCompletionPrompt({
-          systemPrompt,
+          systemPrompt: finalSystemPrompt,
           messages: allMessages,
           character: processedCharacter,
           userName: effectiveUserName,
@@ -197,7 +215,7 @@ export async function POST(request: NextRequest) {
       case 'koboldcpp':
       default: {
         const prompt = buildCompletionPrompt({
-          systemPrompt,
+          systemPrompt: finalSystemPrompt,
           messages: allMessages,
           character: processedCharacter,
           userName: effectiveUserName,

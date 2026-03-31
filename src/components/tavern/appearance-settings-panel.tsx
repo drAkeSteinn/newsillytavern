@@ -27,6 +27,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Palette,
   Type,
   MessageSquare,
@@ -42,8 +47,11 @@ import {
   Eye,
   Wand2,
   Zap,
+  ChevronDown,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type {
   ChatboxTheme,
@@ -366,6 +374,16 @@ export function AppearanceSettingsPanel() {
   
   const appearance = settings.chatboxAppearance || DEFAULT_CHATBOX_APPEARANCE;
   
+  // Live preview visibility - hide by default on small screens
+  const getInitialPreview = () => typeof window !== 'undefined' && window.innerWidth <= 1024 ? false : true;
+  const [previewVisible, setPreviewVisible] = useState(getInitialPreview);
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setPreviewVisible(!e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  
   // Ensure all nested objects exist with defaults
   const safeAppearance = useMemo(() => ({
     ...DEFAULT_CHATBOX_APPEARANCE,
@@ -390,13 +408,14 @@ export function AppearanceSettingsPanel() {
     <TooltipProvider>
       <div className="flex gap-4 h-full">
         {/* Settings Panel */}
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pr-2 min-w-0">
           <Tabs defaultValue="theme" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 h-9 mb-4">
-              <TabsTrigger value="theme" className="text-xs gap-1">
-                <Palette className="w-3 h-3" />
-                Tema
-              </TabsTrigger>
+            <div className="flex items-center justify-between mb-4">
+              <TabsList className="grid grid-cols-5 h-9">
+                <TabsTrigger value="theme" className="text-xs gap-1">
+                  <Palette className="w-3 h-3" />
+                  <span className="hidden sm:inline">Tema</span>
+                </TabsTrigger>
               <TabsTrigger value="bubbles" className="text-xs gap-1">
                 <MessageSquare className="w-3 h-3" />
                 Burbujas
@@ -411,9 +430,22 @@ export function AppearanceSettingsPanel() {
               </TabsTrigger>
               <TabsTrigger value="input" className="text-xs gap-1">
                 <Monitor className="w-3 h-3" />
-                Entrada
+                <span className="hidden sm:inline">Entrada</span>
               </TabsTrigger>
             </TabsList>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs gap-1.5 shrink-0"
+                onClick={() => setPreviewVisible(!previewVisible)}
+              >
+                {previewVisible ? (
+                  <><PanelRightClose className="w-4 h-4" /> Ocultar Vista</>
+                ) : (
+                  <><PanelRightOpen className="w-4 h-4" /> Vista Previa</>
+                )}
+              </Button>
+            </div>
 
             {/* Theme Tab */}
             <TabsContent value="theme" className="space-y-4 mt-0">
@@ -429,7 +461,7 @@ export function AppearanceSettingsPanel() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
                     {THEME_PRESETS.map((theme) => (
                       <button
                         key={theme.value}
@@ -453,7 +485,7 @@ export function AppearanceSettingsPanel() {
                   </div>
                   
                   {safeAppearance.theme === 'custom' && (
-                    <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-muted/30">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-muted/30">
                       <ColorPicker
                         label="Principal"
                         value={safeAppearance.customThemeColors?.primary || '#3b82f6'}
@@ -861,7 +893,7 @@ export function AppearanceSettingsPanel() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {BUBBLE_STYLE_OPTIONS.map((style) => (
                       <button
                         key={style.value}
@@ -952,15 +984,27 @@ export function AppearanceSettingsPanel() {
                 </CardContent>
               </Card>
 
-              {/* Bubble Colors */}
+              {/* Bubble Colors - Collapsible */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Colores de Burbujas</CardTitle>
-                  <CardDescription className="text-xs">
-                    Personaliza los colores de fondo y texto para cada tipo de mensaje
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <Collapsible>
+                  <CardHeader className="pb-0">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <CardTitle className="text-sm">Colores de Burbujas</CardTitle>
+                        <CardDescription className="text-xs">
+                          Personaliza los colores de fondo y texto para cada tipo de mensaje
+                        </CardDescription>
+                      </div>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 shrink-0">
+                          <ChevronDown className="w-3.5 h-3.5 transition-transform [[data-state=open]>rotate-180]" />
+                          Colores
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent className="space-y-4 pt-4">
                   {/* User Bubble */}
                   <div className="p-3 rounded-lg bg-blue-500/10 space-y-3">
                     <div className="flex items-center gap-2 text-xs font-medium text-blue-600">
@@ -1041,6 +1085,8 @@ export function AppearanceSettingsPanel() {
                     </div>
                   </div>
                 </CardContent>
+              </CollapsibleContent>
+                </Collapsible>
               </Card>
             </TabsContent>
 
@@ -1069,7 +1115,7 @@ export function AppearanceSettingsPanel() {
                     <>
                       <div className="space-y-2">
                         <Label className="text-xs">Forma</Label>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           {AVATAR_SHAPE_OPTIONS.map((shape) => {
                             const Icon = shape.icon;
                             return (
@@ -1229,7 +1275,7 @@ export function AppearanceSettingsPanel() {
                       <div className="space-y-3">
                         <div className="space-y-2">
                           <Label className="text-xs">Estilo del cursor</Label>
-                          <div className="grid grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             {CURSOR_STYLE_OPTIONS.map((style) => (
                               <button
                                 key={style.value}
@@ -1368,11 +1414,13 @@ export function AppearanceSettingsPanel() {
         </div>
         
         {/* Live Preview Panel */}
-        <div className="w-[380px] flex-shrink-0">
-          <div className="sticky top-0">
-            <LivePreview settings={safeAppearance} />
+        {previewVisible && (
+          <div className="w-[320px] xl:w-[380px] flex-shrink-0">
+            <div className="sticky top-0">
+              <LivePreview settings={safeAppearance} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </TooltipProvider>
   );

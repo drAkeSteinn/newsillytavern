@@ -53,12 +53,8 @@ cd "$BUILD_DIR" || exit 1
 
 ls -lah
 
-# 初始化数据库（如果存在）
-if [ -d "./next-service-dist/db" ] && [ "$(ls -A ./next-service-dist/db 2>/dev/null)" ] && [ -d "/db" ]; then
-    echo "🗄️  初始化数据库从 ./next-service-dist/db 到 /db..."
-    cp -r ./next-service-dist/db/* /db/ 2>/dev/null || echo "  ⚠️  无法复制到 /db，跳过数据库初始化"
-    echo "✅ 数据库初始化完成"
-fi
+DEFAULT_PACKAGED_DB_PATH="/app/db/custom.db"
+DEFAULT_PACKAGED_DATABASE_URL="file:$DEFAULT_PACKAGED_DB_PATH"
 
 # 启动 Next.js 服务器
 if [ -f "./next-service-dist/server.js" ]; then
@@ -67,8 +63,21 @@ if [ -f "./next-service-dist/server.js" ]; then
     
     # 设置环境变量
     export NODE_ENV=production
-    export PORT=${PORT:-3000}
-    export HOSTNAME=${HOSTNAME:-0.0.0.0}
+    export PORT="${PORT:-3000}"
+    export HOSTNAME="${HOSTNAME:-0.0.0.0}"
+    export DATABASE_URL="${DATABASE_URL:-$DEFAULT_PACKAGED_DATABASE_URL}"
+
+    if [ "$DATABASE_URL" = "$DEFAULT_PACKAGED_DATABASE_URL" ]; then
+        if [ ! -f "$DEFAULT_PACKAGED_DB_PATH" ]; then
+            echo "❌ 未找到打包后的数据库文件 $DEFAULT_PACKAGED_DB_PATH"
+            echo "   为避免生产环境启动到空数据库，启动已终止"
+            exit 1
+        fi
+
+        echo "🗄️  当前使用打包数据库: $DEFAULT_PACKAGED_DB_PATH"
+    else
+        echo "🗄️  当前使用外部指定数据库: $DATABASE_URL"
+    fi
     
     # 后台启动 Next.js
     bun server.js &

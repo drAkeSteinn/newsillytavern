@@ -1509,6 +1509,20 @@ export interface AppSettings {
   chatLayout: ChatLayoutSettings;
   context: ContextSettings;
   chatboxAppearance: ChatboxAppearanceSettings;
+  embeddingsChat: EmbeddingsChatSettings;
+}
+
+// ============ Embeddings Chat Integration Settings ============
+
+export interface EmbeddingsChatSettings {
+  /** Enable automatic embeddings context retrieval during chat */
+  enabled: boolean;
+  /** Maximum token budget for embeddings context (approximate, in chars) */
+  maxTokenBudget: number;
+  /** Strategy for selecting which namespaces to search */
+  namespaceStrategy: 'global' | 'character' | 'session';
+  /** Whether to show retrieved embeddings in the prompt viewer */
+  showInPromptViewer: boolean;
 }
 
 // ============ API Types ============

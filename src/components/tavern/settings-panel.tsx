@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { 
   Settings, 
   Bot, 
@@ -40,7 +42,9 @@ import {
   Cpu,
   Sliders,
   Zap,
-  Sparkles
+  Sparkles,
+  X,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Dialog,
@@ -49,12 +53,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { LLMProvider, AppSettings } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -71,6 +81,7 @@ import { InventoryPanel } from '@/components/inventory';
 import { AppearanceSettingsPanel } from './appearance-settings-panel';
 import { TTSSettingsPanel } from './tts-settings-panel';
 import { SpriteGeneralPanel } from './sprite-general-panel';
+import { EmbeddingsSettingsPanel } from '@/components/embeddings/embeddings-settings-panel';
 
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean; description: string }[] = [
   { value: 'test-mock', label: '🧪 Test Mock (Prueba)', defaultEndpoint: '', needsEndpoint: false, description: 'Prueba del sistema de peticiones sin LLM real' },
@@ -524,87 +535,160 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
     swipeRight: { label: 'Deslizar derecha', description: 'Ver siguiente respuesta alternativa' }
   };
 
+  // Active tab state (controlled)
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Sync active tab when initialTab prop changes or panel opens
+  useEffect(() => {
+    if (open) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, open]);
+
+  // Close panel on Escape (unless recording a hotkey)
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !recordingHotkey) {
+        e.preventDefault();
+        onOpenChangeRef.current(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, recordingHotkey]);
+
+  // Settings navigation tabs
+  const settingsTabs = [
+    { value: 'llm', label: 'LLM', icon: Bot },
+    { value: 'persona', label: 'Persona', icon: User },
+    { value: 'lorebooks', label: 'Lorebooks', icon: BookOpen },
+    { value: 'appearance', label: 'Apariencia', icon: Palette },
+    { value: 'sounds', label: 'Sonidos', icon: Music },
+    { value: 'backgrounds', label: 'Fondos', icon: ImageIcon },
+    { value: 'voice', label: 'Voz / TTS', icon: Volume2 },
+    { value: 'hotkeys', label: 'Atajos', icon: Keyboard },
+    { value: 'data', label: 'Datos', icon: Database },
+    { value: 'hud', label: 'HUD', icon: Layers },
+    { value: 'atmosphere', label: 'Atmósfera', icon: Cloud },
+    { value: 'memory', label: 'Memoria', icon: Brain },
+    { value: 'quests', label: 'Misiones', icon: Target },
+    { value: 'inventory', label: 'Inventario', icon: Package },
+    { value: 'sprites', label: 'Sprites', icon: Sparkles },
+    { value: 'embeddings', label: 'Embeddings', icon: Brain },
+  ];
+
+  // Separators after these tabs to group related sections
+  const separatorAfter = new Set(['lorebooks', 'voice', 'data', 'sprites']);
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="w-[95vw] max-w-[1400px] min-w-[900px] h-[90vh] min-h-[600px] p-0 gap-0 flex flex-col overflow-hidden"
-        showCloseButton={true}
-      >
-        <DialogHeader className="p-4 border-b flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Configuración
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      {/* Full-screen settings overlay */}
+      <AnimatePresence mode="wait">
+        {open && (
+          <motion.div
+            key="settings-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="fixed inset-0 z-50 bg-background"
+          >
+            <div className="h-full flex">
+              {/* ===== Sidebar ===== */}
+              <motion.aside
+                initial={{ x: -16, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ duration: 0.25, delay: 0.05, ease: 'easeOut' }}
+                className="w-14 md:w-60 border-r bg-muted/30 flex flex-col flex-shrink-0"
+              >
+                {/* Sidebar header with title and close button */}
+                <div className="flex items-center justify-between px-2 py-3 md:px-4 border-b">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Settings className="w-5 h-5 shrink-0 text-muted-foreground" />
+                    <span className="hidden md:inline font-semibold text-sm truncate">
+                      Configuración
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
 
-        <Tabs key={initialTab} defaultValue={initialTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
-          <div className="border-b px-4 flex-shrink-0 bg-muted/30">
-            <TabsList className="h-11 flex-wrap gap-1">
-              <TabsTrigger value="llm" className="gap-1.5 text-xs">
-                <Bot className="w-4 h-4" />
-                LLM
-              </TabsTrigger>
-              <TabsTrigger value="persona" className="gap-1.5 text-xs">
-                <User className="w-4 h-4" />
-                Persona
-              </TabsTrigger>
-              <TabsTrigger value="lorebooks" className="gap-1.5 text-xs">
-                <BookOpen className="w-4 h-4" />
-                Lorebooks
-              </TabsTrigger>
-              <TabsTrigger value="appearance" className="gap-1.5 text-xs">
-                <Palette className="w-4 h-4" />
-                Apariencia
-              </TabsTrigger>
-              <TabsTrigger value="sounds" className="gap-1.5 text-xs">
-                <Music className="w-4 h-4" />
-                Sonidos
-              </TabsTrigger>
-              <TabsTrigger value="backgrounds" className="gap-1.5 text-xs">
-                <ImageIcon className="w-4 h-4" />
-                Fondos
-              </TabsTrigger>
-              <TabsTrigger value="voice" className="gap-1.5 text-xs">
-                <Volume2 className="w-4 h-4" />
-                Voz
-              </TabsTrigger>
-              <TabsTrigger value="hotkeys" className="gap-1.5 text-xs">
-                <Keyboard className="w-4 h-4" />
-                Atajos
-              </TabsTrigger>
-              <TabsTrigger value="data" className="gap-1.5 text-xs">
-                <Database className="w-4 h-4" />
-                Datos
-              </TabsTrigger>
-              <TabsTrigger value="hud" className="gap-1.5 text-xs">
-                <Layers className="w-4 h-4" />
-                HUD
-              </TabsTrigger>
-              <TabsTrigger value="atmosphere" className="gap-1.5 text-xs">
-                <Cloud className="w-4 h-4" />
-                Atmósfera
-              </TabsTrigger>
-              <TabsTrigger value="memory" className="gap-1.5 text-xs">
-                <Brain className="w-4 h-4" />
-                Memoria
-              </TabsTrigger>
-              <TabsTrigger value="quests" className="gap-1.5 text-xs">
-                <Target className="w-4 h-4" />
-                Misiones
-              </TabsTrigger>
-              <TabsTrigger value="inventory" className="gap-1.5 text-xs">
-                <Package className="w-4 h-4" />
-                Inventario
-              </TabsTrigger>
-              <TabsTrigger value="sprites" className="gap-1.5 text-xs">
-                <Layers className="w-4 h-4" />
-                Sprites
-              </TabsTrigger>
-            </TabsList>
-          </div>
+                {/* Scrollable navigation */}
+                <ScrollArea className="flex-1">
+                  <TooltipProvider delayDuration={400}>
+                    <nav className="p-1.5 md:p-2 space-y-0.5">
+                      {settingsTabs.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.value;
 
-          {/* Content container with proper height */}
-          <div className="flex-1 overflow-hidden">
+                        return (
+                          <div key={tab.value}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => setActiveTab(tab.value)}
+                                  className={cn(
+                                    'w-full flex items-center gap-3 rounded-md text-sm transition-all duration-150',
+                                    'px-0 md:px-3 py-2 justify-center md:justify-start',
+                                    isActive
+                                      ? 'bg-primary/10 text-primary font-medium shadow-sm'
+                                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                                  )}
+                                >
+                                  <Icon className={cn(
+                                    'w-4 h-4 shrink-0 transition-colors',
+                                    isActive && 'text-primary'
+                                  )} />
+                                  <span className="hidden md:inline truncate">
+                                    {tab.label}
+                                  </span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="md:hidden">
+                                {tab.label}
+                              </TooltipContent>
+                            </Tooltip>
+                            {separatorAfter.has(tab.value) && (
+                              <Separator className="my-1.5 md:my-2" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </nav>
+                  </TooltipProvider>
+                </ScrollArea>
+
+                {/* Sidebar footer - version info */}
+                <div className="hidden md:flex items-center px-4 py-2 border-t text-xs text-muted-foreground">
+                  <Settings2 className="w-3 h-3 mr-1.5" />
+                  <span>TavernFlow v2.0</span>
+                </div>
+              </motion.aside>
+
+              {/* ===== Main content area ===== */}
+              <motion.main
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.1, ease: 'easeOut' }}
+                className="flex-1 overflow-hidden min-w-0"
+              >
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="h-full"
+                >
+                  {/* Content container with proper height */}
+                  <div className="h-full overflow-hidden">
             {/* LLM Settings */}
             <TabsContent value="llm" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
               <TooltipProvider>
@@ -624,7 +708,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[1fr_1fr] gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {/* Left: LLM Connections List */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -902,8 +986,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                             </div>
                           </div>
 
-                          {/* Number inputs in 4 columns */}
-                          <div className="grid grid-cols-4 gap-3">
+                          {/* Number inputs in responsive columns */}
+                          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                             <div>
                               <Label className="text-xs">Tokens Máx.</Label>
                               <Input
@@ -1038,7 +1122,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6" ref={hotkeyContainerRef}>
+                <div ref={hotkeyContainerRef}>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium">Atajos de Teclado</h3>
@@ -1098,8 +1182,23 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   </div>
                 </div>
                 
-                <div className="p-4 rounded-lg border bg-muted/30 text-sm space-y-3">
+                <Collapsible defaultOpen={false}>
+                <button
+                  onClick={(e) => {
+                    const trigger = e.currentTarget;
+                    const content = trigger.nextElementSibling;
+                    if (content) {
+                      content.classList.toggle('hidden');
+                      const icon = trigger.querySelector('.chevron-icon');
+                      if (icon) icon.classList.toggle('rotate-180');
+                    }
+                  }}
+                  className="flex items-center justify-between w-full p-3 rounded-lg border bg-muted/30 text-sm hover:bg-muted/50 transition-colors"
+                >
                   <h4 className="font-medium text-foreground">Cómo usar los atajos</h4>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground chevron-icon transition-transform duration-200" />
+                </button>
+                <div className="hidden p-4 rounded-b-lg border border-t-0 bg-muted/30 text-sm space-y-3">
                   <ul className="space-y-2 text-muted-foreground">
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
@@ -1129,6 +1228,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                     </p>
                   </div>
                 </div>
+                </Collapsible>
               </div>
             </div>
           </TabsContent>
@@ -1154,7 +1254,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
               
               <div className="space-y-6">
                 {/* Settings Toggles */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <h3 className="font-medium">Preferencias de Datos</h3>
                     
@@ -1201,7 +1301,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                     <span className="text-xs text-muted-foreground">(Sin datos de personajes/sesiones)</span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button 
                       variant="outline" 
                       className="h-auto py-4 flex flex-col gap-2"
@@ -1241,7 +1341,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                     <span className="text-xs text-muted-foreground">(Todo: config + personajes + sesiones)</span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button 
                       variant="outline" 
                       className="h-auto py-4 flex flex-col gap-2"
@@ -1290,7 +1390,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             </TabsContent>
 
             {/* HUD Settings */}
-            <TabsContent value="hud" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+            <TabsContent value="hud" className="h-full overflow-hidden p-6 m-0 data-[state=inactive]:hidden">
               <HUDManager />
             </TabsContent>
 
@@ -1305,7 +1405,7 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             </TabsContent>
             
             {/* Quest Settings */}
-            <TabsContent value="quests" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+            <TabsContent value="quests" className="h-full overflow-hidden p-0 m-0 data-[state=inactive]:hidden">
               <QuestSettingsPanel />
             </TabsContent>
             
@@ -1318,9 +1418,16 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
             <TabsContent value="sprites" className="h-full overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
               <SpriteGeneralPanel />
             </TabsContent>
-          </div>
-        </Tabs>
-      </DialogContent>
+            <TabsContent value="embeddings" className="h-full overflow-y-auto p-6 m-0 data-[state=inactive]:hidden">
+              <EmbeddingsSettingsPanel />
+            </TabsContent>
+                </div>
+                </Tabs>
+              </motion.main>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* New Config Dialog */}
       <Dialog open={newConfigOpen} onOpenChange={setNewConfigOpen}>
@@ -1403,6 +1510,6 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
+    </>
   );
 }

@@ -86,7 +86,13 @@ export const defaultSettings: AppSettings = {
     showCharacterSprite: true
   },
   context: defaultContextSettings,
-  chatboxAppearance: DEFAULT_CHATBOX_APPEARANCE
+  chatboxAppearance: DEFAULT_CHATBOX_APPEARANCE,
+  embeddingsChat: {
+    enabled: false,
+    maxTokenBudget: 1024,
+    namespaceStrategy: 'character',
+    showInPromptViewer: true,
+  }
 };
 
 export const defaultPromptTemplate: PromptTemplate = {

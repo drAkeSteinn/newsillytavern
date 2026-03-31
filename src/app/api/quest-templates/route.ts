@@ -65,6 +65,10 @@ export async function POST(request: NextRequest) {
       }
 
       const duplicated = duplicateQuestTemplate(source, newId);
+      
+      // Persist the duplicated template to disk
+      saveQuestTemplate(duplicated);
+      
       return NextResponse.json({ 
         success: true, 
         template: duplicated,

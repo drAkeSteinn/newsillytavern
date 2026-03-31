@@ -38,7 +38,7 @@
     "realtimeEnabled": true,
     "transitionDuration": 500,
     "defaultTransitionType": "fade",
-    "returnToDefaultEnabled": false,
+    "returnToDefaultEnabled": true,
     "returnToDefaultAfter": 300000,
     "defaultBackgroundUrl": "/backgrounds/Room/Room (1).png",
     "globalOverlays": []

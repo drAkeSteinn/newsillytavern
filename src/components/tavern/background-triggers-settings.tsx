@@ -349,7 +349,7 @@ export function BackgroundTriggersSettings() {
                     <AccordionContent className="px-4 pb-4">
                       <div className="space-y-3 pt-2">
                         {/* Pack Settings Row */}
-                        <div className="grid grid-cols-6 gap-3">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                           <div>
                             <Label className="text-xs">Nombre</Label>
                             <Input
@@ -448,7 +448,7 @@ export function BackgroundTriggersSettings() {
                         </div>
 
                         {/* Pack Return to Default Settings */}
-                        <div className="grid grid-cols-4 gap-3 p-3 rounded border bg-muted/20">
+                        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 p-3 rounded border bg-muted/20">
                           <label className="flex items-center gap-2 text-sm cursor-pointer">
                             <Switch
                               checked={pack.returnToDefault ?? false}
@@ -543,7 +543,7 @@ export function BackgroundTriggersSettings() {
                                     !item.enabled && "opacity-50"
                                   )}
                                 >
-                                  <div className="grid grid-cols-7 gap-2 items-center">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 items-center">
                                     {/* Background Preview */}
                                     <div className="relative">
                                       <div

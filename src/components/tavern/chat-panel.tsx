@@ -16,6 +16,7 @@ import { QuestNotifications } from './quest-notifications';
 import { TTSFloatingIndicator } from './tts-playback-controls';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard, SummaryData, ChatMessage } from '@/types';
+import { EmbeddingsContextContainer } from '@/components/embeddings/embeddings-context-indicator';
 import { t } from '@/lib/i18n';
 import { chatLogger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
@@ -24,6 +25,13 @@ export function ChatPanel() {
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingCharacter, setStreamingCharacter] = useState<CharacterCard | null>(null);
   const [streamingProgress, setStreamingProgress] = useState<{ current: number; total: number } | null>(null);
+  const [embeddingsContexts, setEmbeddingsContexts] = useState<Array<{
+    count: number;
+    namespaces: string[];
+    topResults: Array<{ content: string; similarity: number; namespace: string; source_type?: string }>;
+    characterId?: string;
+    characterName?: string;
+  }>>([]);
 
   // Use proper selectors to subscribe to store changes
   const activeSessionId = useTavernStore((state) => state.activeSessionId);
@@ -366,6 +374,7 @@ export function ChatPanel() {
     setStreamingContent('');
     setStreamingCharacter(null);
     setStreamingProgress(null);
+    setEmbeddingsContexts([]);
     
     // Generate a unique message key for this streaming session
     const messageKey = `stream_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -464,6 +473,7 @@ export function ChatPanel() {
             allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
             soundTriggers,  // Pass sound triggers for {{sonidos}} resolution
             settings,  // Pass settings for {{sonidos}} template
+            embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
           })
         });
 
@@ -513,6 +523,13 @@ export function ChatPanel() {
                   setGenerating(false);
                   // Optionally show a toast notification
                   return;
+                } else if (parsed.type === 'embeddings_context' && parsed.data) {
+                  // Embeddings context was retrieved for this character
+                  setEmbeddingsContexts(prev => [...prev, {
+                    ...parsed.data,
+                    characterId: parsed.characterId,
+                    characterName: parsed.characterName,
+                  }]);
                 } else if (parsed.type === 'character_start') {
                   currentCharacterContent = '';
                   const char = groupCharacters.find(c => c.id === parsed.characterId);
@@ -670,6 +687,7 @@ export function ChatPanel() {
             allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
             soundTriggers,  // Pass sound triggers for {{sonidos}} resolution
             settings,  // Pass settings for {{sonidos}} template
+            embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
           })
         });
 
@@ -713,6 +731,9 @@ export function ChatPanel() {
                 if (parsed.type === 'prompt_data' && parsed.promptSections) {
                   // Capture prompt sections for metadata
                   promptSections = parsed.promptSections;
+                } else if (parsed.type === 'embeddings_context' && parsed.data) {
+                  // Embeddings context was retrieved
+                  setEmbeddingsContexts(prev => [...prev, parsed.data]);
                 } else if (parsed.type === 'token' && parsed.content) {
                   accumulatedContent += parsed.content;
                   setStreamingContent(accumulatedContent);
@@ -1270,6 +1291,11 @@ export function ChatPanel() {
       
       {/* TTS Floating Indicator */}
       <TTSFloatingIndicator />
+      
+      {/* Embeddings Context Indicator */}
+      {embeddingsContexts.length > 0 && (
+        <EmbeddingsContextContainer contexts={embeddingsContexts} />
+      )}
     </div>
   );
 }

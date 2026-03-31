@@ -71,9 +71,9 @@ export function QuestSettingsPanel() {
   }, [setQuestSettings]);
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div className="space-y-1">
           <h2 className="text-2xl font-bold flex items-center gap-2.5">
             <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
@@ -108,7 +108,7 @@ export function QuestSettingsPanel() {
         </Badge>
       </div>
 
-      <Tabs defaultValue="templates" className="h-full flex flex-col">
+      <Tabs defaultValue="templates" className="flex-1 flex flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="templates" className="gap-2">
             <ScrollText className="w-4 h-4" />
@@ -125,12 +125,12 @@ export function QuestSettingsPanel() {
         </TabsList>
 
         {/* Templates Tab - Quest Template Manager */}
-        <TabsContent value="templates" className="flex-1 overflow-y-auto m-0 mt-6">
+        <TabsContent value="templates" className="flex-1 overflow-hidden m-0 mt-4">
           <QuestTemplateManager />
         </TabsContent>
 
         {/* Quest Management Tab */}
-        <TabsContent value="quests" className="flex-1 overflow-hidden m-0 mt-6">
+        <TabsContent value="quests" className="flex-1 overflow-hidden m-0 mt-4">
           {activeSessionId ? (
             <QuestLogPanel 
               sessionId={activeSessionId} 
@@ -152,7 +152,7 @@ export function QuestSettingsPanel() {
         </TabsContent>
 
         {/* Settings Tab */}
-        <TabsContent value="settings" className="flex-1 overflow-y-auto m-0 mt-6">
+        <TabsContent value="settings" className="flex-1 overflow-y-auto m-0 mt-4">
           <div className="space-y-6 pr-2">
             {/* Banner informativo */}
             <div className="rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-500/20 p-4">

@@ -265,7 +265,7 @@ function CollectionManager({ onCollectionSelect }: CollectionManagerProps) {
       />
 
       {/* Left Panel - Collections List */}
-      <div className="w-64 flex-shrink-0 flex flex-col gap-3 border rounded-lg bg-muted/20 p-3 overflow-hidden">
+      <div className="w-48 md:w-64 flex-shrink-0 flex flex-col gap-3 border rounded-lg bg-muted/20 p-3 overflow-hidden">
         <div className="flex items-center justify-between flex-shrink-0">
           <Label className="text-xs font-medium flex items-center gap-2">
             <FolderOpen className="w-4 h-4" />
@@ -428,7 +428,7 @@ function CollectionManager({ onCollectionSelect }: CollectionManagerProps) {
                   <p className="text-xs mt-1">Sube imágenes o videos para empezar</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-4 gap-3 pr-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 pr-2">
                   {selectedCollection.files.map((file, index) => (
                     <div
                       key={`${file.name}-${index}`}

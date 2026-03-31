@@ -45,6 +45,8 @@ import {
   type ContextConfig
 } from '@/lib/context-manager';
 import { buildQuestPromptSection } from '@/lib/triggers/handlers/quest-handler';
+import { retrieveEmbeddingsContext, formatEmbeddingsForSSE } from '@/lib/embeddings/chat-context';
+import type { EmbeddingsChatSettings } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,6 +90,11 @@ export async function POST(request: NextRequest) {
     // Extract summary for memory/context compression (single summary from session)
     const summary: SessionSummary | undefined = body.summary;
     
+    // Extract embeddings chat settings for automatic context retrieval
+    const embeddingsChat: Partial<EmbeddingsChatSettings> = body.embeddingsChat || {};
+    const sessionId: string | undefined = body.sessionId;
+    const characterId: string | undefined = body.characterId;
+    
     // Debug: Log sessionStats event fields
     console.log(`[Stream Route] sessionStats event fields:`, {
       hasSessionStats: !!sessionStats,
@@ -128,6 +135,21 @@ export async function POST(request: NextRequest) {
         tokenBudget: 2048
       }
     );
+
+    // ========================================
+    // Embeddings Context Retrieval
+    // ========================================
+    // Retrieve relevant embeddings based on user message and settings
+    const embeddingsResult = await retrieveEmbeddingsContext(
+      sanitizedMessage,
+      characterId || effectiveCharacter.id,
+      sessionId,
+      embeddingsChat
+    );
+    
+    if (embeddingsResult.found) {
+      console.log(`[Stream Route] Retrieved ${embeddingsResult.count} embeddings from namespaces: ${embeddingsResult.searchedNamespaces.join(', ')}`);
+    }
 
     // ========================================
     // Build system prompt with unified key resolution
@@ -230,9 +252,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Combine all sections in order for prompt viewer
-    // Order: System -> Summary -> Quest -> Chat History -> Post-History Instructions
+    // Order: System -> Embeddings -> Summary -> Quest -> Chat History -> Post-History Instructions
     let allPromptSections: PromptSection[] = [
       ...systemSections,
+      ...(embeddingsResult.section ? [embeddingsResult.section] : []),
       ...(summarySection ? [summarySection] : []),
       ...(questSection ? [questSection] : []),
       ...chatHistorySections,
@@ -244,8 +267,11 @@ export async function POST(request: NextRequest) {
       allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
     }
 
-    // Build the final system prompt (only include quest section, summary goes to chat history)
+    // Build the final system prompt (include quest section + embeddings, summary goes to chat history)
     let finalSystemPrompt = systemPrompt;
+    if (embeddingsResult.section) {
+      finalSystemPrompt += `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`;
+    }
     if (questSection) {
       finalSystemPrompt += `\n\n[${questSection.label}]\n${questSection.content}`;
     }
@@ -266,6 +292,14 @@ export async function POST(request: NextRequest) {
             type: 'prompt_data',
             promptSections: allPromptSections
           }));
+          
+          // Send embeddings context metadata to the client for UI display
+          if (embeddingsResult.found) {
+            controller.enqueue(createSSEJSON({
+              type: 'embeddings_context',
+              data: formatEmbeddingsForSSE(embeddingsResult)
+            }));
+          }
 
           let generator: AsyncGenerator<string>;
 

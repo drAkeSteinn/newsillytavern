@@ -136,7 +136,7 @@ export function MemorySettingsPanel() {
           </div>
 
           {/* Keep First/Last N */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs">Conservar Primeros N</Label>
               <Input
@@ -279,7 +279,7 @@ export function MemorySettingsPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Messages to keep */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm">Mensajes recientes a conservar</Label>
               <Input

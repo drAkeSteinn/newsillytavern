@@ -1,0 +1,651 @@
+/**
+ * LanceDB Vector Database Wrapper
+ * 
+ * Handles vector storage, similarity search, and namespace management.
+ * Uses dynamic module loading for cross-platform compatibility.
+ */
+
+import * as path from 'path';
+import * as fs from 'fs';
+import type { Embedding, SearchResult, RecordNamespace, EmbeddingStats } from './types';
+
+// ============ Platform Detection ============
+
+export type Platform = 'win32' | 'linux' | 'darwin' | 'unknown';
+
+export function getPlatform(): Platform {
+  if (typeof process !== 'undefined' && process.platform) {
+    return process.platform as Platform;
+  }
+  return 'unknown';
+}
+
+export function isWindows(): boolean { return getPlatform() === 'win32'; }
+export function isLinux(): boolean { return getPlatform() === 'linux'; }
+export function isMacOS(): boolean { return getPlatform() === 'darwin'; }
+
+// ============ Path Utilities ============
+
+const EMBEDDINGS_TABLE = 'embeddings';
+const NAMESPACES_TABLE = 'namespaces';
+
+export function getDefaultLanceDBPath(): string {
+  const cwd = process.cwd();
+  if (isWindows()) {
+    return path.resolve(cwd, 'data', 'lancedb');
+  }
+  return path.join(cwd, 'data', 'lancedb');
+}
+
+export function normalizePath(uri: string): string {
+  if (uri.startsWith('mem://') || uri.startsWith('lancedb://')) return uri;
+  let normalized = path.normalize(uri);
+  if (isWindows()) normalized = normalized.replace(/\//g, '\\');
+  return normalized;
+}
+
+export function checkDirectoryPermissions(dirPath: string): {
+  exists: boolean; writable: boolean; error?: string;
+} {
+  try {
+    const normalizedPath = normalizePath(dirPath);
+    const parentDir = path.dirname(normalizedPath);
+
+    if (!fs.existsSync(parentDir)) {
+      return { exists: false, writable: false, error: 'Parent directory does not exist' };
+    }
+
+    if (fs.existsSync(normalizedPath)) {
+      try {
+        fs.accessSync(normalizedPath, fs.constants.W_OK);
+        return { exists: true, writable: true };
+      } catch {
+        return { exists: true, writable: false, error: 'No write permission' };
+      }
+    }
+
+    try {
+      fs.accessSync(parentDir, fs.constants.W_OK);
+      return { exists: false, writable: true };
+    } catch {
+      return { exists: false, writable: false, error: 'No write permission on parent directory' };
+    }
+  } catch (error: any) {
+    return { exists: false, writable: false, error: error.message };
+  }
+}
+
+export function ensureLanceDBDirectory(uri: string): { success: boolean; path: string; error?: string } {
+  try {
+    if (uri.startsWith('mem://') || uri.startsWith('lancedb://')) {
+      return { success: true, path: uri };
+    }
+    const normalizedPath = normalizePath(uri);
+    if (!fs.existsSync(normalizedPath)) {
+      fs.mkdirSync(normalizedPath, { recursive: true });
+    }
+    return { success: true, path: normalizedPath };
+  } catch (error: any) {
+    return { success: false, path: uri, error: error.message };
+  }
+}
+
+// ============ Global State ============
+
+let lancedbModule: any = null;
+let lancedbLoadError: string | null = null;
+let isModuleLoadAttempted = false;
+
+let db: any = null;
+let embeddingsTable: any = null;
+let namespacesTable: any = null;
+let isInitialized = false;
+let currentUri: string | null = null;
+
+// ============ Error Types ============
+
+export class LanceDBError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public platform?: Platform,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'LanceDBError';
+  }
+
+  getSuggestion(): string {
+    switch (this.code) {
+      case 'PERMISSION_DENIED':
+        return isWindows()
+          ? 'Run as administrator or change the database path.'
+          : 'Check directory permissions with chmod.';
+      case 'NATIVE_MODULE_ERROR':
+        return isWindows()
+          ? 'Install Visual C++ Redistributable. Reinstall @lancedb/lancedb.'
+          : 'Check native dependencies (glibc, etc.).';
+      case 'MODULE_NOT_AVAILABLE':
+        return 'LanceDB is not available on this system. Check platform compatibility.';
+      case 'TABLE_NOT_FOUND':
+        return 'Table does not exist. It will be created on first operation.';
+      default:
+        return 'Check the documentation or logs for more details.';
+    }
+  }
+}
+
+// ============ Dynamic Module Loading ============
+
+async function loadLanceDBModule(): Promise<{ success: boolean; error?: string }> {
+  if (isModuleLoadAttempted) {
+    return { success: lancedbModule !== null, error: lancedbLoadError || undefined };
+  }
+  isModuleLoadAttempted = true;
+
+  try {
+    lancedbModule = await import('@lancedb/lancedb');
+    return { success: true };
+  } catch (error: any) {
+    const errorMsg = error.message || String(error);
+    lancedbLoadError = errorMsg;
+    return { success: false, error: errorMsg };
+  }
+}
+
+export async function isLanceDBAvailable(): Promise<{ available: boolean; error?: string }> {
+  const result = await loadLanceDBModule();
+  return { available: result.success, error: result.error };
+}
+
+// ============ Helpers ============
+
+function parseMetadata(metadata: any): Record<string, any> {
+  if (!metadata) return {};
+  if (typeof metadata === 'string') {
+    try { return JSON.parse(metadata); } catch { return {}; }
+  }
+  return metadata;
+}
+
+function normalizeVector(vector: number[]): number[] {
+  const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+  if (magnitude === 0) return vector;
+  return vector.map(val => val / magnitude);
+}
+
+function l2ToCosineSimilarity(l2Distance: number): number {
+  return 1 - (l2Distance * l2Distance) / 2;
+}
+
+async function tableToArray(table: any): Promise<any[]> {
+  return await table.query().toArray();
+}
+
+async function tableFilter(table: any, filter: string): Promise<any[]> {
+  return await table.query().where(filter).toArray();
+}
+
+// ============ Initialization ============
+
+async function initializeTables(): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
+  // Get vector dimension from config
+  let vectorDimension = 1024;
+  let embeddingModel = 'bge-m3:567m';
+  try {
+    const { getConfig } = await import('./config-persistence');
+    const config = getConfig();
+    vectorDimension = config.dimension || 1024;
+    embeddingModel = config.model || 'bge-m3:567m';
+  } catch {
+    // Use defaults
+  }
+
+  const defaultEmbedding = {
+    id: 'placeholder',
+    content: 'placeholder',
+    vector: new Array(vectorDimension).fill(0),
+    metadata: '{}',
+    namespace: 'default',
+    source_type: 'system',
+    source_id: 'init',
+    model_name: embeddingModel,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const defaultNamespace = {
+    id: 'placeholder',
+    namespace: 'default',
+    description: 'Default namespace',
+    metadata: '{}',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    embeddingsTable = await db.openTable(EMBEDDINGS_TABLE);
+  } catch {
+    await db.createTable(EMBEDDINGS_TABLE, [defaultEmbedding]);
+    embeddingsTable = await db.openTable(EMBEDDINGS_TABLE);
+    await embeddingsTable.delete("id = 'placeholder'");
+  }
+
+  try {
+    namespacesTable = await db.openTable(NAMESPACES_TABLE);
+  } catch {
+    await db.createTable(NAMESPACES_TABLE, [defaultNamespace]);
+    namespacesTable = await db.openTable(NAMESPACES_TABLE);
+    await namespacesTable.delete("id = 'placeholder'");
+  }
+}
+
+export async function initLanceDB(uri?: string): Promise<void> {
+  const dbUri = uri || process.env.LANCEDB_URI || getDefaultLanceDBPath();
+
+  if (isInitialized && db && currentUri === dbUri) return;
+
+  if (db) await closeLanceDB();
+
+  const { success, error } = await loadLanceDBModule();
+  if (!success) {
+    throw new LanceDBError(
+      `LanceDB not available: ${error}`,
+      'MODULE_NOT_AVAILABLE',
+      getPlatform(),
+      { uri: dbUri, originalError: error }
+    );
+  }
+
+  isInitialized = true;
+  currentUri = dbUri;
+
+  try {
+    const dirResult = ensureLanceDBDirectory(dbUri);
+    if (!dirResult.success) {
+      throw new LanceDBError(
+        `Cannot create/verify directory: ${dirResult.error}`,
+        'DIRECTORY_ERROR',
+        getPlatform(),
+        { uri: dbUri }
+      );
+    }
+
+    db = await lancedbModule.connect(dirResult.path);
+    await initializeTables();
+  } catch (error: any) {
+    if (error instanceof LanceDBError) throw error;
+
+    isInitialized = false;
+    db = null;
+    currentUri = null;
+
+    const msg = error.message || String(error);
+    const lowerMsg = msg.toLowerCase();
+
+    let code = 'UNKNOWN_ERROR';
+    if (lowerMsg.includes('permission') || lowerMsg.includes('access denied')) code = 'PERMISSION_DENIED';
+    else if (lowerMsg.includes('native') || lowerMsg.includes('binding')) code = 'NATIVE_MODULE_ERROR';
+
+    throw new LanceDBError(msg, code, getPlatform(), { uri: dbUri, originalError: error });
+  }
+}
+
+// ============ Table Getters ============
+
+async function getEmbeddingsTable(): Promise<any> {
+  if (!db || !isInitialized) await initLanceDB();
+  if (!embeddingsTable) throw new LanceDBError('Embeddings table not initialized', 'TABLE_NOT_FOUND');
+  return embeddingsTable;
+}
+
+async function getNamespacesTable(): Promise<any> {
+  if (!db || !isInitialized) await initLanceDB();
+  if (!namespacesTable) throw new LanceDBError('Namespaces table not initialized', 'TABLE_NOT_FOUND');
+  return namespacesTable;
+}
+
+export function closeLanceDB(): Promise<void> {
+  if (db) {
+    try { db.close(); } catch { /* ignore */ }
+  }
+  db = null;
+  embeddingsTable = null;
+  namespacesTable = null;
+  isInitialized = false;
+  currentUri = null;
+  return Promise.resolve();
+}
+
+// ============ LanceDBWrapper (static methods) ============
+
+export class LanceDBWrapper {
+  static async checkConnection(): Promise<boolean> {
+    try {
+      if (!db) await initLanceDB();
+      return db !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  static getSystemInfo() {
+    return {
+      platform: getPlatform(),
+      isWindows: isWindows(),
+      isLinux: isLinux(),
+      isMacOS: isMacOS(),
+      currentUri,
+      isInitialized: isInitialized && db !== null,
+    };
+  }
+
+  static async insertEmbedding(params: {
+    content: string;
+    vector: number[];
+    metadata?: Record<string, any>;
+    namespace?: string;
+    source_type?: string;
+    source_id?: string;
+    model_name?: string;
+  }): Promise<string> {
+    const { v4: uuidv4 } = await import('uuid');
+    const {
+      content, vector, metadata = {},
+      namespace = 'default', source_type, source_id,
+    } = params;
+
+    let model_name = params.model_name;
+    if (!model_name) {
+      try {
+        const { getConfig } = await import('./config-persistence');
+        model_name = getConfig().model;
+      } catch { model_name = 'unknown'; }
+    }
+
+    const table = await getEmbeddingsTable();
+    const normalizedVector = normalizeVector(vector);
+
+    const embedding = {
+      id: uuidv4(),
+      content,
+      vector: normalizedVector,
+      metadata: JSON.stringify({ ...metadata, created_at: new Date().toISOString(), source_type, source_id }),
+      namespace,
+      source_type,
+      source_id,
+      model_name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    await table.add([embedding]);
+    return embedding.id;
+  }
+
+  static async searchSimilar(params: {
+    queryVector: number[];
+    namespace?: string;
+    limit?: number;
+    threshold?: number;
+  }): Promise<SearchResult[]> {
+    const {
+      queryVector,
+      namespace,
+      limit = 10,
+      threshold = 0.5,
+    } = params;
+
+    const table = await getEmbeddingsTable();
+    const normalizedQueryVector = normalizeVector(queryVector);
+
+    let results: any[];
+
+    if (namespace && namespace !== 'default' && namespace !== 'all') {
+      try {
+        const namespaceTable = await db!.openTable(namespace);
+        const searchResults = await namespaceTable
+          .search(normalizedQueryVector)
+          .limit(limit)
+          .toArray();
+        results = searchResults.map((row: any) => ({
+          ...row,
+          similarity: l2ToCosineSimilarity(row._distance || 0),
+        })).filter((r: any) => r.similarity >= threshold);
+      } catch {
+        results = [];
+      }
+    } else {
+      const allResults = await table
+        .search(normalizedQueryVector)
+        .limit(limit * 10)
+        .toArray();
+
+      results = allResults
+        .map((row: any) => ({
+          ...row,
+          similarity: l2ToCosineSimilarity(row._distance || 0),
+        }))
+        .filter((r: any) => {
+          if (!namespace || namespace === 'all') return r.similarity >= threshold;
+          return (r.namespace || 'default') === namespace && r.similarity >= threshold;
+        })
+        .slice(0, limit);
+    }
+
+    return results.map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      metadata: parseMetadata(row.metadata),
+      namespace: row.namespace || 'default',
+      source_type: row.source_type,
+      source_id: row.source_id,
+      similarity: row.similarity,
+    }));
+  }
+
+  static async getEmbeddingById(id: string): Promise<Embedding | null> {
+    const table = await getEmbeddingsTable();
+    const results = await tableFilter(table, `id = '${id}'`);
+    if (results.length === 0) return null;
+
+    const row = results[0];
+    return {
+      id: row.id,
+      content: row.content,
+      metadata: parseMetadata(row.metadata),
+      namespace: row.namespace || 'default',
+      source_type: row.source_type,
+      source_id: row.source_id,
+      model_name: row.model_name,
+      created_at: new Date(row.created_at),
+      updated_at: new Date(row.updated_at),
+    };
+  }
+
+  static async deleteEmbedding(id: string): Promise<boolean> {
+    const table = await getEmbeddingsTable();
+    await table.delete(`id = '${id}'`);
+    return true;
+  }
+
+  static async deleteBySource(source_type: string, source_id: string): Promise<number> {
+    const table = await getEmbeddingsTable();
+    await table.delete(`source_type = '${source_type}' AND source_id = '${source_id}'`);
+    return 1;
+  }
+
+  static async upsertNamespace(params: {
+    namespace: string;
+    description?: string;
+    metadata?: Record<string, any>;
+  }): Promise<RecordNamespace> {
+    const { v4: uuidv4 } = await import('uuid');
+    const { namespace, description, metadata = {} } = params;
+    const table = await getNamespacesTable();
+    const existing = await tableFilter(table, `namespace = '${namespace}'`);
+
+    const nsRecord = {
+      id: uuidv4(),
+      namespace,
+      description,
+      metadata: JSON.stringify(metadata),
+      created_at: existing.length > 0 ? existing[0].created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existing.length > 0) {
+      await table.delete(`namespace = '${namespace}'`);
+    }
+    await table.add([nsRecord]);
+
+    return {
+      id: nsRecord.id,
+      namespace: nsRecord.namespace,
+      description: nsRecord.description,
+      metadata: JSON.parse(nsRecord.metadata),
+      created_at: nsRecord.created_at,
+      updated_at: nsRecord.updated_at,
+    };
+  }
+
+  static async getAllNamespaces(): Promise<RecordNamespace[]> {
+    const table = await getNamespacesTable();
+    const results = await tableToArray(table);
+    return results.map((row: any) => ({
+      id: row.id,
+      namespace: row.namespace,
+      description: row.description,
+      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
+      created_at: new Date(row.created_at),
+      updated_at: new Date(row.updated_at),
+    }));
+  }
+
+  static async deleteNamespace(namespace: string): Promise<boolean> {
+    const table = await getNamespacesTable();
+    await table.delete(`namespace = '${namespace}'`);
+    try { await db!.dropTable(namespace); } catch { /* table may not exist */ }
+    return true;
+  }
+
+  static async addEmbeddingToNamespace(namespace: string, embeddingId: string): Promise<void> {
+    const table = await getEmbeddingsTable();
+    const results = await tableFilter(table, `id = '${embeddingId}'`);
+    if (results.length === 0) throw new Error(`Embedding ${embeddingId} not found`);
+
+    const embedding = results[0];
+    await table.delete(`id = '${embeddingId}'`);
+    await table.add([{ ...embedding, namespace, updated_at: new Date().toISOString() }]);
+  }
+
+  static async getNamespaceEmbeddings(namespace: string, limit: number = 100): Promise<Embedding[]> {
+    const table = await getEmbeddingsTable();
+    const results = await tableFilter(table, `namespace = '${namespace}'`);
+    return results.slice(0, limit).map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      metadata: parseMetadata(row.metadata),
+      namespace: row.namespace || 'default',
+      source_type: row.source_type,
+      source_id: row.source_id,
+      model_name: row.model_name,
+      created_at: new Date(row.created_at),
+      updated_at: new Date(row.updated_at),
+    }));
+  }
+
+  static async searchInNamespace(params: {
+    namespace: string;
+    queryVector: number[];
+    limit?: number;
+    threshold?: number;
+  }): Promise<SearchResult[]> {
+    const { namespace, queryVector, limit = 10, threshold = 0.5 } = params;
+    const table = await getEmbeddingsTable();
+    const normalizedQueryVector = normalizeVector(queryVector);
+
+    const results = await table
+      .search(normalizedQueryVector)
+      .where(`namespace = '${namespace}'`)
+      .limit(limit)
+      .toArray();
+
+    return results
+      .map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        metadata: parseMetadata(row.metadata),
+        namespace: row.namespace || 'default',
+        source_type: row.source_type,
+        source_id: row.source_id,
+        similarity: l2ToCosineSimilarity(row._distance || 0),
+      }))
+      .filter((r: any) => r.similarity >= threshold);
+  }
+
+  static async getAllEmbeddings(limit: number = 100): Promise<Embedding[]> {
+    const table = await getEmbeddingsTable();
+    const results = await tableToArray(table);
+    return results.slice(0, limit).map((row: any) => ({
+      id: row.id,
+      content: row.content,
+      metadata: parseMetadata(row.metadata),
+      namespace: row.namespace || 'default',
+      source_type: row.source_type,
+      source_id: row.source_id,
+      model_name: row.model_name,
+      created_at: new Date(row.created_at),
+      updated_at: new Date(row.updated_at),
+    }));
+  }
+
+  static async getStats(): Promise<EmbeddingStats> {
+    const table = await getEmbeddingsTable();
+    const allEmbeddings = await tableToArray(table);
+    const namespaces = await this.getAllNamespaces();
+
+    const embeddingsByNamespace: Record<string, number> = {};
+    const embeddingsBySourceType: Record<string, number> = {};
+
+    allEmbeddings.forEach((row: any) => {
+      const ns = row.namespace || 'default';
+      embeddingsByNamespace[ns] = (embeddingsByNamespace[ns] || 0) + 1;
+      if (row.source_type) {
+        embeddingsBySourceType[row.source_type] = (embeddingsBySourceType[row.source_type] || 0) + 1;
+      }
+    });
+
+    return {
+      totalEmbeddings: allEmbeddings.length,
+      totalNamespaces: namespaces.length,
+      embeddingsByNamespace,
+      embeddingsBySourceType,
+    };
+  }
+
+  static async resetAll(): Promise<{ deletedEmbeddings: number; deletedNamespaces: number }> {
+    const embTable = await getEmbeddingsTable();
+    const nsTable = await getNamespacesTable();
+
+    const allEmbeddings = await tableToArray(embTable);
+    const allNamespaces = await tableToArray(nsTable);
+
+    // Delete all embeddings one by one (LanceDB doesn't have truncate)
+    for (const emb of allEmbeddings) {
+      try { await embTable.delete(`id = '${emb.id}'`); } catch { /* skip */ }
+    }
+    for (const ns of allNamespaces) {
+      try { await nsTable.delete(`namespace = '${ns.namespace}'`); } catch { /* skip */ }
+    }
+
+    return {
+      deletedEmbeddings: allEmbeddings.length,
+      deletedNamespaces: allNamespaces.length,
+    };
+  }
+}
+
+export default LanceDBWrapper;

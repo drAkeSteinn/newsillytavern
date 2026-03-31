@@ -916,7 +916,7 @@
       }
     ],
     "createdAt": "2026-03-20T18:00:11.649Z",
-    "updatedAt": "2026-03-21T20:23:59.598Z",
+    "updatedAt": "2026-03-30T22:47:55.966Z",
     "sessionStats": {
       "characterStats": {
         "fbbdc8e8-12e1-421b-8a38-d4a37231de2a": {
@@ -926,7 +926,7 @@
             "nero": 4
           },
           "lastUpdated": {
-            "resistencia": 1774124639598,
+            "resistencia": 1774910875966,
             "estamina": 1774123653841,
             "nero": 1774123653981
           },
@@ -1155,6 +1155,51 @@
               "newValue": 60,
               "reason": "llm_detection",
               "timestamp": 1774124639598
+            },
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 60,
+              "newValue": 60,
+              "reason": "llm_detection",
+              "timestamp": 1774910868758
+            },
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 60,
+              "newValue": 60,
+              "reason": "llm_detection",
+              "timestamp": 1774910872043
+            },
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 60,
+              "newValue": 60,
+              "reason": "llm_detection",
+              "timestamp": 1774910873251
+            },
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 60,
+              "newValue": 60,
+              "reason": "llm_detection",
+              "timestamp": 1774910874746
+            },
+            {
+              "attributeId": "attr-1772406748598",
+              "attributeKey": "resistencia",
+              "attributeName": "Resistencia",
+              "oldValue": 60,
+              "newValue": 60,
+              "reason": "llm_detection",
+              "timestamp": 1774910875966
             }
           ]
         }
@@ -1165,7 +1210,7 @@
       },
       "ultima_accion_realizada": "Moon - Golpe: Un golpe en la mesa",
       "initialized": true,
-      "lastModified": 1774124639598
+      "lastModified": 1774910875966
     },
     "sessionQuests": [
       {

@@ -18,11 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Tooltip,
   TooltipContent,
@@ -55,6 +54,8 @@ import {
   Settings,
   Users,
   FileText,
+  Pencil,
+  ChevronRight,
 } from 'lucide-react';
 
 type SoundSettingsTab = 'global' | 'triggers' | 'sequences';
@@ -84,8 +85,8 @@ export function SoundTriggersSettings() {
 
   const [activeTab, setActiveTab] = useState<SoundSettingsTab>('global');
   const [isLoading, setIsLoading] = useState(false);
-  const [expandedTriggers, setExpandedTriggers] = useState<string[]>([]);
-  const [expandedSequences, setExpandedSequences] = useState<string[]>([]);
+  const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null);
   const [testingSound, setTestingSound] = useState<string | null>(null);
   const [newKeywordInput, setNewKeywordInput] = useState<Record<string, string>>({});
 
@@ -222,7 +223,7 @@ export function SoundTriggersSettings() {
                 Configuración Global de Sonidos
               </h4>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
                 <label className="flex items-center justify-between p-2 rounded border bg-background">
                   <span className="text-sm">Habilitar</span>
                   <Switch
@@ -266,7 +267,7 @@ export function SoundTriggersSettings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
                 <div>
                   <Label className="text-xs">Máx. Sonidos/Mensaje</Label>
                   <Input
@@ -313,97 +314,119 @@ export function SoundTriggersSettings() {
                 </div>
               </div>
 
-              {/* Collections Info */}
-              <div className="p-4 rounded-lg border bg-background/50">
-                <h5 className="font-medium text-sm mb-2 flex items-center gap-2">
-                  <Music className="w-4 h-4" />
-                  Colecciones de Sonidos
-                </h5>
-                {isLoading ? (
-                  <p className="text-sm text-muted-foreground">Cargando...</p>
-                ) : soundCollections.length === 0 ? (
-                  <div className="text-sm text-yellow-500">
-                    <p className="font-medium">No se encontraron colecciones de sonidos</p>
-                    <p className="text-muted-foreground mt-1">
-                      Agrega archivos a <code className="bg-muted px-1 rounded">public/sounds/</code> y haz clic en "Actualizar"
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    {soundCollections.map((col) => (
-                      <div key={col.name} className="flex items-center justify-between p-2 rounded border bg-muted/30">
-                        <span className="text-sm">{col.name === '__root__' ? 'Raíz' : col.name}</span>
-                        <Badge variant="outline">{col.files.length} sonidos</Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* {{sonidos}} Template Configuration */}
-              <div className="p-4 rounded-lg border bg-background/50">
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText className="w-4 h-4 text-purple-500" />
-                  <h5 className="font-medium text-sm">Plantilla de Sonidos ({'{'}{'{'}sonidos{'}'}{'}'})</h5>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm">
-                      <p>Configura cómo se mostrará la lista de sonidos cuando uses la key {`{{sonidos}}`} en las secciones de un personaje.</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Solo se mostrarán los sonidos configurados para ese personaje.</p>
-                    </TooltipContent>
-                  </Tooltip>
+              {/* Collections Info - Collapsible */}
+              <Collapsible>
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-background/50">
+                  <h5 className="font-medium text-sm flex items-center gap-2">
+                    <Music className="w-4 h-4" />
+                    Colecciones de Sonidos
+                    <Badge variant="outline" className="text-xs">{soundCollections.length}</Badge>
+                  </h5>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                      <ChevronDown className="w-3.5 h-3.5 transition-transform [[data-state=open]>rotate-180]" />
+                      Mostrar
+                    </Button>
+                  </CollapsibleTrigger>
                 </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Prefijo</Label>
-                    <Textarea
-                      value={settings.sound?.soundListPrefix ?? '[SONIDOS DISPONIBLES]'}
-                      onChange={(e) =>
-                        updateSettings({
-                          sound: { ...settings.sound, soundListPrefix: e.target.value }
-                        })
-                      }
-                      placeholder="Texto que aparecerá antes de la lista de sonidos..."
-                      className="h-16 text-sm resize-none"
-                    />
+                <CollapsibleContent>
+                  <div className="pt-3">
+                    {isLoading ? (
+                      <p className="text-sm text-muted-foreground">Cargando...</p>
+                    ) : soundCollections.length === 0 ? (
+                      <div className="text-sm text-yellow-500">
+                        <p className="font-medium">No se encontraron colecciones de sonidos</p>
+                        <p className="text-muted-foreground mt-1">
+                          Agrega archivos a <code className="bg-muted px-1 rounded">public/sounds/</code> y haz clic en "Actualizar"
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                        {soundCollections.map((col) => (
+                          <div key={col.name} className="flex items-center justify-between p-2 rounded border bg-muted/30">
+                            <span className="text-sm truncate">{col.name === '__root__' ? 'Raíz' : col.name}</span>
+                            <Badge variant="outline" className="shrink-0 ml-2">{col.files.length} sonidos</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                </CollapsibleContent>
+              </Collapsible>
 
-                  <div className="p-3 rounded-lg border border-dashed bg-muted/30">
-                    <p className="text-xs text-muted-foreground mb-2">Formato de cada sonido:</p>
-                    <code className="text-xs bg-background px-2 py-1 rounded block">
-                      - keyword: descripción del sonido
-                    </code>
+              {/* {{sonidos}} Template Configuration - Collapsible */}
+              <Collapsible>
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-background/50">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-purple-500" />
+                    <h5 className="font-medium text-sm">Plantilla de Sonidos ({'{'}{'{'}sonidos{'}'}{'}'})</h5>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p>Configura cómo se mostrará la lista de sonidos cuando uses la key {`{{sonidos}}`} en las secciones de un personaje.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Solo se mostrarán los sonidos configurados para ese personaje.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                      <ChevronDown className="w-3.5 h-3.5 transition-transform [[data-state=open]>rotate-180]" />
+                      Mostrar
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent>
+                  <div className="pt-3 space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Prefijo</Label>
+                      <Textarea
+                        value={settings.sound?.soundListPrefix ?? '[SONIDOS DISPONIBLES]'}
+                        onChange={(e) =>
+                          updateSettings({
+                            sound: { ...settings.sound, soundListPrefix: e.target.value }
+                          })
+                        }
+                        placeholder="Texto que aparecerá antes de la lista de sonidos..."
+                        className="h-16 text-sm resize-none"
+                      />
+                    </div>
 
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-1 block">Sufijo</Label>
-                    <Textarea
-                      value={settings.sound?.soundListSuffix ?? ''}
-                      onChange={(e) =>
-                        updateSettings({
-                          sound: { ...settings.sound, soundListSuffix: e.target.value }
-                        })
-                      }
-                      placeholder="Texto que aparecerá después de la lista de sonidos..."
-                      className="h-16 text-sm resize-none"
-                    />
-                  </div>
+                    <div className="p-3 rounded-lg border border-dashed bg-muted/30">
+                      <p className="text-xs text-muted-foreground mb-2">Formato de cada sonido:</p>
+                      <code className="text-xs bg-background px-2 py-1 rounded block">
+                        - keyword: descripción del sonido
+                      </code>
+                    </div>
 
-                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                    <p className="text-xs text-purple-400 font-medium mb-1">Ejemplo de salida:</p>
-                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Sufijo</Label>
+                      <Textarea
+                        value={settings.sound?.soundListSuffix ?? ''}
+                        onChange={(e) =>
+                          updateSettings({
+                            sound: { ...settings.sound, soundListSuffix: e.target.value }
+                          })
+                        }
+                        placeholder="Texto que aparecerá después de la lista de sonidos..."
+                        className="h-16 text-sm resize-none"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                      <p className="text-xs text-purple-400 font-medium mb-1">Ejemplo de salida:</p>
+                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
 {`${settings.sound?.soundListPrefix ?? '[SONIDOS DISPONIBLES]'}
 - golpe: Sonido de golpe fuerte
 - risa: Risita maliciosa
 - pasos: Pasos acercándose
 ${settings.sound?.soundListSuffix ?? ''}`}
-                    </pre>
+                      </pre>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </ScrollArea>
         )}
@@ -447,7 +470,7 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                 </div>
               )}
 
-              {/* Triggers Accordion */}
+              {/* Triggers List or Editor */}
               {soundTriggers.length === 0 ? (
                 <div className="flex items-center justify-center text-muted-foreground py-8">
                   <div className="text-center">
@@ -456,41 +479,53 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                     <p className="text-xs mt-1">Agrega un trigger para reproducir sonidos basados en palabras clave</p>
                   </div>
                 </div>
-              ) : (
-                <Accordion
-                  type="multiple"
-                  value={expandedTriggers}
-                  onValueChange={setExpandedTriggers}
-                  className="space-y-2"
-                >
-              {soundTriggers.map((trigger) => {
-                const collection = soundCollections.find(c => c.name === trigger.collection);
-                
-                return (
-                  <AccordionItem
-                    key={trigger.id}
-                    value={trigger.id}
-                    className="border rounded-lg data-[state=open]:bg-muted/10"
-                  >
-                    <AccordionTrigger className="px-4 py-2 hover:no-underline">
-                      <div className="flex items-center gap-3 w-full">
-                        <div
-                          className={cn(
-                            "w-2 h-2 rounded-full flex-shrink-0",
-                            trigger.active ? "bg-green-500" : "bg-muted-foreground"
-                          )}
-                        />
-                        <span className="font-medium text-sm">{trigger.name}</span>
-                        <span className="text-xs text-muted-foreground ml-auto mr-2">
-                          {trigger.keywords.length} claves · {collection?.files.length || 0} sonidos
-                        </span>
+              ) : selectedTriggerId ? (
+                /* ===== Selected Trigger Editor ===== */
+                (() => {
+                  const trigger = soundTriggers.find(t => t.id === selectedTriggerId);
+                  if (!trigger) return null;
+                  const collection = soundCollections.find(c => c.name === trigger.collection);
+                  return (
+                    <div className="space-y-4">
+                      {/* Editor Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setSelectedTriggerId(null)}>
+                            <ChevronRight className="w-3 h-3 rotate-180" />
+                            Volver
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-2.5 h-2.5 rounded-full",
+                              trigger.active ? "bg-green-500" : "bg-muted-foreground"
+                            )} />
+                            <span className="font-medium">{trigger.name}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => handleTestSound(trigger)}
+                            disabled={testingSound === trigger.id || !collection?.files.length}>
+                            <Play className={cn("w-3 h-3 mr-1", testingSound === trigger.id && "animate-pulse")} />
+                            Probar
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => cloneSoundTrigger(trigger.id)}>
+                            <Copy className="w-3 h-3 mr-1" />
+                            Clonar
+                          </Button>
+                          <Button variant="destructive" size="sm" className="h-7 text-xs"
+                            onClick={() => { deleteSoundTrigger(trigger.id); setSelectedTriggerId(null); }}>
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Eliminar
+                          </Button>
+                        </div>
                       </div>
-                    </AccordionTrigger>
-                    
-                    <AccordionContent className="px-4 pb-4">
-                      <div className="space-y-3 pt-2">
+
+                      {/* Editor Form */}
+                      <div className="p-4 rounded-lg border bg-muted/10 space-y-4">
                         {/* Row 1: Name, Active, Collection, Play Mode */}
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                           <div>
                             <Label className="text-xs">Nombre</Label>
                             <Input
@@ -533,7 +568,7 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                             <Label className="text-xs">Modo</Label>
                             <Select
                               value={trigger.playMode}
-                              onValueChange={(value: 'random' | 'cyclic') => 
+                              onValueChange={(value: 'random' | 'cyclic') =>
                                 updateSoundTrigger(trigger.id, { playMode: value })
                               }
                             >
@@ -548,8 +583,8 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                           </div>
                         </div>
 
-                        {/* Row 1.5: Description and Characters */}
-                        <div className="grid grid-cols-2 gap-3">
+                        {/* Row 2: Description and Characters */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <Label className="text-xs flex items-center gap-1">
                               <FileText className="w-3 h-3" />
@@ -633,7 +668,7 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                           </div>
                         </div>
 
-                        {/* Row 2: Keywords */}
+                        {/* Row 3: Keywords */}
                         <div className="space-y-1.5">
                           <Label className="text-xs">Palabras Clave (separadas por coma)</Label>
                           <Input
@@ -662,8 +697,8 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                           )}
                         </div>
 
-                        {/* Row 3: Volume, Cooldown, Delay */}
-                        <div className="grid grid-cols-3 gap-3">
+                        {/* Row 4: Volume, Cooldown, Delay */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
                               <span>Volumen</span>
@@ -674,7 +709,7 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                               min={0}
                               max={100}
                               step={1}
-                              onValueChange={([value]) => 
+                              onValueChange={([value]) =>
                                 updateSoundTrigger(trigger.id, { volume: value / 100 })
                               }
                             />
@@ -686,7 +721,7 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                               min={0}
                               step={100}
                               value={trigger.cooldown ?? 0}
-                              onChange={(e) => 
+                              onChange={(e) =>
                                 updateSoundTrigger(trigger.id, { cooldown: parseInt(e.target.value) || 0 })
                               }
                               className="mt-1 h-8"
@@ -700,7 +735,7 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                               min={0}
                               step={50}
                               value={trigger.delay ?? 0}
-                              onChange={(e) => 
+                              onChange={(e) =>
                                 updateSoundTrigger(trigger.id, { delay: parseInt(e.target.value) || 0 })
                               }
                               className="mt-1 h-8"
@@ -708,47 +743,42 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                             <p className="text-xs text-muted-foreground mt-0.5">Pausa antes de reproducir</p>
                           </div>
                         </div>
-
-                        {/* Row 4: Actions */}
-                        <div className="flex gap-2 pt-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => handleTestSound(trigger)}
-                            disabled={testingSound === trigger.id || !collection?.files.length}
-                          >
-                            <Play className={cn(
-                              "w-3 h-3 mr-1",
-                              testingSound === trigger.id && "animate-pulse"
-                            )} />
-                            Probar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => cloneSoundTrigger(trigger.id)}
-                          >
-                            <Copy className="w-3 h-3 mr-1" />
-                            Clonar
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => deleteSoundTrigger(trigger.id)}
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            Eliminar
-                          </Button>
-                        </div>
                       </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
+                    </div>
+                  );
+                })()
+              ) : (
+                /* ===== Trigger List ===== */
+                <div className="space-y-1">
+                  {soundTriggers.map((trigger) => {
+                    const collection = soundCollections.find(c => c.name === trigger.collection);
+                    return (
+                      <button
+                        key={trigger.id}
+                        onClick={() => setSelectedTriggerId(trigger.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <div className={cn(
+                          "w-2.5 h-2.5 rounded-full flex-shrink-0",
+                          trigger.active ? "bg-green-500" : "bg-muted-foreground"
+                        )} />
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-sm">{trigger.name}</span>
+                          {trigger.description && (
+                            <p className="text-xs text-muted-foreground truncate">{trigger.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {trigger.keywords.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">{trigger.keywords.length} claves</Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs">{collection?.files.length || 0} sonidos</Badge>
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </ScrollArea>
@@ -794,316 +824,326 @@ ${settings.sound?.soundListSuffix ?? ''}`}
                 </Button>
               </div>
 
-              {/* Sequence Triggers List */}
+              {/* Sequences List or Editor */}
               {soundSequenceTriggers.length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground border rounded-lg bg-muted/20">
                   <ListMusic className="w-10 h-10 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No hay triggers de secuencia configurados</p>
                   <p className="text-xs mt-1">Crea una secuencia para reproducir múltiples sonidos con un solo trigger</p>
                 </div>
-              ) : (
-                <Accordion type="multiple" className="space-y-2">
-                  {soundSequenceTriggers.map((sequence, index) => {
-                    const availableKeywords = soundTriggers
-                      .filter(t => t.active)
-                      .flatMap(t => t.keywords);
-
-                    return (
-                      <AccordionItem key={sequence.id} value={sequence.id} className="border rounded-lg bg-muted/30">
-                        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                          <div className="flex items-center gap-2 flex-1">
-                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                            <Zap className={cn(
-                              "w-4 h-4",
-                              sequence.active ? "text-purple-500" : "text-muted-foreground"
-                            )} />
-                            <span className="font-medium">
-                              {sequence.name || `Secuencia #${index + 1}`}
-                            </span>
-                            {sequence.activationKey && (
-                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                                {sequence.activationKey}
-                              </code>
-                            )}
-                            <Badge variant="outline" className="text-xs">
-                              {sequence.sequence.length} sonidos
-                            </Badge>
+              ) : selectedSequenceId ? (
+                /* ===== Selected Sequence Editor ===== */
+                (() => {
+                  const sequence = soundSequenceTriggers.find(s => s.id === selectedSequenceId);
+                  if (!sequence) return null;
+                  const availableKeywords = soundTriggers
+                    .filter(t => t.active)
+                    .flatMap(t => t.keywords);
+                  return (
+                    <div className="space-y-4">
+                      {/* Editor Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setSelectedSequenceId(null)}>
+                            <ChevronRight className="w-3 h-3 rotate-180" />
+                            Volver
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Zap className={cn("w-4 h-4", sequence.active ? "text-purple-500" : "text-muted-foreground")} />
+                            <span className="font-medium">{sequence.name}</span>
                           </div>
-                        </AccordionTrigger>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="h-7 text-xs"
+                            onClick={() => cloneSoundSequenceTrigger(sequence.id)}>
+                            <Copy className="w-3 h-3 mr-1" />
+                            Clonar
+                          </Button>
+                          <Button variant="destructive" size="sm" className="h-7 text-xs"
+                            onClick={() => { deleteSoundSequenceTrigger(sequence.id); setSelectedSequenceId(null); }}>
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
 
-                        <AccordionContent className="px-4 pb-4">
-                          <div className="space-y-4 pt-2">
-                            {/* Row 1: Name and Active */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label className="text-xs mb-1 block">Nombre</Label>
-                                <Input
-                                  value={sequence.name}
-                                  onChange={(e) =>
-                                    updateSoundSequenceTrigger(sequence.id, { name: e.target.value })
-                                  }
-                                  placeholder="Nombre de la secuencia"
-                                  className="h-8"
-                                />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <Label className="text-xs">Activo</Label>
-                                <Switch
-                                  checked={sequence.active}
-                                  onCheckedChange={() => toggleSoundSequenceTrigger(sequence.id)}
-                                />
-                              </div>
+                      {/* Editor Form */}
+                      <div className="p-4 rounded-lg border bg-muted/10 space-y-4">
+                        {/* Row 1: Name and Active */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs mb-1 block">Nombre</Label>
+                            <Input
+                              value={sequence.name}
+                              onChange={(e) =>
+                                updateSoundSequenceTrigger(sequence.id, { name: e.target.value })
+                              }
+                              placeholder="Nombre de la secuencia"
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">Activo</Label>
+                            <Switch
+                              checked={sequence.active}
+                              onCheckedChange={() => toggleSoundSequenceTrigger(sequence.id)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Row 2: Activation Key */}
+                        <div className="space-y-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-purple-400" />
+                            <Label className="text-xs font-medium text-purple-400">Key de Activación</Label>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">Key principal</Label>
+                              <Input
+                                value={sequence.activationKey || ''}
+                                onChange={(e) =>
+                                  updateSoundSequenceTrigger(sequence.id, {
+                                    activationKey: e.target.value.toLowerCase().replace(/\s+/g, '_') || undefined,
+                                  })
+                                }
+                                placeholder="secuencia1, combo"
+                                className="h-8 font-mono text-xs"
+                              />
                             </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1 block">Keys alternativas</Label>
+                              <Input
+                                value={(sequence.activationKeys || []).join(', ')}
+                                onChange={(e) => {
+                                  const keys = e.target.value.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean);
+                                  updateSoundSequenceTrigger(sequence.id, {
+                                    activationKeys: keys.length > 0 ? keys : undefined,
+                                  });
+                                }}
+                                placeholder="seq1, combo1"
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
 
-                            {/* Row 2: Activation Key */}
-                            <div className="space-y-2 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                              <div className="flex items-center gap-2">
-                                <Zap className="w-4 h-4 text-purple-400" />
-                                <Label className="text-xs font-medium text-purple-400">Key de Activación</Label>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label className="text-xs text-muted-foreground mb-1 block">Key principal</Label>
-                                  <Input
-                                    value={sequence.activationKey || ''}
-                                    onChange={(e) =>
-                                      updateSoundSequenceTrigger(sequence.id, {
-                                        activationKey: e.target.value.toLowerCase().replace(/\s+/g, '_') || undefined,
-                                      })
-                                    }
-                                    placeholder="secuencia1, combo"
-                                    className="h-8 font-mono text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-muted-foreground mb-1 block">Keys alternativas</Label>
-                                  <Input
-                                    value={(sequence.activationKeys || []).join(', ')}
-                                    onChange={(e) => {
-                                      const keys = e.target.value.split(',').map(k => k.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean);
-                                      updateSoundSequenceTrigger(sequence.id, {
-                                        activationKeys: keys.length > 0 ? keys : undefined,
-                                      });
+                        {/* Row 3: Sequence */}
+                        <div className="space-y-2">
+                          <Label className="text-xs flex items-center gap-1">
+                            Secuencia de Sonidos
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>Lista de keywords de triggers de sonido existentes. Cada uno se reproducirá en orden.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </Label>
+
+                          {/* Current sequence */}
+                          <div className="space-y-1">
+                            {sequence.sequence.map((keyword, kwIndex) => (
+                              <div
+                                key={kwIndex}
+                                className="flex items-center gap-2 bg-muted/50 rounded p-2"
+                              >
+                                <span className="text-xs text-muted-foreground w-6">{kwIndex + 1}.</span>
+                                <Badge variant="secondary" className="font-mono">
+                                  {keyword}
+                                </Badge>
+                                <div className="flex-1" />
+                                {kwIndex > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => {
+                                      const newSeq = [...sequence.sequence];
+                                      const [removed] = newSeq.splice(kwIndex, 1);
+                                      newSeq.splice(kwIndex - 1, 0, removed);
+                                      updateSoundSequenceTrigger(sequence.id, { sequence: newSeq });
                                     }}
-                                    placeholder="seq1, combo1"
-                                    className="h-8 text-xs"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Row 3: Sequence */}
-                            <div className="space-y-2">
-                              <Label className="text-xs flex items-center gap-1">
-                                Secuencia de Sonidos
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    <p>Lista de keywords de triggers de sonido existentes. Cada uno se reproducirá en orden.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </Label>
-
-                              {/* Current sequence */}
-                              <div className="space-y-1">
-                                {sequence.sequence.map((keyword, kwIndex) => (
-                                  <div
-                                    key={kwIndex}
-                                    className="flex items-center gap-2 bg-muted/50 rounded p-2"
                                   >
-                                    <span className="text-xs text-muted-foreground w-6">{kwIndex + 1}.</span>
-                                    <Badge variant="secondary" className="font-mono">
-                                      {keyword}
-                                    </Badge>
-                                    <div className="flex-1" />
-                                    {kwIndex > 0 && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => {
-                                          const newSeq = [...sequence.sequence];
-                                          const [removed] = newSeq.splice(kwIndex, 1);
-                                          newSeq.splice(kwIndex - 1, 0, removed);
-                                          updateSoundSequenceTrigger(sequence.id, { sequence: newSeq });
-                                        }}
-                                      >
-                                        <ChevronUp className="w-3 h-3" />
-                                      </Button>
-                                    )}
-                                    {kwIndex < sequence.sequence.length - 1 && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => {
-                                          const newSeq = [...sequence.sequence];
-                                          const [removed] = newSeq.splice(kwIndex, 1);
-                                          newSeq.splice(kwIndex + 1, 0, removed);
-                                          updateSoundSequenceTrigger(sequence.id, { sequence: newSeq });
-                                        }}
-                                      >
-                                        <ChevronDown className="w-3 h-3" />
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={() => {
-                                        updateSoundSequenceTrigger(sequence.id, {
-                                          sequence: sequence.sequence.filter((_, i) => i !== kwIndex),
-                                        });
-                                      }}
-                                    >
-                                      <Trash2 className="w-3 h-3 text-destructive" />
-                                    </Button>
-                                  </div>
-                                ))}
-                                {sequence.sequence.length === 0 && (
-                                  <p className="text-xs text-muted-foreground italic p-2">Sin sonidos en la secuencia</p>
+                                    <ChevronUp className="w-3 h-3" />
+                                  </Button>
                                 )}
-                              </div>
-
-                              {/* Add keyword input */}
-                              <div className="flex gap-2">
-                                <Input
-                                  value={newKeywordInput[sequence.id] || ''}
-                                  onChange={(e) =>
-                                    setNewKeywordInput(prev => ({ ...prev, [sequence.id]: e.target.value }))
-                                  }
-                                  placeholder="Agregar keyword de sonido..."
-                                  className="h-8 text-xs"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && (newKeywordInput[sequence.id]?.trim())) {
-                                      updateSoundSequenceTrigger(sequence.id, {
-                                        sequence: [...sequence.sequence, newKeywordInput[sequence.id].trim()],
-                                      });
-                                      setNewKeywordInput(prev => ({ ...prev, [sequence.id]: '' }));
-                                    }
-                                  }}
-                                  list={`available-keywords-${sequence.id}`}
-                                />
+                                {kwIndex < sequence.sequence.length - 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => {
+                                      const newSeq = [...sequence.sequence];
+                                      const [removed] = newSeq.splice(kwIndex, 1);
+                                      newSeq.splice(kwIndex + 1, 0, removed);
+                                      updateSoundSequenceTrigger(sequence.id, { sequence: newSeq });
+                                    }}
+                                  >
+                                    <ChevronDown className="w-3 h-3" />
+                                  </Button>
+                                )}
                                 <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
                                   onClick={() => {
-                                    if (newKeywordInput[sequence.id]?.trim()) {
-                                      updateSoundSequenceTrigger(sequence.id, {
-                                        sequence: [...sequence.sequence, newKeywordInput[sequence.id].trim()],
-                                      });
-                                      setNewKeywordInput(prev => ({ ...prev, [sequence.id]: '' }));
-                                    }
+                                    updateSoundSequenceTrigger(sequence.id, {
+                                      sequence: sequence.sequence.filter((_, i) => i !== kwIndex),
+                                    });
                                   }}
                                 >
-                                  <Plus className="w-4 h-4" />
+                                  <Trash2 className="w-3 h-3 text-destructive" />
                                 </Button>
                               </div>
-
-                              <datalist id={`available-keywords-${sequence.id}`}>
-                                {availableKeywords.map((kw, i) => (
-                                  <option key={i} value={kw} />
-                                ))}
-                              </datalist>
-
-                              {/* Quick add suggestions */}
-                              {availableKeywords.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  <span className="text-xs text-muted-foreground mr-1">Sugerencias:</span>
-                                  {availableKeywords.slice(0, 6).map((kw, i) => (
-                                    <Button
-                                      key={i}
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 text-[10px] px-2"
-                                      onClick={() => {
-                                        updateSoundSequenceTrigger(sequence.id, {
-                                          sequence: [...sequence.sequence, kw],
-                                        });
-                                      }}
-                                    >
-                                      +{kw}
-                                    </Button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Row 4: Volume, Delay, Cooldown */}
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-xs">
-                                  <span>Volumen</span>
-                                  <span className="text-muted-foreground">{Math.round(sequence.volume * 100)}%</span>
-                                </div>
-                                <Slider
-                                  value={[sequence.volume * 100]}
-                                  min={0}
-                                  max={100}
-                                  step={1}
-                                  onValueChange={([value]) =>
-                                    updateSoundSequenceTrigger(sequence.id, { volume: value / 100 })
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Delay entre sonidos (ms)</Label>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={50}
-                                  value={sequence.delayBetween ?? 0}
-                                  onChange={(e) =>
-                                    updateSoundSequenceTrigger(sequence.id, { delayBetween: parseInt(e.target.value) || 0 })
-                                  }
-                                  className="mt-1 h-8"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs">Cooldown (ms)</Label>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step={100}
-                                  value={sequence.cooldown ?? 0}
-                                  onChange={(e) =>
-                                    updateSoundSequenceTrigger(sequence.id, { cooldown: parseInt(e.target.value) || 0 })
-                                  }
-                                  className="mt-1 h-8"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Row 5: Actions */}
-                            <div className="flex gap-2 pt-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => cloneSoundSequenceTrigger(sequence.id)}
-                              >
-                                <Copy className="w-3 h-3 mr-1" />
-                                Clonar
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => deleteSoundSequenceTrigger(sequence.id)}
-                              >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                Eliminar
-                              </Button>
-                            </div>
+                            ))}
+                            {sequence.sequence.length === 0 && (
+                              <p className="text-xs text-muted-foreground italic p-2">Sin sonidos en la secuencia</p>
+                            )}
                           </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    );
-                  })}
-                </Accordion>
+
+                          {/* Add keyword input */}
+                          <div className="flex gap-2">
+                            <Input
+                              value={newKeywordInput[sequence.id] || ''}
+                              onChange={(e) =>
+                                setNewKeywordInput(prev => ({ ...prev, [sequence.id]: e.target.value }))
+                              }
+                              placeholder="Agregar keyword de sonido..."
+                              className="h-8 text-xs"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (newKeywordInput[sequence.id]?.trim())) {
+                                  updateSoundSequenceTrigger(sequence.id, {
+                                    sequence: [...sequence.sequence, newKeywordInput[sequence.id].trim()],
+                                  });
+                                  setNewKeywordInput(prev => ({ ...prev, [sequence.id]: '' }));
+                                }
+                              }}
+                              list={`available-keywords-${sequence.id}`}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => {
+                                if (newKeywordInput[sequence.id]?.trim()) {
+                                  updateSoundSequenceTrigger(sequence.id, {
+                                    sequence: [...sequence.sequence, newKeywordInput[sequence.id].trim()],
+                                  });
+                                  setNewKeywordInput(prev => ({ ...prev, [sequence.id]: '' }));
+                                }
+                              }}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          <datalist id={`available-keywords-${sequence.id}`}>
+                            {availableKeywords.map((kw, i) => (
+                              <option key={i} value={kw} />
+                            ))}
+                          </datalist>
+
+                          {/* Quick add suggestions */}
+                          {availableKeywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              <span className="text-xs text-muted-foreground mr-1">Sugerencias:</span>
+                              {availableKeywords.slice(0, 6).map((kw, i) => (
+                                <Button
+                                  key={i}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-[10px] px-2"
+                                  onClick={() => {
+                                    updateSoundSequenceTrigger(sequence.id, {
+                                      sequence: [...sequence.sequence, kw],
+                                    });
+                                  }}
+                                >
+                                  +{kw}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Row 4: Volume, Delay, Cooldown */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span>Volumen</span>
+                              <span className="text-muted-foreground">{Math.round(sequence.volume * 100)}%</span>
+                            </div>
+                            <Slider
+                              value={[sequence.volume * 100]}
+                              min={0}
+                              max={100}
+                              step={1}
+                              onValueChange={([value]) =>
+                                updateSoundSequenceTrigger(sequence.id, { volume: value / 100 })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Delay entre sonidos (ms)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={50}
+                              value={sequence.delayBetween ?? 0}
+                              onChange={(e) =>
+                                updateSoundSequenceTrigger(sequence.id, { delayBetween: parseInt(e.target.value) || 0 })
+                              }
+                              className="mt-1 h-8"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Cooldown (ms)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={sequence.cooldown ?? 0}
+                              onChange={(e) =>
+                                updateSoundSequenceTrigger(sequence.id, { cooldown: parseInt(e.target.value) || 0 })
+                              }
+                              className="mt-1 h-8"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                /* ===== Sequence List ===== */
+                <div className="space-y-1">
+                  {soundSequenceTriggers.map((sequence, index) => (
+                    <button
+                      key={sequence.id}
+                      onClick={() => setSelectedSequenceId(sequence.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <div className={cn(
+                        "w-2.5 h-2.5 rounded-full flex-shrink-0",
+                        sequence.active ? "bg-purple-500" : "bg-muted-foreground"
+                      )} />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm">{sequence.name || `Secuencia #${index + 1}`}</span>
+                        {sequence.activationKey && (
+                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground ml-2">
+                            {sequence.activationKey}
+                          </code>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="outline" className="text-xs">{sequence.sequence.length} sonidos</Badge>
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </ScrollArea>

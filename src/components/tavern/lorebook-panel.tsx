@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import type { Lorebook, LorebookEntry, SillyTavernLorebook } from '@/types';
+import { Badge } from '@/components/ui/badge';
 import {
   Plus,
   Trash2,
@@ -35,7 +36,10 @@ import {
   ToggleLeft,
   ToggleRight,
   AlertCircle,
-  Settings2
+  Settings2,
+  Pencil,
+  ArrowLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import {
@@ -83,6 +87,7 @@ export function LorebookPanel() {
   } = useTavernStore();
 
   const [selectedLorebookId, setSelectedLorebookId] = useState<string | null>(null);
+  const [editingEntryUid, setEditingEntryUid] = useState<number | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importName, setImportName] = useState('');
   const [importDescription, setImportDescription] = useState('');
@@ -232,7 +237,7 @@ export function LorebookPanel() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-[240px_1fr] gap-4 min-h-0">
+        <div className="flex-1 grid grid-cols-[200px_1fr] md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] gap-4 min-h-0">
           {/* Left: Lorebook List */}
           <div className="flex flex-col border rounded-lg overflow-hidden">
             <div className="p-2 border-b bg-muted/30 flex-shrink-0">
@@ -338,7 +343,7 @@ export function LorebookPanel() {
 
               {/* Settings Bar */}
               <div className="p-2 border-b flex-shrink-0 bg-muted/10">
-                <div className="grid grid-cols-5 gap-3 items-end">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
                   <div>
                     <Label className="text-xs">Descripción</Label>
                     <Input
@@ -404,78 +409,119 @@ export function LorebookPanel() {
               </div>
 
               {/* Content Area */}
-              <ScrollArea className="flex-1">
-                <div className="p-3 space-y-3">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <div className="p-3 space-y-3 flex-1 flex flex-col min-h-0">
                   {/* Entries Section */}
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="p-2 border-b bg-muted/30 flex items-center justify-between">
-                      <Label className="text-xs">Entradas ({selectedLorebook.entries.length})</Label>
-                      <Button size="sm" variant="outline" className="h-6 text-xs" onClick={handleAddEntry}>
-                        <Plus className="w-3 h-3 mr-1" />
-                        Agregar
-                      </Button>
+                  <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+                    <div className="p-2 border-b bg-muted/30 flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-2">
+                        {editingEntryUid !== null && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-xs"
+                            onClick={() => setEditingEntryUid(null)}
+                          >
+                            <ArrowLeft className="w-3 h-3 mr-1" />
+                            Entradas
+                          </Button>
+                        )}
+                        <Label className="text-xs">
+                          {editingEntryUid !== null 
+                            ? `Editando: ${selectedLorebook.entries.find(e => e.uid === editingEntryUid)?.comment || 'Sin título'}`
+                            : `Entradas (${selectedLorebook.entries.length})`
+                          }
+                        </Label>
+                      </div>
+                      {editingEntryUid === null && (
+                        <Button size="sm" variant="outline" className="h-6 text-xs" onClick={handleAddEntry}>
+                          <Plus className="w-3 h-3 mr-1" />
+                          Agregar
+                        </Button>
+                      )}
                     </div>
 
-                    <div className="max-h-[400px] overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                       {selectedLorebook.entries.length === 0 ? (
                         <div className="p-4 text-center text-muted-foreground">
                           <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">Sin entradas</p>
                           <p className="text-xs">Agrega entradas para definir información del mundo</p>
                         </div>
+                      ) : editingEntryUid !== null ? (
+                        // Full-width editor for selected entry
+                        <div className="p-4">
+                          {(() => {
+                            const entry = selectedLorebook.entries.find(e => e.uid === editingEntryUid);
+                            if (!entry) return null;
+                            return (
+                              <LorebookEntryEditor
+                                entry={entry}
+                                lorebookId={selectedLorebook.id}
+                                onUpdate={(updates) =>
+                                  updateLorebookEntry(selectedLorebook.id, entry.uid, updates)
+                                }
+                                onDelete={() => {
+                                  if (confirm('¿Eliminar esta entrada?')) {
+                                    deleteLorebookEntry(selectedLorebook.id, entry.uid);
+                                    setEditingEntryUid(null);
+                                  }
+                                }}
+                                onDuplicate={() =>
+                                  duplicateLorebookEntry(selectedLorebook.id, entry.uid)
+                                }
+                              />
+                            );
+                          })()}
+                        </div>
                       ) : (
-                        <div className="p-1.5">
-                          <Accordion type="multiple" className="space-y-1">
-                            {selectedLorebook.entries.map((entry) => (
-                              <AccordionItem
-                                key={entry.uid}
-                                value={entry.uid.toString()}
-                                className="border rounded-lg data-[state=open]:bg-muted/10"
-                              >
-                                <AccordionTrigger className="px-3 py-1.5 hover:no-underline">
-                                  <div className="flex items-center gap-2 w-full pr-4">
-                                    <div
-                                      className={cn(
-                                        'w-2 h-2 rounded-full flex-shrink-0',
-                                        entry.disable ? 'bg-muted-foreground' : 'bg-green-500'
-                                      )}
-                                    />
-                                    <span className="font-medium text-sm truncate">
-                                      {entry.comment || 'Sin título'}
+                        // Compact entry list
+                        <div className="divide-y">
+                          {selectedLorebook.entries.map((entry) => (
+                            <button
+                              key={entry.uid}
+                              type="button"
+                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left group"
+                              onClick={() => setEditingEntryUid(entry.uid)}
+                            >
+                              <div
+                                className={cn(
+                                  'w-2 h-2 rounded-full flex-shrink-0',
+                                  entry.disable ? 'bg-muted-foreground' : 'bg-green-500'
+                                )}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-sm truncate block">
+                                  {entry.comment || 'Sin título'}
+                                </span>
+                                {entry.key.length > 0 && (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <Key className="w-2.5 h-2.5 text-muted-foreground" />
+                                    <span className="text-[10px] text-muted-foreground truncate">
+                                      {entry.key.slice(0, 5).join(', ')}{entry.key.length > 5 ? '...' : ''}
                                     </span>
-                                    <div className="flex items-center gap-1.5 ml-auto mr-2 text-xs text-muted-foreground">
-                                      <span className="bg-muted px-1.5 py-0.5 rounded">
-                                        {entry.key.length} claves
-                                      </span>
-                                    </div>
                                   </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="px-3 pb-3">
-                                  <LorebookEntryEditor
-                                    entry={entry}
-                                    lorebookId={selectedLorebook.id}
-                                    onUpdate={(updates) =>
-                                      updateLorebookEntry(selectedLorebook.id, entry.uid, updates)
-                                    }
-                                    onDelete={() => {
-                                      if (confirm('¿Eliminar esta entrada?')) {
-                                        deleteLorebookEntry(selectedLorebook.id, entry.uid);
-                                      }
-                                    }}
-                                    onDuplicate={() =>
-                                      duplicateLorebookEntry(selectedLorebook.id, entry.uid)
-                                    }
-                                  />
-                                </AccordionContent>
-                              </AccordionItem>
-                            ))}
-                          </Accordion>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+                                <span className="bg-muted px-1.5 py-0.5 rounded">
+                                  {entry.key.length} claves
+                                </span>
+                                {!entry.disable && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-green-500/10 text-green-600 border-green-500/20">
+                                    {POSITION_LABELS[entry.position] || `Pos.${entry.position}`}
+                                  </Badge>
+                                )}
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center border rounded-lg text-muted-foreground">
@@ -641,7 +687,7 @@ function LorebookEntryEditor({
       </div>
 
       {/* Row 5: Options Grid */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
         <div>
           <Label className="text-xs">Posición</Label>
           <Select
@@ -745,7 +791,7 @@ function LorebookEntryEditor({
       )}
 
       {/* Row 6: Toggles in a row */}
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-1.5">
         <label className="flex items-center justify-between p-1.5 rounded border text-xs cursor-pointer">
           Siempre
           <Switch

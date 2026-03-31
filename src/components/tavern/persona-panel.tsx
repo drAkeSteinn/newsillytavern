@@ -16,7 +16,9 @@ import {
 } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 import { 
   Plus, 
   Trash2, 
@@ -38,6 +40,8 @@ import {
   GripVertical,
   Settings2,
   Zap,
+  ArrowLeft,
+  Save,
 } from 'lucide-react';
 import { useState, useRef, useMemo } from 'react';
 import type { 
@@ -306,9 +310,34 @@ export function PersonaPanel() {
     }));
   };
 
+  // Find the persona being edited
+  const editingPersona = editingId ? personas.find(p => p.id === editingId) : null;
+
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col gap-4 overflow-hidden">
+      {editingId ? (
+        <PersonaEditorPanel
+          persona={editingPersona}
+          editForm={editForm}
+          setEditForm={setEditForm}
+          uploading={uploading}
+          fileInputRef={fileInputRef}
+          showStatsEditor={showStatsEditor}
+          setShowStatsEditor={setShowStatsEditor}
+          handleSaveEdit={handleSaveEdit}
+          handleCancelEdit={handleCancelEdit}
+          handleAvatarUpload={handleAvatarUpload}
+          handleToggleStats={handleToggleStats}
+          handleAddSolicitud={handleAddSolicitud}
+          handleUpdateSolicitud={handleUpdateSolicitud}
+          handleDeleteSolicitud={handleDeleteSolicitud}
+          handleAddInvitation={handleAddInvitation}
+          handleUpdateInvitation={handleUpdateInvitation}
+          handleDeleteInvitation={handleDeleteInvitation}
+          charactersWithSolicitudes={charactersWithSolicitudes}
+        />
+      ) : (
+        <div className="h-full flex flex-col gap-4 overflow-hidden">
         {/* Banner Informativo */}
         <div className="bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/20 rounded-lg p-3 flex-shrink-0">
           <div className="flex items-start gap-3">
@@ -379,307 +408,82 @@ export function PersonaPanel() {
                       : 'border-border/40 bg-background hover:bg-muted/50'
                   )}
                 >
-                  {editingId === persona.id ? (
-                    // Edit Mode
-                    <div className="space-y-4">
-                      {/* Basic Info Section */}
-                      <div className="flex items-start gap-3">
-                        <div className="relative">
-                          <Avatar 
-                            className={cn(
-                              "w-12 h-12 border-2 border-dashed border-muted-foreground/30", 
-                              !uploading && "cursor-pointer hover:border-primary/50"
-                            )} 
-                            onClick={() => !uploading && fileInputRef.current?.click()}
-                          >
-                            <AvatarImage src={editForm.avatar} />
-                            <AvatarFallback>
-                              {uploading ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                              ) : (
-                                <User className="w-6 h-6 text-muted-foreground" />
-                              )}
-                            </AvatarFallback>
-                          </Avatar>
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={uploading}
-                          >
-                            {uploading ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <Upload className="w-3 h-3" />
-                            )}
-                          </Button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => handleAvatarUpload(e)}
-                            disabled={uploading}
-                          />
+                  {/* View Mode */}
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Avatar className="w-9 h-9 flex-shrink-0">
+                        <AvatarImage src={persona.avatar} />
+                        <AvatarFallback>
+                          <User className="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-sm truncate">{persona.name}</p>
+                          {persona.id === activePersonaId && (
+                            <Badge className="text-[10px] bg-emerald-500/20 text-emerald-600 border-0 py-0 px-1.5">
+                              Activa
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex-1">
-                          <Input
-                            value={editForm.name}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Nombre de Persona"
-                            className="h-8"
-                            disabled={uploading}
-                          />
-                        </div>
-                      </div>
-                      
-                      <Textarea
-                        value={editForm.description}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Describe la personalidad, antecedentes..."
-                        rows={2}
-                        className="text-sm resize-none"
-                        disabled={uploading}
-                      />
-
-                      {/* Peticiones/Solicitudes Section */}
-                      <div className="border rounded-lg overflow-hidden">
-                        <button
-                          type="button"
-                          className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted/70 transition-colors"
-                          onClick={() => setShowStatsEditor(showStatsEditor === persona.id ? null : persona.id)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Settings2 className="w-4 h-4 text-cyan-500" />
-                            <span className="text-sm font-medium">Peticiones y Solicitudes</span>
-                            {(editForm.statsConfig?.invitations?.length || 0) > 0 && (
-                              <Badge className="bg-blue-500/20 text-blue-400 text-[10px]">
-                                {editForm.statsConfig?.invitations?.length} peticiones
-                              </Badge>
-                            )}
-                            {(editForm.statsConfig?.solicitudDefinitions?.length || 0) > 0 && (
-                              <Badge className="bg-amber-500/20 text-amber-400 text-[10px]">
-                                {editForm.statsConfig?.solicitudDefinitions?.length} solicitudes
-                              </Badge>
-                            )}
-                          </div>
-                          {showStatsEditor === persona.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                        
-                        {showStatsEditor === persona.id && (
-                          <div className="p-3 space-y-4 border-t max-h-[400px] overflow-y-auto">
-                            {/* Enable/Disable */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={editForm.statsConfig?.enabled || false}
-                                  onCheckedChange={handleToggleStats}
-                                />
-                                <Label className="text-xs">Habilitar sistema de peticiones</Label>
-                              </div>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                  <p>Activa el sistema de peticiones y solicitudes para esta persona.</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    Los personajes podran hacerte solicitudes y tu podras hacer peticiones a ellos.
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-
-                            {editForm.statsConfig?.enabled && (
-                              <>
-                                {/* Invitaciones (Peticiones que el usuario puede hacer) */}
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <Send className="w-4 h-4 text-blue-400" />
-                                      <Label className="text-xs font-medium text-blue-400">Peticiones (enviar)</Label>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                          <p>Peticiones que puedes hacer a otros personajes.</p>
-                                          <p className="mt-1 text-xs text-muted-foreground">
-                                            Apareceran como tags en el chatbox cuando hables con el personaje objetivo.
-                                          </p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-6 text-xs"
-                                      onClick={handleAddInvitation}
-                                    >
-                                      <Plus className="w-3 h-3 mr-1" /> Agregar
-                                    </Button>
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    {(editForm.statsConfig?.invitations || []).map((invitation, idx) => (
-                                      <PersonaInvitationEditor
-                                        key={invitation.id}
-                                        invitation={invitation}
-                                        index={idx}
-                                        allCharacters={charactersWithSolicitudes}
-                                        onChange={handleUpdateInvitation}
-                                        onDelete={handleDeleteInvitation}
-                                      />
-                                    ))}
-                                    {(editForm.statsConfig?.invitations || []).length === 0 && (
-                                      <p className="text-xs text-muted-foreground italic pl-2">
-                                        Sin peticiones configuradas. Agrega una para poder solicitar cosas a los personajes.
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Solicitudes (Solicitudes que el usuario puede recibir) */}
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <Inbox className="w-4 h-4 text-amber-400" />
-                                      <Label className="text-xs font-medium text-amber-400">Solicitudes (recibir)</Label>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                          <p>Solicitudes que los personajes pueden hacerte.</p>
-                                          <p className="mt-1 text-xs text-muted-foreground">
-                                            Cuando un personaje te haga una solicitud, aparecera en un panel para que puedas aceptarla o rechazarla.
-                                          </p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-6 text-xs"
-                                      onClick={handleAddSolicitud}
-                                    >
-                                      <Plus className="w-3 h-3 mr-1" /> Agregar
-                                    </Button>
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    {(editForm.statsConfig?.solicitudDefinitions || []).map((solicitud, idx) => (
-                                      <PersonaSolicitudEditor
-                                        key={solicitud.id}
-                                        solicitud={solicitud}
-                                        index={idx}
-                                        onChange={handleUpdateSolicitud}
-                                        onDelete={handleDeleteSolicitud}
-                                      />
-                                    ))}
-                                    {(editForm.statsConfig?.solicitudDefinitions || []).length === 0 && (
-                                      <p className="text-xs text-muted-foreground italic pl-2">
-                                        Sin solicitudes configuradas. Los personajes no podran hacerte peticiones.
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                        {persona.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                            {persona.description}
+                          </p>
                         )}
-                      </div>
-
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={handleCancelEdit} disabled={uploading} className="h-7 text-xs">
-                          <X className="w-3 h-3 mr-1" />
-                          Cancelar
-                        </Button>
-                        <Button size="sm" onClick={() => handleSaveEdit(persona.id)} disabled={uploading} className="h-7 text-xs">
-                          {uploading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                          Guardar
-                        </Button>
+                        {/* Show stats badges */}
+                        <div className="flex gap-1 mt-1">
+                          {persona.statsConfig?.enabled && (
+                            <>
+                              {(persona.statsConfig.invitations?.length || 0) > 0 && (
+                                <Badge className="text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/20">
+                                  <Send className="w-2.5 h-2.5 mr-0.5" />
+                                  {persona.statsConfig.invitations?.length} peticiones
+                                </Badge>
+                              )}
+                              {(persona.statsConfig.solicitudDefinitions?.length || 0) > 0 && (
+                                <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20">
+                                  <Inbox className="w-2.5 h-2.5 mr-0.5" />
+                                  {persona.statsConfig.solicitudDefinitions?.length} solicitudes
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    // View Mode
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2">
-                        <Avatar className="w-9 h-9 flex-shrink-0">
-                          <AvatarImage src={persona.avatar} />
-                          <AvatarFallback>
-                            <User className="w-4 h-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-sm truncate">{persona.name}</p>
-                            {persona.id === activePersonaId && (
-                              <Badge className="text-[10px] bg-emerald-500/20 text-emerald-600 border-0 py-0 px-1.5">
-                                Activa
-                              </Badge>
-                            )}
-                          </div>
-                          {persona.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                              {persona.description}
-                            </p>
-                          )}
-                          {/* Show stats badges */}
-                          <div className="flex gap-1 mt-1">
-                            {persona.statsConfig?.enabled && (
-                              <>
-                                {(persona.statsConfig.invitations?.length || 0) > 0 && (
-                                  <Badge className="text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/20">
-                                    <Send className="w-2.5 h-2.5 mr-0.5" />
-                                    {persona.statsConfig.invitations?.length} peticiones
-                                  </Badge>
-                                )}
-                                {(persona.statsConfig.solicitudDefinitions?.length || 0) > 0 && (
-                                  <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20">
-                                    <Inbox className="w-2.5 h-2.5 mr-0.5" />
-                                    {persona.statsConfig.solicitudDefinitions?.length} solicitudes
-                                  </Badge>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-end gap-1">
-                        {persona.id !== activePersonaId && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
-                            onClick={() => setActivePersona(persona.id)}
-                          >
-                            <Check className="w-3 h-3 mr-1" />
-                            Activar
-                          </Button>
-                        )}
+                    <div className="flex items-center justify-end gap-1">
+                      {persona.id !== activePersonaId && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-6 w-6 p-0"
-                          onClick={() => handleStartEdit(persona)}
+                          className="h-6 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                          onClick={() => setActivePersona(persona.id)}
                         >
-                          <Edit2 className="w-3 h-3" />
+                          <Check className="w-3 h-3 mr-1" />
+                          Activar
                         </Button>
-                        {persona.id !== 'default' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(persona.id)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleStartEdit(persona)}
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
+                      {persona.id !== 'default' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(persona.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
 
@@ -714,13 +518,348 @@ export function PersonaPanel() {
           </div>
         </div>
       </div>
+      )}
     </TooltipProvider>
   );
 }
 
 // ============================================
-// Persona Invitation Editor Component
+// Persona Editor Panel (Full-Screen)
 // ============================================
+
+interface PersonaEditorPanelProps {
+  persona: Persona | undefined;
+  editForm: {
+    name: string;
+    description: string;
+    avatar: string;
+    statsConfig?: CharacterStatsConfig;
+  };
+  setEditForm: React.Dispatch<React.SetStateAction<{
+    name: string;
+    description: string;
+    avatar: string;
+    statsConfig?: CharacterStatsConfig;
+  }>>;
+  uploading: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  showStatsEditor: string | null;
+  setShowStatsEditor: (id: string | null) => void;
+  handleSaveEdit: (id: string) => void;
+  handleCancelEdit: () => void;
+  handleAvatarUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleToggleStats: (enabled: boolean) => void;
+  handleAddSolicitud: () => void;
+  handleUpdateSolicitud: (index: number, updates: Partial<SolicitudDefinition>) => void;
+  handleDeleteSolicitud: (index: number) => void;
+  handleAddInvitation: () => void;
+  handleUpdateInvitation: (index: number, updates: Partial<InvitationDefinition>) => void;
+  handleDeleteInvitation: (index: number) => void;
+  charactersWithSolicitudes: { id: string; name: string; solicitudDefinitions: SolicitudDefinition[] }[];
+}
+
+function PersonaEditorPanel({
+  persona,
+  editForm,
+  setEditForm,
+  uploading,
+  fileInputRef,
+  showStatsEditor,
+  setShowStatsEditor,
+  handleSaveEdit,
+  handleCancelEdit,
+  handleAvatarUpload,
+  handleToggleStats,
+  handleAddSolicitud,
+  handleUpdateSolicitud,
+  handleDeleteSolicitud,
+  handleAddInvitation,
+  handleUpdateInvitation,
+  handleDeleteInvitation,
+  charactersWithSolicitudes,
+}: PersonaEditorPanelProps) {
+  if (!persona) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
+      className="h-full flex flex-col"
+    >
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-border/50 bg-background/95 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleCancelEdit} className="h-9 w-9" disabled={uploading}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-3">
+            <Avatar className="w-10 h-10 border-2 border-violet-500/30">
+              <AvatarImage src={editForm.avatar} />
+              <AvatarFallback className="bg-violet-500/20">
+                <User className="w-5 h-5 text-violet-600" />
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="text-xl font-bold">{editForm.name || 'Nueva Persona'}</h2>
+              <p className="text-xs text-muted-foreground">Edita la información y configuración de la persona</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleCancelEdit} disabled={uploading}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={() => handleSaveEdit(persona.id)} 
+            disabled={uploading || !editForm.name.trim()}
+            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Guardar
+          </Button>
+        </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="grid grid-cols-1 2xl:grid-cols-[1fr_320px] gap-6 p-6 max-w-5xl mx-auto w-full">
+          {/* Left Column - Editor */}
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <div className="p-1.5 rounded-md bg-violet-500/10">
+                  <User className="w-4 h-4 text-violet-500" />
+                </div>
+                Información Básica
+              </div>
+              <div className="flex items-start gap-6 p-4 rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-muted/10">
+                <div className="relative shrink-0">
+                  <Avatar 
+                    className={cn(
+                      "w-20 h-20 border-2 border-dashed border-muted-foreground/30",
+                      !uploading && "cursor-pointer hover:border-violet-500/50"
+                    )} 
+                    onClick={() => !uploading && fileInputRef.current?.click()}
+                  >
+                    <AvatarImage src={editForm.avatar} />
+                    <AvatarFallback className="bg-violet-500/20">
+                      {uploading ? (
+                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                      ) : (
+                        <User className="w-8 h-8 text-muted-foreground" />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Upload className="w-3 h-3" />
+                    )}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={uploading}
+                  />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Nombre de la Persona</Label>
+                    <Input
+                      value={editForm.name}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Nombre de Persona"
+                      className="h-10"
+                      disabled={uploading}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Descripción</Label>
+                    <Textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe la personalidad, antecedentes, motivaciones..."
+                      rows={4}
+                      className="text-sm resize-none"
+                      disabled={uploading}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            {/* Peticiones y Solicitudes */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <div className="p-1.5 rounded-md bg-cyan-500/10">
+                  <Settings2 className="w-4 h-4 text-cyan-500" />
+                </div>
+                Peticiones y Solicitudes
+                {(editForm.statsConfig?.invitations?.length || 0) > 0 && (
+                  <Badge className="bg-blue-500/20 text-blue-400 text-[10px]">
+                    {editForm.statsConfig?.invitations?.length} peticiones
+                  </Badge>
+                )}
+                {(editForm.statsConfig?.solicitudDefinitions?.length || 0) > 0 && (
+                  <Badge className="bg-amber-500/20 text-amber-400 text-[10px]">
+                    {editForm.statsConfig?.solicitudDefinitions?.length} solicitudes
+                  </Badge>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* Enable/Disable */}
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-gradient-to-br from-muted/30 to-muted/10">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={editForm.statsConfig?.enabled || false}
+                      onCheckedChange={handleToggleStats}
+                    />
+                    <div>
+                      <Label className="text-xs font-medium cursor-pointer">Habilitar sistema de peticiones</Label>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Permite enviar peticiones y recibir solicitudes de personajes
+                      </p>
+                    </div>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Activa el sistema para configurar peticiones y solicitudes.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
+                {editForm.statsConfig?.enabled && (
+                  <>
+                    {/* Invitaciones (Peticiones) */}
+                    <div className="space-y-3 p-4 rounded-xl border border-blue-500/20 bg-blue-500/5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Send className="w-4 h-4 text-blue-400" />
+                          <Label className="text-sm font-medium text-blue-400">Peticiones (enviar)</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Peticiones que puedes hacer a otros personajes.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={handleAddInvitation}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Agregar
+                        </Button>
+                      </div>
+                      
+                      {(editForm.statsConfig?.invitations || []).map((invitation, idx) => (
+                        <PersonaInvitationEditor
+                          key={invitation.id}
+                          invitation={invitation}
+                          index={idx}
+                          allCharacters={charactersWithSolicitudes}
+                          onChange={handleUpdateInvitation}
+                          onDelete={handleDeleteInvitation}
+                        />
+                      ))}
+                      {(editForm.statsConfig?.invitations || []).length === 0 && (
+                        <p className="text-xs text-muted-foreground italic pl-6">
+                          Sin peticiones configuradas. Agrega una para poder solicitar cosas a los personajes.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Solicitudes (recibir) */}
+                    <div className="space-y-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Inbox className="w-4 h-4 text-amber-400" />
+                          <Label className="text-sm font-medium text-amber-400">Solicitudes (recibir)</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Solicitudes que los personajes pueden hacerte.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={handleAddSolicitud}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Agregar
+                        </Button>
+                      </div>
+                      
+                      {(editForm.statsConfig?.solicitudDefinitions || []).map((solicitud, idx) => (
+                        <PersonaSolicitudEditor
+                          key={solicitud.id}
+                          solicitud={solicitud}
+                          index={idx}
+                          onChange={handleUpdateSolicitud}
+                          onDelete={handleDeleteSolicitud}
+                        />
+                      ))}
+                      {(editForm.statsConfig?.solicitudDefinitions || []).length === 0 && (
+                        <p className="text-xs text-muted-foreground italic pl-6">
+                          Sin solicitudes configuradas. Los personajes no podrán hacerte peticiones.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Sidebar - Info (visible on 2xl) */}
+          <div className="hidden 2xl:block space-y-4">
+            <div className="sticky top-0 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <div className="p-1.5 rounded-md bg-slate-500/10">
+                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                </div>
+                Información
+              </div>
+              <div className="p-4 rounded-xl border border-border/60 bg-gradient-to-br from-muted/30 to-muted/10 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Peticiones:</strong> Solicitudes que puedes hacer a los personajes. Aparecerán como tags rapidos en el chatbox.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Solicitudes:</strong> Peticiones que los personajes pueden hacerte. Aparecerán en un panel para aceptar o rechazar.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 interface PersonaInvitationEditorProps {
   invitation: InvitationDefinition;

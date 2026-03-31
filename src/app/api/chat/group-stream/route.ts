@@ -43,6 +43,8 @@ import {
 } from '@/lib/context-manager';
 import { detectMentions } from '@/lib/mention-detector';
 import { buildQuestPromptSection } from '@/lib/triggers/handlers/quest-handler';
+import { retrieveEmbeddingsContext, formatEmbeddingsForSSE } from '@/lib/embeddings/chat-context';
+import type { EmbeddingsChatSettings } from '@/types';
 
 // ============================================
 // Responder Selection Logic
@@ -328,6 +330,10 @@ export async function POST(request: NextRequest) {
     // Extract summaries for memory/context compression
     const summary: SessionSummary | undefined = body.summary;
 
+    // Extract embeddings chat settings
+    const embeddingsChat: Partial<EmbeddingsChatSettings> = body.embeddingsChat || {};
+    const sessionId: string | undefined = body.sessionId;
+
     // Cast sessionStats to proper type
     const typedSessionStats = sessionStats as SessionStats | undefined;
 
@@ -483,6 +489,20 @@ export async function POST(request: NextRequest) {
             // Determine lorebook section for this character
             let lorebookSectionForCharacter: PromptSection | null = groupLorebookSection;
 
+            // ========================================
+            // Embeddings Context Retrieval (per-character)
+            // ========================================
+            const embeddingsResult = await retrieveEmbeddingsContext(
+              sanitizedMessage,
+              responder.id,
+              sessionId,
+              embeddingsChat
+            );
+            
+            if (embeddingsResult.found) {
+              console.log(`[Group Stream] Retrieved ${embeddingsResult.count} embeddings for ${responder.name}`);
+            }
+
             // If group has no lorebooks, use character's own lorebooks
             if (!useGroupLorebooks) {
               const characterLorebookIds = characterLorebooksMap[responder.id] || [];
@@ -545,6 +565,16 @@ export async function POST(request: NextRequest) {
             // Build HUD context section for this character (resolves keys!)
             const hudContextSection = typedHUDContext ? buildHUDContextSection(typedHUDContext, keyContext) : null;
 
+            // Send embeddings context metadata to the client for UI display
+            if (embeddingsResult.found) {
+              controller.enqueue(createSSEJSON({
+                type: 'embeddings_context',
+                data: formatEmbeddingsForSSE(embeddingsResult),
+                characterId: responder.id,
+                characterName: responder.name,
+              }));
+            }
+
             // Check if this responder is a narrator in the group (MUST be before buildQuestPromptSection)
             const responderMember = group.members?.find(m => m.characterId === responder.id);
             const isResponderNarrator = responderMember?.isNarrator || false;
@@ -571,8 +601,11 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // Add quest section to the system prompt if present
+            // Add quest section and embeddings to the system prompt if present
             let finalSystemPrompt = systemPrompt;
+            if (embeddingsResult.section) {
+              finalSystemPrompt += `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`;
+            }
             if (resolvedQuestSection) {
               finalSystemPrompt += `\n\n[${resolvedQuestSection.label}]\n${resolvedQuestSection.content}`;
             }
@@ -638,10 +671,10 @@ export async function POST(request: NextRequest) {
             );
 
             // Combine prompt sections with chat history for the viewer
-            // Order: System sections -> Quest -> Chat History -> Post-History Instructions
+            // Order: System sections -> Embeddings -> Quest -> Chat History -> Post-History Instructions
             let allPromptSections: PromptSection[] = chatHistorySection
-              ? [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
-              : [...promptSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(postHistorySection ? [postHistorySection] : [])];
+              ? [...promptSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
+              : [...promptSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(postHistorySection ? [postHistorySection] : [])];
 
             // Inject HUD context into sections if enabled
             if (hudContextSection && typedHUDContext) {
