@@ -82,6 +82,13 @@ export class EmbeddingClient {
   async searchSimilar(params: SearchParams): Promise<SearchResult[]> {
     const { query, queryVector, namespace, limit, threshold, source_type, source_id } = params;
 
+    // Load config for defaults
+    let configThreshold = 0.3;
+    try {
+      const { getConfig } = await import('./config-persistence');
+      configThreshold = getConfig().similarityThreshold ?? 0.3;
+    } catch { /* use default */ }
+
     let vector: number[];
     if (queryVector) {
       vector = queryVector;
@@ -95,7 +102,7 @@ export class EmbeddingClient {
       queryVector: vector,
       namespace,
       limit: limit || 10,
-      threshold: threshold || 0.5,
+      threshold: threshold ?? configThreshold,
     });
 
     let filtered = results;

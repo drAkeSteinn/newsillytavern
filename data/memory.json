@@ -206,6 +206,12 @@
       "messagesSinceLastSummary": 5,
       "lastSummaryMessageIndex": 0,
       "isGroupChat": false
+    },
+    "e2a499be-f084-4f83-bff9-7d91d94ddb83": {
+      "sessionId": "e2a499be-f084-4f83-bff9-7d91d94ddb83",
+      "messagesSinceLastSummary": 0,
+      "lastSummaryMessageIndex": 0,
+      "isGroupChat": false
     }
   }
 }

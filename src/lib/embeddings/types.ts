@@ -103,6 +103,9 @@ export interface EmbeddingsConfig {
   dimension: number;
   similarityThreshold: number;
   maxResults: number;
+  timeout?: number;
+  retryCount?: number;
+  retryDelay?: number;
   updatedAt?: string;
 }
 

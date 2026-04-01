@@ -17,7 +17,15 @@ export async function GET() {
     }
 
     const namespaces = await LanceDBWrapper.getAllNamespaces();
-    return NextResponse.json({ success: true, data: { namespaces, dbAvailable: true } });
+    const stats = await LanceDBWrapper.getStats();
+
+    // Enrich namespaces with embedding counts
+    const enriched = namespaces.map(ns => ({
+      ...ns,
+      embedding_count: stats.embeddingsByNamespace[ns.namespace] || 0,
+    }));
+
+    return NextResponse.json({ success: true, data: { namespaces: enriched, dbAvailable: true } });
   } catch (error: any) {
     return NextResponse.json({
       success: true,

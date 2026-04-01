@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Brain,
   Search,
@@ -21,6 +21,14 @@ import {
   Globe,
   FileText,
   Layers,
+  Upload,
+  File,
+  Eye,
+  ArrowLeft,
+  FileCode,
+  Code,
+  FileType,
+  List,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,6 +89,16 @@ interface NamespaceRecord {
   description?: string;
   created_at: string;
   updated_at: string;
+  embedding_count?: number;
+}
+
+interface DocumentRecord {
+  source_id: string;
+  source_type: string;
+  count: number;
+  firstChunk: string;
+  created_at: string;
+  ids: string[];
 }
 
 interface EmbeddingStats {
@@ -98,13 +116,56 @@ interface SearchResult {
   similarity: number;
 }
 
+interface ChunkPreview {
+  chunks: string[];
+  totalChunks: number;
+  totalCharacters: number;
+  avgChunkSize: number;
+}
+
 const KNOWN_MODELS = [
   { name: 'nomic-embed-text', dimension: 768 },
   { name: 'nomic-embed-text:latest', dimension: 768 },
   { name: 'bge-m3', dimension: 1024 },
+  { name: 'bge-m3:567m', dimension: 1024 },
   { name: 'mxbai-embed-large', dimension: 1024 },
   { name: 'all-minilm', dimension: 384 },
   { name: 'snowflake-arctic-embed', dimension: 1024 },
+];
+
+const SPLITTER_OPTIONS = [
+  {
+    value: 'character',
+    label: 'Character Text Splitter',
+    icon: FileType,
+    description: 'Simple split by character count',
+    defaultChunkSize: 1000,
+    defaultOverlap: 200,
+  },
+  {
+    value: 'recursive-character',
+    label: 'Recursive Character Splitter',
+    icon: List,
+    description: 'Tries paragraphs, lines, words for natural breaks',
+    defaultChunkSize: 1000,
+    defaultOverlap: 200,
+  },
+  {
+    value: 'markdown',
+    label: 'Markdown Text Splitter',
+    icon: FileText,
+    description: 'Splits by markdown headings first',
+    defaultChunkSize: 1000,
+    defaultOverlap: 200,
+  },
+  {
+    value: 'code',
+    label: 'Code Text Splitter',
+    icon: Code,
+    description: 'Splits by code structures (classes, functions)',
+    defaultChunkSize: 1500,
+    defaultOverlap: 300,
+  },
 ];
 
 export function EmbeddingsSettingsPanel() {
@@ -113,8 +174,8 @@ export function EmbeddingsSettingsPanel() {
   // Config state
   const [config, setConfig] = useState<EmbeddingConfig>({
     ollamaUrl: 'http://localhost:11434',
-    model: 'nomic-embed-text',
-    dimension: 768,
+    model: 'bge-m3:567m',
+    dimension: 1024,
     similarityThreshold: 0.5,
     maxResults: 5,
   });
@@ -155,7 +216,30 @@ export function EmbeddingsSettingsPanel() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
 
-  // Load config (called on demand, not in useEffect to avoid lint)
+  // Namespace documents
+  const [nsDocuments, setNsDocuments] = useState<DocumentRecord[]>([]);
+  const [viewingNsDocuments, setViewingNsDocuments] = useState<string | null>(null);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  // File upload state
+  const [uploadedFile, setUploadedFile] = useState<{
+    fileName: string;
+    fileSize: number;
+    content: string;
+    characterCount: number;
+  } | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [splitterType, setSplitterType] = useState('recursive-character');
+  const [chunkSize, setChunkSize] = useState(1000);
+  const [chunkOverlap, setChunkOverlap] = useState(200);
+  const [previewChunks, setPreviewChunks] = useState<ChunkPreview | null>(null);
+  const [previewingChunks, setPreviewingChunks] = useState(false);
+  const [creatingEmbeddings, setCreatingEmbeddings] = useState(false);
+  const [uploadNamespace, setUploadNamespace] = useState('default');
+  const [uploadSectionOpen, setUploadSectionOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load config
   const fetchConfig = useCallback(async () => {
     try {
       const res = await fetch('/api/embeddings/config');
@@ -189,7 +273,6 @@ export function EmbeddingsSettingsPanel() {
   };
 
   const testConnection = async () => {
-    // Ensure config is loaded before testing
     if (!configLoaded) await fetchConfig();
     try {
       const res = await fetch('/api/embeddings/test', { method: 'POST' });
@@ -218,7 +301,6 @@ export function EmbeddingsSettingsPanel() {
     }
   };
 
-  // Check only Ollama connection
   const checkOllama = async () => {
     setCheckingOllama(true);
     try {
@@ -243,7 +325,6 @@ export function EmbeddingsSettingsPanel() {
     setCheckingOllama(false);
   };
 
-  // Refresh Ollama models list
   const refreshModels = async () => {
     setRefreshingModels(true);
     try {
@@ -264,7 +345,6 @@ export function EmbeddingsSettingsPanel() {
     setRefreshingModels(false);
   };
 
-  // Check only LanceDB connection
   const checkLanceDB = async () => {
     setCheckingLanceDB(true);
     try {
@@ -300,7 +380,6 @@ export function EmbeddingsSettingsPanel() {
         if (data.success) setStats(data.data);
       }
     } catch { /* ignore */ }
-    // Also update LanceDB status
     setLanceDBStatus(stats !== null ? 'ok' : 'unknown');
   };
 
@@ -320,6 +399,19 @@ export function EmbeddingsSettingsPanel() {
     } catch { /* ignore */ }
   };
 
+  // Load config and namespaces on mount
+  useEffect(() => {
+    let mounted = true;
+    const init = async () => {
+      await fetchConfig();
+      if (mounted) {
+        await Promise.all([loadNamespaces(), loadStats()]);
+      }
+    };
+    init();
+    return () => { mounted = false; };
+  }, []);
+
   const loadEmbeddings = async (namespace?: string) => {
     try {
       const params = new URLSearchParams();
@@ -331,6 +423,61 @@ export function EmbeddingsSettingsPanel() {
         if (data.success) setEmbeddings(data.data.embeddings);
       }
     } catch { /* ignore */ }
+  };
+
+  const loadNamespaceDocuments = async (namespace: string) => {
+    setLoadingDocuments(true);
+    try {
+      const res = await fetch(`/api/embeddings/namespaces/${encodeURIComponent(namespace)}/documents`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setNsDocuments(data.data.documents);
+        }
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load documents.', variant: 'destructive' });
+    }
+    setLoadingDocuments(false);
+  };
+
+  const handleViewNamespaceDocuments = (namespace: string) => {
+    setViewingNsDocuments(namespace);
+    loadNamespaceDocuments(namespace);
+  };
+
+  const handleDeleteDocument = async (namespace: string, sourceId: string) => {
+    try {
+      const res = await fetch(`/api/embeddings/namespaces/${encodeURIComponent(namespace)}/documents`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_id: sourceId }),
+      });
+      if (res.ok) {
+        toast({ title: 'Document deleted', description: `Document "${sourceId}" and its embeddings removed.` });
+        loadNamespaceDocuments(namespace);
+        loadStats();
+        loadNamespaces();
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
+    }
+  };
+
+  const handleClearNamespaceDocuments = async (namespace: string) => {
+    try {
+      const res = await fetch(`/api/embeddings/namespaces/${encodeURIComponent(namespace)}/documents`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        toast({ title: 'Cleared', description: `All documents in "${namespace}" removed.` });
+        setNsDocuments([]);
+        loadStats();
+        loadNamespaces();
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to clear namespace.', variant: 'destructive' });
+    }
   };
 
   const handleSearch = async () => {
@@ -416,10 +563,15 @@ export function EmbeddingsSettingsPanel() {
 
   const handleDeleteNamespace = async (namespace: string) => {
     try {
-      const res = await fetch(`/api/embeddings/namespaces/${namespace}`, { method: 'DELETE' });
+      const res = await fetch(`/api/embeddings/namespaces/${encodeURIComponent(namespace)}`, { method: 'DELETE' });
       if (res.ok) {
-        toast({ title: 'Deleted', description: `Namespace "${namespace}" deleted.` });
+        const data = await res.json();
+        toast({
+          title: 'Deleted',
+          description: `Namespace "${namespace}" deleted (${data.deletedEmbeddings || 0} embeddings removed).`,
+        });
         setSelectedNamespace(null);
+        setViewingNsDocuments(null);
         loadNamespaces();
         loadStats();
       }
@@ -442,6 +594,7 @@ export function EmbeddingsSettingsPanel() {
         setEmbeddings([]);
         setSearchResults([]);
         setSelectedNamespace(null);
+        setViewingNsDocuments(null);
       }
     } catch {
       toast({ title: 'Error', description: 'Failed to reset.', variant: 'destructive' });
@@ -458,16 +611,128 @@ export function EmbeddingsSettingsPanel() {
     }));
   };
 
-  const handleSelectNamespace = useCallback((ns: string | null) => {
+  const handleSelectNamespace = (ns: string | null) => {
     setSelectedNamespace(ns);
     if (ns) loadEmbeddings(ns);
     else { setEmbeddings([]); loadStats(); }
-  });
+  };
 
-  // Refresh data on tab change
   const handleTabChange = (tab: string) => {
-    if (tab === 'namespaces') loadNamespaces();
+    if (tab === 'namespaces') { loadNamespaces(); setViewingNsDocuments(null); }
     if (tab === 'embeddings') { loadStats(); if (selectedNamespace) loadEmbeddings(selectedNamespace); }
+  };
+
+  // File upload handlers
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/embeddings/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setUploadedFile({
+          fileName: data.data.fileName,
+          fileSize: data.data.fileSize,
+          content: data.data.content,
+          characterCount: data.data.characterCount,
+        });
+        setPreviewChunks(null);
+        toast({ title: 'File loaded', description: `${data.data.fileName} (${data.data.characterCount.toLocaleString()} chars)` });
+      } else {
+        toast({ title: 'Upload failed', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to upload file.', variant: 'destructive' });
+    }
+    setUploadingFile(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSplitterChange = (value: string) => {
+    setSplitterType(value);
+    const opt = SPLITTER_OPTIONS.find(o => o.value === value);
+    if (opt) {
+      setChunkSize(opt.defaultChunkSize);
+      setChunkOverlap(opt.defaultOverlap);
+    }
+    setPreviewChunks(null);
+  };
+
+  const handlePreviewChunks = async () => {
+    if (!uploadedFile?.content) return;
+    setPreviewingChunks(true);
+    try {
+      const res = await fetch('/api/embeddings/preview-chunks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: uploadedFile.content,
+          splitterType,
+          chunkSize,
+          chunkOverlap,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPreviewChunks(data.data);
+      } else {
+        toast({ title: 'Preview failed', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to preview chunks.', variant: 'destructive' });
+    }
+    setPreviewingChunks(false);
+  };
+
+  const handleCreateEmbeddings = async () => {
+    if (!uploadedFile?.content) return;
+    setCreatingEmbeddings(true);
+    try {
+      const res = await fetch('/api/embeddings/create-from-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: uploadedFile.content,
+          namespace: uploadNamespace,
+          splitterType,
+          chunkSize,
+          chunkOverlap,
+          source_type: 'file',
+          source_id: uploadedFile.fileName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({
+          title: 'Embeddings created',
+          description: `${data.data.createdCount} embeddings in "${uploadNamespace}" (${data.data.errorCount} errors)`,
+        });
+        setUploadedFile(null);
+        setPreviewChunks(null);
+        loadStats();
+        loadNamespaces();
+      } else {
+        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create embeddings.', variant: 'destructive' });
+    }
+    setCreatingEmbeddings(false);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (
@@ -510,9 +775,7 @@ export function EmbeddingsSettingsPanel() {
           <Card>
             <CardContent className="pt-4 space-y-4">
 
-              {/* ============================================ */}
-              {/* Service Status Cards — Ollama + LanceDB */}
-              {/* ============================================ */}
+              {/* Service Status Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Ollama Status Card */}
                 <div className={cn(
@@ -585,9 +848,7 @@ export function EmbeddingsSettingsPanel() {
 
               <Separator />
 
-              {/* ============================================ */}
               {/* Ollama URL */}
-              {/* ============================================ */}
               <div className="space-y-2">
                 <Label className="text-xs">Ollama URL</Label>
                 <Input
@@ -598,9 +859,7 @@ export function EmbeddingsSettingsPanel() {
                 />
               </div>
 
-              {/* ============================================ */}
-              {/* Embedding Model — Select from scanned Ollama models */}
-              {/* ============================================ */}
+              {/* Embedding Model */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Embedding Model</Label>
@@ -616,7 +875,6 @@ export function EmbeddingsSettingsPanel() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Known embedding models (shown first) */}
                     {KNOWN_MODELS.map(m => (
                       <SelectItem key={m.name} value={m.name}>
                         <div className="flex items-center justify-between gap-4">
@@ -625,7 +883,6 @@ export function EmbeddingsSettingsPanel() {
                         </div>
                       </SelectItem>
                     ))}
-                    {/* Scanned Ollama models not in known list */}
                     {ollamaModels.filter(m => !KNOWN_MODELS.find(k => k.name === m)).length > 0 && (
                       <>
                         <SelectItem value="__separator__" disabled>
@@ -650,40 +907,49 @@ export function EmbeddingsSettingsPanel() {
                 </Select>
               </div>
 
-              {/* ============================================ */}
+              {/* Similarity Threshold + Max Results (moved here from Advanced) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Umbral de Similitud: {(config.similarityThreshold * 100).toFixed(0)}%</Label>
+                  <Slider
+                    value={[config.similarityThreshold]}
+                    min={0} max={1} step={0.05}
+                    onValueChange={([v]) => setConfig(prev => ({ ...prev, similarityThreshold: v }))}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {config.similarityThreshold === 0 ? 'Cualquier resultado' :
+                     config.similarityThreshold >= 0.9 ? 'Solo coincidencias muy cercanas' :
+                     config.similarityThreshold >= 0.7 ? 'Coincidencias moderadas' :
+                     'Resultados más amplios'}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Máx. Resultados: {config.maxResults}</Label>
+                  <Slider
+                    value={[config.maxResults]}
+                    min={1} max={50} step={1}
+                    onValueChange={([v]) => setConfig(prev => ({ ...prev, maxResults: v }))}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Número máximo de embeddings retornados por búsqueda
+                  </p>
+                </div>
+              </div>
+
               {/* Advanced Settings */}
-              {/* ============================================ */}
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                 <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <ChevronDown className={cn('w-3 h-3 transition-transform', advancedOpen && 'rotate-180')} />
                   Advanced Settings
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-4 mt-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Vector Dimension: {config.dimension}</Label>
-                      <Input
-                        type="number"
-                        value={config.dimension}
-                        onChange={(e) => setConfig(prev => ({ ...prev, dimension: parseInt(e.target.value) || 768 }))}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Similarity Threshold: {(config.similarityThreshold * 100).toFixed(0)}%</Label>
-                      <Slider
-                        value={[config.similarityThreshold]}
-                        min={0} max={1} step={0.05}
-                        onValueChange={([v]) => setConfig(prev => ({ ...prev, similarityThreshold: v }))}
-                      />
-                    </div>
-                  </div>
                   <div className="space-y-2">
-                    <Label className="text-xs">Max Results: {config.maxResults}</Label>
-                    <Slider
-                      value={[config.maxResults]}
-                      min={1} max={20} step={1}
-                      onValueChange={([v]) => setConfig(prev => ({ ...prev, maxResults: v }))}
+                    <Label className="text-xs">Vector Dimension: {config.dimension}</Label>
+                    <Input
+                      type="number"
+                      value={config.dimension}
+                      onChange={(e) => setConfig(prev => ({ ...prev, dimension: parseInt(e.target.value) || 1024 }))}
+                      className="h-8 text-sm"
                     />
                   </div>
                 </CollapsibleContent>
@@ -706,6 +972,189 @@ export function EmbeddingsSettingsPanel() {
 
       {/* Chat Integration Section */}
       <EmbeddingsChatIntegration />
+
+      {/* File Upload Section */}
+      <Collapsible open={uploadSectionOpen} onOpenChange={setUploadSectionOpen}>
+        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+          <div className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-medium">Upload & Create Embeddings</span>
+            {uploadedFile && (
+              <Badge variant="default" className="text-[10px] h-5 px-1.5 bg-blue-500">
+                {uploadedFile.fileName}
+              </Badge>
+            )}
+          </div>
+          <ChevronDown className={cn('w-4 h-4 transition-transform', uploadSectionOpen && 'rotate-180')} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-3">
+          <Card>
+            <CardContent className="pt-4 space-y-4">
+              {/* File Upload */}
+              <div className="space-y-2">
+                <Label className="text-xs">Upload File</Label>
+                <div className="flex gap-2">
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.md,.json,.csv,.html,.py,.js,.ts,.java,.c,.cpp,.rb,.go,.rs,.xml,.yaml,.yml,.log"
+                    onChange={handleFileUpload}
+                    className="h-9 text-sm"
+                    disabled={uploadingFile}
+                  />
+                  {uploadingFile && (
+                    <Button size="sm" disabled>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Loading...
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Supported: .txt, .md, .json, .csv, .html, code files (.py, .js, .ts, .java, etc.) — Max 10MB
+                </p>
+              </div>
+
+              {uploadedFile && (
+                <>
+                  <Separator />
+
+                  {/* File Info */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                    <File className="w-5 h-5 text-blue-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{uploadedFile.fileName}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatFileSize(uploadedFile.fileSize)} · {uploadedFile.characterCount.toLocaleString()} characters
+                      </p>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setUploadedFile(null); setPreviewChunks(null); }}>
+                      Remove
+                    </Button>
+                  </div>
+
+                  {/* Namespace Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Target Namespace</Label>
+                    <Select value={uploadNamespace} onValueChange={setUploadNamespace}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {namespaces.map(ns => (
+                          <SelectItem key={ns.namespace} value={ns.namespace}>{ns.namespace}</SelectItem>
+                        ))}
+                        <SelectItem value="default">default</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Text Splitter Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Text Splitter</Label>
+                    <Select value={splitterType} onValueChange={handleSplitterChange}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SPLITTER_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <div className="flex items-center gap-2">
+                              <opt.icon className="w-3.5 h-3.5" />
+                              <div>
+                                <span className="text-sm">{opt.label}</span>
+                                <p className="text-[10px] text-muted-foreground">{opt.description}</p>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Chunk Size + Overlap */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Chunk Size: {chunkSize} chars</Label>
+                      <Slider
+                        value={[chunkSize]}
+                        min={100} max={4000} step={50}
+                        onValueChange={([v]) => { setChunkSize(v); setPreviewChunks(null); }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Overlap: {chunkOverlap} chars</Label>
+                      <Slider
+                        value={[chunkOverlap]}
+                        min={0} max={Math.min(chunkSize, 1000)} step={10}
+                        onValueChange={([v]) => { setChunkOverlap(v); setPreviewChunks(null); }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handlePreviewChunks}
+                      disabled={previewingChunks || !uploadedFile}
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {previewingChunks ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+                      Preview Chunks
+                    </Button>
+                    <Button
+                      onClick={handleCreateEmbeddings}
+                      disabled={creatingEmbeddings || !uploadedFile}
+                      size="sm"
+                      className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    >
+                      {creatingEmbeddings ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Layers className="w-4 h-4 mr-1" />}
+                      Create Embeddings
+                    </Button>
+                  </div>
+
+                  {/* Preview Chunks - Fixed height scrollable */}
+                  {previewChunks && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-purple-500" />
+                          Chunk Preview
+                        </h4>
+                        <Badge variant="outline">
+                          {previewChunks.totalChunks} chunks · avg {previewChunks.avgChunkSize} chars
+                        </Badge>
+                      </div>
+                      <ScrollArea className="h-48 rounded-lg border">
+                        <div className="p-3 space-y-2">
+                          {previewChunks.chunks.map((chunk, i) => (
+                            <div key={i} className="p-2 rounded bg-muted/50 text-xs font-mono">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">#{i + 1}</Badge>
+                                <span className="text-[10px] text-muted-foreground">{chunk.length} chars</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-3">{chunk}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!uploadedFile && (
+                <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <Upload className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Upload a file to create embeddings</p>
+                  <p className="text-xs mt-1">Text, markdown, code, and more supported</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Main Tabs */}
       <Tabs defaultValue="search" onValueChange={handleTabChange}>
@@ -792,64 +1241,147 @@ export function EmbeddingsSettingsPanel() {
 
         {/* Namespaces Tab */}
         <TabsContent value="namespaces" className="space-y-3 mt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">{namespaces.length} namespaces</span>
-            <div className="flex gap-1.5">
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { loadNamespaces(); loadStats(); }}>
-                <RefreshCw className="w-3 h-3 mr-1" />Refresh
-              </Button>
-              <Button size="sm" className="h-7 text-xs" onClick={() => setCreateNamespaceOpen(true)}>
-                <Plus className="w-3 h-3 mr-1" />New
-              </Button>
-            </div>
-          </div>
+          {viewingNsDocuments ? (
+            /* Documents View for selected namespace */
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setViewingNsDocuments(null)}>
+                  <ArrowLeft className="w-3 h-3 mr-1" />
+                  Back to Namespaces
+                </Button>
+                <h3 className="text-sm font-medium">Documents in "{viewingNsDocuments}"</h3>
+              </div>
 
-          <ScrollArea className="max-h-80">
-            {namespaces.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No namespaces yet. Create one to organize embeddings.</p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {loadingDocuments ? 'Loading...' : `${nsDocuments.length} documents`}
+                </span>
+                {nsDocuments.length > 0 && (
+                  <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleClearNamespaceDocuments(viewingNsDocuments)}>
+                    <Trash2 className="w-3 h-3 mr-1" />Clear All
+                  </Button>
+                )}
               </div>
-            ) : (
-              <div className="space-y-1.5">
-                {namespaces.map(ns => (
-                  <div
-                    key={ns.id}
-                    className={cn(
-                      'p-3 rounded-lg border transition-colors cursor-pointer',
-                      selectedNamespace === ns.namespace
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border/40 hover:bg-muted/50'
-                    )}
-                    onClick={() => handleSelectNamespace(ns.namespace)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-sm font-medium truncate">{ns.namespace}</span>
+
+              {loadingDocuments ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : nsDocuments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No documents in this namespace</p>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-80">
+                  <div className="space-y-1.5">
+                    {nsDocuments.map(doc => (
+                      <div key={doc.source_id} className="p-3 rounded-lg border border-border/40 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <span className="text-sm font-medium truncate">{doc.source_id}</span>
+                              <Badge variant="secondary" className="text-[10px]">
+                                {doc.count} chunks
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px]">
+                                {doc.source_type}
+                              </Badge>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground line-clamp-2 ml-5">
+                              {doc.firstChunk}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-1 ml-5">
+                              {new Date(doc.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                            onClick={() => handleDeleteDocument(viewingNsDocuments, doc.source_id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteNamespace(ns.namespace); }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    {ns.description && (
-                      <p className="text-xs text-muted-foreground mt-1 ml-5">{ns.description}</p>
-                    )}
-                    {stats?.embeddingsByNamespace?.[ns.namespace] !== undefined && (
-                      <p className="text-[10px] text-muted-foreground mt-1 ml-5">
-                        {stats.embeddingsByNamespace[ns.namespace]} embeddings
-                      </p>
-                    )}
+                    ))}
                   </div>
-                ))}
+                </ScrollArea>
+              )}
+            </div>
+          ) : (
+            /* Namespace List View */
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{namespaces.length} namespaces</span>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { loadNamespaces(); loadStats(); }}>
+                    <RefreshCw className="w-3 h-3 mr-1" />Refresh
+                  </Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={() => setCreateNamespaceOpen(true)}>
+                    <Plus className="w-3 h-3 mr-1" />New
+                  </Button>
+                </div>
               </div>
-            )}
-          </ScrollArea>
+
+              <ScrollArea className="max-h-80">
+                {namespaces.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No namespaces yet. Create one to organize embeddings.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {namespaces.map(ns => (
+                      <div
+                        key={ns.id}
+                        className={cn(
+                          'p-3 rounded-lg border transition-colors',
+                          selectedNamespace === ns.namespace
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border/40 hover:bg-muted/50'
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-medium truncate">{ns.namespace}</span>
+                            <Badge variant="outline" className="text-[10px] shrink-0">
+                              {ns.embedding_count || 0} embeddings
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => handleViewNamespaceDocuments(ns.namespace)}
+                            >
+                              <FileText className="w-3 h-3 mr-1" />
+                              Docs
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteNamespace(ns.namespace)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        {ns.description && (
+                          <p className="text-xs text-muted-foreground mt-1 ml-5">{ns.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </>
+          )}
         </TabsContent>
 
         {/* Browse Embeddings Tab */}
@@ -880,7 +1412,7 @@ export function EmbeddingsSettingsPanel() {
               <div className="text-center py-8 text-muted-foreground">
                 <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">No embeddings stored yet.</p>
-                <p className="text-xs mt-1">Add embeddings manually or import from lorebooks/characters.</p>
+                <p className="text-xs mt-1">Add embeddings manually or import from files above.</p>
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -977,6 +1509,7 @@ export function EmbeddingsSettingsPanel() {
                     <SelectItem value="lorebook">Lorebook</SelectItem>
                     <SelectItem value="session">Session</SelectItem>
                     <SelectItem value="memory">Memory</SelectItem>
+                    <SelectItem value="file">File</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1101,13 +1634,11 @@ function EmbeddingsChatIntegration() {
       <CollapsibleContent className="mt-3">
         <Card>
           <CardContent className="pt-4 space-y-4">
-            {/* Description */}
             <p className="text-xs text-muted-foreground">
               Automatically retrieve relevant embeddings when chatting and inject them as context into the AI prompt.
               Works in both normal and group chats.
             </p>
 
-            {/* Enable Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-sm">Enable in Chat</Label>
@@ -1121,12 +1652,10 @@ function EmbeddingsChatIntegration() {
               />
             </div>
 
-            {/* Settings (shown when enabled) */}
             {embeddingsChat.enabled && (
               <>
                 <Separator />
 
-                {/* Namespace Strategy */}
                 <div className="space-y-2">
                   <Label className="text-xs">Namespace Search Strategy</Label>
                   <Select value={embeddingsChat.namespaceStrategy} onValueChange={(v) => handleStrategyChange(v as 'global' | 'character' | 'session')}>
@@ -1156,7 +1685,6 @@ function EmbeddingsChatIntegration() {
                   </Select>
                 </div>
 
-                {/* Token Budget */}
                 <div className="space-y-2">
                   <Label className="text-xs">Context Token Budget: ~{embeddingsChat.maxTokenBudget} tokens</Label>
                   <Slider
@@ -1171,18 +1699,16 @@ function EmbeddingsChatIntegration() {
                   </p>
                 </div>
 
-                {/* Info Box */}
                 <div className="bg-violet-500/5 border border-violet-500/20 rounded-lg p-3">
                   <div className="flex items-start gap-2">
                     <Brain className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-violet-600 dark:text-violet-400">How it works</p>
-                      <ul className="text-[10px] text-muted-foreground space-y-0.5">
-                        <li>• Your message is used as a search query</li>
-                        <li>• Relevant embeddings are retrieved by semantic similarity</li>
-                        <li>• Results are injected as &quot;Embeddings Context&quot; in the prompt</li>
-                        <li>• Works in both normal and group chats</li>
-                        <li>• A visual indicator shows retrieved context in the chat</li>
+                      <ul className="text-[10px] text-muted-foreground space-y-0.5 list-disc list-inside">
+                        <li>When you send a message, the system generates a vector embedding of your text</li>
+                        <li>It searches the selected namespaces for similar embeddings</li>
+                        <li>Top results are injected into the AI prompt as context</li>
+                        <li>The AI uses this context to generate more informed responses</li>
                       </ul>
                     </div>
                   </div>

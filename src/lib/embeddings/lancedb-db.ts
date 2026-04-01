@@ -342,6 +342,10 @@ export class LanceDBWrapper {
     };
   }
 
+  static async close(): Promise<void> {
+    return closeLanceDB();
+  }
+
   static async insertEmbedding(params: {
     content: string;
     vector: number[];
@@ -395,7 +399,7 @@ export class LanceDBWrapper {
       queryVector,
       namespace,
       limit = 10,
-      threshold = 0.5,
+      threshold = 0.3,
     } = params;
 
     const table = await getEmbeddingsTable();
@@ -405,10 +409,10 @@ export class LanceDBWrapper {
 
     if (namespace && namespace !== 'default' && namespace !== 'all') {
       try {
-        const namespaceTable = await db!.openTable(namespace);
-        const searchResults = await namespaceTable
-          .search(normalizedQueryVector)
-          .limit(limit)
+        const nsTable = await db!.openTable(namespace);
+        const searchResults = await nsTable
+          .vectorSearch(normalizedQueryVector)
+          .limit(limit * 5)
           .toArray();
         results = searchResults.map((row: any) => ({
           ...row,
@@ -419,7 +423,7 @@ export class LanceDBWrapper {
       }
     } else {
       const allResults = await table
-        .search(normalizedQueryVector)
+        .vectorSearch(normalizedQueryVector)
         .limit(limit * 10)
         .toArray();
 
@@ -506,8 +510,8 @@ export class LanceDBWrapper {
       namespace: nsRecord.namespace,
       description: nsRecord.description,
       metadata: JSON.parse(nsRecord.metadata),
-      created_at: nsRecord.created_at,
-      updated_at: nsRecord.updated_at,
+      created_at: new Date(nsRecord.created_at),
+      updated_at: new Date(nsRecord.updated_at),
     };
   }
 
@@ -563,17 +567,17 @@ export class LanceDBWrapper {
     limit?: number;
     threshold?: number;
   }): Promise<SearchResult[]> {
-    const { namespace, queryVector, limit = 10, threshold = 0.5 } = params;
+    const { namespace, queryVector, limit = 10, threshold = 0.3 } = params;
     const table = await getEmbeddingsTable();
     const normalizedQueryVector = normalizeVector(queryVector);
 
     const results = await table
-      .search(normalizedQueryVector)
-      .where(`namespace = '${namespace}'`)
-      .limit(limit)
+      .vectorSearch(normalizedQueryVector)
+      .limit(limit * 5)
       .toArray();
 
     return results
+      .filter((row: any) => (row.namespace || 'default') === namespace)
       .map((row: any) => ({
         id: row.id,
         content: row.content,
@@ -583,7 +587,8 @@ export class LanceDBWrapper {
         source_id: row.source_id,
         similarity: l2ToCosineSimilarity(row._distance || 0),
       }))
-      .filter((r: any) => r.similarity >= threshold);
+      .filter((r: any) => r.similarity >= threshold)
+      .slice(0, limit);
   }
 
   static async getAllEmbeddings(limit: number = 100): Promise<Embedding[]> {

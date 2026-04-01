@@ -1,8 +1,8 @@
 {
   "ollamaUrl": "http://localhost:11434",
-  "model": "bge-m3:567m",
+  "model": "nomic-embed-text-v2-moe:latest",
   "dimension": 1024,
-  "similarityThreshold": 0.5,
+  "similarityThreshold": 0.15,
   "maxResults": 5,
-  "updatedAt": "2026-03-31T08:42:33.313Z"
+  "updatedAt": "2026-04-01T22:01:22.130Z"
 }

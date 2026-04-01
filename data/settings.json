@@ -142,5 +142,11 @@
     "enableAnimations": true,
     "enableParticles": true,
     "animationIntensity": 50
+  },
+  "embeddingsChat": {
+    "enabled": true,
+    "maxTokenBudget": 1024,
+    "namespaceStrategy": "global",
+    "showInPromptViewer": true
   }
 }

@@ -11,14 +11,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'query or queryVector is required' }, { status: 400 });
     }
 
+    // Load config to get default threshold if not provided
+    const { getConfig } = await import('@/lib/embeddings/config-persistence');
+    const config = getConfig();
+
     const { getEmbeddingClient } = await import('@/lib/embeddings/client');
     const client = getEmbeddingClient();
     const results = await client.searchSimilar({
       query: body.query,
       queryVector: body.queryVector,
       namespace: body.namespace,
-      limit: body.limit || 10,
-      threshold: body.threshold || 0.5,
+      limit: body.limit || config.maxResults || 10,
+      threshold: body.threshold ?? config.similarityThreshold ?? 0.3,
       source_type: body.source_type,
       source_id: body.source_id,
     });
