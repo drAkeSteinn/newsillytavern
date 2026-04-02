@@ -120,6 +120,7 @@ export const useTavernStore = create<TavernState>()(
         settings: state.settings,
         soundTriggers: state.soundTriggers,
         soundCollections: state.soundCollections,
+        soundSequenceTriggers: state.soundSequenceTriggers,
         // Background triggers (unified system)
         backgroundTriggerPacks: state.backgroundTriggerPacks,
         backgroundCollections: state.backgroundCollections,

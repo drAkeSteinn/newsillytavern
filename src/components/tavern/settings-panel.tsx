@@ -314,6 +314,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           containers: store.containers,
           currencies: store.currencies,
           inventoryNotifications: store.inventoryNotifications,
+          // Timeline
+          collections: store.collections,
           // Data
           characters: store.characters,
           sessions: store.sessions,
@@ -384,6 +386,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
           'questSettings', 'quests', 'questNotifications',
           'dialogueSettings',
           'inventorySettings', 'items', 'containers', 'currencies', 'inventoryNotifications',
+          // Timeline
+          'collections',
           // Data
           'characters', 'sessions', 'groups',
           // Active states

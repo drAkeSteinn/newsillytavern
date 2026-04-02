@@ -1876,6 +1876,10 @@ const DEFAULT_EMBEDDINGS_CHAT = {
   memoryExtractionEnabled: false,
   memoryExtractionFrequency: 5,
   memoryExtractionMinImportance: 2,
+  memoryConsolidationEnabled: false,
+  memoryConsolidationThreshold: 50,
+  memoryConsolidationKeepRecent: 10,
+  memoryConsolidationKeepHighImportance: 4,
 };
 
 function EmbeddingsChatIntegration() {
@@ -1916,6 +1920,30 @@ function EmbeddingsChatIntegration() {
   const handleMinImportanceChange = (value: number) => {
     updateSettings({
       embeddingsChat: { ...embeddingsChat, memoryExtractionMinImportance: value },
+    });
+  };
+
+  const handleToggleConsolidation = (enabled: boolean) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryConsolidationEnabled: enabled },
+    });
+  };
+
+  const handleThresholdChange = (value: number) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryConsolidationThreshold: value },
+    });
+  };
+
+  const handleKeepRecentChange = (value: number) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryConsolidationKeepRecent: value },
+    });
+  };
+
+  const handleKeepHighImportanceChange = (value: number) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryConsolidationKeepHighImportance: value },
     });
   };
 
@@ -2056,6 +2084,88 @@ function EmbeddingsChatIntegration() {
                               <li>Los hechos se guardan en namespaces automáticos (character-{'{id}'} o group-{'{id}'})</li>
                               <li>Se filtran por importancia (1=bajo, 5=crítico)</li>
                               <li>La extracción es asíncrona — no afecta la velocidad de respuesta</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Memory Consolidation Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-violet-500" />
+                        Consolidación de Memoria
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Comprime memorias antiguas cuando un namespace excede el límite
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!!embeddingsChat.memoryConsolidationEnabled}
+                      onCheckedChange={handleToggleConsolidation}
+                    />
+                  </div>
+
+                  {embeddingsChat.memoryConsolidationEnabled && (
+                    <div className="space-y-3 pl-1 border-l-2 border-violet-300/30">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Umbral de consolidación: {embeddingsChat.memoryConsolidationThreshold || 50} embeddings</Label>
+                        <Slider
+                          value={[embeddingsChat.memoryConsolidationThreshold || 50]}
+                          min={20}
+                          max={200}
+                          step={10}
+                          onValueChange={([v]) => handleThresholdChange(v)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Cuando un namespace supera esta cantidad, se consolida automáticamente
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Memorias recientes protegidas: {embeddingsChat.memoryConsolidationKeepRecent || 10}</Label>
+                        <Slider
+                          value={[embeddingsChat.memoryConsolidationKeepRecent || 10]}
+                          min={3}
+                          max={30}
+                          step={1}
+                          onValueChange={([v]) => handleKeepRecentChange(v)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Las N memorias más recientes nunca se consolidan
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Proteger importancia ≥ {embeddingsChat.memoryConsolidationKeepHighImportance || 4}/5</Label>
+                        <Slider
+                          value={[embeddingsChat.memoryConsolidationKeepHighImportance || 4]}
+                          min={2}
+                          max={5}
+                          step={1}
+                          onValueChange={([v]) => handleKeepHighImportanceChange(v)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Memorias con esta importancia o mayor nunca se consolidan
+                        </p>
+                      </div>
+
+                      <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <Layers className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Consolidación Inteligente</p>
+                            <ul className="text-[10px] text-muted-foreground space-y-0.5 list-disc list-inside">
+                              <li>Agrupa memorias antiguas por tipo (hechos, eventos, relaciones...)</li>
+                              <li>El LLM combina hechos relacionados en resúmenes concisos</li>
+                              <li>Las memorias de alta importancia y recientes siempre se preservan</li>
+                              <li>Se ejecuta automáticamente después de cada extracción que supera el umbral</li>
                             </ul>
                           </div>
                         </div>

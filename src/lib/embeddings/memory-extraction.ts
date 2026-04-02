@@ -101,7 +101,7 @@ Nombre del personaje: {characterName}
  * Extract a JSON array of MemoryFact from any LLM output.
  * Tries multiple parsing strategies in order of reliability.
  */
-function extractFactsFromLLMOutput(text: string): MemoryFact[] {
+export function extractFactsFromLLMOutput(text: string): MemoryFact[] {
   if (!text || !text.trim()) return [];
 
   const trimmed = text.trim();

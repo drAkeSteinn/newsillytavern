@@ -427,3 +427,42 @@ Implement Phase 1 of automatic memory extraction: LLM-powered fact extraction fr
 - Uses the same LLM provider configured for chat (with temperature 0.1 for consistency)
 - Namespaces: `character-{id}` for normal chat, `group-{id}` for group chat
 - source_type: `memory` for all auto-extracted embeddings
+
+---
+## Task ID: 14 - memory-extraction-phase2-visual-feedback
+### Work Task
+Fix critical bugs and add visual feedback for the memory extraction system.
+
+### Work Summary
+
+**Bug Fix: JSX `{id}` reference error (`embeddings-settings-panel.tsx`):**
+- Line 2056 had `(character-{id} o group-{id})` which JSX parsed as JavaScript expression `id` (undefined variable)
+- Fixed by escaping: `(character-{'{id}'} o group-{'{id}'})` so curly braces render as literal text
+
+**Bug Fix: `allMessages` undefined in group-stream (`group-stream/route.ts`):**
+- Line 853 referenced `allMessages` which doesn't exist in group-stream scope
+- Changed to `messages` (the destructured variable from request body)
+- This was a silent runtime error that would crash memory extraction in group chat
+
+**Enhancement: SSE `memory_extracting` event (stream + group-stream routes):**
+- Moved the extraction condition check BEFORE `controller.close()` so we can send SSE events
+- Both routes now send `{ type: 'memory_extracting', characterName/characterNames }` event before `done` event
+- Stream route: sends single `characterName`
+- Group-stream route: sends `characterNames` array of extractable characters (content > 50 chars)
+- Extraction still runs async via `setTimeout(0)` after stream close
+
+**Enhancement: Visual memory extraction indicator (chat-panel.tsx):**
+- Added `memoryExtractingInfo` state: `{ active: boolean, characterNames: string }`
+- Handlers in both group and single chat SSE parsing sections
+- On `memory_extracting` event: shows indicator, auto-hides after 8 seconds
+- UI: Fixed-position pill at bottom-center with spinner animation
+  - Violet background with white text
+  - Shows "Extrayendo memoria — {character names}"
+  - Smooth fade-in slide-up animation
+  - Non-intrusive, doesn't block interaction
+
+### Files Modified:
+- `src/components/embeddings/embeddings-settings-panel.tsx` — Fixed JSX `{id}` error
+- `src/app/api/chat/group-stream/route.ts` — Fixed `allMessages` bug + added SSE event
+- `src/app/api/chat/stream/route.ts` — Added SSE `memory_extracting` event
+- `src/components/tavern/chat-panel.tsx` — Added state, SSE handlers, visual indicator

@@ -32,6 +32,7 @@ export function ChatPanel() {
     characterId?: string;
     characterName?: string;
   }>>([]);
+  const [memoryExtractingInfo, setMemoryExtractingInfo] = useState<{ active: boolean; characterNames: string }>({ active: false, characterNames: '' });
 
   // Use proper selectors to subscribe to store changes
   const activeSessionId = useTavernStore((state) => state.activeSessionId);
@@ -533,6 +534,14 @@ export function ChatPanel() {
                     characterId: parsed.characterId,
                     characterName: parsed.characterName,
                   }]);
+                } else if (parsed.type === 'memory_extracting') {
+                  // Memory extraction is running in background
+                  const names = parsed.characterNames || parsed.characterName || '';
+                  const label = Array.isArray(names) ? names.join(', ') : names;
+                  if (label) {
+                    setMemoryExtractingInfo({ active: true, characterNames: label });
+                    setTimeout(() => setMemoryExtractingInfo(prev => ({ ...prev, active: false })), 8000);
+                  }
                 } else if (parsed.type === 'character_start') {
                   currentCharacterContent = '';
                   const char = groupCharacters.find(c => c.id === parsed.characterId);
@@ -740,6 +749,13 @@ export function ChatPanel() {
                 } else if (parsed.type === 'embeddings_context' && parsed.data) {
                   // Embeddings context was retrieved
                   setEmbeddingsContexts(prev => [...prev, parsed.data]);
+                } else if (parsed.type === 'memory_extracting') {
+                  // Memory extraction is running in background
+                  const label = parsed.characterName || '';
+                  if (label) {
+                    setMemoryExtractingInfo({ active: true, characterNames: label });
+                    setTimeout(() => setMemoryExtractingInfo(prev => ({ ...prev, active: false })), 8000);
+                  }
                 } else if (parsed.type === 'token' && parsed.content) {
                   accumulatedContent += parsed.content;
                   setStreamingContent(accumulatedContent);
@@ -1304,6 +1320,17 @@ export function ChatPanel() {
       {/* Embeddings Context Indicator */}
       {embeddingsContexts.length > 0 && (
         <EmbeddingsContextContainer contexts={embeddingsContexts} />
+      )}
+
+      {/* Memory Extraction Indicator */}
+      {memoryExtractingInfo.active && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-500/90 text-white text-xs shadow-lg backdrop-blur-sm">
+            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span className="font-medium">Extrayendo memoria</span>
+            <span className="opacity-80">— {memoryExtractingInfo.characterNames}</span>
+          </div>
+        </div>
       )}
     </div>
   );

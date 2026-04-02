@@ -454,19 +454,27 @@ Y cambiar mi expresión:
             controller.enqueue(createSSEJSON({ type: 'token', content: chunk }));
           }
 
+          // Check if memory extraction should trigger BEFORE closing stream
+          const shouldExtract =
+            embeddingsChat.memoryExtractionEnabled &&
+            accumulatedContent.length > 50 &&
+            allMessages.length > 0 &&
+            allMessages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
+            !!llmConfig;
+
+          if (shouldExtract) {
+            controller.enqueue(createSSEJSON({
+              type: 'memory_extracting',
+              characterName: effectiveCharacter.name,
+            }));
+          }
+
           // Send done signal
           controller.enqueue(createSSEJSON({ type: 'done' }));
           controller.close();
 
           // Async: Extract memory from response (fire-and-forget, don't block)
-          if (
-            embeddingsChat.memoryExtractionEnabled &&
-            accumulatedContent.length > 50 &&
-            allMessages.length > 0 &&
-            allMessages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
-            llmConfig
-          ) {
-            // Use setTimeout to not block the stream closing
+          if (shouldExtract) {
             setTimeout(async () => {
               try {
                 const response = await fetch('/api/embeddings/extract-memory', {
@@ -485,6 +493,12 @@ Y cambiar mi expresión:
                       parameters: llmConfig.parameters,
                     },
                     minImportance: embeddingsChat.memoryExtractionMinImportance || 2,
+                    consolidationSettings: embeddingsChat.memoryConsolidationEnabled ? {
+                      enabled: true,
+                      threshold: embeddingsChat.memoryConsolidationThreshold || 50,
+                      keepRecent: embeddingsChat.memoryConsolidationKeepRecent || 10,
+                      keepHighImportance: embeddingsChat.memoryConsolidationKeepHighImportance || 4,
+                    } : undefined,
                   }),
                 });
                 if (response.ok) {

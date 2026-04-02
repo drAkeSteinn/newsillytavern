@@ -704,6 +704,45 @@ export class LanceDBWrapper {
       deletedNamespaces: allNamespaces.length,
     };
   }
+
+  /**
+   * Delete multiple embeddings by their IDs in batch.
+   */
+  static async deleteByIds(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const table = await getEmbeddingsTable();
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        await table.delete(`id = '${id}'`);
+        deleted++;
+      } catch { /* skip */ }
+    }
+    return deleted;
+  }
+
+  /**
+   * Delete all embeddings in a specific namespace from the main embeddings table.
+   * NOTE: This does NOT delete the namespace record itself.
+   */
+  static async deleteAllByNamespace(namespace: string): Promise<number> {
+    const table = await getEmbeddingsTable();
+    const embeddings = await tableFilter(table, `namespace = '${namespace}'`);
+    for (const emb of embeddings) {
+      try { await table.delete(`id = '${emb.id}'`); } catch { /* skip */ }
+    }
+    return embeddings.length;
+  }
+
+  /**
+   * Count embeddings in a specific namespace without loading full content.
+   * Returns the count and optionally basic metadata of each embedding.
+   */
+  static async countByNamespace(namespace: string): Promise<number> {
+    const table = await getEmbeddingsTable();
+    const results = await tableFilter(table, `namespace = '${namespace}'`);
+    return results.length;
+  }
 }
 
 export default LanceDBWrapper;

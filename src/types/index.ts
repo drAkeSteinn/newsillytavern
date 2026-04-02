@@ -1533,6 +1533,14 @@ export interface EmbeddingsChatSettings {
   memoryExtractionFrequency?: number;
   /** Minimum importance (1-5) to save extracted memories (default: 2) */
   memoryExtractionMinImportance?: number;
+  /** Enable automatic memory consolidation when namespace exceeds threshold */
+  memoryConsolidationEnabled?: boolean;
+  /** Consolidate when namespace exceeds this many memory embeddings (default: 50) */
+  memoryConsolidationThreshold?: number;
+  /** Keep this many most recent memories protected from consolidation (default: 10) */
+  memoryConsolidationKeepRecent?: number;
+  /** Keep all memories with importance >= this value (default: 4) */
+  memoryConsolidationKeepHighImportance?: number;
 }
 
 // ============ API Types ============

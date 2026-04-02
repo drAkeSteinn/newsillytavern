@@ -146,7 +146,8 @@
   "embeddingsChat": {
     "enabled": true,
     "maxTokenBudget": 1024,
-    "namespaceStrategy": "global",
-    "showInPromptViewer": true
+    "namespaceStrategy": "character",
+    "showInPromptViewer": true,
+    "memoryExtractionEnabled": true
   }
 }

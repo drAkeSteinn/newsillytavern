@@ -839,6 +839,26 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // Check if memory extraction should trigger BEFORE closing stream
+          const shouldExtractGroupMemory =
+            embeddingsChat.memoryExtractionEnabled &&
+            responsesThisTurn.length > 0 &&
+            messages.length > 0 &&
+            messages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
+            !!llmConfig;
+
+          if (shouldExtractGroupMemory) {
+            const extractableChars = responsesThisTurn
+              .filter(r => r.content && r.content.length > 50)
+              .map(r => r.characterName);
+            if (extractableChars.length > 0) {
+              controller.enqueue(createSSEJSON({
+                type: 'memory_extracting',
+                characterNames: extractableChars,
+              }));
+            }
+          }
+
           // Send final done event with all responses
           controller.enqueue(createSSEJSON({
             type: 'done',
@@ -847,13 +867,7 @@ export async function POST(request: NextRequest) {
           controller.close();
 
           // Async: Extract memory from each responder's response (fire-and-forget)
-          if (
-            embeddingsChat.memoryExtractionEnabled &&
-            responsesThisTurn.length > 0 &&
-            allMessages.length > 0 &&
-            allMessages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
-            llmConfig
-          ) {
+          if (shouldExtractGroupMemory) {
             setTimeout(async () => {
               try {
                 for (const resp of responsesThisTurn) {
@@ -875,6 +889,12 @@ export async function POST(request: NextRequest) {
                           parameters: llmConfig.parameters,
                         },
                         minImportance: embeddingsChat.memoryExtractionMinImportance || 2,
+                        consolidationSettings: embeddingsChat.memoryConsolidationEnabled ? {
+                          enabled: true,
+                          threshold: embeddingsChat.memoryConsolidationThreshold || 50,
+                          keepRecent: embeddingsChat.memoryConsolidationKeepRecent || 10,
+                          keepHighImportance: embeddingsChat.memoryConsolidationKeepHighImportance || 4,
+                        } : undefined,
                       }),
                     });
                     if (response.ok) {
