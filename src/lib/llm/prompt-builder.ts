@@ -589,7 +589,8 @@ export function buildChatMessages(
   userName: string = 'User',
   postHistoryInstructions?: string,
   authorNote?: string,
-  useSystemRole: boolean = false
+  useSystemRole: boolean = false,
+  embeddingsContext?: string  // NEW: embeddings injected before chat history
 ): ChatApiMessage[] {
   const chatMessages: ChatApiMessage[] = [];
 
@@ -598,6 +599,16 @@ export function buildChatMessages(
     role: useSystemRole ? 'system' : 'assistant',
     content: systemPrompt
   });
+
+  // 1.5. Embeddings Context - injected BEFORE chat history for recency primacy
+  // LLMs attend more to recent context, so placing memories right before
+  // the conversation makes them more influential in the response.
+  if (embeddingsContext?.trim()) {
+    chatMessages.push({
+      role: 'system',
+      content: embeddingsContext
+    });
+  }
 
   // 2. Chat history
   // Note: Narrator messages are excluded from prompt building
@@ -644,11 +655,17 @@ export function buildChatMessages(
  * 5. Assistant prefix
  */
 export function buildCompletionPrompt(config: CompletionPromptConfig): string {
-  const { systemPrompt, messages, character, userName, postHistoryInstructions, authorNote } = config;
+  const { systemPrompt, messages, character, userName, postHistoryInstructions, authorNote, embeddingsContext } = config;
   const parts: string[] = [];
 
   parts.push(systemPrompt);
   parts.push('\n---\n');
+
+  // Embeddings Context - injected before chat history for recency primacy
+  if (embeddingsContext?.trim()) {
+    parts.push(embeddingsContext);
+    parts.push('\n---\n');
+  }
 
   // Exclude narrator messages from prompt
   const visibleMessages = messages.filter(m => !m.isDeleted && !m.isNarratorMessage);
@@ -848,12 +865,21 @@ export function buildGroupChatMessages(
   previousResponses?: Array<{ characterName: string; content: string }>,
   postHistoryInstructions?: string,
   authorNote?: string,
-  isForNarrator: boolean = false
+  isForNarrator: boolean = false,
+  embeddingsContext?: string  // NEW: embeddings injected before chat history
 ): GroupPromptBuildResult {
   const chatMessages: ChatApiMessage[] = [];
 
   // 1. System message (just the character/group prompt, no chat history here)
   chatMessages.push({ role: 'assistant', content: systemPrompt });
+
+  // 1.5. Embeddings Context - injected BEFORE chat history for recency primacy
+  if (embeddingsContext?.trim()) {
+    chatMessages.push({
+      role: 'system',
+      content: embeddingsContext
+    });
+  }
 
   // Filter visible messages
   // - For narrator: show all messages (including other narrator messages)

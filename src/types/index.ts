@@ -514,7 +514,7 @@ export interface MessageMetadata {
 
 // Prompt section for displaying in prompt viewer
 export interface PromptSection {
-  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'author_note' | 'post_history' | 'chat_history' | 'instructions' | 'quest' | 'memory';
+  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'author_note' | 'post_history' | 'chat_history' | 'instructions' | 'quest' | 'memory' | 'context';
   label: string;
   content: string;
   color: string;  // Tailwind color class for the section header

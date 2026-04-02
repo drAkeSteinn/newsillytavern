@@ -99,6 +99,7 @@ export interface CompletionPromptConfig {
   userName: string;
   postHistoryInstructions?: string;
   authorNote?: string;
+  embeddingsContext?: string;
 }
 
 // Prompt build result for group chats

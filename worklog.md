@@ -466,3 +466,118 @@ Fix critical bugs and add visual feedback for the memory extraction system.
 - `src/app/api/chat/group-stream/route.ts` — Fixed `allMessages` bug + added SSE event
 - `src/app/api/chat/stream/route.ts` — Added SSE `memory_extracting` event
 - `src/components/tavern/chat-panel.tsx` — Added state, SSE handlers, visual indicator
+
+---
+## Task ID: 15 - group-editor-optimization
+### Work Task
+Optimize the group editor component (`src/components/tavern/group-editor.tsx`, 1515 lines) with 10 targeted improvements: bug fixes, code cleanup, UI refinements, and toast notifications.
+
+### Work Summary
+
+**Files modified:**
+- `src/components/tavern/group-editor.tsx` — 10 optimizations applied (1515 → ~1315 lines)
+- `src/components/tavern/character-panel.tsx` — Group avatar display in sidebar
+
+**1. Fixed critical bug: Avatar not in initialValues**
+- Added `avatar: existingGroup?.avatar || ''` to the existing group return path in `initialValues` useMemo
+- Added `avatar: ''` to the default (new group) return path
+- Before fix: `useState(initialValues.avatar || '')` always got `undefined`, so editing an existing group would lose its avatar
+
+**2. Removed duplicate "Estilo de Conversación" from Info tab**
+- Removed the Conversation Style selector from the Info tab (lines 528-563 in original)
+- Kept the one in the Strategy tab (lines 997-1038) where it belongs with activation strategy config
+
+**3. Replaced all alert() calls with useToast()**
+- Added `import { useToast } from '@/hooks/use-toast'` and `const { toast } = useToast()`
+- Replaced 6 `alert()` calls with proper toast notifications using `variant: 'destructive'` for errors:
+  - `handleAvatarUpload`: Image too large, unsupported format, upload error, connection error
+  - `handleSave`: Name required, at least one member required
+
+**4. Removed redundant "Resumen" card from Info tab**
+- Removed the entire "Resumen" card (lines 630-656 in original) that duplicated info visible in the Strategy tab
+- Cleaner avatar section without the redundant stats card
+
+**5. Removed unused `selectedCharacterId` state and `handleAddMember`**
+- Removed `const [selectedCharacterId, setSelectedCharacterId] = useState<string>('')`
+- Removed the entire `handleAddMember` function (was never called — members tab uses inline buttons)
+
+**6. Fixed embeddingNamespaces initialization for new groups**
+- Added `embeddingNamespaces: []` to the default (new group) return path in `initialValues`
+
+**7. Simplified verbose strategy color classes with helper function**
+- Created `getStrategyColorClasses(color)` helper at module level with a colorMap for emerald/blue/purple/amber/cyan
+- Returns `{ bg, border, text, bgLight, bgSelected }` classes for each color
+- Replaced verbose multi-line `cn()` conditionals in 3 locations:
+  - Strategy tip box in strategy tab
+  - Strategy info card at bottom of strategy tab
+  - Per-strategy icon color in strategy selector
+
+**8. Improved Info tab layout**
+- Changed from 3-column (`lg:grid-cols-3`) to 2-column (`lg:grid-cols-2`) layout
+- Left column: Name + Description (cleaner without Conversation Style)
+- Right column: Avatar upload (horizontal layout) + Assignments section
+- Avatar now displays inline with description text instead of being a standalone column
+
+**9. Show group avatar in character-panel.tsx sidebar**
+- Updated group list item rendering to conditionally show the group's uploaded avatar
+- Shows `<img>` when `group.avatar` is set, falls back to violet gradient + Users icon
+
+**10. Removed unused imports**
+- Removed `Eye` and `EyeOff` from lucide-react imports (never used in the component)
+
+**ESLint:** Passes with zero errors
+
+---
+## Task ID: 16 - embeddings-recency-primacy-injection
+### Work Task
+Change WHERE memory embeddings are injected into the LLM prompt. Previously they were appended inside the system prompt text (after User's Persona). Now they are injected as a SEPARATE system message RIGHT BEFORE the chat history, which is more effective because LLMs pay more attention to recent context.
+
+### Work Summary
+
+**Problem:** Memory embeddings were being concatenated into the `finalSystemPrompt` string, burying them deep in the system message where LLMs tend to pay less attention. LLMs exhibit recency bias — they attend more to context closer to the generation point.
+
+**Solution:** Extract embeddings from the system prompt string and inject them as a separate system message positioned right before the chat history, maximizing their influence on the LLM response.
+
+**Files Modified:**
+
+1. **`src/lib/llm/types.ts`** — Added `embeddingsContext?: string` to `CompletionPromptConfig` interface
+
+2. **`src/lib/llm/prompt-builder.ts`** — Three function updates:
+   - `buildChatMessages()`: Added 8th parameter `embeddingsContext?: string`. Injects as a separate `role: 'system'` message at position 1.5 (between system prompt and chat history)
+   - `buildCompletionPrompt()`: Added `embeddingsContext` to config destructuring. Injects between system prompt separator (`\n---\n`) and chat messages
+   - `buildGroupChatMessages()`: Added 10th parameter `embeddingsContext?: string`. Injects as a separate `role: 'system'` message at position 1.5
+
+3. **`src/app/api/chat/stream/route.ts`** — Normal chat route:
+   - Removed `finalSystemPrompt += ... embeddingsResult.section ...` (no longer appended to system prompt)
+   - Built separate `embeddingsContextString` variable
+   - Updated all 5 provider calls (z-ai, openai/vllm/custom, anthropic, ollama, text-generation-webui/koboldcpp) to pass `embeddingsContextString`
+   - Moved embeddings section in prompt viewer from after persona to before chat history
+
+4. **`src/app/api/chat/group-stream/route.ts`** — Group chat route:
+   - Removed embeddings from `finalSystemPrompt` concatenation
+   - Built separate `embeddingsContextString` variable
+   - Updated `buildGroupChatMessages()` call to pass `embeddingsContextString` as last parameter
+   - Moved embeddings section in prompt viewer from after persona to before chat history
+
+5. **`src/app/api/chat/regenerate/route.ts`** — Regenerate route:
+   - Removed `finalSystemPrompt += ... embeddingsResult.section ...`
+   - Built separate `embeddingsContextString` variable
+   - Updated all 5 provider calls to pass `embeddingsContextString`
+   - Moved embeddings section in prompt viewer to before chat history
+
+**New Prompt Message Order:**
+```
+[System Prompt]           ← position 1 (persona, description, scenario, etc.)
+[Embeddings Context]      ← NEW position 1.5 (separate system message, recency primacy)
+[Chat History]            ← position 2+ (user/assistant messages)
+[Author's Note]           ← after chat history
+[Post-History Instructions] ← last, before generation
+```
+
+**Unchanged:**
+- SSE `embeddings_context` events remain the same (client UI unchanged)
+- Memory extraction logic unchanged
+- Embeddings retrieval logic unchanged
+- Only the POSITION in the final LLM messages array changed
+
+**ESLint:** Passes with zero errors

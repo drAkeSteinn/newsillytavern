@@ -32,8 +32,6 @@ import {
   Users,
   UserCheck,
   UserX,
-  Eye,
-  EyeOff,
   MessageSquare,
   HelpCircle,
   Sparkles,
@@ -61,6 +59,19 @@ import { HUDSelector } from './hud-selector';
 import { LorebookSelector } from './lorebook-selector';
 import { QuestSelector } from './quest-selector';
 import { NamespaceSelector } from './namespace-selector';
+import { useToast } from '@/hooks/use-toast';
+
+// Strategy color helper
+const getStrategyColorClasses = (color: string) => {
+  const colorMap: Record<string, { bg: string; border: string; text: string; bgLight: string; bgSelected: string }> = {
+    emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-600', bgLight: 'bg-emerald-500/5', bgSelected: 'bg-emerald-500/20' },
+    blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-600', bgLight: 'bg-blue-500/5', bgSelected: 'bg-blue-500/20' },
+    purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-600', bgLight: 'bg-purple-500/5', bgSelected: 'bg-purple-500/20' },
+    amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-600', bgLight: 'bg-amber-500/5', bgSelected: 'bg-amber-500/20' },
+    cyan: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-600', bgLight: 'bg-cyan-500/5', bgSelected: 'bg-cyan-500/20' },
+  };
+  return colorMap[color] || colorMap.emerald;
+};
 
 // Default narrator settings
 const DEFAULT_NARRATOR_SETTINGS: NarratorSettings = {
@@ -173,6 +184,8 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
     updateGroupMember
   } = useTavernStore();
 
+  const { toast } = useToast();
+
   const [activeTab, setActiveTab] = useState('info');
   const isNewGroup = !groupId;
   const existingGroup = groups.find(g => g.id === groupId);
@@ -194,6 +207,7 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
       return {
         name: existingGroup.name || '',
         description: existingGroup.description || '',
+        avatar: existingGroup.avatar || '',
         systemPrompt: existingGroup.systemPrompt || '',
         activationStrategy: existingGroup.activationStrategy || 'all' as GroupActivationStrategy,
         minResponsesPerTurn: existingGroup.minResponsesPerTurn ?? 1,
@@ -211,6 +225,7 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
     return {
       name: '',
       description: '',
+      avatar: '',
       systemPrompt: '',
       activationStrategy: 'all' as GroupActivationStrategy,
       minResponsesPerTurn: 1,
@@ -221,6 +236,7 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
       hudTemplateId: null,
       lorebookIds: [],
       questTemplateIds: [],
+      embeddingNamespaces: [],
       narratorSettings: DEFAULT_NARRATOR_SETTINGS
     };
   }, [existingGroup]);
@@ -242,10 +258,9 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
   const [questTemplateIds, setQuestTemplateIds] = useState<string[]>(initialValues.questTemplateIds);
   const [embeddingNamespaces, setEmbeddingNamespaces] = useState<string[]>(initialValues.embeddingNamespaces);
   const [narratorSettings, setNarratorSettings] = useState<NarratorSettings>(initialValues.narratorSettings);
-  const [selectedCharacterId, setSelectedCharacterId] = useState<string>('');
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(initialValues.avatar || '');
+  const [avatarUrl, setAvatarUrl] = useState(initialValues.avatar);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const [availableSearchQuery, setAvailableSearchQuery] = useState('');
 
@@ -307,13 +322,21 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen es muy grande. El tamaño máximo es 5MB.');
+      toast({
+        title: 'Imagen muy grande',
+        description: 'El tamaño máximo es 5MB.',
+        variant: 'destructive'
+      });
       return;
     }
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Formato no soportado. Usa JPEG, PNG, GIF o WebP.');
+      toast({
+        title: 'Formato no soportado',
+        description: 'Usa JPEG, PNG, GIF o WebP.',
+        variant: 'destructive'
+      });
       return;
     }
 
@@ -334,10 +357,18 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
       if (res.ok && data.success) {
         setAvatarUrl(data.url);
       } else {
-        alert(data.error || 'Error al subir la imagen');
+        toast({
+          title: 'Error al subir la imagen',
+          description: data.error || 'Error al subir la imagen',
+          variant: 'destructive'
+        });
       }
     } catch {
-      alert('Error de conexión al subir la imagen');
+      toast({
+        title: 'Error de conexión',
+        description: 'Error de conexión al subir la imagen',
+        variant: 'destructive'
+      });
     } finally {
       setAvatarUploading(false);
       if (avatarFileInputRef.current) {
@@ -370,12 +401,20 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
 
   const handleSave = () => {
     if (!name.trim()) {
-      alert('El nombre del grupo es requerido');
+      toast({
+        title: 'Nombre requerido',
+        description: 'El nombre del grupo es requerido.',
+        variant: 'destructive'
+      });
       return;
     }
 
     if (memberCharacters.length === 0) {
-      alert('Agrega al menos un personaje al grupo');
+      toast({
+        title: 'Sin miembros',
+        description: 'Agrega al menos un personaje al grupo.',
+        variant: 'destructive'
+      });
       return;
     }
 
@@ -417,17 +456,6 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
       deleteGroup(groupId);
       onClose();
     }
-  };
-
-  const handleAddMember = () => {
-    if (!selectedCharacterId) return;
-    
-    if (isNewGroup) {
-      handleLocalAddMember(selectedCharacterId);
-    } else {
-      addGroupMember(groupId, selectedCharacterId);
-    }
-    setSelectedCharacterId('');
   };
 
   const handleRemoveMember = (characterId: string) => {
@@ -501,8 +529,8 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Name */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left column: Name + Description */}
         <div className="space-y-4">
           <div>
             <div className="flex items-center gap-1.5 mb-1.5">
@@ -523,43 +551,6 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
               placeholder="Nombre del grupo..."
               className="h-9"
             />
-          </div>
-
-          {/* Conversation Style */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Label className="text-sm font-medium">Estilo de Conversación</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p><strong>Secuencial:</strong> Un personaje a la vez. <strong>Paralelo:</strong> Todos responden simultáneamente.</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <Select
-              value={conversationStyle}
-              onValueChange={(v) => setConversationStyle(v as 'sequential' | 'parallel')}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sequential">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <RefreshCw className="w-3 h-3 text-blue-500" />
-                    Secuencial
-                  </div>
-                </SelectItem>
-                <SelectItem value="parallel">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Sparkles className="w-3 h-3 text-purple-500" />
-                    Paralelo
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Description */}
@@ -586,165 +577,142 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
           </div>
         </div>
 
-        {/* Avatar */}
-        <div className="flex flex-col items-center justify-start pt-6">
-          <div
-            className={cn(
-              'relative group/avatar-wrapper',
-              !avatarUploading && 'cursor-pointer'
-            )}
-            onClick={() => !avatarUploading && avatarFileInputRef.current?.click()}
-          >
-            <div className="w-24 h-24 rounded-xl overflow-hidden bg-muted mb-3">
-              {avatarUploading ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : avatarUrl ? (
-                <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center">
-                  <Users className="w-10 h-10 text-white" />
-                </div>
-              )}
-            </div>
-            <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-              <Camera className="w-5 h-5 text-white" />
-            </div>
-          </div>
-          <input
-            type="file"
-            ref={avatarFileInputRef}
-            className="hidden"
-            accept="image/*"
-            onChange={handleAvatarUpload}
-            disabled={avatarUploading}
-          />
-          <p className="text-xs text-muted-foreground text-center">
-            {avatarUrl ? 'Avatar del grupo (clic para cambiar)' : 'Clic para subir avatar'}
-          </p>
-          <p className="text-[10px] text-muted-foreground text-center mt-1">
-            Sin avatar se usará el icono del grupo
-          </p>
-
-          {/* Tags / Quick Stats */}
-          <div className="mt-6 w-full space-y-3">
-            <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
-              <div className="flex items-center gap-2 mb-2">
-                <Package className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Resumen</span>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Miembros</span>
-                  <span className="font-medium">{memberCharacters.length}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Estrategia</span>
-                  <span className="font-medium">{strategyInfo[activationStrategy].name}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Estilo</span>
-                  <span className="font-medium">{conversationStyle === 'sequential' ? 'Secuencial' : 'Paralelo'}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Menciones</span>
-                  <span className="font-medium">{allowMentions ? 'Activadas' : 'Desactivadas'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Assignments: HUD, Lorebooks, Quests */}
+        {/* Right column: Avatar + Assignments */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm font-medium mb-2">
-            <Package className="w-4 h-4 text-muted-foreground" />
-            <span>Asignaciones</span>
+          {/* Avatar */}
+          <div className="flex items-center gap-6">
+            <div
+              className={cn(
+                'relative group/avatar-wrapper flex-shrink-0',
+                !avatarUploading && 'cursor-pointer'
+              )}
+              onClick={() => !avatarUploading && avatarFileInputRef.current?.click()}
+            >
+              <div className="w-20 h-20 rounded-xl overflow-hidden bg-muted">
+                {avatarUploading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : avatarUrl ? (
+                  <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center">
+                    <Users className="w-8 h-8 text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <input
+              type="file"
+              ref={avatarFileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              disabled={avatarUploading}
+            />
+            <div>
+              <p className="text-xs text-muted-foreground">
+                {avatarUrl ? 'Avatar del grupo (clic para cambiar)' : 'Clic para subir avatar'}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Sin avatar se usará el icono del grupo
+              </p>
+            </div>
           </div>
 
-          {/* HUD Selector */}
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Layers className="w-3.5 h-3.5 text-cyan-500" />
-              <Label className="text-sm">Plantilla HUD</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Plantilla HUD para mostrar estadísticas del grupo.</p>
-                </TooltipContent>
-              </Tooltip>
+          {/* Assignments: HUD, Lorebooks, Quests */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium mb-2">
+              <Package className="w-4 h-4 text-muted-foreground" />
+              <span>Asignaciones</span>
             </div>
-            <HUDSelector
-              value={hudTemplateId}
-              onChange={setHudTemplateId}
-              placeholder="Sin HUD asignado"
-            />
-          </div>
 
-          {/* Lorebook Selector */}
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-amber-500" />
-              <Label className="text-sm">Lorebooks</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Lorebooks compartidos por todos los miembros del grupo.</p>
-                </TooltipContent>
-              </Tooltip>
+            {/* HUD Selector */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                <Label className="text-sm">Plantilla HUD</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Plantilla HUD para mostrar estadísticas del grupo.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <HUDSelector
+                value={hudTemplateId}
+                onChange={setHudTemplateId}
+                placeholder="Sin HUD asignado"
+              />
             </div>
-            <LorebookSelector
-              value={lorebookIds}
-              onChange={setLorebookIds}
-              placeholder="Sin lorebooks asignados"
-            />
-          </div>
 
-          {/* Quest Templates Selector */}
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <ScrollText className="w-3.5 h-3.5 text-purple-500" />
-              <Label className="text-sm">Misiones</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Misiones disponibles para el grupo.</p>
-                </TooltipContent>
-              </Tooltip>
+            {/* Lorebook Selector */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                <Label className="text-sm">Lorebooks</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Lorebooks compartidos por todos los miembros del grupo.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <LorebookSelector
+                value={lorebookIds}
+                onChange={setLorebookIds}
+                placeholder="Sin lorebooks asignados"
+              />
             </div>
-            <QuestSelector
-              value={questTemplateIds}
-              onChange={setQuestTemplateIds}
-              placeholder="Sin misiones asignadas"
-            />
-          </div>
 
-          {/* Embedding Namespaces Selector */}
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Database className="w-3.5 h-3.5 text-violet-500" />
-              <Label className="text-sm">Namespaces de Embeddings</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Namespaces donde buscar contexto durante el chat grupal. Si no se selecciona ninguno, se usará la estrategia global.</p>
-                </TooltipContent>
-              </Tooltip>
+            {/* Quest Templates Selector */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <ScrollText className="w-3.5 h-3.5 text-purple-500" />
+                <Label className="text-sm">Misiones</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Misiones disponibles para el grupo.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <QuestSelector
+                value={questTemplateIds}
+                onChange={setQuestTemplateIds}
+                placeholder="Sin misiones asignadas"
+              />
             </div>
-            <NamespaceSelector
-              value={embeddingNamespaces}
-              onChange={setEmbeddingNamespaces}
-              placeholder="Usar estrategia global"
-            />
+
+            {/* Embedding Namespaces Selector */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Database className="w-3.5 h-3.5 text-violet-500" />
+                <Label className="text-sm">Namespaces de Embeddings</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Namespaces donde buscar contexto durante el chat grupal. Si no se selecciona ninguno, se usará la estrategia global.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <NamespaceSelector
+                value={embeddingNamespaces}
+                onChange={setEmbeddingNamespaces}
+                placeholder="Usar estrategia global"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -925,239 +893,227 @@ export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
     </div>
   );
 
-  const renderStrategyTab = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-1">Estrategia de Respuesta</h3>
-        <p className="text-sm text-muted-foreground">
-          Define cómo y cuándo los personajes del grupo responden en la conversación.
-        </p>
-      </div>
+  const renderStrategyTab = () => {
+    const currentColorClasses = getStrategyColorClasses(strategyInfo[activationStrategy].color);
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Strategy selector + Conversation style */}
-        <div className="space-y-6">
-          {/* Strategy Selector */}
-          <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MessageSquare className="w-4 h-4" />
-              <span className="font-medium">Modo de Activación</span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              {Object.entries(strategyInfo).map(([key, info]) => (
-                <button
-                  key={key}
-                  onClick={() => setActivationStrategy(key as GroupActivationStrategy)}
-                  className={cn(
-                    "p-3 rounded-lg border text-left transition-colors",
-                    activationStrategy === key 
-                      ? "border-primary bg-primary/10" 
-                      : "hover:bg-muted/50 border-border/40"
-                  )}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={cn(
-                      activationStrategy === key && key === 'all' && "text-emerald-500",
-                      activationStrategy === key && key === 'round_robin' && "text-blue-500",
-                      activationStrategy === key && key === 'random' && "text-purple-500",
-                      activationStrategy === key && key === 'reactive' && "text-amber-500",
-                      activationStrategy === key && key === 'smart' && "text-cyan-500",
-                    )}>
-                      {info.icon}
-                    </span>
-                    <span className="text-sm font-medium">{info.name}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{info.description}</p>
-                </button>
-              ))}
-            </div>
-
-            <div className={cn(
-              "p-3 rounded-lg border",
-              strategyInfo[activationStrategy].color === 'emerald' && "bg-emerald-500/10 border-emerald-500/20",
-              strategyInfo[activationStrategy].color === 'blue' && "bg-blue-500/10 border-blue-500/20",
-              strategyInfo[activationStrategy].color === 'purple' && "bg-purple-500/10 border-purple-500/20",
-              strategyInfo[activationStrategy].color === 'amber' && "bg-amber-500/10 border-amber-500/20",
-              strategyInfo[activationStrategy].color === 'cyan' && "bg-cyan-500/10 border-cyan-500/20"
-            )}>
-              <p className={cn(
-                "text-sm",
-                strategyInfo[activationStrategy].color === 'emerald' && "text-emerald-600",
-                strategyInfo[activationStrategy].color === 'blue' && "text-blue-600",
-                strategyInfo[activationStrategy].color === 'purple' && "text-purple-600",
-                strategyInfo[activationStrategy].color === 'amber' && "text-amber-600",
-                strategyInfo[activationStrategy].color === 'cyan' && "text-cyan-600"
-              )}>
-                💡 {strategyInfo[activationStrategy].tip}
-              </p>
-            </div>
-          </div>
-
-          {/* Conversation Style */}
-          <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Label className="text-sm font-medium">Estilo de Conversación</Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p><strong>Secuencial:</strong> Un personaje a la vez. <strong>Paralelo:</strong> Todos responden simultáneamente.</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <Select
-              value={conversationStyle}
-              onValueChange={(v) => setConversationStyle(v as 'sequential' | 'parallel')}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sequential">
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 text-blue-500" />
-                    <div>
-                      <span className="text-sm">Secuencial</span>
-                      <p className="text-[10px] text-muted-foreground">Un personaje responde a la vez</p>
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="parallel">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-500" />
-                    <div>
-                      <span className="text-sm">Paralelo</span>
-                      <p className="text-[10px] text-muted-foreground">Todos responden simultáneamente</p>
-                    </div>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-1">Estrategia de Respuesta</h3>
+          <p className="text-sm text-muted-foreground">
+            Define cómo y cuándo los personajes del grupo responden en la conversación.
+          </p>
         </div>
 
-        {/* Right: Min/Max responses + Mentions */}
-        <div className="space-y-6">
-          {/* Response limits */}
-          {activationStrategy !== 'all' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left: Strategy selector + Conversation style */}
+          <div className="space-y-6">
+            {/* Strategy Selector */}
             <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Settings className="w-4 h-4" />
-                <span className="font-medium">Límites de Respuesta</span>
+                <MessageSquare className="w-4 h-4" />
+                <span className="font-medium">Modo de Activación</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Label htmlFor="minResponses" className="text-sm">Mín. Respuestas</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Número mínimo de personajes que responderán por turno. Si hay menciones o solicitudes pendientes, se pueden agregar más.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="minResponses"
-                    type="number"
-                    min={1}
-                    max={maxResponsesPerTurn}
-                    value={minResponsesPerTurn}
-                    onChange={(e) => setMinResponsesPerTurn(Math.min(parseInt(e.target.value) || 1, maxResponsesPerTurn))}
-                    className="h-9"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Label htmlFor="maxResponses" className="text-sm">Máx. Respuestas</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Número máximo de personajes que responderán por turno.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    id="maxResponses"
-                    type="number"
-                    min={minResponsesPerTurn}
-                    max={10}
-                    value={maxResponsesPerTurn}
-                    onChange={(e) => setMaxResponsesPerTurn(Math.max(parseInt(e.target.value) || 1, minResponsesPerTurn))}
-                    className="h-9"
-                  />
-                </div>
+              <div className="grid grid-cols-1 gap-2">
+                {Object.entries(strategyInfo).map(([key, info]) => {
+                  const isSelected = activationStrategy === key;
+                  const colors = getStrategyColorClasses(info.color);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setActivationStrategy(key as GroupActivationStrategy)}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition-colors",
+                        isSelected
+                          ? cn("border-primary bg-primary/10")
+                          : "hover:bg-muted/50 border-border/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={isSelected ? colors.text : ''}>
+                          {info.icon}
+                        </span>
+                        <span className="text-sm font-medium">{info.name}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{info.description}</p>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          )}
 
-          {/* Mentions */}
-          <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Zap className="w-4 h-4" />
-              <span className="font-medium">Menciones</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-sm font-medium">Detección de Menciones</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Cuando está activo, los personajes responderán cuando sean mencionados por nombre.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Detectar nombres en mensajes</p>
-              </div>
-              <Switch
-                checked={allowMentions}
-                onCheckedChange={setAllowMentions}
-              />
-            </div>
-          </div>
-
-          {/* Info card about current strategy */}
-          <div className={cn(
-            "p-4 rounded-lg border",
-            strategyInfo[activationStrategy].color === 'emerald' && "bg-emerald-500/5 border-emerald-500/20",
-            strategyInfo[activationStrategy].color === 'blue' && "bg-blue-500/5 border-blue-500/20",
-            strategyInfo[activationStrategy].color === 'purple' && "bg-purple-500/5 border-purple-500/20",
-            strategyInfo[activationStrategy].color === 'amber' && "bg-amber-500/5 border-amber-500/20",
-            strategyInfo[activationStrategy].color === 'cyan' && "bg-cyan-500/5 border-cyan-500/20"
-          )}>
-            <div className="flex items-start gap-3">
               <div className={cn(
-                "p-2 rounded-lg",
-                strategyInfo[activationStrategy].color === 'emerald' && "bg-emerald-500/20",
-                strategyInfo[activationStrategy].color === 'blue' && "bg-blue-500/20",
-                strategyInfo[activationStrategy].color === 'purple' && "bg-purple-500/20",
-                strategyInfo[activationStrategy].color === 'amber' && "bg-amber-500/20",
-                strategyInfo[activationStrategy].color === 'cyan' && "bg-cyan-500/20"
+                "p-3 rounded-lg border",
+                currentColorClasses.bg,
+                currentColorClasses.border
               )}>
-                {strategyInfo[activationStrategy].icon}
-              </div>
-              <div>
-                <p className="text-sm font-medium">Estrategia: {strategyInfo[activationStrategy].name}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {strategyInfo[activationStrategy].description}. {strategyInfo[activationStrategy].tip}
+                <p className={cn(
+                  "text-sm",
+                  currentColorClasses.text
+                )}>
+                  💡 {strategyInfo[activationStrategy].tip}
                 </p>
               </div>
             </div>
+
+            {/* Conversation Style */}
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Label className="text-sm font-medium">Estilo de Conversación</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p><strong>Secuencial:</strong> Un personaje a la vez. <strong>Paralelo:</strong> Todos responden simultáneamente.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select
+                value={conversationStyle}
+                onValueChange={(v) => setConversationStyle(v as 'sequential' | 'parallel')}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sequential">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-blue-500" />
+                      <div>
+                        <span className="text-sm">Secuencial</span>
+                        <p className="text-[10px] text-muted-foreground">Un personaje responde a la vez</p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="parallel">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <div>
+                        <span className="text-sm">Paralelo</span>
+                        <p className="text-[10px] text-muted-foreground">Todos responden simultáneamente</p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Right: Min/Max responses + Mentions */}
+          <div className="space-y-6">
+            {/* Response limits */}
+            {activationStrategy !== 'all' && (
+              <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Settings className="w-4 h-4" />
+                  <span className="font-medium">Límites de Respuesta</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Label htmlFor="minResponses" className="text-sm">Mín. Respuestas</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Número mínimo de personajes que responderán por turno. Si hay menciones o solicitudes pendientes, se pueden agregar más.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input
+                      id="minResponses"
+                      type="number"
+                      min={1}
+                      max={maxResponsesPerTurn}
+                      value={minResponsesPerTurn}
+                      onChange={(e) => setMinResponsesPerTurn(Math.min(parseInt(e.target.value) || 1, maxResponsesPerTurn))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Label htmlFor="maxResponses" className="text-sm">Máx. Respuestas</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Número máximo de personajes que responderán por turno.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input
+                      id="maxResponses"
+                      type="number"
+                      min={minResponsesPerTurn}
+                      max={10}
+                      value={maxResponsesPerTurn}
+                      onChange={(e) => setMaxResponsesPerTurn(Math.max(parseInt(e.target.value) || 1, minResponsesPerTurn))}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Mentions */}
+            <div className="p-4 bg-muted/30 rounded-lg border border-border/40 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Zap className="w-4 h-4" />
+                <span className="font-medium">Menciones</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-sm font-medium">Detección de Menciones</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Cuando está activo, los personajes responderán cuando sean mencionados por nombre.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Detectar nombres en mensajes</p>
+                </div>
+                <Switch
+                  checked={allowMentions}
+                  onCheckedChange={setAllowMentions}
+                />
+              </div>
+            </div>
+
+            {/* Info card about current strategy */}
+            <div className={cn(
+              "p-4 rounded-lg border",
+              currentColorClasses.bgLight,
+              currentColorClasses.border
+            )}>
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "p-2 rounded-lg",
+                  currentColorClasses.bgSelected
+                )}>
+                  {strategyInfo[activationStrategy].icon}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Estrategia: {strategyInfo[activationStrategy].name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {strategyInfo[activationStrategy].description}. {strategyInfo[activationStrategy].tip}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderPromptsTab = () => (
     <div className="space-y-6">

@@ -198,16 +198,17 @@ export async function POST(request: NextRequest) {
     const postHistorySection = buildPostHistorySection(processedCharacter.postHistoryInstructions);
 
     // Combine all sections in order
-    // Order: System (up to Persona) -> CONTEXTO (embeddings) -> Rest of System -> Chat History -> Post-History Instructions
-    // Insert embeddings section right after User's Persona
+    // Order: System -> [CONTEXTO] non-memory -> [MEMORIA] memory -> Chat History -> Post-History
+    // Non-memory (lore, world) stays with character definition. Memory goes before chat history for recency primacy.
     const personaIndex = systemSections.findIndex(s => s.type === 'persona');
     const prePersonaSections = personaIndex >= 0 ? systemSections.slice(0, personaIndex + 1) : systemSections;
     const postPersonaSections = personaIndex >= 0 ? systemSections.slice(personaIndex + 1) : [];
 
     let allPromptSections: PromptSection[] = [
       ...prePersonaSections,
-      ...(embeddingsResult.section ? [embeddingsResult.section] : []),
+      ...(embeddingsResult.nonMemorySection ? [embeddingsResult.nonMemorySection] : []),  // Non-memory: after persona
       ...postPersonaSections,
+      ...(embeddingsResult.memorySection ? [embeddingsResult.memorySection] : []),  // Memory: before chat history
       ...chatHistorySections,
       ...(postHistorySection ? [postHistorySection] : [])
     ];
@@ -217,10 +218,16 @@ export async function POST(request: NextRequest) {
       allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
     }
 
-    // Build the final system prompt (include embeddings context)
+    // Non-memory embeddings: append to system prompt (static knowledge)
+    // Memory embeddings: inject as separate system message before chat history (recency primacy)
+    const memoryContextString = embeddingsResult.memoryContextString?.trim()
+      ? `[${embeddingsResult.memorySection?.label || 'MEMORIA DEL PERSONAJE'}]\n${embeddingsResult.memoryContextString}`
+      : undefined;
+
+    // Build the final system prompt (non-memory embeddings appended)
     let finalSystemPrompt = systemPrompt;
-    if (embeddingsResult.section) {
-      finalSystemPrompt += `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`;
+    if (embeddingsResult.nonMemoryContextString?.trim()) {
+      finalSystemPrompt += `\n\n[${embeddingsResult.nonMemorySection?.label || 'CONTEXTO'}]\n${embeddingsResult.nonMemoryContextString}`;
     }
 
     // Create a TransformStream for SSE
@@ -251,7 +258,10 @@ export async function POST(request: NextRequest) {
                 contextWindow.messages,
                 processedCharacter,
                 effectiveUserName,
-                processedCharacter.postHistoryInstructions
+                processedCharacter.postHistoryInstructions,
+                undefined,  // authorNote
+                false,      // useSystemRole
+                memoryContextString  // Memory embeddings before chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -273,7 +283,9 @@ export async function POST(request: NextRequest) {
                 processedCharacter,
                 effectiveUserName,
                 processedCharacter.postHistoryInstructions,
-                true
+                undefined,  // authorNote
+                true,       // useSystemRole
+                memoryContextString  // Memory embeddings before chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -293,7 +305,9 @@ export async function POST(request: NextRequest) {
                 processedCharacter,
                 effectiveUserName,
                 processedCharacter.postHistoryInstructions,
-                true
+                undefined,  // authorNote
+                true,       // useSystemRole
+                memoryContextString  // Memory embeddings before chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -309,7 +323,8 @@ export async function POST(request: NextRequest) {
                 messages: contextWindow.messages,
                 character: processedCharacter,
                 userName: effectiveUserName,
-                postHistoryInstructions: processedCharacter.postHistoryInstructions
+                postHistoryInstructions: processedCharacter.postHistoryInstructions,
+                embeddingsContext: memoryContextString  // Memory embeddings before chat history
               });
               generator = streamOllama(prompt, llmConfig);
               break;
@@ -323,7 +338,8 @@ export async function POST(request: NextRequest) {
                 messages: contextWindow.messages,
                 character: processedCharacter,
                 userName: effectiveUserName,
-                postHistoryInstructions: processedCharacter.postHistoryInstructions
+                postHistoryInstructions: processedCharacter.postHistoryInstructions,
+                embeddingsContext: memoryContextString  // Memory embeddings before chat history
               });
               generator = streamTextGenerationWebUI(prompt, llmConfig);
               break;

@@ -610,10 +610,16 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // Add quest section and embeddings to the system prompt if present
+            // Non-memory embeddings: append to system prompt (static knowledge)
+            // Memory embeddings: inject as separate system message before chat history
+            const memoryContextString = embeddingsResult.memoryContextString?.trim()
+              ? `[${embeddingsResult.memorySection?.label || 'MEMORIA DEL PERSONAJE'}]\n${embeddingsResult.memoryContextString}`
+              : undefined;
+
+            // Add non-memory embeddings + quest section to the system prompt
             let finalSystemPrompt = systemPrompt;
-            if (embeddingsResult.section) {
-              finalSystemPrompt += `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`;
+            if (embeddingsResult.nonMemoryContextString?.trim()) {
+              finalSystemPrompt += `\n\n[${embeddingsResult.nonMemorySection?.label || 'CONTEXTO'}]\n${embeddingsResult.nonMemoryContextString}`;
             }
             if (resolvedQuestSection) {
               finalSystemPrompt += `\n\n[${resolvedQuestSection.label}]\n${resolvedQuestSection.content}`;
@@ -676,19 +682,20 @@ export async function POST(request: NextRequest) {
               previousResponses,
               resolvedPostHistoryInstructions,  // Post-history instructions AFTER chat (with keys resolved)
               undefined,  // authorNote
-              isResponderNarrator  // If responder is narrator, they see all messages
+              isResponderNarrator,  // If responder is narrator, they see all messages
+              memoryContextString  // Memory embeddings before chat history
             );
 
             // Combine prompt sections with chat history for the viewer
-            // Order: System (up to Persona) -> CONTEXTO (embeddings) -> Rest of System -> Quest -> Chat History -> Post-History
-            // Insert embeddings section right after User's Persona
+            // Order: System -> [CONTEXTO] non-memory -> Quest -> [MEMORIA] memory -> Chat History -> Post-History
+            // Non-memory stays with character definition. Memory goes before chat history for recency primacy.
             const personaIndex = promptSections.findIndex(s => s.type === 'persona');
             const prePersonaSections = personaIndex >= 0 ? promptSections.slice(0, personaIndex + 1) : promptSections;
             const postPersonaSections = personaIndex >= 0 ? promptSections.slice(personaIndex + 1) : [];
 
             let allPromptSections: PromptSection[] = chatHistorySection
-              ? [...prePersonaSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...postPersonaSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
-              : [...prePersonaSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...postPersonaSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(postHistorySection ? [postHistorySection] : [])];
+              ? [...prePersonaSections, ...(embeddingsResult.nonMemorySection ? [embeddingsResult.nonMemorySection] : []), ...postPersonaSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(embeddingsResult.memorySection ? [embeddingsResult.memorySection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
+              : [...prePersonaSections, ...(embeddingsResult.nonMemorySection ? [embeddingsResult.nonMemorySection] : []), ...postPersonaSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(embeddingsResult.memorySection ? [embeddingsResult.memorySection] : []), ...(postHistorySection ? [postHistorySection] : [])];
 
             // Inject HUD context into sections if enabled
             if (hudContextSection && typedHUDContext) {

@@ -125,9 +125,17 @@ export async function POST(request: NextRequest) {
       sessionId,
       embeddingsChat
     );
-    const finalSystemPrompt = embeddingsResult.section
-      ? systemPrompt + `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`
-      : systemPrompt;
+
+    // Memory embeddings: inject before chat history
+    const memoryContextString = embeddingsResult.memoryContextString?.trim()
+      ? `[${embeddingsResult.memorySection?.label || 'MEMORIA DEL PERSONAJE'}]\n${embeddingsResult.memoryContextString}`
+      : undefined;
+
+    // Build final system prompt: non-memory embeddings go in system prompt, memory goes separately
+    let finalSystemPrompt = systemPrompt;
+    if (embeddingsResult.nonMemoryContextString?.trim()) {
+      finalSystemPrompt += `\n\n[${embeddingsResult.nonMemorySection?.label || 'CONTEXTO'}]\n${embeddingsResult.nonMemoryContextString}`;
+    }
 
     // Build HUD context section if enabled
     const hudContextSection = hudContext ? buildHUDContextSection(hudContext) : null;
@@ -146,7 +154,10 @@ export async function POST(request: NextRequest) {
           allMessages,
           processedCharacter,
           effectiveUserName,
-          processedCharacter.postHistoryInstructions
+          processedCharacter.postHistoryInstructions,
+          undefined,  // authorNote
+          false,     // useSystemRole
+          memoryContextString  // Memory embeddings before chat history
         );
         // Inject HUD context into chat messages if enabled
         if (hudContextSection && hudContext) {
@@ -169,7 +180,9 @@ export async function POST(request: NextRequest) {
           processedCharacter,
           effectiveUserName,
           processedCharacter.postHistoryInstructions,
-          true // Use system role for OpenAI
+          undefined,  // authorNote
+          true,      // useSystemRole
+          memoryContextString  // Memory embeddings before chat history
         );
         // Inject HUD context into chat messages if enabled
         if (hudContextSection && hudContext) {
@@ -189,7 +202,9 @@ export async function POST(request: NextRequest) {
           processedCharacter,
           effectiveUserName,
           processedCharacter.postHistoryInstructions,
-          true // Use system role for Anthropic
+          undefined,  // authorNote
+          true,      // useSystemRole
+          memoryContextString  // Memory embeddings before chat history
         );
         // Inject HUD context into chat messages if enabled
         if (hudContextSection && hudContext) {
@@ -205,7 +220,8 @@ export async function POST(request: NextRequest) {
           messages: allMessages,
           character: processedCharacter,
           userName: effectiveUserName,
-          postHistoryInstructions: processedCharacter.postHistoryInstructions
+          postHistoryInstructions: processedCharacter.postHistoryInstructions,
+          embeddingsContext: memoryContextString  // Memory embeddings before chat history
         });
         response = await callOllama(prompt, llmConfig);
         break;
@@ -219,7 +235,8 @@ export async function POST(request: NextRequest) {
           messages: allMessages,
           character: processedCharacter,
           userName: effectiveUserName,
-          postHistoryInstructions: processedCharacter.postHistoryInstructions
+          postHistoryInstructions: processedCharacter.postHistoryInstructions,
+          embeddingsContext: memoryContextString  // Memory embeddings before chat history
         });
         response = await callTextGenerationWebUI(prompt, llmConfig);
         break;

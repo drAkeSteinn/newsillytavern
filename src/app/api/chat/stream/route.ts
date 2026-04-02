@@ -252,18 +252,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Combine all sections in order for prompt viewer
-    // Order: System (up to Persona) -> CONTEXTO (embeddings) -> Rest of System -> Summary -> Quest -> Chat History -> Post-History
-    // Insert embeddings section right after User's Persona
+    // Order: System -> [CONTEXTO] non-memory -> Summary -> Quest -> [MEMORIA] memory -> Chat History -> Post-History
+    // Non-memory (lore, world) stays with character definition. Memory goes before chat history for recency primacy.
     const personaIndex = systemSections.findIndex(s => s.type === 'persona');
     const prePersonaSections = personaIndex >= 0 ? systemSections.slice(0, personaIndex + 1) : systemSections;
     const postPersonaSections = personaIndex >= 0 ? systemSections.slice(personaIndex + 1) : [];
 
     let allPromptSections: PromptSection[] = [
       ...prePersonaSections,
-      ...(embeddingsResult.section ? [embeddingsResult.section] : []),
+      ...(embeddingsResult.nonMemorySection ? [embeddingsResult.nonMemorySection] : []),  // Non-memory: after persona
       ...postPersonaSections,
       ...(summarySection ? [summarySection] : []),
       ...(questSection ? [questSection] : []),
+      ...(embeddingsResult.memorySection ? [embeddingsResult.memorySection] : []),  // Memory: before chat history
       ...chatHistorySections,
       ...(postHistorySection ? [postHistorySection] : [])
     ];
@@ -273,10 +274,16 @@ export async function POST(request: NextRequest) {
       allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
     }
 
-    // Build the final system prompt (include quest section + embeddings, summary goes to chat history)
+    // Non-memory embeddings: append to system prompt (static knowledge with character definition)
+    // Memory embeddings: inject as separate system message before chat history (recency primacy)
+    const memoryContextString = embeddingsResult.memoryContextString?.trim()
+      ? `[${embeddingsResult.memorySection?.label || 'MEMORIA DEL PERSONAJE'}]\n${embeddingsResult.memoryContextString}`
+      : undefined;
+
+    // Build the final system prompt (non-memory embeddings + quest section)
     let finalSystemPrompt = systemPrompt;
-    if (embeddingsResult.section) {
-      finalSystemPrompt += `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`;
+    if (embeddingsResult.nonMemoryContextString?.trim()) {
+      finalSystemPrompt += `\n\n[${embeddingsResult.nonMemorySection?.label || 'CONTEXTO'}]\n${embeddingsResult.nonMemoryContextString}`;
     }
     if (questSection) {
       finalSystemPrompt += `\n\n[${questSection.label}]\n${questSection.content}`;
@@ -365,7 +372,10 @@ Y cambiar mi expresión:
                 allMessages,
                 effectiveCharacter,
                 effectiveUserName,
-                postHistoryInstructions  // Injected AFTER chat history
+                postHistoryInstructions,  // Injected AFTER chat history
+                undefined,  // authorNote
+                false,      // useSystemRole
+                memoryContextString  // Memory embeddings before chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -390,7 +400,9 @@ Y cambiar mi expresión:
                 effectiveCharacter,
                 effectiveUserName,
                 postHistoryInstructions,  // Injected AFTER chat history
-                true // Use system role for OpenAI
+                undefined,  // authorNote
+                true,       // useSystemRole
+                memoryContextString  // Memory embeddings before chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -410,7 +422,9 @@ Y cambiar mi expresión:
                 effectiveCharacter,
                 effectiveUserName,
                 postHistoryInstructions,  // Injected AFTER chat history
-                true // Use system role for Anthropic
+                undefined,  // authorNote
+                true,       // useSystemRole
+                memoryContextString  // Memory embeddings before chat history
               );
               // Inject HUD context into chat messages if enabled
               if (hudContextSection && hudContext) {
@@ -426,7 +440,8 @@ Y cambiar mi expresión:
                 messages: allMessages,
                 character: effectiveCharacter,
                 userName: effectiveUserName,
-                postHistoryInstructions  // Injected AFTER chat history
+                postHistoryInstructions,  // Injected AFTER chat history
+                embeddingsContext: memoryContextString  // Memory embeddings before chat history
               });
               generator = streamOllama(prompt, llmConfig);
               break;
@@ -440,7 +455,8 @@ Y cambiar mi expresión:
                 messages: allMessages,
                 character: effectiveCharacter,
                 userName: effectiveUserName,
-                postHistoryInstructions  // Injected AFTER chat history
+                postHistoryInstructions,  // Injected AFTER chat history
+                embeddingsContext: memoryContextString  // Memory embeddings before chat history
               });
               generator = streamTextGenerationWebUI(prompt, llmConfig);
               break;
