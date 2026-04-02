@@ -143,6 +143,8 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       statsConfig: extensions?.statsConfig as CharacterCard['statsConfig'],
       lorebookIds: extensions?.lorebookIds as string[],
       questTemplateIds: extensions?.questTemplateIds as string[],
+      // Embeddings
+      embeddingNamespaces: extensions?.embeddingNamespaces as string[],
       memory: extensions?.memory as CharacterCard['memory'],
       chatStats: extensions?.chatStats as CharacterCard['chatStats'],
     };
@@ -186,6 +188,8 @@ function parseCharacterData(data: unknown): Partial<CharacterCard> {
       questTemplateIds: v1Data.questTemplateIds as string[],
       memory: v1Data.memory as CharacterCard['memory'],
       chatStats: v1Data.chatStats as CharacterCard['chatStats'],
+      // Embeddings
+      embeddingNamespaces: v1Data.embeddingNamespaces as string[],
     };
   }
   
@@ -362,6 +366,8 @@ export async function exportCharacterCardAsPng(
         lorebookIds: character.lorebookIds,
         // Quests
         questTemplateIds: character.questTemplateIds,
+        // Embeddings
+        embeddingNamespaces: character.embeddingNamespaces,
       }
     }
   };
@@ -624,6 +630,8 @@ export function exportCharacterCardAsJson(character: CharacterCard): string {
         lorebookIds: character.lorebookIds,
         // Quests
         questTemplateIds: character.questTemplateIds,
+        // Embeddings
+        embeddingNamespaces: character.embeddingNamespaces,
       }
     }
   };

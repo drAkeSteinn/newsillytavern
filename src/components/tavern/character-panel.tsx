@@ -208,6 +208,8 @@ export function CharacterPanel() {
         characterVersion: character.characterVersion,
         memory: character.memory,
         chatStats: character.chatStats,
+        // Embeddings
+        embeddingNamespaces: character.embeddingNamespaces,
       });
 
       toast({
@@ -397,6 +399,8 @@ export function CharacterPanel() {
           extensions: character.extensions,
           chatStats: character.chatStats,
           memory: character.memory,
+          // Embeddings
+          embeddingNamespaces: character.embeddingNamespaces,
         }, true); // preserveId = true
         importedCharacters++;
       }
@@ -432,6 +436,8 @@ export function CharacterPanel() {
             questTemplateIds: group.questTemplateIds,
             // Narrator settings
             narratorSettings: group.narratorSettings,
+            // Embeddings
+            embeddingNamespaces: group.embeddingNamespaces,
           }, true); // preserveId = true
           importedGroups++;
         }
@@ -531,6 +537,8 @@ export function CharacterPanel() {
         characterVersion: character.characterVersion,
         memory: character.memory,
         chatStats: character.chatStats,
+        // Embeddings
+        embeddingNamespaces: character.embeddingNamespaces,
       });
 
       toast({
