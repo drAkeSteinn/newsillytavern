@@ -29,6 +29,7 @@ import {
   Code,
   FileType,
   List,
+  Pencil,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ interface EmbeddingConfig {
   dimension: number;
   similarityThreshold: number;
   maxResults: number;
+  tableDimension?: number | null;
 }
 
 interface EmbeddingRecord {
@@ -87,6 +89,7 @@ interface NamespaceRecord {
   id: string;
   namespace: string;
   description?: string;
+  type?: string;
   created_at: string;
   updated_at: string;
   embedding_count?: number;
@@ -116,6 +119,13 @@ interface SearchResult {
   similarity: number;
 }
 
+interface SearchMeta {
+  model: string;
+  threshold: number;
+  limit: number;
+  namespace: string;
+}
+
 interface ChunkPreview {
   chunks: string[];
   totalChunks: number;
@@ -126,6 +136,8 @@ interface ChunkPreview {
 const KNOWN_MODELS = [
   { name: 'nomic-embed-text', dimension: 768 },
   { name: 'nomic-embed-text:latest', dimension: 768 },
+  { name: 'nomic-embed-text-v2-moe', dimension: 768 },
+  { name: 'nomic-embed-text-v2-moe:latest', dimension: 768 },
   { name: 'bge-m3', dimension: 1024 },
   { name: 'bge-m3:567m', dimension: 1024 },
   { name: 'mxbai-embed-large', dimension: 1024 },
@@ -136,33 +148,33 @@ const KNOWN_MODELS = [
 const SPLITTER_OPTIONS = [
   {
     value: 'character',
-    label: 'Character Text Splitter',
+    label: 'Divisor por Caracteres',
     icon: FileType,
-    description: 'Simple split by character count',
+    description: 'División simple por conteo de caracteres',
     defaultChunkSize: 1000,
     defaultOverlap: 200,
   },
   {
     value: 'recursive-character',
-    label: 'Recursive Character Splitter',
+    label: 'Divisor Recursivo',
     icon: List,
-    description: 'Tries paragraphs, lines, words for natural breaks',
+    description: 'Intenta párrafos, líneas, palabras para cortes naturales',
     defaultChunkSize: 1000,
     defaultOverlap: 200,
   },
   {
     value: 'markdown',
-    label: 'Markdown Text Splitter',
+    label: 'Divisor Markdown',
     icon: FileText,
-    description: 'Splits by markdown headings first',
+    description: 'Divide por encabezados markdown primero',
     defaultChunkSize: 1000,
     defaultOverlap: 200,
   },
   {
     value: 'code',
-    label: 'Code Text Splitter',
+    label: 'Divisor de Código',
     icon: Code,
-    description: 'Splits by code structures (classes, functions)',
+    description: 'Divide por estructuras de código (clases, funciones)',
     defaultChunkSize: 1500,
     defaultOverlap: 300,
   },
@@ -185,6 +197,7 @@ export function EmbeddingsSettingsPanel() {
   const [namespaces, setNamespaces] = useState<NamespaceRecord[]>([]);
   const [embeddings, setEmbeddings] = useState<EmbeddingRecord[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -209,7 +222,10 @@ export function EmbeddingsSettingsPanel() {
   const [createNamespaceOpen, setCreateNamespaceOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [newEmbedding, setNewEmbedding] = useState({ content: '', namespace: 'default', source_type: 'custom' });
-  const [newNamespace, setNewNamespace] = useState({ namespace: '', description: '' });
+  const [newNamespace, setNewNamespace] = useState({ namespace: '', description: '', type: '' });
+  const [editingNamespace, setEditingNamespace] = useState<NamespaceRecord | null>(null);
+  const [customTypeText, setCustomTypeText] = useState('');
+  const [editCustomTypeText, setEditCustomTypeText] = useState('');
 
   // Collapsible sections
   const [configOpen, setConfigOpen] = useState(true);
@@ -229,6 +245,7 @@ export function EmbeddingsSettingsPanel() {
     characterCount: number;
   } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [refreshingEmbeddings, setRefreshingEmbeddings] = useState(false);
   const [splitterType, setSplitterType] = useState('recursive-character');
   const [chunkSize, setChunkSize] = useState(1000);
   const [chunkOverlap, setChunkOverlap] = useState(200);
@@ -236,7 +253,6 @@ export function EmbeddingsSettingsPanel() {
   const [previewingChunks, setPreviewingChunks] = useState(false);
   const [creatingEmbeddings, setCreatingEmbeddings] = useState(false);
   const [uploadNamespace, setUploadNamespace] = useState('default');
-  const [uploadSectionOpen, setUploadSectionOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load config
@@ -264,10 +280,30 @@ export function EmbeddingsSettingsPanel() {
         body: JSON.stringify(config),
       });
       if (res.ok) {
-        toast({ title: 'Config saved', description: 'Embeddings config updated successfully.' });
+        const data = await res.json();
+        if (data.success) {
+          setConfig(data.data);
+          if (data.meta?.dimensionMismatch) {
+            toast({
+              title: 'Tabla de embeddings recreada',
+              description: `Dimensión cambiada de ${data.meta.oldDimension}D a ${data.meta.newDimension}D. Los embeddings anteriores fueron eliminados automáticamente. Recrea tus embeddings con el nuevo modelo.`,
+              variant: 'default',
+            });
+          } else if (data.meta?.modelChanged) {
+            toast({
+              title: 'Configuración guardada',
+              description: `Modelo cambiado a ${config.model}. Los nuevos embeddings se crearán con este modelo. Los embeddings existentes pueden no ser compatibles si la dimensión es diferente.`,
+            });
+          } else {
+            toast({ title: 'Configuración guardada', description: 'Configuración de embeddings actualizada.' });
+          }
+          // Refresh stats/namespaces in case data was cleared
+          loadStats();
+          loadNamespaces();
+        }
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to save config.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al guardar configuración.', variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -286,18 +322,18 @@ export function EmbeddingsSettingsPanel() {
         setStats(data.data.stats);
         setOllamaModels(data.data.ollamaModels || []);
         toast({
-          title: 'Connection test',
-          description: `Ollama: ${data.data.connections.ollama ? 'Connected' : 'Disconnected'} | LanceDB: ${data.data.connections.db ? 'Connected' : 'Disconnected'}`,
+          title: 'Prueba de conexión',
+          description: `Ollama: ${data.data.connections.ollama ? 'Conectado' : 'Desconectado'} | LanceDB: ${data.data.connections.db ? 'Conectado' : 'Desconectado'}`,
         });
       } else {
         setConnectionStatus('disconnected');
         setOllamaStatus('error');
         setLanceDBStatus('error');
-        toast({ title: 'Connection failed', description: data.error, variant: 'destructive' });
+        toast({ title: 'Conexión fallida', description: data.error, variant: 'destructive' });
       }
     } catch {
       setConnectionStatus('disconnected');
-      toast({ title: 'Error', description: 'Failed to test connections.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al probar conexiones.', variant: 'destructive' });
     }
   };
 
@@ -311,7 +347,7 @@ export function EmbeddingsSettingsPanel() {
         setOllamaModels(models);
         setOllamaStatus('ok');
         setOllamaError(undefined);
-        toast({ title: 'Ollama connected', description: `${models.length} models available.` });
+        toast({ title: 'Ollama conectado', description: `${models.length} modelos disponibles.` });
       } else {
         setOllamaStatus('error');
         setOllamaError(`HTTP ${res.status}`);
@@ -320,7 +356,7 @@ export function EmbeddingsSettingsPanel() {
     } catch (e: any) {
       setOllamaStatus('error');
       setOllamaError(e.message || 'Cannot reach server');
-      toast({ title: 'Ollama unreachable', description: e.message || 'Check that Ollama is running.', variant: 'destructive' });
+      toast({ title: 'Ollama inalcanzable', description: e.message || 'Verifica que Ollama esté ejecutándose.', variant: 'destructive' });
     }
     setCheckingOllama(false);
   };
@@ -335,12 +371,12 @@ export function EmbeddingsSettingsPanel() {
         setOllamaModels(models);
         setOllamaStatus('ok');
         setOllamaError(undefined);
-        toast({ title: 'Models refreshed', description: `Found ${models.length} models from Ollama.` });
+        toast({ title: 'Modelos actualizados', description: `Se encontraron ${models.length} modelos en Ollama.` });
       } else {
-        toast({ title: 'Refresh failed', description: `HTTP ${res.status}`, variant: 'destructive' });
+        toast({ title: 'Error al actualizar', description: `HTTP ${res.status}`, variant: 'destructive' });
       }
     } catch (e: any) {
-      toast({ title: 'Refresh failed', description: e.message || 'Cannot reach Ollama.', variant: 'destructive' });
+      toast({ title: 'Error al actualizar', description: e.message || 'No se puede conectar a Ollama.', variant: 'destructive' });
     }
     setRefreshingModels(false);
   };
@@ -355,19 +391,19 @@ export function EmbeddingsSettingsPanel() {
         setLanceDBError(data.data.dbError);
         setStats(data.data.stats);
         if (data.data.connections.db) {
-          toast({ title: 'LanceDB active', description: 'Database is connected and working.' });
+          toast({ title: 'LanceDB activo', description: 'Base de datos conectada y funcionando.' });
         } else {
-          toast({ title: 'LanceDB not available', description: data.data.dbError || 'Could not initialize.', variant: 'destructive' });
+          toast({ title: 'LanceDB no disponible', description: data.data.dbError || 'No se pudo inicializar.', variant: 'destructive' });
         }
       } else {
         setLanceDBStatus('error');
         setLanceDBError(data.error);
-        toast({ title: 'LanceDB error', description: data.error || 'Check logs.', variant: 'destructive' });
+        toast({ title: 'Error de LanceDB', description: data.error || 'Revisa los logs.', variant: 'destructive' });
       }
     } catch {
       setLanceDBStatus('error');
       setLanceDBError('Failed to test');
-      toast({ title: 'LanceDB error', description: 'Failed to test connection.', variant: 'destructive' });
+      toast({ title: 'Error de LanceDB', description: 'Error al probar la conexión.', variant: 'destructive' });
     }
     setCheckingLanceDB(false);
   };
@@ -389,7 +425,11 @@ export function EmbeddingsSettingsPanel() {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setNamespaces(data.data.namespaces);
+          const enriched = data.data.namespaces.map((ns: any) => ({
+            ...ns,
+            type: ns.metadata?.type || '',
+          }));
+          setNamespaces(enriched);
           if (data.data.dbAvailable === false) {
             setLanceDBStatus('error');
             setLanceDBError(data.data.dbError);
@@ -436,7 +476,7 @@ export function EmbeddingsSettingsPanel() {
         }
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to load documents.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al cargar documentos.', variant: 'destructive' });
     }
     setLoadingDocuments(false);
   };
@@ -454,13 +494,13 @@ export function EmbeddingsSettingsPanel() {
         body: JSON.stringify({ source_id: sourceId }),
       });
       if (res.ok) {
-        toast({ title: 'Document deleted', description: `Document "${sourceId}" and its embeddings removed.` });
+        toast({ title: 'Documento eliminado', description: `Documento "${sourceId}" y sus embeddings eliminados.` });
         loadNamespaceDocuments(namespace);
         loadStats();
         loadNamespaces();
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al eliminar documento.', variant: 'destructive' });
     }
   };
 
@@ -470,13 +510,13 @@ export function EmbeddingsSettingsPanel() {
         method: 'DELETE',
       });
       if (res.ok) {
-        toast({ title: 'Cleared', description: `All documents in "${namespace}" removed.` });
+        toast({ title: 'Limpiado', description: `Todos los documentos en "${namespace}" eliminados.` });
         setNsDocuments([]);
         loadStats();
         loadNamespaces();
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to clear namespace.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al limpiar namespace.', variant: 'destructive' });
     }
   };
 
@@ -489,6 +529,7 @@ export function EmbeddingsSettingsPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: searchQuery,
+          model: config.model,
           namespace: searchNamespace === 'all' ? undefined : searchNamespace,
           limit: config.maxResults,
           threshold: config.similarityThreshold,
@@ -497,12 +538,15 @@ export function EmbeddingsSettingsPanel() {
       const data = await res.json();
       if (data.success) {
         setSearchResults(data.data.results);
+        setSearchMeta(data.data.meta || null);
         if (data.data.results.length === 0) {
-          toast({ title: 'No results', description: 'No similar embeddings found above the threshold.' });
+          toast({ title: 'Sin resultados', description: 'No se encontraron embeddings similares sobre el umbral.' });
         }
+      } else {
+        toast({ title: 'Error de búsqueda', description: data.error || 'Error desconocido al buscar.', variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Search error', description: 'Failed to search embeddings.', variant: 'destructive' });
+      toast({ title: 'Error de búsqueda', description: 'Error al buscar embeddings.', variant: 'destructive' });
     }
     setSearching(false);
   };
@@ -517,14 +561,14 @@ export function EmbeddingsSettingsPanel() {
         body: JSON.stringify(newEmbedding),
       });
       if (res.ok) {
-        toast({ title: 'Embedding created', description: 'New embedding stored successfully.' });
+        toast({ title: 'Embedding creado', description: 'Nuevo embedding almacenado.' });
         setCreateEmbeddingOpen(false);
         setNewEmbedding({ content: '', namespace: 'default', source_type: 'custom' });
         loadStats();
         if (selectedNamespace) loadEmbeddings(selectedNamespace);
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to create embedding.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al crear embedding.', variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -533,19 +577,50 @@ export function EmbeddingsSettingsPanel() {
     if (!newNamespace.namespace.trim()) return;
     setLoading(true);
     try {
+      const metadata: Record<string, any> = {};
+      const typeValue = newNamespace.type === '__custom__' ? customTypeText.trim() : newNamespace.type.trim();
+      if (typeValue && typeValue !== '__none__') {
+        metadata.type = typeValue;
+      }
       const res = await fetch('/api/embeddings/namespaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newNamespace),
+        body: JSON.stringify({ namespace: newNamespace.namespace, description: newNamespace.description, metadata }),
       });
       if (res.ok) {
-        toast({ title: 'Namespace created', description: `Namespace "${newNamespace.namespace}" created.` });
+        toast({ title: 'Namespace creado', description: `Namespace "${newNamespace.namespace}" creado.` });
         setCreateNamespaceOpen(false);
-        setNewNamespace({ namespace: '', description: '' });
+        setNewNamespace({ namespace: '', description: '', type: '' });
+        setCustomTypeText('');
         loadNamespaces();
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to create namespace.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al crear namespace.', variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleUpdateNamespace = async () => {
+    if (!editingNamespace) return;
+    setLoading(true);
+    try {
+      const metadata: Record<string, any> = {};
+      const typeValue = editingNamespace.type === '__custom__' ? editCustomTypeText.trim() : (editingNamespace.type?.trim() || '');
+      if (typeValue && typeValue !== '__none__') {
+        metadata.type = typeValue;
+      }
+      const res = await fetch('/api/embeddings/namespaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ namespace: editingNamespace.namespace, description: editingNamespace.description, metadata }),
+      });
+      if (res.ok) {
+        toast({ title: 'Namespace actualizado', description: `Namespace "${editingNamespace.namespace}" actualizado.` });
+        setEditingNamespace(null);
+        loadNamespaces();
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Error al actualizar namespace.', variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -554,7 +629,7 @@ export function EmbeddingsSettingsPanel() {
     try {
       const res = await fetch(`/api/embeddings/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        toast({ title: 'Deleted', description: 'Embedding deleted.' });
+        toast({ title: 'Eliminado', description: 'Embedding eliminado.' });
         loadStats();
         if (selectedNamespace) loadEmbeddings(selectedNamespace);
       }
@@ -567,8 +642,8 @@ export function EmbeddingsSettingsPanel() {
       if (res.ok) {
         const data = await res.json();
         toast({
-          title: 'Deleted',
-          description: `Namespace "${namespace}" deleted (${data.deletedEmbeddings || 0} embeddings removed).`,
+          title: 'Eliminado',
+          description: `Namespace "${namespace}" eliminado (${data.deletedEmbeddings || 0} embeddings eliminados).`,
         });
         setSelectedNamespace(null);
         setViewingNsDocuments(null);
@@ -585,8 +660,8 @@ export function EmbeddingsSettingsPanel() {
       if (res.ok) {
         const data = await res.json();
         toast({
-          title: 'Reset complete',
-          description: `Deleted ${data.data.deletedEmbeddings} embeddings and ${data.data.deletedNamespaces} namespaces.`,
+          title: 'Reinicio completado',
+          description: `Se eliminaron ${data.data.deletedEmbeddings} embeddings y ${data.data.deletedNamespaces} namespaces.`,
         });
         setResetConfirmOpen(false);
         setStats(null);
@@ -597,7 +672,7 @@ export function EmbeddingsSettingsPanel() {
         setViewingNsDocuments(null);
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to reset.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al reiniciar.', variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -617,9 +692,16 @@ export function EmbeddingsSettingsPanel() {
     else { setEmbeddings([]); loadStats(); }
   };
 
+  const refreshEmbeddingsTab = async () => {
+    setRefreshingEmbeddings(true);
+    await Promise.all([loadStats(), loadNamespaces(), loadEmbeddings(selectedNamespace || undefined)]);
+    setRefreshingEmbeddings(false);
+  };
+
   const handleTabChange = (tab: string) => {
     if (tab === 'namespaces') { loadNamespaces(); setViewingNsDocuments(null); }
-    if (tab === 'embeddings') { loadStats(); if (selectedNamespace) loadEmbeddings(selectedNamespace); }
+    if (tab === 'embeddings') { refreshEmbeddingsTab(); }
+    if (tab === 'archivos') { loadNamespaces(); }
   };
 
   // File upload handlers
@@ -646,12 +728,12 @@ export function EmbeddingsSettingsPanel() {
           characterCount: data.data.characterCount,
         });
         setPreviewChunks(null);
-        toast({ title: 'File loaded', description: `${data.data.fileName} (${data.data.characterCount.toLocaleString()} chars)` });
+        toast({ title: 'Archivo cargado', description: `${data.data.fileName} (${data.data.characterCount.toLocaleString()} caracteres)` });
       } else {
-        toast({ title: 'Upload failed', description: data.error, variant: 'destructive' });
+        toast({ title: 'Error al subir', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to upload file.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al subir archivo.', variant: 'destructive' });
     }
     setUploadingFile(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -685,10 +767,10 @@ export function EmbeddingsSettingsPanel() {
       if (data.success) {
         setPreviewChunks(data.data);
       } else {
-        toast({ title: 'Preview failed', description: data.error, variant: 'destructive' });
+        toast({ title: 'Error en vista previa', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to preview chunks.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al previsualizar fragmentos.', variant: 'destructive' });
     }
     setPreviewingChunks(false);
   };
@@ -713,18 +795,18 @@ export function EmbeddingsSettingsPanel() {
       const data = await res.json();
       if (data.success) {
         toast({
-          title: 'Embeddings created',
-          description: `${data.data.createdCount} embeddings in "${uploadNamespace}" (${data.data.errorCount} errors)`,
+          title: 'Embeddings creados',
+          description: `${data.data.createdCount} embeddings en "${uploadNamespace}" (${data.data.errorCount} errores)`,
         });
         setUploadedFile(null);
         setPreviewChunks(null);
         loadStats();
         loadNamespaces();
       } else {
-        toast({ title: 'Failed', description: data.error, variant: 'destructive' });
+        toast({ title: 'Fallido', description: data.error, variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Error', description: 'Failed to create embeddings.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Error al crear embeddings.', variant: 'destructive' });
     }
     setCreatingEmbeddings(false);
   };
@@ -745,10 +827,10 @@ export function EmbeddingsSettingsPanel() {
           </div>
           <div className="flex-1">
             <h4 className="text-sm font-medium text-purple-600 dark:text-purple-400">
-              Vector Embeddings
+              Embeddings Vectoriales
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              Semantic search powered by <strong>Ollama</strong> + <strong>LanceDB</strong>. Store text embeddings and search by meaning, not just keywords.
+              Búsqueda semántica con <strong>Ollama</strong> + <strong>LanceDB</strong>. Almacena embeddings de texto y busca por significado, no solo palabras clave.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -756,7 +838,7 @@ export function EmbeddingsSettingsPanel() {
               {connectionStatus === 'connected' ? <CheckCircle className="w-3 h-3 mr-1" /> :
                connectionStatus === 'disconnected' ? <XCircle className="w-3 h-3 mr-1" /> :
                <AlertCircle className="w-3 h-3 mr-1" />}
-              {connectionStatus === 'connected' ? 'All Connected' : connectionStatus === 'disconnected' ? 'Issues Detected' : 'Not Tested'}
+              {connectionStatus === 'connected' ? 'Todo Conectado' : connectionStatus === 'disconnected' ? 'Problemas Detectados' : 'Sin Probar'}
             </Badge>
           </div>
         </div>
@@ -767,7 +849,7 @@ export function EmbeddingsSettingsPanel() {
         <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
           <div className="flex items-center gap-2">
             <Settings className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Configuration</span>
+            <span className="text-sm font-medium">Configuración</span>
           </div>
           <ChevronDown className={cn('w-4 h-4 transition-transform', configOpen && 'rotate-180')} />
         </CollapsibleTrigger>
@@ -793,23 +875,23 @@ export function EmbeddingsSettingsPanel() {
                     </div>
                     <Badge variant={ollamaStatus === 'ok' ? 'default' : ollamaStatus === 'error' ? 'destructive' : 'outline'}
                       className={cn(ollamaStatus === 'ok' && 'bg-emerald-500 border-emerald-500')}>
-                      {ollamaStatus === 'ok' ? 'Connected' : ollamaStatus === 'error' ? 'Error' : 'Unknown'}
+                      {ollamaStatus === 'ok' ? 'Conectado' : ollamaStatus === 'error' ? 'Error' : 'Desconocido'}
                     </Badge>
                   </div>
                   {ollamaError && (
                     <p className="text-[10px] text-red-500/80 mb-2 line-clamp-2">{ollamaError}</p>
                   )}
                   {ollamaStatus === 'ok' && ollamaModels.length > 0 && (
-                    <p className="text-[10px] text-muted-foreground mb-2">{ollamaModels.length} models available</p>
+                    <p className="text-[10px] text-muted-foreground mb-2">{ollamaModels.length} modelos disponibles</p>
                   )}
                   <div className="flex gap-1.5">
                     <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={checkOllama} disabled={checkingOllama}>
                       {checkingOllama ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                      Check
+                      Verificar
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={refreshModels} disabled={refreshingModels}>
                       {refreshingModels ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
-                      Refresh Models
+                      Actualizar Modelos
                     </Button>
                   </div>
                 </div>
@@ -830,7 +912,7 @@ export function EmbeddingsSettingsPanel() {
                     </div>
                     <Badge variant={lanceDBStatus === 'ok' ? 'default' : lanceDBStatus === 'error' ? 'destructive' : 'outline'}
                       className={cn(lanceDBStatus === 'ok' && 'bg-emerald-500 border-emerald-500')}>
-                      {lanceDBStatus === 'ok' ? 'Active' : lanceDBStatus === 'error' ? 'Error' : 'Unknown'}
+                      {lanceDBStatus === 'ok' ? 'Activo' : lanceDBStatus === 'error' ? 'Error' : 'Desconocido'}
                     </Badge>
                   </div>
                   {lanceDBError && (
@@ -841,7 +923,7 @@ export function EmbeddingsSettingsPanel() {
                   )}
                   <Button size="sm" variant="outline" className="h-7 text-xs w-full" onClick={checkLanceDB} disabled={checkingLanceDB}>
                     {checkingLanceDB ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Database className="w-3 h-3 mr-1" />}
-                    Check Database
+                    Verificar BD
                   </Button>
                 </div>
               </div>
@@ -850,7 +932,7 @@ export function EmbeddingsSettingsPanel() {
 
               {/* Ollama URL */}
               <div className="space-y-2">
-                <Label className="text-xs">Ollama URL</Label>
+                <Label className="text-xs">URL de Ollama</Label>
                 <Input
                   value={config.ollamaUrl}
                   onChange={(e) => setConfig(prev => ({ ...prev, ollamaUrl: e.target.value }))}
@@ -862,7 +944,7 @@ export function EmbeddingsSettingsPanel() {
               {/* Embedding Model */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Embedding Model</Label>
+                  <Label className="text-xs">Modelo de Embedding</Label>
                   {ollamaModels.length > 0 && (
                     <Button size="sm" variant="ghost" className="h-5 text-[10px] px-1.5 text-muted-foreground"
                       onClick={refreshModels} disabled={refreshingModels}>
@@ -900,14 +982,14 @@ export function EmbeddingsSettingsPanel() {
                     )}
                     {ollamaModels.length === 0 && (
                       <SelectItem value="no-models" disabled>
-                        <span className="text-muted-foreground">No models scanned — click "Refresh Models"</span>
+                        <span className="text-muted-foreground">No hay modelos escaneados — haz clic en "Actualizar Modelos"</span>
                       </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Similarity Threshold + Max Results (moved here from Advanced) */}
+              {/* Similarity Threshold + Max Results */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs">Umbral de Similitud: {(config.similarityThreshold * 100).toFixed(0)}%</Label>
@@ -940,11 +1022,11 @@ export function EmbeddingsSettingsPanel() {
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                 <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <ChevronDown className={cn('w-3 h-3 transition-transform', advancedOpen && 'rotate-180')} />
-                  Advanced Settings
+                  Ajustes Avanzados
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-4 mt-3">
                   <div className="space-y-2">
-                    <Label className="text-xs">Vector Dimension: {config.dimension}</Label>
+                    <Label className="text-xs">Dimensión Vectorial: {config.dimension}</Label>
                     <Input
                       type="number"
                       value={config.dimension}
@@ -955,14 +1037,32 @@ export function EmbeddingsSettingsPanel() {
                 </CollapsibleContent>
               </Collapsible>
 
+              {/* Dimension Mismatch Warning */}
+              {config.tableDimension != null && config.tableDimension !== config.dimension && (
+                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                        Incompatibilidad de dimensiones detectada
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        La tabla de embeddings tiene {config.tableDimension}D pero el modelo actual usa {config.dimension}D.
+                        Guarda la configuración para recrear automáticamente la tabla con la dimensión correcta.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Save Config Button */}
               <div className="flex gap-2 pt-2">
                 <Button onClick={saveConfig} disabled={loading} size="sm" className="flex-1 sm:flex-none">
                   {loading ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : null}
-                  Save Config
+                  Guardar Config
                 </Button>
                 <Button onClick={testConnection} size="sm" variant="outline" className="flex-1 sm:flex-none">
-                  Test All
+                  Probar Todo
                 </Button>
               </div>
             </CardContent>
@@ -973,200 +1073,20 @@ export function EmbeddingsSettingsPanel() {
       {/* Chat Integration Section */}
       <EmbeddingsChatIntegration />
 
-      {/* File Upload Section */}
-      <Collapsible open={uploadSectionOpen} onOpenChange={setUploadSectionOpen}>
-        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
-          <div className="flex items-center gap-2">
-            <Upload className="w-4 h-4 text-blue-500" />
-            <span className="text-sm font-medium">Upload & Create Embeddings</span>
-            {uploadedFile && (
-              <Badge variant="default" className="text-[10px] h-5 px-1.5 bg-blue-500">
-                {uploadedFile.fileName}
-              </Badge>
-            )}
-          </div>
-          <ChevronDown className={cn('w-4 h-4 transition-transform', uploadSectionOpen && 'rotate-180')} />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3">
-          <Card>
-            <CardContent className="pt-4 space-y-4">
-              {/* File Upload */}
-              <div className="space-y-2">
-                <Label className="text-xs">Upload File</Label>
-                <div className="flex gap-2">
-                  <Input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".txt,.md,.json,.csv,.html,.py,.js,.ts,.java,.c,.cpp,.rb,.go,.rs,.xml,.yaml,.yml,.log"
-                    onChange={handleFileUpload}
-                    className="h-9 text-sm"
-                    disabled={uploadingFile}
-                  />
-                  {uploadingFile && (
-                    <Button size="sm" disabled>
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                      Loading...
-                    </Button>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Supported: .txt, .md, .json, .csv, .html, code files (.py, .js, .ts, .java, etc.) — Max 10MB
-                </p>
-              </div>
-
-              {uploadedFile && (
-                <>
-                  <Separator />
-
-                  {/* File Info */}
-                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-                    <File className="w-5 h-5 text-blue-500 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{uploadedFile.fileName}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatFileSize(uploadedFile.fileSize)} · {uploadedFile.characterCount.toLocaleString()} characters
-                      </p>
-                    </div>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setUploadedFile(null); setPreviewChunks(null); }}>
-                      Remove
-                    </Button>
-                  </div>
-
-                  {/* Namespace Selection */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Target Namespace</Label>
-                    <Select value={uploadNamespace} onValueChange={setUploadNamespace}>
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {namespaces.map(ns => (
-                          <SelectItem key={ns.namespace} value={ns.namespace}>{ns.namespace}</SelectItem>
-                        ))}
-                        <SelectItem value="default">default</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Text Splitter Selection */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Text Splitter</Label>
-                    <Select value={splitterType} onValueChange={handleSplitterChange}>
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SPLITTER_OPTIONS.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            <div className="flex items-center gap-2">
-                              <opt.icon className="w-3.5 h-3.5" />
-                              <div>
-                                <span className="text-sm">{opt.label}</span>
-                                <p className="text-[10px] text-muted-foreground">{opt.description}</p>
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Chunk Size + Overlap */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Chunk Size: {chunkSize} chars</Label>
-                      <Slider
-                        value={[chunkSize]}
-                        min={100} max={4000} step={50}
-                        onValueChange={([v]) => { setChunkSize(v); setPreviewChunks(null); }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Overlap: {chunkOverlap} chars</Label>
-                      <Slider
-                        value={[chunkOverlap]}
-                        min={0} max={Math.min(chunkSize, 1000)} step={10}
-                        onValueChange={([v]) => { setChunkOverlap(v); setPreviewChunks(null); }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handlePreviewChunks}
-                      disabled={previewingChunks || !uploadedFile}
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      {previewingChunks ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
-                      Preview Chunks
-                    </Button>
-                    <Button
-                      onClick={handleCreateEmbeddings}
-                      disabled={creatingEmbeddings || !uploadedFile}
-                      size="sm"
-                      className="flex-1 bg-purple-600 hover:bg-purple-700"
-                    >
-                      {creatingEmbeddings ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Layers className="w-4 h-4 mr-1" />}
-                      Create Embeddings
-                    </Button>
-                  </div>
-
-                  {/* Preview Chunks - Fixed height scrollable */}
-                  {previewChunks && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium flex items-center gap-2">
-                          <Layers className="w-4 h-4 text-purple-500" />
-                          Chunk Preview
-                        </h4>
-                        <Badge variant="outline">
-                          {previewChunks.totalChunks} chunks · avg {previewChunks.avgChunkSize} chars
-                        </Badge>
-                      </div>
-                      <ScrollArea className="h-48 rounded-lg border">
-                        <div className="p-3 space-y-2">
-                          {previewChunks.chunks.map((chunk, i) => (
-                            <div key={i} className="p-2 rounded bg-muted/50 text-xs font-mono">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge variant="secondary" className="text-[10px] h-4 px-1">#{i + 1}</Badge>
-                                <span className="text-[10px] text-muted-foreground">{chunk.length} chars</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground line-clamp-3">{chunk}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {!uploadedFile && (
-                <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
-                  <Upload className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Upload a file to create embeddings</p>
-                  <p className="text-xs mt-1">Text, markdown, code, and more supported</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </CollapsibleContent>
-      </Collapsible>
-
       {/* Main Tabs */}
       <Tabs defaultValue="search" onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="search" className="text-xs">
-            <Search className="w-3 h-3 mr-1" />Search
+            <Search className="w-3 h-3 mr-1" />Búsqueda
+          </TabsTrigger>
+          <TabsTrigger value="archivos" className="text-xs">
+            <Upload className="w-3 h-3 mr-1" />Archivos
           </TabsTrigger>
           <TabsTrigger value="namespaces" className="text-xs">
             <FolderOpen className="w-3 h-3 mr-1" />Namespaces
           </TabsTrigger>
           <TabsTrigger value="embeddings" className="text-xs">
-            <Database className="w-3 h-3 mr-1" />Browse
+            <Database className="w-3 h-3 mr-1" />Examinar
           </TabsTrigger>
         </TabsList>
 
@@ -1174,7 +1094,7 @@ export function EmbeddingsSettingsPanel() {
         <TabsContent value="search" className="space-y-3 mt-3">
           <div className="flex gap-2">
             <Input
-              placeholder="Search by meaning... (e.g., 'magic sword', 'ancient forest')"
+              placeholder="Buscar por significado... (ej. 'espada mágica', 'bosque antiguo')"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -1185,7 +1105,7 @@ export function EmbeddingsSettingsPanel() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Namespaces</SelectItem>
+                <SelectItem value="all">Todos los Namespaces</SelectItem>
                 {namespaces.map(ns => (
                   <SelectItem key={ns.namespace} value={ns.namespace}>{ns.namespace}</SelectItem>
                 ))}
@@ -1199,9 +1119,21 @@ export function EmbeddingsSettingsPanel() {
           {/* Search Results */}
           {searchResults.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                {searchResults.length} results found
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {searchResults.length} resultados encontrados
+                </p>
+                {searchMeta && (
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="secondary" className="text-[10px]">
+                      Modelo: {searchMeta.model}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      Umbral: {(searchMeta.threshold * 100).toFixed(0)}%
+                    </Badge>
+                  </div>
+                )}
+              </div>
               <div className="max-h-80 overflow-y-auto space-y-1.5">
                 {searchResults.map((result, i) => (
                   <div key={result.id} className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
@@ -1226,17 +1158,186 @@ export function EmbeddingsSettingsPanel() {
           {searchQuery && searchResults.length === 0 && !searching && (
             <div className="text-center py-8 text-muted-foreground">
               <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No results found. Try a different query or lower the threshold.</p>
+              <p className="text-sm">No se encontraron resultados. Intenta una consulta diferente o baja el umbral.</p>
             </div>
           )}
 
           {!searchQuery && (
             <div className="text-center py-8 text-muted-foreground">
               <Brain className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Type a query to search embeddings by semantic similarity.</p>
-              <p className="text-xs mt-1">Results are ranked by cosine similarity.</p>
+              <p className="text-sm">Escribe una consulta para buscar embeddings por similitud semántica.</p>
+              <p className="text-xs mt-1">Los resultados se ordenan por similitud coseno.</p>
             </div>
           )}
+        </TabsContent>
+
+        {/* Archivos (Files) Tab */}
+        <TabsContent value="archivos" className="mt-3">
+          <Card>
+            <CardContent className="pt-4 space-y-4">
+              {/* File Upload */}
+              <div className="space-y-2">
+                <Label className="text-xs">Subir Archivo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.md,.json,.csv,.html,.py,.js,.ts,.java,.c,.cpp,.rb,.go,.rs,.xml,.yaml,.yml,.log"
+                    onChange={handleFileUpload}
+                    className="h-9 text-sm"
+                    disabled={uploadingFile}
+                  />
+                  {uploadingFile && (
+                    <Button size="sm" disabled>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Cargando...
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Soportados: .txt, .md, .json, .csv, .html, archivos de código (.py, .js, .ts, .java, etc.) — Máx. 10MB
+                </p>
+              </div>
+
+              {uploadedFile && (
+                <>
+                  <Separator />
+
+                  {/* File Info */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                    <File className="w-5 h-5 text-blue-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{uploadedFile.fileName}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatFileSize(uploadedFile.fileSize)} · {uploadedFile.characterCount.toLocaleString()} caracteres
+                      </p>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setUploadedFile(null); setPreviewChunks(null); }}>
+                      Eliminar
+                    </Button>
+                  </div>
+
+                  {/* Namespace Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Namespace Destino</Label>
+                    <Select value={uploadNamespace} onValueChange={setUploadNamespace}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {namespaces.map(ns => (
+                          <SelectItem key={ns.namespace} value={ns.namespace}>{ns.namespace}</SelectItem>
+                        ))}
+                        <SelectItem value="default">default</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Text Splitter Selection */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Divisor de Texto</Label>
+                    <Select value={splitterType} onValueChange={handleSplitterChange}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SPLITTER_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <div className="flex items-center gap-2">
+                              <opt.icon className="w-3.5 h-3.5" />
+                              <div>
+                                <span className="text-sm">{opt.label}</span>
+                                <p className="text-[10px] text-muted-foreground">{opt.description}</p>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Chunk Size + Overlap */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Tamaño de Fragmento: {chunkSize} caracteres</Label>
+                      <Slider
+                        value={[chunkSize]}
+                        min={100} max={4000} step={50}
+                        onValueChange={([v]) => { setChunkSize(v); setPreviewChunks(null); }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Solapamiento: {chunkOverlap} caracteres</Label>
+                      <Slider
+                        value={[chunkOverlap]}
+                        min={0} max={Math.min(chunkSize, 1000)} step={10}
+                        onValueChange={([v]) => { setChunkOverlap(v); setPreviewChunks(null); }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handlePreviewChunks}
+                      disabled={previewingChunks || !uploadedFile}
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {previewingChunks ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+                      Vista Previa
+                    </Button>
+                    <Button
+                      onClick={handleCreateEmbeddings}
+                      disabled={creatingEmbeddings || !uploadedFile}
+                      size="sm"
+                      className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    >
+                      {creatingEmbeddings ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Layers className="w-4 h-4 mr-1" />}
+                      Crear Embeddings
+                    </Button>
+                  </div>
+
+                  {/* Preview Chunks - Fixed height scrollable */}
+                  {previewChunks && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-purple-500" />
+                          Vista Previa de Fragmentos
+                        </h4>
+                        <Badge variant="outline">
+                          {previewChunks.totalChunks} fragmentos · promedio {previewChunks.avgChunkSize} caracteres
+                        </Badge>
+                      </div>
+                      <ScrollArea className="h-48 rounded-lg border">
+                        <div className="p-3 space-y-2">
+                          {previewChunks.chunks.map((chunk, i) => (
+                            <div key={i} className="p-2 rounded bg-muted/50 text-xs font-mono">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">#{i + 1}</Badge>
+                                <span className="text-[10px] text-muted-foreground">{chunk.length} caracteres</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-3">{chunk}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!uploadedFile && (
+                <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <Upload className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Sube un archivo para crear embeddings</p>
+                  <p className="text-xs mt-1">Texto, markdown, código y más</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Namespaces Tab */}
@@ -1247,18 +1348,18 @@ export function EmbeddingsSettingsPanel() {
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setViewingNsDocuments(null)}>
                   <ArrowLeft className="w-3 h-3 mr-1" />
-                  Back to Namespaces
+                  Volver a Namespaces
                 </Button>
-                <h3 className="text-sm font-medium">Documents in "{viewingNsDocuments}"</h3>
+                <h3 className="text-sm font-medium">Documentos en &quot;{viewingNsDocuments}&quot;</h3>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  {loadingDocuments ? 'Loading...' : `${nsDocuments.length} documents`}
+                  {loadingDocuments ? 'Cargando...' : `${nsDocuments.length} documentos`}
                 </span>
                 {nsDocuments.length > 0 && (
                   <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleClearNamespaceDocuments(viewingNsDocuments)}>
-                    <Trash2 className="w-3 h-3 mr-1" />Clear All
+                    <Trash2 className="w-3 h-3 mr-1" />Limpiar Todo
                   </Button>
                 )}
               </div>
@@ -1270,7 +1371,7 @@ export function EmbeddingsSettingsPanel() {
               ) : nsDocuments.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">No documents in this namespace</p>
+                  <p className="text-sm">Sin documentos en este namespace</p>
                 </div>
               ) : (
                 <ScrollArea className="max-h-80">
@@ -1283,7 +1384,7 @@ export function EmbeddingsSettingsPanel() {
                               <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                               <span className="text-sm font-medium truncate">{doc.source_id}</span>
                               <Badge variant="secondary" className="text-[10px]">
-                                {doc.count} chunks
+                                {doc.count} fragmentos
                               </Badge>
                               <Badge variant="outline" className="text-[10px]">
                                 {doc.source_type}
@@ -1318,10 +1419,10 @@ export function EmbeddingsSettingsPanel() {
                 <span className="text-xs text-muted-foreground">{namespaces.length} namespaces</span>
                 <div className="flex gap-1.5">
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { loadNamespaces(); loadStats(); }}>
-                    <RefreshCw className="w-3 h-3 mr-1" />Refresh
+                    <RefreshCw className="w-3 h-3 mr-1" />Actualizar
                   </Button>
                   <Button size="sm" className="h-7 text-xs" onClick={() => setCreateNamespaceOpen(true)}>
-                    <Plus className="w-3 h-3 mr-1" />New
+                    <Plus className="w-3 h-3 mr-1" />Nuevo
                   </Button>
                 </div>
               </div>
@@ -1330,7 +1431,7 @@ export function EmbeddingsSettingsPanel() {
                 {namespaces.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">No namespaces yet. Create one to organize embeddings.</p>
+                    <p className="text-sm">Sin namespaces aún. Crea uno para organizar embeddings.</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
@@ -1348,11 +1449,29 @@ export function EmbeddingsSettingsPanel() {
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <span className="text-sm font-medium truncate">{ns.namespace}</span>
+                            {ns.type && (
+                              <Badge variant="secondary" className="text-[10px] shrink-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                                {ns.type}
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-[10px] shrink-0">
-                              {ns.embedding_count || 0} embeddings
+                              {ns.embedding_count || 0} emb
                             </Badge>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                const isCustomType = ns.type && !['MEMORIA DEL PERSONAJE', 'EVENTOS RECIENTES', 'LORE DEL MUNDO', 'REGLAS Y MECANICAS', 'RELACIONES'].includes(ns.type);
+                                setEditingNamespace({ ...ns, type: isCustomType ? '__custom__' : (ns.type || '') });
+                                setEditCustomTypeText(isCustomType ? ns.type : '');
+                              }}
+                              title="Editar tipo"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1389,77 +1508,81 @@ export function EmbeddingsSettingsPanel() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                {selectedNamespace ? `${embeddings.length} in "${selectedNamespace}"` : `${stats?.totalEmbeddings || 0} total`}
+                {selectedNamespace ? `${embeddings.length} en "${selectedNamespace}"` : `${stats?.totalEmbeddings || 0} total`}
               </span>
               {selectedNamespace && (
                 <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => handleSelectNamespace(null)}>
-                  Show all
+                  Mostrar todo
                 </Button>
               )}
             </div>
             <div className="flex gap-1.5">
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { loadStats(); loadNamespaces(); loadEmbeddings(selectedNamespace || undefined); }}>
-                <RefreshCw className="w-3 h-3 mr-1" />Refresh
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={refreshEmbeddingsTab} disabled={refreshingEmbeddings}>
+                {refreshingEmbeddings ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                Actualizar
               </Button>
               <Button size="sm" className="h-7 text-xs" onClick={() => setCreateEmbeddingOpen(true)}>
-                <Plus className="w-3 h-3 mr-1" />Add
+                <Plus className="w-3 h-3 mr-1" />Agregar
               </Button>
             </div>
           </div>
 
-          <ScrollArea className="max-h-80">
-            {embeddings.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No embeddings stored yet.</p>
-                <p className="text-xs mt-1">Add embeddings manually or import from files above.</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {embeddings.map(emb => (
-                  <div key={emb.id} className="p-3 rounded-lg border border-border/40 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm line-clamp-2">{emb.content}</p>
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <Badge variant="outline" className="text-[10px]">
-                            <Tag className="w-2.5 h-2.5 mr-0.5" />
-                            {emb.namespace}
+          {refreshingEmbeddings ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground ml-2">Cargando embeddings...</span>
+            </div>
+          ) : embeddings.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Sin embeddings almacenados.</p>
+              <p className="text-xs mt-1">Agrega embeddings manualmente o importa desde archivos.</p>
+            </div>
+          ) : (
+            <div className="max-h-[400px] overflow-y-auto space-y-1.5 pr-1">
+              {embeddings.map(emb => (
+                <div key={emb.id} className="p-3 rounded-lg border border-border/40 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm line-clamp-2">{emb.content}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <Badge variant="outline" className="text-[10px]">
+                          <Tag className="w-2.5 h-2.5 mr-0.5" />
+                          {emb.namespace}
+                        </Badge>
+                        {emb.source_type && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            <Globe className="w-2.5 h-2.5 mr-0.5" />
+                            {emb.source_type}
                           </Badge>
-                          {emb.source_type && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              <Globe className="w-2.5 h-2.5 mr-0.5" />
-                              {emb.source_type}
-                            </Badge>
-                          )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {new Date(emb.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(emb.created_at).toLocaleDateString()}
+                        </span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => handleDeleteEmbedding(emb.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => handleDeleteEmbedding(emb.id)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Danger Zone */}
           {stats && stats.totalEmbeddings > 0 && (
             <div className="pt-3">
               <Separator className="mb-3" />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-destructive">Danger: Reset all data</span>
+                <span className="text-xs text-destructive">Peligro: Reiniciar todo</span>
                 <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => setResetConfirmOpen(true)}>
-                  <Trash2 className="w-3 h-3 mr-1" />Reset All
+                  <Trash2 className="w-3 h-3 mr-1" />Reiniciar Todo
                 </Button>
               </div>
             </div>
@@ -1471,16 +1594,16 @@ export function EmbeddingsSettingsPanel() {
       <Dialog open={createEmbeddingOpen} onOpenChange={setCreateEmbeddingOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Embedding</DialogTitle>
-            <DialogDescription>Store a new text embedding for semantic search.</DialogDescription>
+            <DialogTitle>Agregar Embedding</DialogTitle>
+            <DialogDescription>Almacena un nuevo embedding de texto para búsqueda semántica.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Content</Label>
+              <Label>Contenido</Label>
               <Textarea
                 value={newEmbedding.content}
                 onChange={(e) => setNewEmbedding(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Enter the text to embed..."
+                placeholder="Ingresa el texto para incrustar..."
                 rows={4}
                 className="text-sm"
               />
@@ -1499,27 +1622,27 @@ export function EmbeddingsSettingsPanel() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Source Type</Label>
+                <Label>Tipo de Origen</Label>
                 <Select value={newEmbedding.source_type} onValueChange={(v) => setNewEmbedding(prev => ({ ...prev, source_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="custom">Custom</SelectItem>
-                    <SelectItem value="character">Character</SelectItem>
-                    <SelectItem value="world">World</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                    <SelectItem value="character">Personaje</SelectItem>
+                    <SelectItem value="world">Mundo</SelectItem>
                     <SelectItem value="lorebook">Lorebook</SelectItem>
-                    <SelectItem value="session">Session</SelectItem>
-                    <SelectItem value="memory">Memory</SelectItem>
-                    <SelectItem value="file">File</SelectItem>
+                    <SelectItem value="session">Sesión</SelectItem>
+                    <SelectItem value="memory">Memoria</SelectItem>
+                    <SelectItem value="file">Archivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateEmbeddingOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateEmbeddingOpen(false)}>Cancelar</Button>
             <Button onClick={handleCreateEmbedding} disabled={loading || !newEmbedding.content.trim()}>
               {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
-              Create
+              Crear
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1529,33 +1652,189 @@ export function EmbeddingsSettingsPanel() {
       <Dialog open={createNamespaceOpen} onOpenChange={setCreateNamespaceOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create Namespace</DialogTitle>
-            <DialogDescription>Namespaces organize embeddings into logical groups.</DialogDescription>
+            <DialogTitle>Crear Namespace</DialogTitle>
+            <DialogDescription>Los namespaces organizan embeddings en grupos lógicos. El tipo se usa para agrupar embeddings en el prompt del chat.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>Nombre</Label>
               <Input
                 value={newNamespace.namespace}
                 onChange={(e) => setNewNamespace(prev => ({ ...prev, namespace: e.target.value }))}
-                placeholder="e.g., character-lore, world-history"
+                placeholder="ej. historia-personaje, eventos-recientes"
                 className="text-sm"
               />
             </div>
             <div className="space-y-2">
-              <Label>Description (optional)</Label>
+              <Label>Tipo <span className="text-muted-foreground text-[10px]">(agrupa en el prompt del chat)</span></Label>
+              <Select
+                value={newNamespace.type === '__custom__' || (!['__none__', 'MEMORIA DEL PERSONAJE', 'EVENTOS RECIENTES', 'LORE DEL MUNDO', 'REGLAS Y MECANICAS', 'RELACIONES'].includes(newNamespace.type) && newNamespace.type) ? '__custom__' : (newNamespace.type || '__none__')}
+                onValueChange={(v) => {
+                  if (v === '__custom__') {
+                    setCustomTypeText('');
+                  }
+                  setNewNamespace(prev => ({ ...prev, type: v }));
+                }}
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Sin tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Sin tipo</span>
+                  </SelectItem>
+                  <SelectItem value="MEMORIA DEL PERSONAJE">
+                    <div className="flex flex-col">
+                      <span>🧠 Memoria del Personaje</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="EVENTOS RECIENTES">
+                    <div className="flex flex-col">
+                      <span>📅 Eventos Recientes</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="LORE DEL MUNDO">
+                    <div className="flex flex-col">
+                      <span>🌍 Lore del Mundo</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="REGLAS Y MECANICAS">
+                    <div className="flex flex-col">
+                      <span>⚙️ Reglas y Mecánicas</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="RELACIONES">
+                    <div className="flex flex-col">
+                      <span>👥 Relaciones</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="__custom__">
+                    <div className="flex flex-col">
+                      <span>✏️ Tipo personalizado...</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {newNamespace.type === '__custom__' && (
+                <Input
+                  autoFocus
+                  value={customTypeText}
+                  onChange={(e) => setCustomTypeText(e.target.value)}
+                  placeholder="Escribe el tipo personalizado"
+                  className="text-sm"
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción (opcional)</Label>
               <Input
                 value={newNamespace.description}
                 onChange={(e) => setNewNamespace(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Brief description of this namespace"
+                placeholder="Descripción breve de este namespace"
                 className="text-sm"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateNamespaceOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateNamespaceOpen(false)}>Cancelar</Button>
             <Button onClick={handleCreateNamespace} disabled={loading || !newNamespace.namespace.trim()}>
-              Create
+              Crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Namespace Dialog */}
+      <Dialog open={!!editingNamespace} onOpenChange={(open) => { if (!open) setEditingNamespace(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Namespace</DialogTitle>
+            <DialogDescription>Modifica el tipo y descripción del namespace. Los embeddings no se afectan.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre</Label>
+              <Input
+                value={editingNamespace?.namespace || ''}
+                disabled
+                className="text-sm bg-muted"
+              />
+              <p className="text-[10px] text-muted-foreground">El nombre no se puede cambiar después de crearlo.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo <span className="text-muted-foreground text-[10px]">(agrupa en el prompt del chat)</span></Label>
+              <Select
+                value={editingNamespace?.type === '__custom__' || (!['__none__', 'MEMORIA DEL PERSONAJE', 'EVENTOS RECIENTES', 'LORE DEL MUNDO', 'REGLAS Y MECANICAS', 'RELACIONES', ''].includes(editingNamespace?.type || '') && editingNamespace?.type) ? '__custom__' : (editingNamespace?.type || '__none__')}
+                onValueChange={(v) => {
+                  if (v === '__custom__') {
+                    setEditCustomTypeText('');
+                  }
+                  setEditingNamespace(prev => prev ? { ...prev, type: v } : prev);
+                }}
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Sin tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Sin tipo</span>
+                  </SelectItem>
+                  <SelectItem value="MEMORIA DEL PERSONAJE">
+                    <div className="flex flex-col">
+                      <span>🧠 Memoria del Personaje</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="EVENTOS RECIENTES">
+                    <div className="flex flex-col">
+                      <span>📅 Eventos Recientes</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="LORE DEL MUNDO">
+                    <div className="flex flex-col">
+                      <span>🌍 Lore del Mundo</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="REGLAS Y MECANICAS">
+                    <div className="flex flex-col">
+                      <span>⚙️ Reglas y Mecánicas</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="RELACIONES">
+                    <div className="flex flex-col">
+                      <span>👥 Relaciones</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="__custom__">
+                    <div className="flex flex-col">
+                      <span>✏️ Tipo personalizado...</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {editingNamespace?.type === '__custom__' && (
+                <Input
+                  autoFocus
+                  value={editCustomTypeText}
+                  onChange={(e) => setEditCustomTypeText(e.target.value)}
+                  placeholder="Escribe el tipo personalizado"
+                  className="text-sm"
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción (opcional)</Label>
+              <Input
+                value={editingNamespace?.description || ''}
+                onChange={(e) => setEditingNamespace(prev => prev ? { ...prev, description: e.target.value } : prev)}
+                placeholder="Descripción breve de este namespace"
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingNamespace(null)}>Cancelar</Button>
+            <Button onClick={handleUpdateNamespace} disabled={loading}>
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1565,16 +1844,16 @@ export function EmbeddingsSettingsPanel() {
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-destructive">Reset All Embeddings</DialogTitle>
+            <DialogTitle className="text-destructive">Reiniciar Todos los Embeddings</DialogTitle>
             <DialogDescription>
-              This will permanently delete all {stats?.totalEmbeddings || 0} embeddings and {stats?.totalNamespaces || 0} namespaces. This action cannot be undone.
+              Esto eliminará permanentemente todos los {stats?.totalEmbeddings || 0} embeddings y {stats?.totalNamespaces || 0} namespaces. Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={handleResetAll} disabled={loading}>
               {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
-              Delete All
+              Eliminar Todo
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1594,6 +1873,9 @@ const DEFAULT_EMBEDDINGS_CHAT = {
   maxTokenBudget: 1024,
   namespaceStrategy: 'character' as const,
   showInPromptViewer: true,
+  memoryExtractionEnabled: false,
+  memoryExtractionFrequency: 5,
+  memoryExtractionMinImportance: 2,
 };
 
 function EmbeddingsChatIntegration() {
@@ -1619,14 +1901,32 @@ function EmbeddingsChatIntegration() {
     });
   };
 
+  const handleToggleMemoryExtraction = (enabled: boolean) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryExtractionEnabled: enabled },
+    });
+  };
+
+  const handleFrequencyChange = (value: number) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryExtractionFrequency: value },
+    });
+  };
+
+  const handleMinImportanceChange = (value: number) => {
+    updateSettings({
+      embeddingsChat: { ...embeddingsChat, memoryExtractionMinImportance: value },
+    });
+  };
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-violet-500" />
-          <span className="text-sm font-medium">Chat Integration</span>
+          <span className="text-sm font-medium">Integración con Chat</span>
           {embeddingsChat.enabled && (
-            <Badge variant="default" className="text-[10px] h-5 px-1.5 bg-violet-500">Active</Badge>
+            <Badge variant="default" className="text-[10px] h-5 px-1.5 bg-violet-500">Activo</Badge>
           )}
         </div>
         <ChevronDown className={cn('w-4 h-4 transition-transform', isOpen && 'rotate-180')} />
@@ -1635,15 +1935,15 @@ function EmbeddingsChatIntegration() {
         <Card>
           <CardContent className="pt-4 space-y-4">
             <p className="text-xs text-muted-foreground">
-              Automatically retrieve relevant embeddings when chatting and inject them as context into the AI prompt.
-              Works in both normal and group chats.
+              Recupera automáticamente embeddings relevantes al chatear y los inyecta como contexto en el prompt de la IA.
+              Funciona tanto en chats normales como grupales.
             </p>
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-sm">Enable in Chat</Label>
+                <Label className="text-sm">Activar en Chat</Label>
                 <p className="text-[10px] text-muted-foreground">
-                  Search embeddings on every message and add context to the prompt
+                  Busca embeddings en cada mensaje y agrega contexto al prompt
                 </p>
               </div>
               <Switch
@@ -1657,7 +1957,7 @@ function EmbeddingsChatIntegration() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Namespace Search Strategy</Label>
+                  <Label className="text-xs">Estrategia de Búsqueda por Namespace</Label>
                   <Select value={embeddingsChat.namespaceStrategy} onValueChange={(v) => handleStrategyChange(v as 'global' | 'character' | 'session')}>
                     <SelectTrigger className="h-8 text-sm">
                       <SelectValue />
@@ -1665,20 +1965,20 @@ function EmbeddingsChatIntegration() {
                     <SelectContent>
                       <SelectItem value="character">
                         <div className="flex flex-col">
-                          <span>Per-Character</span>
-                          <span className="text-[10px] text-muted-foreground">Search character-specific + default + world namespaces</span>
+                          <span>Por Personaje</span>
+                          <span className="text-[10px] text-muted-foreground">Busca namespaces específicos del personaje + default + mundo</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="session">
                         <div className="flex flex-col">
-                          <span>Per-Session</span>
-                          <span className="text-[10px] text-muted-foreground">Search session-specific + character + default namespaces</span>
+                          <span>Por Sesión</span>
+                          <span className="text-[10px] text-muted-foreground">Busca namespaces de sesión + personaje + default</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="global">
                         <div className="flex flex-col">
-                          <span>Global (All)</span>
-                          <span className="text-[10px] text-muted-foreground">Search all namespaces regardless of character or session</span>
+                          <span>Global (Todos)</span>
+                          <span className="text-[10px] text-muted-foreground">Busca todos los namespaces sin importar personaje o sesión</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -1686,7 +1986,7 @@ function EmbeddingsChatIntegration() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Context Token Budget: ~{embeddingsChat.maxTokenBudget} tokens</Label>
+                  <Label className="text-xs">Presupuesto de Tokens de Contexto: ~{embeddingsChat.maxTokenBudget} tokens</Label>
                   <Slider
                     value={[embeddingsChat.maxTokenBudget]}
                     min={128}
@@ -1695,20 +1995,85 @@ function EmbeddingsChatIntegration() {
                     onValueChange={([v]) => handleBudgetChange(v)}
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    Limits how many tokens of embeddings context are added to the prompt. Higher values give more context but use more of the context window.
+                    Limita cuántos tokens de contexto de embeddings se agregan al prompt. Valores más altos dan más contexto pero usan más de la ventana de contexto.
                   </p>
+                </div>
+
+                <Separator />
+
+                {/* Memory Extraction Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm">🧠 Extracción Automática de Memoria</Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Extrae hechos memorables de las respuestas del personaje y los guarda como embeddings
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!!embeddingsChat.memoryExtractionEnabled}
+                      onCheckedChange={handleToggleMemoryExtraction}
+                    />
+                  </div>
+
+                  {embeddingsChat.memoryExtractionEnabled && (
+                    <div className="space-y-3 pl-1 border-l-2 border-violet-300/30">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Frecuencia: cada {embeddingsChat.memoryExtractionFrequency || 5} mensajes</Label>
+                        <Slider
+                          value={[embeddingsChat.memoryExtractionFrequency || 5]}
+                          min={2}
+                          max={20}
+                          step={1}
+                          onValueChange={([v]) => handleFrequencyChange(v)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Cada cuántos mensajes se analiza la respuesta para extraer memoria. Más frecuente = más contexto, pero más uso del LLM.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">Importancia mínima: {embeddingsChat.memoryExtractionMinImportance || 2}/5</Label>
+                        <Slider
+                          value={[embeddingsChat.memoryExtractionMinImportance || 2]}
+                          min={1}
+                          max={5}
+                          step={1}
+                          onValueChange={([v]) => handleMinImportanceChange(v)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Solo se guardan hechos con importancia igual o mayor. Más alto = solo lo más relevante.
+                        </p>
+                      </div>
+
+                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <Brain className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Memoria Automática</p>
+                            <ul className="text-[10px] text-muted-foreground space-y-0.5 list-disc list-inside">
+                              <li>Después de cada N respuestas, el LLM analiza el mensaje y extrae hechos memorables</li>
+                              <li>Los hechos se guardan en namespaces automáticos (character-{'{id}'} o group-{'{id}'})</li>
+                              <li>Se filtran por importancia (1=bajo, 5=crítico)</li>
+                              <li>La extracción es asíncrona — no afecta la velocidad de respuesta</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-violet-500/5 border border-violet-500/20 rounded-lg p-3">
                   <div className="flex items-start gap-2">
                     <Brain className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-medium text-violet-600 dark:text-violet-400">How it works</p>
+                      <p className="text-xs font-medium text-violet-600 dark:text-violet-400">Cómo funciona</p>
                       <ul className="text-[10px] text-muted-foreground space-y-0.5 list-disc list-inside">
-                        <li>When you send a message, the system generates a vector embedding of your text</li>
-                        <li>It searches the selected namespaces for similar embeddings</li>
-                        <li>Top results are injected into the AI prompt as context</li>
-                        <li>The AI uses this context to generate more informed responses</li>
+                        <li>Cuando envías un mensaje, el sistema genera un vector embedding de tu texto</li>
+                        <li>Busca en los namespaces seleccionados embeddings similares</li>
+                        <li>Los mejores resultados se inyectan en el prompt de la IA como contexto</li>
+                        <li>La IA usa este contexto para generar respuestas más informadas</li>
                       </ul>
                     </div>
                   </div>

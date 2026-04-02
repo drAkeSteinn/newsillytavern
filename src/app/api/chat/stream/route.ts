@@ -252,10 +252,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Combine all sections in order for prompt viewer
-    // Order: System -> Embeddings -> Summary -> Quest -> Chat History -> Post-History Instructions
+    // Order: System (up to Persona) -> CONTEXTO (embeddings) -> Rest of System -> Summary -> Quest -> Chat History -> Post-History
+    // Insert embeddings section right after User's Persona
+    const personaIndex = systemSections.findIndex(s => s.type === 'persona');
+    const prePersonaSections = personaIndex >= 0 ? systemSections.slice(0, personaIndex + 1) : systemSections;
+    const postPersonaSections = personaIndex >= 0 ? systemSections.slice(personaIndex + 1) : [];
+
     let allPromptSections: PromptSection[] = [
-      ...systemSections,
+      ...prePersonaSections,
       ...(embeddingsResult.section ? [embeddingsResult.section] : []),
+      ...postPersonaSections,
       ...(summarySection ? [summarySection] : []),
       ...(questSection ? [questSection] : []),
       ...chatHistorySections,
@@ -442,13 +448,56 @@ Y cambiar mi expresión:
           }
 
           // Stream the response
+          let accumulatedContent = '';
           for await (const chunk of generator) {
+            accumulatedContent += chunk;
             controller.enqueue(createSSEJSON({ type: 'token', content: chunk }));
           }
 
           // Send done signal
           controller.enqueue(createSSEJSON({ type: 'done' }));
           controller.close();
+
+          // Async: Extract memory from response (fire-and-forget, don't block)
+          if (
+            embeddingsChat.memoryExtractionEnabled &&
+            accumulatedContent.length > 50 &&
+            allMessages.length > 0 &&
+            allMessages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
+            llmConfig
+          ) {
+            // Use setTimeout to not block the stream closing
+            setTimeout(async () => {
+              try {
+                const response = await fetch('/api/embeddings/extract-memory', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    lastMessage: accumulatedContent,
+                    characterName: effectiveCharacter.name,
+                    characterId: effectiveCharacter.id,
+                    sessionId: sessionId || '',
+                    llmConfig: {
+                      provider: llmConfig.provider,
+                      endpoint: llmConfig.endpoint,
+                      apiKey: llmConfig.apiKey,
+                      model: llmConfig.model,
+                      parameters: llmConfig.parameters,
+                    },
+                    minImportance: embeddingsChat.memoryExtractionMinImportance || 2,
+                  }),
+                });
+                if (response.ok) {
+                  const result = await response.json();
+                  if (result.success && result.saved > 0) {
+                    console.log(`[Memory] Auto-extracted ${result.saved} memories for ${effectiveCharacter.name}`);
+                  }
+                }
+              } catch (err) {
+                console.warn('[Memory] Async extraction failed:', err);
+              }
+            }, 0);
+          }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           controller.enqueue(createSSEJSON({ type: 'error', error: errorMessage }));

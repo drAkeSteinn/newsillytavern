@@ -3,7 +3,7 @@
 // ============================================
 
 import { NextRequest } from 'next/server';
-import type { CharacterCard, PromptSection, Lorebook, SessionStats, HUDContextConfig } from '@/types';
+import type { CharacterCard, PromptSection, Lorebook, SessionStats, HUDContextConfig, EmbeddingsChatSettings } from '@/types';
 import {
   DEFAULT_CHARACTER,
   createSSEJSON,
@@ -30,6 +30,10 @@ import {
 import {
   sanitizeInput
 } from '@/lib/validations';
+import {
+  retrieveEmbeddingsContext,
+  formatEmbeddingsForSSE
+} from '@/lib/embeddings/chat-context';
 
 import {
   selectContextMessages,
@@ -64,6 +68,7 @@ function validateRegenerateRequest(data: unknown) {
       sessionId: obj.sessionId,
       messageId: obj.messageId,
       character: obj.character as Record<string, unknown> | undefined,
+      characterId: typeof obj.characterId === 'string' ? obj.characterId : undefined,
       messages: Array.isArray(obj.messages) ? obj.messages : [],
       llmConfig: obj.llmConfig as Record<string, unknown>,
       userName: typeof obj.userName === 'string' ? obj.userName : 'User',
@@ -72,7 +77,9 @@ function validateRegenerateRequest(data: unknown) {
       lorebooks: Array.isArray(obj.lorebooks) ? obj.lorebooks : [],
       sessionStats: obj.sessionStats,
       hudContext: obj.hudContext as HUDContextConfig | undefined,
-      allCharacters: Array.isArray(obj.allCharacters) ? obj.allCharacters : []
+      allCharacters: Array.isArray(obj.allCharacters) ? obj.allCharacters : [],
+      embeddingsChat: obj.embeddingsChat as Partial<EmbeddingsChatSettings> | undefined,
+      summary: obj.summary as Record<string, unknown> | undefined
     }
   } as const;
 }
@@ -91,6 +98,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       messageId,
       character,
+      characterId,
       messages = [],
       llmConfig,
       userName = 'User',
@@ -99,7 +107,9 @@ export async function POST(request: NextRequest) {
       lorebooks = [],
       sessionStats,
       hudContext,
-      allCharacters = []
+      allCharacters = [],
+      embeddingsChat,
+      summary
     } = validation.data;
 
     // Extract lorebooks for processing
@@ -152,6 +162,24 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // ========================================
+    // Embeddings Context Retrieval
+    // ========================================
+    // Retrieve relevant embeddings based on the last user message before the assistant message to regenerate
+    const lastUserMessage = [...messagesBeforeRegenerate].reverse().find((m: { role: string }) => m.role === 'user');
+    const queryMessage = lastUserMessage ? sanitizeInput((lastUserMessage as { content: string }).content || '') : '';
+
+    const embeddingsResult = await retrieveEmbeddingsContext(
+      queryMessage,
+      characterId || effectiveCharacter.id,
+      sessionId,
+      embeddingsChat
+    );
+
+    if (embeddingsResult.found) {
+      console.log(`[Regenerate Route] Retrieved ${embeddingsResult.count} embeddings from namespaces: ${embeddingsResult.searchedNamespaces.join(', ')}`);
+    }
+
     // Build system prompt with persona and lorebook (using processed character)
     const { prompt: systemPrompt, sections: systemSections } = buildSystemPrompt(
       processedCharacter,
@@ -170,8 +198,16 @@ export async function POST(request: NextRequest) {
     const postHistorySection = buildPostHistorySection(processedCharacter.postHistoryInstructions);
 
     // Combine all sections in order
+    // Order: System (up to Persona) -> CONTEXTO (embeddings) -> Rest of System -> Chat History -> Post-History Instructions
+    // Insert embeddings section right after User's Persona
+    const personaIndex = systemSections.findIndex(s => s.type === 'persona');
+    const prePersonaSections = personaIndex >= 0 ? systemSections.slice(0, personaIndex + 1) : systemSections;
+    const postPersonaSections = personaIndex >= 0 ? systemSections.slice(personaIndex + 1) : [];
+
     let allPromptSections: PromptSection[] = [
-      ...systemSections,
+      ...prePersonaSections,
+      ...(embeddingsResult.section ? [embeddingsResult.section] : []),
+      ...postPersonaSections,
       ...chatHistorySections,
       ...(postHistorySection ? [postHistorySection] : [])
     ];
@@ -179,6 +215,12 @@ export async function POST(request: NextRequest) {
     // Inject HUD context into sections if enabled
     if (hudContextSection && hudContext) {
       allPromptSections = injectHUDContextIntoSections(allPromptSections, hudContextSection, hudContext.position);
+    }
+
+    // Build the final system prompt (include embeddings context)
+    let finalSystemPrompt = systemPrompt;
+    if (embeddingsResult.section) {
+      finalSystemPrompt += `\n\n[${embeddingsResult.section.label}]\n${embeddingsResult.contextString}`;
     }
 
     // Create a TransformStream for SSE
@@ -191,13 +233,21 @@ export async function POST(request: NextRequest) {
             promptSections: allPromptSections
           }));
 
+          // Send embeddings context metadata to the client for UI display
+          if (embeddingsResult.found) {
+            controller.enqueue(createSSEJSON({
+              type: 'embeddings_context',
+              data: formatEmbeddingsForSSE(embeddingsResult)
+            }));
+          }
+
           let generator: AsyncGenerator<string>;
 
           // Route to appropriate provider
           switch (llmConfig.provider) {
             case 'z-ai': {
               let chatMessages = buildChatMessages(
-                systemPrompt,
+                finalSystemPrompt,
                 contextWindow.messages,
                 processedCharacter,
                 effectiveUserName,
@@ -218,7 +268,7 @@ export async function POST(request: NextRequest) {
                 throw new Error(`${llmConfig.provider} requires an endpoint URL`);
               }
               let chatMessages = buildChatMessages(
-                systemPrompt,
+                finalSystemPrompt,
                 contextWindow.messages,
                 processedCharacter,
                 effectiveUserName,
@@ -238,7 +288,7 @@ export async function POST(request: NextRequest) {
                 throw new Error('Anthropic requires an API key');
               }
               let chatMessages = buildChatMessages(
-                systemPrompt,
+                finalSystemPrompt,
                 contextWindow.messages,
                 processedCharacter,
                 effectiveUserName,
@@ -255,7 +305,7 @@ export async function POST(request: NextRequest) {
 
             case 'ollama': {
               const prompt = buildCompletionPrompt({
-                systemPrompt,
+                systemPrompt: finalSystemPrompt,
                 messages: contextWindow.messages,
                 character: processedCharacter,
                 userName: effectiveUserName,
@@ -269,7 +319,7 @@ export async function POST(request: NextRequest) {
             case 'koboldcpp':
             default: {
               const prompt = buildCompletionPrompt({
-                systemPrompt,
+                systemPrompt: finalSystemPrompt,
                 messages: contextWindow.messages,
                 character: processedCharacter,
                 userName: effectiveUserName,

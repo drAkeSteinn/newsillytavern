@@ -3,6 +3,7 @@
  *
  * Provides utilities for automatically retrieving relevant embeddings
  * during chat and injecting them as context into the LLM prompt.
+ * Embeddings are grouped by namespace type for organized presentation.
  *
  * Used by /api/chat/stream and /api/chat/group-stream routes.
  */
@@ -10,6 +11,7 @@
 import type { PromptSection, EmbeddingsChatSettings } from '@/types';
 import { getEmbeddingClient } from './client';
 import { loadConfig } from './config-persistence';
+import { LanceDBWrapper } from './lancedb-db';
 import type { SearchResult } from './types';
 
 /** Result of embeddings context retrieval */
@@ -26,13 +28,16 @@ export interface EmbeddingsContextResult {
   section: PromptSection | null;
   /** Namespaces that were searched */
   searchedNamespaces: string[];
+  /** Grouping info: type → count of results */
+  typeGroups?: Record<string, number>;
 }
 
 /**
  * Retrieve embeddings context for a chat message.
  *
- * Searches relevant namespaces based on the configured strategy and
- * returns a PromptSection that can be injected into the system prompt.
+ * Searches relevant namespaces based on the configured strategy,
+ * groups results by namespace type, and returns a PromptSection
+ * that can be injected into the system prompt.
  *
  * @param userMessage - The user's current message (used as search query)
  * @param characterId - The active character's ID (for character strategy)
@@ -54,6 +59,7 @@ export async function retrieveEmbeddingsContext(
     results: [],
     section: null,
     searchedNamespaces: [],
+    typeGroups: {},
   };
 
   if (!settings?.enabled) {
@@ -69,11 +75,15 @@ export async function retrieveEmbeddingsContext(
     const config = loadConfig();
 
     // Determine namespaces to search based on strategy
-    const namespaces = getNamespacesForStrategy(
-      settings.namespaceStrategy || 'character',
-      characterId,
-      sessionId
-    );
+    // If custom namespaces are provided (from character/group assignment), use those instead
+    const customNamespaces = settings.customNamespaces;
+    const namespaces = (customNamespaces && customNamespaces.length > 0)
+      ? customNamespaces
+      : getNamespacesForStrategy(
+          settings.namespaceStrategy || 'character',
+          characterId,
+          sessionId
+        );
 
     if (namespaces.length === 0) {
       return emptyResult;
@@ -131,8 +141,11 @@ export async function retrieveEmbeddingsContext(
     // Trim to max results
     const trimmed = allResults.slice(0, maxResults);
 
-    // Build context string respecting token budget
-    const contextString = buildContextString(trimmed, maxBudget);
+    // Load namespace info to get types for grouping
+    const namespaceTypes = await getNamespaceTypesMap(trimmed);
+
+    // Build grouped context string respecting token budget
+    const { contextString, typeGroups } = buildGroupedContextString(trimmed, namespaceTypes, maxBudget);
 
     if (!contextString.trim()) {
       return emptyResult;
@@ -141,7 +154,7 @@ export async function retrieveEmbeddingsContext(
     // Build PromptSection
     const section: PromptSection = {
       type: 'memory',
-      label: 'Embeddings Context',
+      label: 'CONTEXTO',
       content: contextString,
       color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
     };
@@ -153,10 +166,43 @@ export async function retrieveEmbeddingsContext(
       results: trimmed,
       section: settings.showInPromptViewer !== false ? section : null,
       searchedNamespaces: namespaces,
+      typeGroups,
     };
   } catch (error) {
     console.error('[Embeddings] Context retrieval failed:', error);
     return emptyResult;
+  }
+}
+
+/**
+ * Build a map of namespace name → type string by loading all namespaces from DB.
+ * Only loads once and caches the result for this call.
+ */
+async function getNamespaceTypesMap(results: SearchResult[]): Promise<Record<string, string>> {
+  try {
+    const allNamespaces = await LanceDBWrapper.getAllNamespaces();
+    const typeMap: Record<string, string> = {};
+
+    // Collect unique namespace names from results
+    const uniqueNamespaces = new Set<string>();
+    for (const r of results) {
+      if (r.namespace) uniqueNamespaces.add(r.namespace);
+    }
+
+    // Map each namespace name to its type
+    for (const ns of allNamespaces) {
+      if (uniqueNamespaces.has(ns.namespace)) {
+        const type = (ns.metadata as Record<string, any>)?.type;
+        if (type && typeof type === 'string' && type.trim()) {
+          typeMap[ns.namespace] = type.trim().toUpperCase();
+        }
+      }
+    }
+
+    return typeMap;
+  } catch (err) {
+    console.warn('[Embeddings] Could not load namespace types for grouping:', err);
+    return {};
   }
 }
 
@@ -197,26 +243,104 @@ function getNamespacesForStrategy(
 }
 
 /**
- * Build a formatted context string from search results,
- * respecting the token budget (approximated as characters / 4).
+ * Build a grouped context string from search results.
+ * Results are grouped by their namespace type (if available),
+ * with section headers for each group. Results without a type
+ * go into an ungrouped section.
+ *
+ * Respects the token budget (approximated as characters / 4).
  */
-function buildContextString(results: SearchResult[], maxTokenBudget: number): string {
+function buildGroupedContextString(
+  results: SearchResult[],
+  namespaceTypes: Record<string, string>,
+  maxTokenBudget: number
+): { contextString: string; typeGroups: Record<string, number> } {
   const maxChars = maxTokenBudget * 4; // rough estimate: 1 token ≈ 4 chars
-  let totalChars = 0;
-  const parts: string[] = [];
+
+  // Group results by type
+  const groups = new Map<string, SearchResult[]>();
+  const ungrouped: SearchResult[] = [];
 
   for (const result of results) {
-    const entry = `[${result.source_type || 'memory'}] ${result.content}`;
-    if (totalChars + entry.length > maxChars) {
-      break;
+    const type = namespaceTypes[result.namespace];
+    if (type) {
+      if (!groups.has(type)) {
+        groups.set(type, []);
+      }
+      groups.get(type)!.push(result);
+    } else {
+      ungrouped.push(result);
     }
-    parts.push(entry);
-    totalChars += entry.length;
   }
 
-  if (parts.length === 0) return '';
+  // Order: typed groups first (in insertion order), then ungrouped
+  const typeGroups: Record<string, number> = {};
+  const parts: string[] = [];
+  let totalChars = 0;
 
-  return `[Relevant Context from Embeddings]\n${parts.join('\n\n')}`;
+  // Header
+  const header = '[CONTEXTO RELEVANTE]';
+  parts.push(header);
+  totalChars += header.length + 2; // +2 for newlines
+
+  // Add each typed group as a section
+  for (const [type, typeResults] of groups) {
+    const groupHeader = `[${type}]`;
+    const headerLen = groupHeader.length + 2; // header + newline
+    const entries: string[] = [];
+
+    let groupChars = 0;
+    for (const result of typeResults) {
+      const entry = `- ${result.content}`;
+      if (totalChars + headerLen + groupChars + entry.length + 2 > maxChars) {
+        break;
+      }
+      entries.push(entry);
+      groupChars += entry.length + 2;
+    }
+
+    if (entries.length > 0) {
+      const groupSection = `${groupHeader}\n${entries.join('\n')}`;
+      parts.push(groupSection);
+      totalChars += headerLen + groupChars;
+      typeGroups[type] = entries.length;
+    }
+  }
+
+  // Add ungrouped results (if any space left)
+  if (ungrouped.length > 0) {
+    const entries: string[] = [];
+    for (const result of ungrouped) {
+      const entry = `- ${result.content}`;
+      if (totalChars + entry.length + 2 > maxChars) {
+        break;
+      }
+      entries.push(entry);
+      totalChars += entry.length + 2;
+    }
+
+    if (entries.length > 0) {
+      if (groups.size > 0) {
+        // If there are typed groups, add a generic section header
+        const groupHeader = '[OTRO CONTEXTO]';
+        const groupSection = `${groupHeader}\n${entries.join('\n')}`;
+        parts.push(groupSection);
+        totalChars += groupHeader.length + 2;
+        typeGroups['OTRO CONTEXTO'] = entries.length;
+      } else {
+        // No types at all - use simple list format
+        parts.push(entries.join('\n'));
+        typeGroups['SIN TIPO'] = entries.length;
+      }
+    }
+  }
+
+  if (parts.length <= 1) return { contextString: '', typeGroups: {} };
+
+  return {
+    contextString: parts.join('\n\n'),
+    typeGroups,
+  };
 }
 
 /**
@@ -226,6 +350,7 @@ function buildContextString(results: SearchResult[], maxTokenBudget: number): st
 export function formatEmbeddingsForSSE(result: EmbeddingsContextResult): {
   count: number;
   namespaces: string[];
+  typeGroups: Record<string, number>;
   topResults: Array<{
     content: string;
     similarity: number;
@@ -238,6 +363,7 @@ export function formatEmbeddingsForSSE(result: EmbeddingsContextResult): {
   return {
     count: result.count,
     namespaces: result.searchedNamespaces,
+    typeGroups: result.typeGroups || {},
     topResults: result.results.slice(0, 5).map(r => ({
       content: r.content.slice(0, 200), // truncate for SSE payload
       similarity: r.similarity,

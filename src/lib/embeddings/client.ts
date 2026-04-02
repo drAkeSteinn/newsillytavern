@@ -5,7 +5,7 @@
  * Provides a high-level API for creating, searching, and managing embeddings.
  */
 
-import { OllamaEmbeddingClient, getOllamaClient } from './ollama-client';
+import { OllamaEmbeddingClient, getOllamaClient, resetOllamaClient } from './ollama-client';
 import { LanceDBWrapper } from './lancedb-db';
 import type {
   CreateEmbeddingParams,
@@ -82,12 +82,33 @@ export class EmbeddingClient {
   async searchSimilar(params: SearchParams): Promise<SearchResult[]> {
     const { query, queryVector, namespace, limit, threshold, source_type, source_id } = params;
 
-    // Load config for defaults
+    // Always load the latest persisted config for defaults
     let configThreshold = 0.3;
+    let configMaxResults = 10;
     try {
       const { getConfig } = await import('./config-persistence');
-      configThreshold = getConfig().similarityThreshold ?? 0.3;
-    } catch { /* use default */ }
+      const persistedConfig = getConfig();
+      configThreshold = persistedConfig.similarityThreshold ?? 0.3;
+      configMaxResults = persistedConfig.maxResults ?? 10;
+    } catch { /* use defaults */ }
+
+    // Ensure the Ollama client uses the latest model from persisted config
+    try {
+      const { getConfig } = await import('./config-persistence');
+      const cfg = getConfig();
+      const currentModel = this.getActiveClient().getConfig().model;
+      if (currentModel !== cfg.model) {
+        resetOllamaClient();
+        const fresh = getOllamaClient({
+          ollamaUrl: cfg.ollamaUrl,
+          model: cfg.model,
+          dimension: cfg.dimension,
+          similarityThreshold: cfg.similarityThreshold,
+          maxResults: cfg.maxResults,
+        });
+        (this as any).ollamaClient = fresh;
+      }
+    } catch { /* proceed with existing client */ }
 
     let vector: number[];
     if (queryVector) {
@@ -101,7 +122,7 @@ export class EmbeddingClient {
     const results = await this.db.searchSimilar({
       queryVector: vector,
       namespace,
-      limit: limit || 10,
+      limit: limit || configMaxResults,
       threshold: threshold ?? configThreshold,
     });
 
@@ -219,6 +240,8 @@ export function getEmbeddingClient(config?: any): EmbeddingClient {
 }
 
 export function resetEmbeddingClient(config?: any): EmbeddingClient {
+  // Reset Ollama singleton so a fresh one is created with the new config
+  resetOllamaClient();
   embeddingClientInstance = new EmbeddingClient(config);
   return embeddingClientInstance;
 }

@@ -188,6 +188,9 @@ async function tableFilter(table: any, filter: string): Promise<any[]> {
 
 // ============ Initialization ============
 
+// Track the dimension that the embeddings table was created with
+let tableDimension: number | null = null;
+
 async function initializeTables(): Promise<void> {
   if (!db) throw new Error('Database not initialized');
 
@@ -225,14 +228,59 @@ async function initializeTables(): Promise<void> {
     updated_at: new Date().toISOString(),
   };
 
+  // Try to open existing embeddings table
   try {
     embeddingsTable = await db.openTable(EMBEDDINGS_TABLE);
+
+    // Check if dimension matches by reading the first row's vector
+    // If the table was created with a different dimension, we must recreate it
+    const existingRows = await embeddingsTable.query().limit(1).toArray();
+    if (existingRows.length > 0 && existingRows[0].vector) {
+      const existingDim = existingRows[0].vector.length;
+      tableDimension = existingDim;
+
+      if (existingDim !== vectorDimension) {
+        console.warn(
+          `[LanceDB] Dimension mismatch detected! Table has ${existingDim}D vectors, but config requires ${vectorDimension}D. ` +
+          `Dropping and recreating embeddings table. All existing embeddings will be lost.`
+        );
+
+        // Drop the old table
+        try { await db.dropTable(EMBEDDINGS_TABLE); } catch { /* ignore */ }
+
+        // Also drop any namespace-specific tables that might have wrong dimensions
+        try {
+          const tables = await db.tableNames();
+          for (const tableName of tables) {
+            if (tableName !== EMBEDDINGS_TABLE && tableName !== NAMESPACES_TABLE) {
+              try { await db.dropTable(tableName); } catch { /* ignore */ }
+            }
+          }
+        } catch { /* ignore */ }
+
+        // Recreate with new dimension
+        await db.createTable(EMBEDDINGS_TABLE, [defaultEmbedding]);
+        embeddingsTable = await db.openTable(EMBEDDINGS_TABLE);
+        await embeddingsTable.delete("id = 'placeholder'");
+        tableDimension = vectorDimension;
+      }
+    } else if (existingRows.length === 0) {
+      // Table exists but is empty — recreate with new dimension to be safe
+      try { await db.dropTable(EMBEDDINGS_TABLE); } catch { /* ignore */ }
+      await db.createTable(EMBEDDINGS_TABLE, [defaultEmbedding]);
+      embeddingsTable = await db.openTable(EMBEDDINGS_TABLE);
+      await embeddingsTable.delete("id = 'placeholder'");
+      tableDimension = vectorDimension;
+    }
   } catch {
+    // Table doesn't exist yet, create it
     await db.createTable(EMBEDDINGS_TABLE, [defaultEmbedding]);
     embeddingsTable = await db.openTable(EMBEDDINGS_TABLE);
     await embeddingsTable.delete("id = 'placeholder'");
+    tableDimension = vectorDimension;
   }
 
+  // Namespaces table (no vectors, no dimension concern)
   try {
     namespacesTable = await db.openTable(NAMESPACES_TABLE);
   } catch {
@@ -242,10 +290,14 @@ async function initializeTables(): Promise<void> {
   }
 }
 
-export async function initLanceDB(uri?: string): Promise<void> {
+export function getTableDimension(): number | null {
+  return tableDimension;
+}
+
+export async function initLanceDB(uri?: string, forceReinit: boolean = false): Promise<void> {
   const dbUri = uri || process.env.LANCEDB_URI || getDefaultLanceDBPath();
 
-  if (isInitialized && db && currentUri === dbUri) return;
+  if (isInitialized && db && currentUri === dbUri && !forceReinit) return;
 
   if (db) await closeLanceDB();
 
@@ -316,6 +368,7 @@ export function closeLanceDB(): Promise<void> {
   namespacesTable = null;
   isInitialized = false;
   currentUri = null;
+  tableDimension = null;
   return Promise.resolve();
 }
 

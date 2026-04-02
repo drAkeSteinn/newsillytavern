@@ -1,375 +1,429 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Clone newsillytavern repository and integrate into my-project
+Task: Clone and integrate newsillytavern repository into main project
 
 Work Log:
-- Cloned https://github.com/drAkeSteinn/newsillytavern.git to /home/z/newsillytavern
-- Analyzed repository structure: Next.js 16 app with Tailwind CSS 4, shadcn/ui, Prisma, Zustand
-- Copied src/components (tavern, atmosphere, settings, inventory, dialogue, memory, quests, persistence-provider)
-- Copied src/lib with full subdirectory structure (llm/providers, triggers/handlers, lorebook, quest, stats, tts, pre-llm, dialogue, migration, background-triggers)
-- Copied src/store (tavern-store, trigger-store, 21 slices)
-- Copied src/hooks (13 custom hooks)
-- Copied src/types (index.ts, triggers.ts)
-- Copied src/app/api routes (chat, backgrounds, sprites, sounds, upload, tts, persistence, quest-templates, background-triggers)
-- Copied data directory (settings, characters, sessions, sprites, sounds, lorebooks, quests, etc.)
-- Copied public assets (backgrounds, sprites, sounds, uploads, logo.svg)
-- Updated layout.tsx with ThemeProvider and PersistenceProvider
-- Updated globals.css with atmosphere, HUD, and theme effect animations
-- Updated next.config.ts with standalone output and allowedDevOrigins
-- Updated page.tsx with TavernFlow main page component
-- Verified all files with lint (0 errors)
-- Dev server compiled successfully with 200 responses
+- Cloned https://github.com/drAkeSteinn/newsillytavern to temporary location
+- Analyzed full project structure (115 components, 85 lib files, 24 store files, 38 API routes)
+- Cleaned old project source files while preserving sandbox configs (.zscripts, Caddyfile, .git)
+- Copied all new source files: src/, prisma/, public/, data/, db/, docs/, download/, examples/, mini-services/
+- Copied config files: components.json, tailwind.config.ts, postcss.config.mjs, eslint.config.mjs, tsconfig.json, next.config.ts, package.json, bun.lock
+- Updated dev script to include `tee dev.log` for sandbox compatibility
+- Fixed Prisma version mismatch: pinned prisma CLI to 6.19.2 (was ^7.6.0) to match @prisma/client
+- Ran `prisma generate` and `prisma db push` - database synced successfully
+- Installed all dependencies with bun (881 packages)
+- Started dev server - Next.js 16.1.3 (Turbopack) running on port 3000
+- Verified: GET / returns 200, API routes functional (backgrounds, tts, persistence, quest-templates)
 
 Stage Summary:
-- Full repository successfully integrated into my-project
-- All source files, assets, data, and configurations copied
-- Lint passes cleanly
-- Dev server was compiling and serving pages before restart
-- Project is a TavernFlow AI Character Chat Platform (SillyTavern-like)
+- TavernFlow (newsillytavern) successfully integrated into main project
+- All 15+ feature systems migrated: Character Chat, Group Chat, Sprite System V2, Unified Triggers, RAG/Embeddings, Quest System, RPG Stats, Atmosphere, Backgrounds, Sounds, Memory, Dialogue, Inventory, TTS/STT, HUD
+- 5 LLM providers supported: Z.ai, OpenAI, Anthropic, Ollama, Text-Gen-WebUI
+- Dev server running at localhost:3000, proxying through Caddy on port 81
 
 ---
-Task ID: 3
-Agent: Main Agent
-Task: Optimize settings panel layout for full-screen usage
+## Task ID: 2 - embeddings-ui-restructure
+### Work Task
+Rewrite `src/components/embeddings/embeddings-settings-panel.tsx` to: (1) move the "Upload & Create Embeddings" collapsible section into a new "Archivos" tab, (2) translate all English UI text to Spanish, (3) update tab layout to 4 columns, (4) remove unused `uploadSectionOpen` state.
 
-Work Log:
-- Analyzed full settings panel structure (15 tabs, sidebar + content area layout)
-- Settings panel already uses full viewport width (max-w constraint was previously removed)
-- Fixed LLM settings grid: `grid-cols-[1fr_1fr]` → responsive `grid-cols-1 xl:grid-cols-2`
-- Fixed LLM number inputs: `grid-cols-4` → responsive `grid-cols-2 xl:grid-cols-4`
-- Fixed Hotkeys settings: `grid-cols-2` → responsive `grid-cols-1 xl:grid-cols-2`
-- Fixed Data settings: `grid-cols-2` → responsive `grid-cols-1 xl:grid-cols-2`
-- Fixed Quest Template Editor Dialog → Converted from Dialog to full-screen motion.div panel
-  - Removed orphaned `</DialogContent>` and `</Dialog>` closing tags that were causing broken JSX nesting
-  - Added 2-column layout with live preview panel (visible on 2xl screens)
-  - Made identification grid: `grid-cols-2` → `grid-cols-1 xl:grid-cols-3`
-  - Made properties grid: `grid-cols-3` → `grid-cols-2 xl:grid-cols-4`
-- Optimized Item Editor Dialog: `max-w-2xl` → `max-w-4xl`, `max-h-[90vh]` → `max-h-[95vh]`
-  - Added proper flex-col overflow structure with scrollable content area
-  - Footer pinned to bottom with border separator
-- Optimized Inventory settings: `max-w-md` → `max-w-2xl`
-- Optimized Memory settings grids: `grid-cols-2` → `grid-cols-2 xl:grid-cols-4` and `grid-cols-2 xl:grid-cols-3`
-- Optimized HUD Manager: `grid-cols-2 gap-6` → `grid-cols-2 xl:grid-cols-3 gap-6`
-
-Stage Summary:
-- Settings panel uses full viewport width effectively
-- Quest template editor is now a full-screen sliding panel with live preview sidebar (no more cramped Dialog)
-- Item editor is wider (4xl vs 2xl) with proper scroll behavior
-- All settings grids are now responsive with xl breakpoints
-- Lint passes cleanly, dev server compiles successfully
+### Work Summary
+- Moved the entire file upload section (previously a standalone Collapsible between Chat Integration and Tabs) into a new TabsContent with value="archivos"
+- Tabs now have 4 items: Búsqueda (Search), Archivos (Files), Namespaces, Examinar (Browse) with `grid-cols-4`
+- Added `archivos` case to `handleTabChange` function to reload namespaces
+- Removed `uploadSectionOpen` state variable and its `Collapsible` wrapper
+- Translated all user-facing strings to Spanish including: header banner, config section labels/buttons/toast messages, upload section labels/buttons/placeholders, search tab, namespaces tab, browse tab, all 3 dialogs (Create Embedding, Create Namespace, Reset All), SPLITTER_OPTIONS constants, and the EmbeddingsChatIntegration sub-component
+- Preserved all imports, interfaces, types, constants structure, API calls, state management, and component logic
+- File reduced from 1724 to 1712 lines (removed Collapsible wrapper overhead)
+- ESLint passes with zero errors
 
 ---
-Task ID: 4
-Agent: Main Agent
-Task: Fix quest template editor visibility and delete/duplicate operations
+## Task ID: 3 - embeddings-reliability-fixes
+### Work Task
+Fix three reliability issues in the embeddings system: (1) config persistence and client singleton reset, (2) auto-create namespace on file upload, (3) search always uses latest persisted config and model.
 
-Work Log:
-- Diagnosed editor not appearing: `absolute inset-0` positioning didn't work because parent scroll containers clipped it
-- Changed QuestTemplateEditorDialog from `absolute inset-0 z-10 bg-background` to `h-full flex flex-col` (normal flow)
-- Made QuestTemplateManager parent container use `h-full flex flex-col` when editor is active
-- Changed QuestSettingsPanel root to `h-full flex flex-col p-6` with `shrink-0` header
-- Made inner Tabs use `flex-1 flex flex-col min-h-0` for proper flex constraint
-- Changed Templates TabsContent from `overflow-y-auto` to `overflow-hidden` (editor handles its own scroll)
-- Removed AnimatePresence wrapper (no longer needed since we don't use absolute positioning + exit animations)
-- Fixed duplicate template bug: `duplicateQuestTemplate()` in API route was creating in-memory copy without saving to disk
-  - Added `saveQuestTemplate(duplicated)` call after duplication in the POST /api/quest-templates route
-  - This caused delete to fail because the file didn't exist on disk
-- Added `await` to `handleDuplicate` for proper async handling
-- Cleaned up unused AnimatePresence import
+### Work Summary
+**Config persistence (already working):**
+- Verified config saves to `data/embeddings-config.json` via `config-persistence.ts` `saveConfig()`
+- Verified `loadConfig()` reads from disk on server restart
+- Verified `PUT /api/embeddings/config` correctly invalidates cache, saves to disk, and resets client singleton
+- Tested full round-trip: save → verify on disk → read via API — all consistent
 
-Stage Summary:
-- Quest template editor now properly fills the available space when creating/editing
-- Duplicate operation now correctly persists the new template to disk
-- Delete operation works correctly for both original and duplicated templates
-- Lint passes cleanly
----
-Task ID: 2-a
-Agent: Main Agent
-Task: FASE 2a - Convertir HUD Manager de Dialog a panel full-screen
+**Bug fix: Ollama client singleton stale model (`ollama-client.ts`, `client.ts`):**
+- Added `resetOllamaClient()` export to `ollama-client.ts` that sets `ollamaClientInstance = null`
+- Updated `resetEmbeddingClient()` in `client.ts` to call `resetOllamaClient()` before creating new client, ensuring a fresh Ollama client with the latest model on every config change
+- Before fix: `resetEmbeddingClient` only updated the existing singleton's config, which could lead to stale model being used for embedding generation
 
-Work Log:
-- Changed HUDManager root to conditional render: list view or editor panel (like QuestTemplateManager pattern)
-- Converted HUDEditorDialog (Dialog max-w-4xl) to HUDEditorPanel (motion.div h-full flex flex-col)
-- Added header with ArrowLeft back button, title, description, Cancel/Save buttons
-- Content area uses 2-column grid (1fr + 300px sidebar on 2xl) for editor + summary preview
-- Right sidebar shows template summary: name, fields count, position, style, opacity, context status, field list
-- HUDFieldEditorDialog remains as Dialog (parent is no longer a Dialog, so no nesting issue)
-- Made info grid responsive: grid-cols-2 → grid-cols-1 md:grid-cols-2
-- Made template list grid responsive: grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4
-- Added motion import, ArrowLeft/Save icon imports
+**Bug fix: Search uses wrong model (`client.ts` searchSimilar):**
+- Added model drift detection: before embedding the search query, compares current client model against persisted config model
+- If models differ, resets Ollama client and creates fresh one with persisted config
+- Search now always loads `maxResults` and `similarityThreshold` from persisted config (not just defaults)
+- Before fix: if model was changed without server restart, search would embed query with old model causing dimension mismatch
 
-Stage Summary:
-- HUD templates editor now fills full available space instead of being cramped in a Dialog
-- Field editor (nested Dialog) works properly since parent is no longer a Dialog
-- Summary sidebar on 2xl provides quick overview of template configuration
-- Lint passes cleanly
+**Bug fix: Namespace not auto-created on file upload (`create-from-file/route.ts`):**
+- Added `client.upsertNamespace({ namespace })` call before creating embeddings from file
+- Before fix: if the selected namespace didn't exist in the namespaces table, embeddings were stored with a namespace field that had no corresponding record, making the namespace tab show inconsistent counts
 
 ---
-Task ID: 2-b
-Agent: Main Agent
-Task: FASE 2b - Crear editor full-screen para edición de persona
+## Task ID: 4 - embeddings-examinar-layout-and-search-fix
+### Work Task
+Fix two issues: (1) Examinar tab embeddings overlapping on refresh, (2) Search not returning results because silent error handling bug and model mismatch.
 
-Work Log:
-- Added conditional render in PersonaPanel: editor panel or list view
-- Created PersonaEditorPanel component (motion.div h-full flex flex-col)
-- Editor has header with avatar preview, name, description, back/save buttons
-- Content area uses 2-column grid (1fr + 320px sidebar on 2xl) with max-w-5xl mx-auto
-- Editor includes: Basic Info (avatar + name + description), Peticiones/Solicitudes sections
-- Peticiones and Solicitudes shown as full-width colored panels (blue for peticiones, amber for solicitudes)
-- List view now only shows view mode (edit mode code removed, handled by full-screen panel)
-- Added motion, ArrowLeft, Save, Separator imports
+### Work Summary
 
-Stage Summary:
-- Persona editing no longer pushes content down in the list
-- Full-screen editor provides comfortable editing space with all sections visible
-- Stats config (peticiones/solicitudes) shown in dedicated colored panels
-- Lint passes cleanly
+**Fix 1: Examinar tab overlapping display (`embeddings-settings-panel.tsx`):**
+- Added `refreshingEmbeddings` state variable for loading indicator during refresh
+- Created `refreshEmbeddingsTab()` function that sets loading state, calls all three data loaders, then clears loading
+- Updated `handleTabChange` to use `refreshEmbeddingsTab()` for the embeddings tab
+- Replaced `ScrollArea` with direct `max-h-[400px] overflow-y-auto` div for better scroll containment
+- Added loading spinner with "Cargando embeddings..." text while refreshing
+- "Actualizar" button now shows spinner and is disabled during refresh
 
----
-Task ID: 2-c
-Agent: Main Agent
-Task: FASE 2c - Convertir edición de entries de lorebook de acordeones a formulario full-width
+**Fix 2: Silent error handling bug in search (`embeddings-settings-panel.tsx`):**
+- **Critical bug found**: `handleSearch()` checked `data.success` but had NO `else` branch — server errors (500) were silently ignored!
+- Added `else` branch that shows error toast with `data.error` message from server
+- This means users can now see actual Ollama connection errors, model not found errors, etc.
 
-Work Log:
-- Added editingEntryUid state to track selected entry
-- Replaced Accordion-based entry list with clickable entry list
-- When entry is selected, shows full-width LorebookEntryEditor form
-- Added back button in header when editing an entry
-- Compact entry list shows: status dot, title, key preview, key count badge, position badge
-- Entry list uses divide-y for clean separators
-- Added Badge, Pencil, ArrowLeft, ChevronRight imports
+**Fix 3: Search uses configured Ollama model (`search/route.ts`, `create-from-file/route.ts`, `embeddings/route.ts`):**
+- Updated search route to explicitly reset the embedding client before every search, ensuring the persisted config model is used
+- Added model mismatch warning logging when frontend-sent model differs from persisted config
+- Search response now includes `meta` object with model, threshold, limit, namespace for transparency
+- Updated `create-from-file` route to reset client with persisted config before creating embeddings
+- Updated main `POST /api/embeddings` route to reset client with persisted config before creating single embeddings
+- Frontend now passes `model: config.model` in search request body as a safety check
 
-Stage Summary:
-- Lorebook entry editing no longer uses cramped accordion panels
-- Clicking an entry opens a full-width form with all fields visible
-- Entry list is more compact and scannable
-- Back button returns to list view
-- Lint passes cleanly
+**Fix 4: Search metadata display (`embeddings-settings-panel.tsx`):**
+- Added `SearchMeta` interface for type safety
+- Added `searchMeta` state to store search response metadata
+- Search results header now shows badges with "Modelo: X" and "Umbral: Y%" for user transparency
 
 ---
-Task ID: 3-a
-Agent: Main Agent
-Task: FASE 3 - Sonidos, TTS y HUD optimizations
+## Task ID: 5 - lanceDB-dimension-mismatch-fix
+### Work Task
+Fix LanceDB error "No vector column found to match with the query vector dimension: 768" when user switches embedding model from 1024D to 768D (nomic-embed-text-v2-moe).
 
-Work Log:
-- Fixed TTS panel JSX parsing error: missing `</div>` closing tag for `space-y-3 pt-3` wrapper inside CollapsibleContent
-- Sonidos Global tab: Wrapped "Colecciones de Sonidos" and "Plantilla de Sonidos" in Collapsible (defaultOpen=false)
-- Sonidos Triggers: Converted Accordion to selected-entry pattern (clickable list + full-width editor)
-- Sonidos Sequences: Same selected-entry pattern conversion
-- TTS Advanced Parameters: Wrapped in Collapsible (defaultOpen=false)
-- HUD tab wrapper: Changed overflow-y-auto to overflow-hidden
-- Collections grid made responsive: xl:grid-cols-3
+### Root Cause
+LanceDB table schema is immutable once created. The embeddings table was created with 1024D vectors (bge-m3:567m model). When user switched to nomic-embed-text-v2-moe (768D), the search query vector (768D) couldn't match the table's 1024D vector column.
 
-Stage Summary:
-- Sound settings much cleaner with collapsible sections and click-to-edit patterns
-- TTS advanced parameters hidden by default
-- HUD no longer double-scrolls
-- Lint passes cleanly
+### Work Summary
 
----
-Task ID: 4
-Agent: Main Agent
-Task: FASE 4 - Apariencia live preview, grids responsive, Bubble Colors collapsible, Memory grids fix
+**Fix 1: Added nomic-embed-text-v2-moe to KNOWN_MODELS (`embeddings-settings-panel.tsx`):**
+- Model uses Matryoshka Embeddings with flexible dimensions 256-768 (default 768)
+- Added both `nomic-embed-text-v2-moe` and `nomic-embed-text-v2-moe:latest` entries with dimension 768
 
-Work Log:
-- Apariencia LivePreview: Added collapsible toggle button (PanelRightClose/PanelRightOpen) in tabs header
-  - Preview panel width: w-[380px] → w-[320px] xl:w-[380px] (responsive)
-  - Auto-hides on screens <= 1024px via matchMedia listener
-  - Button shows "Ocultar Vista" / "Vista Previa" with icons
-- Apariencia grids made responsive:
-  - Theme presets: grid-cols-4 → grid-cols-3 md:grid-cols-4 xl:grid-cols-5
-  - Custom colors: grid-cols-3 → grid-cols-1 sm:grid-cols-3
-  - Bubble styles: grid-cols-3 → grid-cols-2 md:grid-cols-3
-  - Avatar shapes: grid-cols-4 → grid-cols-2 md:grid-cols-4
-  - Cursor styles: grid-cols-4 → grid-cols-2 md:grid-cols-4
-  - Tabs labels: hidden on sm with `hidden sm:inline` for Tema/Entrada
-- Bubble Colors card: Wrapped in Collapsible (defaultOpen=false) with "Colores" trigger
-- Memory grids fixed:
-  - Keep First/Last N: grid-cols-2 xl:grid-cols-4 → grid-cols-1 sm:grid-cols-2 (was over-provisioned with 2 children in 4 cols)
-  - Summary settings: grid-cols-2 xl:grid-cols-3 → grid-cols-1 sm:grid-cols-2 (was over-provisioned with 2 children in 3 cols)
-- Added imports: Collapsible/CollapsibleContent/CollapsibleTrigger, ChevronDown, PanelRightClose, PanelRightOpen, useEffect
+**Fix 2: LanceDB auto-detect and recreate table on dimension mismatch (`lancedb-db.ts`):**
+- Added `tableDimension` tracker variable to track current table's vector dimension
+- Added `getTableDimension()` export for external dimension checking
+- Modified `initializeTables()` to read the first row's vector after opening existing table
+- If existing vector dimension differs from config dimension, automatically drops and recreates the table
+- Also drops namespace-specific tables that might have wrong dimensions
+- Empty tables are also recreated to ensure correct schema
+- Added `forceReinit` parameter to `initLanceDB()` to bypass cached initialization check
+- `closeLanceDB()` now resets `tableDimension` tracker
 
-Stage Summary:
-- LivePreview panel is now collapsible and responsive (auto-hides on tablets/mobile)
-- All appearance grids are responsive with proper breakpoints
-- Bubble Colors section collapsed by default (reduces visual clutter)
-- Memory grids no longer waste columns
-- Lint passes cleanly, dev server compiles successfully
+**Fix 3: Config save triggers LanceDB reinit (`config/route.ts`):**
+- On PUT, compares old vs new model/dimension to detect dimension-affecting changes
+- Calls `initLanceDB(undefined, true)` with force flag when model/dimension changed
+- Response includes `meta` object with `modelChanged`, `dimensionChanged`, `dimensionMismatch`, `oldDimension`, `newDimension`
+- GET response now includes `tableDimension` for UI comparison
+
+**Fix 4: UI dimension mismatch warning (`embeddings-settings-panel.tsx`):**
+- Added `tableDimension` to `EmbeddingConfig` interface
+- Save handler now reads response meta and shows contextual toast messages
+- Dimension mismatch: "Tabla de embeddings recreada" with specific dimension change info
+- Model change (same dimension): Warning about potential incompatibility
+- Added amber warning banner in config section when `tableDimension !== config.dimension`
+- Banner says "Incompatibilidad de dimensiones detectada" with explanation and fix instruction
 
 ---
-Task ID: 5
-Agent: Main Agent
-Task: FASE 5 - Atajos collapsible, Datos cleanup, Inventario UX, Sprites responsive sidebar
+## Task ID: 6 - embeddings-chat-integration-verification
+### Work Task
+Verify and fix embeddings chat integration in normal chat, group chat, and regenerate when "integración con chat" is enabled in configuration.
 
-Work Log:
-- Atajos: Removed dead 2-column grid → simple div wrapper
-- Atajos: "Cómo usar los atajos" help card → Collapsible (defaultOpen=false)
-- Datos: Export/Import buttons grid-cols-2 → grid-cols-1 sm:grid-cols-2
-- Inventario Settings: Removed max-w-2xl constraint
-- Sprites sidebar: w-64 → w-48 md:w-64, sprite grid: grid-cols-2 md:grid-cols-3 xl:grid-cols-4
+### Work Summary
 
-Stage Summary:
-- All 5 phases completed
-- Lint passes cleanly, dev server compiles successfully
+**Verification Results:**
+- ✅ **Normal chat (stream route)**: Fully implemented — `retrieveEmbeddingsContext()` called, context injected into system prompt, SSE `embeddings_context` event sent, shown in prompt viewer
+- ✅ **Group chat (group-stream route)**: Fully implemented — per-character embedding retrieval using each responder's ID, context injected into per-character system prompt, SSE event with `characterId`
+- ❌ **Regenerate route**: Was completely missing embeddings integration
 
----
-Task ID: 6
-Agent: Main Agent
-Task: Implement Vector Embeddings System (LanceDB + Ollama)
+**Bug fix: Regenerate route missing embeddings integration (`regenerate/route.ts`, `chat-panel.tsx`):**
 
-Work Log:
-- Installed @lancedb/lancedb v0.27.1 as vector database dependency
-- Created src/lib/embeddings/types.ts - All type definitions (Embedding, SearchResult, RecordNamespace, EmbeddingStats, EmbeddingsConfig, MODEL_DIMENSIONS map)
-- Created src/lib/embeddings/config-persistence.ts - JSON file-based config persistence in data/embeddings-config.json
-- Created src/lib/embeddings/lancedb-db.ts - LanceDBWrapper with full CRUD: insertEmbedding, searchSimilar, deleteEmbedding, deleteBySource, upsertNamespace, deleteNamespace, getAllNamespaces, getNamespaceEmbeddings, searchInNamespace, getAllEmbeddings, getStats, resetAll. Cross-platform path handling (Win/Linux/Mac), dynamic module loading, vector normalization, L2→cosine similarity conversion
-- Created src/lib/embeddings/ollama-client.ts - OllamaEmbeddingClient: embedText, embedBatch, checkConnection, getAvailableModels, retry logic, cosineSimilarity utility
-- Created src/lib/embeddings/client.ts - EmbeddingClient unified class combining Ollama + LanceDB, singleton pattern, createEmbedding, createBatchEmbeddings, searchSimilar, createAndAddToNamespace, namespace management, connection testing
-- Created src/lib/embeddings/index.ts - Barrel export
-- Created 9 API routes under /api/embeddings/: route.ts (GET list + POST create), batch/route.ts (POST batch create), search/route.ts (POST vector search), stats/route.ts (GET stats), namespaces/route.ts (GET list + POST create), namespaces/[namespace]/route.ts (DELETE), [id]/route.ts (GET + DELETE single), delete-by-source/route.ts (POST), reset/route.ts (POST reset all), config/route.ts (GET + PUT config), test/route.ts (POST test connection)
-- Created src/components/embeddings/embeddings-settings-panel.tsx - Full UI panel with: Configuration section (Ollama URL, model selector with known dimensions, threshold/maxResults sliders), Connection testing with status badge, Statistics dashboard, 3-tab interface (Search with semantic similarity, Namespaces CRUD, Browse embeddings), Create/Delete dialogs for embeddings and namespaces, Reset all with confirmation dialog
-- Integrated Embeddings tab into settings-panel.tsx (added import, tab entry with Brain icon, TabsContent)
-- Lint passes cleanly (0 errors), dev server compiles successfully
+Frontend (`chat-panel.tsx`):
+- Added `characterId: activeCharacter?.id` to regenerate fetch body
+- Added `embeddingsChat: settings.embeddingsChat` to regenerate fetch body (was missing — other handlers had it)
+- Added `summary: currentSession?.summary` for memory/context compression support
 
-Stage Summary:
-- Complete vector embeddings system implemented based on Esparcraft-Brige
-- Improvements over original: cleaner API (dynamic imports), better error handling, shadcn/ui consistent UI, known model dimensions auto-fill, collapsible advanced settings, responsive design
-- Architecture: Ollama (vector generation) → LanceDB (vector storage) → Next.js API routes → React UI panel
-- Accessible from Settings → Embeddings tab (Brain icon)
-- Data stored in data/lancedb/ directory, config in data/embeddings-config.json
+Backend (`regenerate/route.ts`):
+- Added imports: `EmbeddingsChatSettings` type, `retrieveEmbeddingsContext()`, `formatEmbeddingsForSSE()`
+- Added `characterId`, `embeddingsChat`, `summary` to validation function and destructuring
+- Added embeddings context retrieval using the **last user message before the assistant message** as search query
+- Added embeddings section to `allPromptSections` array (between system sections and chat history)
+- Created `finalSystemPrompt` variable that appends embeddings context to base system prompt
+- Replaced all `systemPrompt` references in LLM provider switch with `finalSystemPrompt` (z-ai, openai, anthropic, ollama, text-generation-webui)
+- Added `embeddings_context` SSE event transmission for frontend UI display
+- Added server-side logging when embeddings are found
+
+**Impact:**
+- Before fix: Regenerating a message would produce a different response because the original had embeddings context but the regeneration did not
+- After fix: Regeneration uses the same embeddings context as the original message, producing consistent results
 
 ---
-Task ID: 7
-Agent: Main Agent
-Task: Integrate Embeddings into Chat Pipeline (Normal + Group)
+## Task ID: 7 - embeddings-context-position-and-editor-layout
+### Work Task
+(1) Move embeddings [CONTEXTO] section to appear right after "User's Persona" in the prompt. (2) Adjust character and group editor layouts for full-screen mode.
 
-Work Log:
-- Added `EmbeddingsChatSettings` interface to `src/types/index.ts` with fields: enabled, maxTokenBudget, namespaceStrategy (global/character/session), showInPromptViewer
-- Added `embeddingsChat` field to `AppSettings` interface
-- Added default values in `src/store/defaults.ts` (disabled by default, 1024 token budget, character strategy)
-- Created `src/lib/embeddings/chat-context.ts` - Utility module with:
-  - `retrieveEmbeddingsContext()` - Main function that searches embeddings based on user message, character/session ID, and settings
-  - `getNamespacesForStrategy()` - Determines which namespaces to search based on strategy
-  - `buildContextString()` - Formats search results into a prompt-ready string with token budget
-  - `formatEmbeddingsForSSE()` - Lightweight formatter for sending results over SSE to the client
-  - `EmbeddingsContextResult` interface with found, count, contextString, results, section, searchedNamespaces
-- Modified `src/app/api/chat/stream/route.ts` (normal chat):
-  - Extracts embeddingsChat settings, sessionId, characterId from request body
-  - Calls retrieveEmbeddingsContext() after lorebook processing, before system prompt building
-  - Injects embeddings section into allPromptSections (type: 'memory') and finalSystemPrompt
-  - Sends `embeddings_context` SSE event with search metadata for UI indicator
-- Modified `src/app/api/chat/group-stream/route.ts` (group chat):
-  - Same integration per-character inside the responder loop
-  - Each character gets its own embeddings search (using character ID)
-  - Sends `embeddings_context` SSE event per-character with characterId/characterName
-- Modified `src/app/api/chat/generate/route.ts` (non-streaming):
-  - Same embeddings integration for the non-streaming path
-  - Uses finalSystemPrompt with embeddings context appended
-- Created `src/components/embeddings/embeddings-context-indicator.tsx`:
-  - `EmbeddingsContextIndicator` - Expandable indicator showing retrieved count, namespaces, and top results
-  - `EmbeddingsContextContainer` - Container for multiple indicators (group chat)
-  - Violet-themed design matching embeddings branding
-- Modified `src/components/tavern/chat-panel.tsx`:
-  - Added `embeddingsContexts` state to track retrieved embeddings per message
-  - Passes `settings.embeddingsChat` to both /api/chat/stream and /api/chat/group-stream bodies
-  - Captures `embeddings_context` SSE events in both normal and group chat streaming loops
-  - Renders `EmbeddingsContextContainer` in the chat overlay
-- Added `EmbeddingsChatIntegration` sub-component to embeddings settings panel:
-  - Enable/disable toggle with "Active" badge
-  - Namespace search strategy selector (Per-Character, Per-Session, Global)
-  - Token budget slider (128-4096 tokens)
-  - Info box explaining how the feature works
-  - Collapsible section with MessageSquare icon
-- Lint passes cleanly (0 errors), dev server compiles successfully
+### Work Summary
 
-Stage Summary:
-- Embeddings are now automatically queried during chat when enabled in Settings → Embeddings → Chat Integration
-- Normal chat: searches embeddings once using the character ID
-- Group chat: searches embeddings per-responder using each character's ID
-- Retrieved context is injected into the system prompt as "Embeddings Context" section (after system prompt, before summary)
-- Visual indicator in chat shows: count, namespaces searched, top results with similarity scores
-- Works with both streaming and non-streaming LLM providers
-- Three namespace strategies: Per-Character (character-{id} + default + world), Per-Session (session-{id} + character + default), Global (all namespaces)
-- Token budget limits context size to avoid consuming too much context window
+**Part 1: Embeddings CONTEXTO position in prompt:**
+- Changed label from `'Embeddings Context'` to `'CONTEXTO'` in `chat-context.ts`
+- Removed `[Relevant Context from Embeddings]` prefix from `buildContextString()` — now only the embedding entries appear
+- Updated all 3 routes (`stream`, `group-stream`, `regenerate`) to insert embeddings section after "User's Persona" using `findIndex('persona')` + split
+- Section only appears if embeddings were found (conditional spread)
+
+**Part 2: Editor layout adjustments for full-screen:**
+
+Character Editor (`character-editor.tsx`):
+- Added `max-w-5xl mx-auto` wrapper inside the main scrollable content area
+- Made Info tab name/tags grid responsive: `grid-cols-3` → `grid grid-cols-1 md:grid-cols-3`
+- Made Description tab grid responsive: `grid-cols-3` → `grid grid-cols-1 lg:grid-cols-3`, col-span updated to `lg:col-span-2`
+- Made Dialogue tab grid responsive: `grid-cols-2` → `grid grid-cols-1 lg:grid-cols-2`
+- Made Prompts tab grid responsive: `grid-cols-2` → `grid grid-cols-1 lg:grid-cols-2`
+
+Group Editor (`group-editor.tsx`):
+- Added `max-w-5xl mx-auto` wrapper inside the main scrollable content area
+- Changed member list heights from hardcoded `max-h-[500px]` to viewport-relative `max-h-[60vh]`
+- Grid layouts already had responsive `lg:` breakpoints (no changes needed)
+
+Settings Panel: Already well-structured, kept as reference (no changes)
 
 ---
-Task ID: 1
-Agent: Main Agent
-Task: Fix embeddingsChat undefined error in EmbeddingsChatIntegration component
+## Task ID: 8 - embedding-namespace-assignment
+### Work Task
+Add namespace selection to Character and Group editors so each can specify which embedding namespaces to search during chat, overriding the global strategy.
 
-Work Log:
-- Diagnosed error: `Cannot read properties of undefined (reading 'enabled')` in EmbeddingsChatIntegration
-- Root cause: Store's persist merge function didn't handle `embeddingsChat` field — old localStorage data loaded without it
-- Fix 1: Added `embeddingsChat` and `context` to the store merge function in `src/store/index.ts` (similar to existing `sound`, `backgroundTriggers`, `chatLayout` migrations)
-- Fix 2: Added defensive fallback `?? DEFAULT_EMBEDDINGS_CHAT` in the component selector for extra safety
-- Verified: dev server compiled cleanly, lint passes
+### Work Summary
 
-Stage Summary:
-- Error fixed by two-layer defense: store merge migration + component fallback
-- Files modified: `src/store/index.ts`, `src/components/embeddings/embeddings-settings-panel.tsx`
-- The previously requested features (LanceDB check button, Ollama model refresh, model selector) were already implemented in the codebase
+**Types (`src/types/index.ts`):**
+- Added `embeddingNamespaces?: string[]` field to `CharacterCard` interface
+- Added `embeddingNamespaces?: string[]` field to `CharacterGroup` interface
+- Added `customNamespaces?: string[]` field to `EmbeddingsChatSettings` interface
+
+**New Component (`src/components/tavern/namespace-selector.tsx`):**
+- Created `NamespaceSelector` component following same pattern as `QuestSelector`/`LorebookSelector`
+- Fetches available namespaces from `GET /api/embeddings/namespaces` on mount
+- Multi-select dropdown with checkboxes, badges showing selected namespaces with embedding counts
+- Shows description and embedding count per namespace
+- "Limpiar" button to clear all selections
+- Info text: "Sin seleccionar — se usará la estrategia definida en la configuración"
+- Handles states: loading, DB unavailable, empty namespaces
+
+**Character Editor (`src/components/tavern/character-editor.tsx`):**
+- Added `NamespaceSelector` to the "Asignaciones" section after Quest selector
+- Uses `character.embeddingNamespaces` as value, updates via `setCharacter`
+- Icon: `Database` in violet color
+
+**Group Editor (`src/components/tavern/group-editor.tsx`):**
+- Added `NamespaceSelector` to the "Asignaciones" section after Quest selector
+- Added `embeddingNamespaces` to initial values extraction from existing group
+- Added state: `const [embeddingNamespaces, setEmbeddingNamespaces]`
+- Included in `handleSave` data payload
+
+**Chat Context Logic (`src/lib/embeddings/chat-context.ts`):**
+- Updated `retrieveEmbeddingsContext()` to check for `settings.customNamespaces` first
+- If `customNamespaces` is provided and non-empty, it overrides the strategy-based namespace resolution
+- Falls back to `getNamespacesForStrategy()` when no custom namespaces are set
+
+**Frontend Chat Integration (`src/components/tavern/chat-panel.tsx`):**
+- Normal chat: passes `customNamespaces: activeCharacter?.embeddingNamespaces` in embeddingsChat
+- Group chat: passes `customNamespaces: activeGroup?.embeddingNamespaces` in embeddingsChat
+- Both merge with spread: `{...settings.embeddingsChat, customNamespaces: ...}`
 
 ---
-Task ID: 2
-Agent: Main Agent
-Task: Fix LanceDB initialization and ensure cross-platform compatibility
+## Task ID: 9 - group-chat-character-namespace-fallback
+### Work Task
+In group chat, if the group has no custom embedding namespaces, fall back to each responding character's own namespaces when that character generates a response.
 
-Work Log:
-- Diagnosed root cause: Next.js 16 Turbopack was bundling LanceDB native .node files, causing "Cannot find native binding" at runtime
-- Confirmed native bindings load fine in plain Node.js — the issue was Turbopack bundling only
-- Added `serverExternalPackages` to `next.config.ts` with all LanceDB platform packages + apache-arrow
-- Added explicit `apache-arrow` dependency to `package.json` (was only a transitive dep)
-- Added all LanceDB platform packages to `package.json` as direct dependencies for lockfile consistency:
-  - darwin-arm64, linux-x64-gnu, linux-arm64-gnu, linux-x64-musl, linux-arm64-musl, win32-x64-msvc, win32-arm64-msvc
-- Improved `/api/embeddings/test` endpoint to return detailed error messages instead of generic "could not be initialized"
-- Verified the dev server starts clean with no Turbopack errors (confirmed HTTP 200 and route compilation)
+### Work Summary
 
-Stage Summary:
-- Files modified: `next.config.ts`, `package.json`, `src/app/api/embeddings/test/route.ts`
-- Key fix: `serverExternalPackages` tells Turbopack to NOT bundle native modules — they load at runtime from node_modules
-- All 8 platform-specific native bindings are in the lockfile for cross-platform support
-- The system auto-dev will pick up the changes on restart
+**File changed:** `src/app/api/chat/group-stream/route.ts`
+
+**Logic added (per-character loop, around line 495):**
+- Check `group.embeddingNamespaces` (group-level override)
+- If group has namespaces → use those for all characters
+- If group has NO namespaces → check `responder.embeddingNamespaces` (character-level)
+- If character has namespaces → use those
+- If neither has namespaces → use global strategy (default behavior)
+
+```typescript
+const effectiveEmbeddingsChat = (groupNamespaces?.length > 0)
+  ? { ...embeddingsChat, customNamespaces: groupNamespaces }
+  : (characterNamespaces?.length > 0)
+    ? { ...embeddingsChat, customNamespaces: characterNamespaces }
+    : embeddingsChat;
+```
+
+**Priority chain for group chat:**
+| Priority | Source | Condition |
+|---|---|---|
+| 1 | Group namespaces | Group has `embeddingNamespaces` set |
+| 2 | Character namespaces | Group has none, character has `embeddingNamespaces` |
+| 3 | Global strategy | Neither group nor character has namespaces |
 
 ---
-Task ID: 3
-Agent: Main Agent
-Task: Compare embeddings with Esparcraft-Brige and fix all differences
+## Task ID: 10 - avatar-file-storage-and-group-avatar
+### Work Task
+(1) Change character avatar upload from base64 to file-based storage via /api/upload. (2) Add avatar upload capability to group editor.
 
-Work Log:
-- Cloned repo exists at `/home/z/Esparcraft-Brige` — read all embeddings-related files
-- Did comprehensive comparison of both projects' embeddings systems
-- Found 5 critical differences causing TavernFlow's embeddings to fail
+### Work Summary
 
-Differences Found & Fixed:
+**Character Editor (`src/components/tavern/character-editor.tsx`):**
+- Replaced `FileReader.readAsDataURL()` (base64) with `fetch('/api/upload')` POST
+- File is now saved to `public/uploads/avatar/{timestamp}-{random}.{ext}`
+- Avatar value stored in JSON is now a relative URL (`/uploads/avatar/...`) instead of a base64 data URL
+- Increased max size from 2MB to 5MB
+- Added image type validation (JPEG, PNG, GIF, WebP)
+- Existing base64 avatars (from imported characters) continue to work since `<img src>` accepts both formats
 
-1. **LanceDB version mismatch**: TavernFlow had `0.27.1` (unstable), Esparcraft uses `0.26.2` (proven working)
-   - Fix: Pinned all `@lancedb/*` to `0.26.2` in package.json, ran `bun install`
+**Group Editor (`src/components/tavern/group-editor.tsx`):**
+- Added avatar upload UI with click-to-upload pattern
+- Added states: `avatarUploading`, `avatarUrl`, `avatarFileInputRef`
+- Added `handleAvatarUpload()` function using `fetch('/api/upload')` with type `group-avatar`
+- Updated avatar display: shows uploaded image, loading spinner, or gradient fallback with Users icon
+- Added hover overlay with Camera icon for visual feedback
+- Updated `handleSave` to use `avatarUrl` state instead of `existingGroup?.avatar`
+- Without custom avatar: shows gradient with Users icon (same as before)
+- Text: "Clic para subir avatar" / "Avatar del grupo (clic para cambiar)"
 
-2. **Missing `apache-arrow` conflict**: TavernFlow had explicit `apache-arrow` dep causing version conflicts
-   - Fix: Removed `apache-arrow` from package.json and `serverExternalPackages` (let LanceDB manage it)
+**Impact on persistence:**
+- `data/characters.json`: New character avatars are lightweight URLs (~50 chars) instead of base64 (~500KB-2MB)
+- `data/groups.json`: Groups now store avatar URL when uploaded, empty string when not
 
-3. **Default model/dimension wrong**: TavernFlow defaulted to `nomic-embed-text` (768D), Esparcraft uses `bge-m3:567m` (1024D)
-   - Fix: Updated defaults in `config-persistence.ts`, `lancedb-db.ts`, `ollama-client.ts`, `types.ts`
+---
+## Task ID: 11 - character-editor-selection-fix
+### Work Task
+Fix character editor not loading correct character data (name, avatar, etc.) when editing an existing character.
 
-4. **Test endpoint causes SEGFAULT**: TavernFlow's `/api/embeddings/test` called `closeLanceDB()` before re-init
-   - Fix: Rewrote test endpoint to NEVER call `closeLanceDB()`, using `checkConnection()` pattern from Esparcraft
-   - Esparcraft separates tests into `/test-lancedb` and `/test-embeddings` — no forced close
+### Work Summary
 
-5. **Config persistence missing env var sync**: Esparcraft's `saveConfig()` sets `process.env.*` variables
-   - Fix: Added `process.env.OLLAMA_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSION` updates in `saveConfig()`
+**Root Cause:**
+- `CharacterEditor` in `character-panel.tsx` had no `key` prop, so React reused the same component instance when switching between characters
+- `useState(getInitialCharacter)` only runs once at mount, so switching `characterId` while the component was mounted would not update the form data
+- Compare: `GroupEditor` already had `key={editingGroupId || 'new-group'}` and worked correctly
 
-6. **Cleaned old LanceDB data**: Deleted `data/lancedb/` (had 768D schema) and `data/embeddings-config.json` (old defaults)
+**Fix (`src/components/tavern/character-panel.tsx`):**
+- Added `key={editingCharacterId || 'new-character'}` to `CharacterEditor` component
+- This forces React to fully unmount and remount the editor when the character ID changes
+- All fields (name, avatar, description, tags, etc.) now correctly load from the store for the selected character
 
-7. **Fixed keepalive.sh**: Changed to always restart (next dev returns exit code 0 even on native crashes)
+**Before:** Opening editor for Character A, closing, then opening for Character B would show Character A's data
+**After:** Each character edit opens with the correct character's data loaded fresh
 
-Verification Results:
-- `POST /api/embeddings/test` → `{ db: true, ollama: false, dimension: 1024, currentModel: "bge-m3:567m" }` ✅
-- `GET /api/embeddings/stats` → `{ dbAvailable: true, totalEmbeddings: 0 }` ✅
-- No more server crashes on test endpoint ✅
+---
+## Task ID: 12 - namespace-type-grouping
+### Work Task
+Add "Tipo" (Type) field to namespaces so embeddings are grouped by type in the LLM prompt with headers like [MEMORIA DEL PERSONAJE], [EVENTOS RECIENTES], [LORE DEL MUNDO].
 
-Stage Summary:
-- All embeddings dependencies aligned with working Esparcraft-Brige setup
-- LanceDB 0.26.2 pinned for stability
-- Test endpoint no longer causes segfault
-- Config defaults aligned (bge-m3:567m, 1024D)
-- Files modified: package.json, next.config.ts, config-persistence.ts, lancedb-db.ts, ollama-client.ts, types.ts, embeddings/test/route.ts, keepalive.sh
+### Work Summary
+
+**Namespace Type Field (`embeddings-settings-panel.tsx`):**
+- Added `type?: string` to `NamespaceRecord` interface
+- Added `type` to `newNamespace` state and `editingNamespace` state
+- Create Namespace Dialog: Added "Tipo" dropdown with 5 predefined types + custom option:
+  - 🧠 Memoria del Personaje
+  - 📅 Eventos Recientes
+  - 🌍 Lore del Mundo
+  - ⚙️ Reglas y Mecánicas
+  - 👥 Relaciones
+  - ✏️ Tipo personalizado (free-form input)
+- Edit Namespace Dialog: New dialog for editing type/description of existing namespaces (name is read-only)
+- Added edit button (Pencil icon) to each namespace in the list
+- Type stored in namespace's `metadata.type` field (LanceDB JSON column)
+- `loadNamespaces()` extracts `type` from `metadata.type` for display
+- Type badge shown next to namespace name with violet styling
+
+**Grouped Context Format (`chat-context.ts`):**
+- Complete rewrite of `buildContextString()` → `buildGroupedContextString()`
+- New `getNamespaceTypesMap()` function loads namespace type info from LanceDB
+- Embeddings grouped by namespace type into sections with `[TYPE]` headers
+- Each entry formatted as `- content` (bullet list style) instead of `[source_type] content`
+- Format example:
+  ```
+  [CONTEXTO RELEVANTE]
+
+  [MEMORIA DEL PERSONAJE]
+  - Alvar recuerda que el jugador sobrevivió varias expediciones peligrosas.
+  - Alvar sospecha que el jugador evita pagar sus deudas.
+
+  [EVENTOS RECIENTES]
+  - Un grupo desapareció en el bosque al norte del pueblo.
+  ```
+- Results without a type go into `[OTRO CONTEXTO]` section (or plain list if no types exist at all)
+- Token budget respected across all groups
+- `EmbeddingsContextResult` now includes `typeGroups?: Record<string, number>` for UI display
+- `formatEmbeddingsForSSE()` updated to include `typeGroups` in SSE events
+
+**Type Fix (`types/index.ts`):**
+- Added `'memory'` to `PromptSection.type` union (was missing, causing type mismatch)
+
+**Impact:**
+- Namespaces can now be categorized by type for organized context injection
+- Multiple namespaces can share the same type for merged grouping
+- LLM receives well-structured, grouped context instead of flat list
+- Existing namespaces without a type continue to work (grouped as "OTRO CONTEXTO" or ungrouped)
+
+---
+## Task ID: 13 - memory-extraction-phase1
+### Work Task
+Implement Phase 1 of automatic memory extraction: LLM-powered fact extraction from chat messages, robust JSON parsing, embedding storage, and integration into chat routes + UI settings.
+
+### Work Summary
+
+**Memory Extraction Utility (`src/lib/embeddings/memory-extraction.ts`) - NEW:**
+- `extractMemories()` — Calls LLM with extraction prompt to analyze last assistant message
+- `saveMemoriesAsEmbeddings()` — Saves extracted facts as embeddings to LanceDB
+- `extractAndSaveMemories()` — Combined pipeline: extract → save → return result
+- `shouldExtractMemory()` — Check if extraction should trigger based on message count
+- Robust JSON Parser with 5 fallback layers:
+  - Layer 1: Direct `JSON.parse()`
+  - Layer 2: Extract from markdown code fences (```json ... ```)
+  - Layer 3: Find `[...]` array anywhere in text
+  - Layer 4: Parse individual JSON objects line by line (handles broken JSON)
+  - Layer 5: Simple line format fallback (`HECHO | importance | tipo | descripcion`)
+- Validation: clamps importance 1-5, normalizes memory types (with Spanish aliases), max 200 chars per fact
+- LLM prompt in Spanish, asks for concise facts only (returns `[]` if nothing memorable)
+
+**API Route (`src/app/api/embeddings/extract-memory/route.ts`) - NEW:**
+- `POST /api/embeddings/extract-memory` — Receives message + character info + LLM config
+- Dynamic import to avoid loading heavy modules at startup
+- Returns: `{ success, count, facts, saved, namespace, embeddingIds }`
+
+**Type Updates (`src/types/index.ts`):**
+- Added to `EmbeddingsChatSettings`:
+  - `memoryExtractionEnabled?: boolean` — Toggle auto-extraction
+  - `memoryExtractionFrequency?: number` — Every N messages (default: 5)
+  - `memoryExtractionMinImportance?: number` — Min importance to save (default: 2)
+
+**Chat Route Integration (`src/app/api/chat/stream/route.ts`):**
+- Accumulates full response content during streaming (`accumulatedContent`)
+- After `done` signal, fires async extraction via `setTimeout(0)` (fire-and-forget)
+- Triggers when: enabled AND response > 50 chars AND message count % frequency === 0
+- Calls `/api/embeddings/extract-memory` with LLM config subset (provider, endpoint, apiKey, model, parameters)
+
+**Group Chat Integration (`src/app/api/chat/group-stream/route.ts`):**
+- Same pattern but iterates over `responsesThisTurn` array (multiple responders)
+- Passes `groupId: group.id` so memories are saved to `group-{groupId}` namespace
+
+**UI Settings (`embeddings-settings-panel.tsx`):**
+- Added "🧠 Extracción Automática de Memoria" section in Integración con Chat
+- Toggle switch to enable/disable
+- Frequency slider: every 2-20 messages (default: 5)
+- Min importance slider: 1-5 (default: 2)
+- Info box explaining: auto namespaces (character-{id}/group-{id}), importance filter, async (non-blocking)
+- Default settings: disabled, frequency 5, min importance 2
+
+**Architecture:**
+- Extraction is ASYNC and FIRE-AND-FORGET — never blocks chat response
+- Uses the same LLM provider configured for chat (with temperature 0.1 for consistency)
+- Namespaces: `character-{id}` for normal chat, `group-{id}` for group chat
+- source_type: `memory` for all auto-extracted embeddings

@@ -492,11 +492,20 @@ export async function POST(request: NextRequest) {
             // ========================================
             // Embeddings Context Retrieval (per-character)
             // ========================================
+            // If group has custom namespaces, use those; otherwise fall back to character's own namespaces
+            const groupNamespaces = group.embeddingNamespaces;
+            const characterNamespaces = responder.embeddingNamespaces;
+            const effectiveEmbeddingsChat = (groupNamespaces && groupNamespaces.length > 0)
+              ? { ...embeddingsChat, customNamespaces: groupNamespaces }
+              : (characterNamespaces && characterNamespaces.length > 0)
+                ? { ...embeddingsChat, customNamespaces: characterNamespaces }
+                : embeddingsChat;
+
             const embeddingsResult = await retrieveEmbeddingsContext(
               sanitizedMessage,
               responder.id,
               sessionId,
-              embeddingsChat
+              effectiveEmbeddingsChat
             );
             
             if (embeddingsResult.found) {
@@ -671,10 +680,15 @@ export async function POST(request: NextRequest) {
             );
 
             // Combine prompt sections with chat history for the viewer
-            // Order: System sections -> Embeddings -> Quest -> Chat History -> Post-History Instructions
+            // Order: System (up to Persona) -> CONTEXTO (embeddings) -> Rest of System -> Quest -> Chat History -> Post-History
+            // Insert embeddings section right after User's Persona
+            const personaIndex = promptSections.findIndex(s => s.type === 'persona');
+            const prePersonaSections = personaIndex >= 0 ? promptSections.slice(0, personaIndex + 1) : promptSections;
+            const postPersonaSections = personaIndex >= 0 ? promptSections.slice(personaIndex + 1) : [];
+
             let allPromptSections: PromptSection[] = chatHistorySection
-              ? [...promptSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
-              : [...promptSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(postHistorySection ? [postHistorySection] : [])];
+              ? [...prePersonaSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...postPersonaSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), chatHistorySection, ...(postHistorySection ? [postHistorySection] : [])]
+              : [...prePersonaSections, ...(embeddingsResult.section ? [embeddingsResult.section] : []), ...postPersonaSections, ...(resolvedQuestSection ? [resolvedQuestSection] : []), ...(postHistorySection ? [postHistorySection] : [])];
 
             // Inject HUD context into sections if enabled
             if (hudContextSection && typedHUDContext) {
@@ -831,6 +845,51 @@ export async function POST(request: NextRequest) {
             responses: responsesThisTurn
           }));
           controller.close();
+
+          // Async: Extract memory from each responder's response (fire-and-forget)
+          if (
+            embeddingsChat.memoryExtractionEnabled &&
+            responsesThisTurn.length > 0 &&
+            allMessages.length > 0 &&
+            allMessages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
+            llmConfig
+          ) {
+            setTimeout(async () => {
+              try {
+                for (const resp of responsesThisTurn) {
+                  if (resp.content && resp.content.length > 50) {
+                    const response = await fetch('/api/embeddings/extract-memory', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        lastMessage: resp.content,
+                        characterName: resp.characterName,
+                        characterId: resp.characterId,
+                        sessionId: sessionId || '',
+                        groupId: group.id,
+                        llmConfig: {
+                          provider: llmConfig.provider,
+                          endpoint: llmConfig.endpoint,
+                          apiKey: llmConfig.apiKey,
+                          model: llmConfig.model,
+                          parameters: llmConfig.parameters,
+                        },
+                        minImportance: embeddingsChat.memoryExtractionMinImportance || 2,
+                      }),
+                    });
+                    if (response.ok) {
+                      const result = await response.json();
+                      if (result.success && result.saved > 0) {
+                        console.log(`[Memory] Auto-extracted ${result.saved} memories for group char ${resp.characterName}`);
+                      }
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn('[Memory] Async group extraction failed:', err);
+              }
+            }, 0);
+          }
 
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';

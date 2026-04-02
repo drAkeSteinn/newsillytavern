@@ -1,8 +1,9 @@
 {
   "ollamaUrl": "http://localhost:11434",
   "model": "nomic-embed-text-v2-moe:latest",
-  "dimension": 1024,
+  "dimension": 768,
   "similarityThreshold": 0.15,
   "maxResults": 5,
-  "updatedAt": "2026-04-01T22:01:22.130Z"
+  "updatedAt": "2026-04-02T03:16:10.752Z",
+  "tableDimension": null
 }

@@ -156,4 +156,9 @@ export function getOllamaClient(config?: Partial<EmbeddingsConfig>): OllamaEmbed
   return ollamaClientInstance;
 }
 
+/** Reset the singleton so next getOllamaClient() creates a fresh instance */
+export function resetOllamaClient(): void {
+  ollamaClientInstance = null;
+}
+
 export default OllamaEmbeddingClient;

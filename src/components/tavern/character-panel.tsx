@@ -27,12 +27,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { CharacterEditor } from './character-editor';
 import { GroupEditor } from './group-editor';
 import { importCharacterCard, exportCharacterCardAsPng, exportCharacterCardAsJson } from '@/lib/character-card';
@@ -888,38 +882,21 @@ export function CharacterPanel() {
         </div>
       </div>
 
-      {/* Character Editor Dialog */}
-      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingCharacterId ? 'Editar Personaje' : 'Crear Nuevo Personaje'}
-            </DialogTitle>
-          </DialogHeader>
-          <CharacterEditor 
-            characterId={editingCharacterId}
-            onClose={() => setEditorOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Character Editor - Full-screen overlay */}
+      <CharacterEditor
+        key={editingCharacterId || 'new-character'}
+        characterId={editingCharacterId}
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+      />
 
-      {/* Group Editor Dialog */}
-      <Dialog open={groupEditorOpen} onOpenChange={setGroupEditorOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] overflow-hidden flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-2">
-            <DialogTitle>
-              {editingGroupId ? 'Editar Grupo' : 'Crear Nuevo Grupo'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            <GroupEditor 
-              key={editingGroupId || 'new-group'}
-              groupId={editingGroupId}
-              onClose={() => setGroupEditorOpen(false)}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Group Editor - Full-screen overlay */}
+      <GroupEditor 
+        key={editingGroupId || 'new-group'}
+        groupId={editingGroupId}
+        open={groupEditorOpen}
+        onClose={() => setGroupEditorOpen(false)}
+      />
     </>
   );
 }

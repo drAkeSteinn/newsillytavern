@@ -47,7 +47,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'content cannot be empty' }, { status: 400 });
     }
 
-    const { getEmbeddingClient } = await import('@/lib/embeddings/client');
+    // Load persisted config to ensure the correct embedding model is used
+    const { getConfig } = await import('@/lib/embeddings/config-persistence');
+    const persistedConfig = getConfig();
+
+    const { getEmbeddingClient, resetEmbeddingClient } = await import('@/lib/embeddings/client');
+    
+    // Reset client to use persisted config model
+    resetEmbeddingClient({
+      ollamaUrl: persistedConfig.ollamaUrl,
+      model: persistedConfig.model,
+      dimension: persistedConfig.dimension,
+    });
+
     const client = getEmbeddingClient();
     const embeddingId = await client.createEmbedding(body);
 

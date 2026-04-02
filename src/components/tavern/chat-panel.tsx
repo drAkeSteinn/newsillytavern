@@ -473,7 +473,10 @@ export function ChatPanel() {
             allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
             soundTriggers,  // Pass sound triggers for {{sonidos}} resolution
             settings,  // Pass settings for {{sonidos}} template
-            embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
+            embeddingsChat: {
+              ...settings.embeddingsChat,
+              customNamespaces: activeGroup?.embeddingNamespaces,
+            },  // Pass embeddings chat settings + group namespace override
           })
         });
 
@@ -687,7 +690,10 @@ export function ChatPanel() {
             allCharacters: allCharactersWithPersona,  // Pass all characters + persona for peticiones/solicitudes
             soundTriggers,  // Pass sound triggers for {{sonidos}} resolution
             settings,  // Pass settings for {{sonidos}} template
-            embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
+            embeddingsChat: {
+              ...settings.embeddingsChat,
+              customNamespaces: activeCharacter?.embeddingNamespaces,
+            },  // Pass embeddings chat settings + character namespace override
           })
         });
 
@@ -941,6 +947,7 @@ export function ChatPanel() {
           sessionId: activeSessionId,
           messageId,
           character: activeCharacter,
+          characterId: activeCharacter?.id,
           messages: currentMessages.filter((m: { isDeleted: boolean }) => !m.isDeleted),
           llmConfig: activeLLMConfig,
           userName: activePersona?.name || 'User',
@@ -951,7 +958,9 @@ export function ChatPanel() {
           sessionQuests: currentSession?.sessionQuests,  // Pass session quests
           questTemplates,  // Pass quest templates
           questSettings,  // Pass quest settings
-          hudContext: activeHUDContext  // Pass HUD context for prompt injection
+          hudContext: activeHUDContext,  // Pass HUD context for prompt injection
+          embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
+          summary: currentSession?.summary  // Pass summary for memory/context
         })
       });
 

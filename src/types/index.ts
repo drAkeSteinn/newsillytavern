@@ -414,6 +414,7 @@ export interface CharacterCard {
   hudTemplateId?: string | null;  // HUD template to use for this character
   lorebookIds?: string[];         // Lorebooks to use for this character
   questTemplateIds?: string[];       // Quest templates to use for this character
+  embeddingNamespaces?: string[];   // Embedding namespaces to search during chat (overrides strategy)
   statsConfig?: CharacterStatsConfig;  // Stats system configuration (attributes, skills, etc.)
   createdAt: string;
   updatedAt: string;
@@ -513,7 +514,7 @@ export interface MessageMetadata {
 
 // Prompt section for displaying in prompt viewer
 export interface PromptSection {
-  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'author_note' | 'post_history' | 'chat_history' | 'instructions' | 'quest';
+  type: 'system' | 'persona' | 'character_description' | 'personality' | 'scenario' | 'example_dialogue' | 'character_note' | 'lorebook' | 'author_note' | 'post_history' | 'chat_history' | 'instructions' | 'quest' | 'memory';
   label: string;
   content: string;
   color: string;  // Tailwind color class for the section header
@@ -603,6 +604,7 @@ export interface CharacterGroup {
   hudTemplateId?: string | null;  // HUD template to use for this group
   lorebookIds?: string[];         // Lorebooks to use for this group
   questTemplateIds?: string[];       // Quest templates to use for this group
+  embeddingNamespaces?: string[];   // Embedding namespaces to search during chat (overrides strategy)
   narratorSettings?: NarratorSettings;  // Narrator behavior configuration
   createdAt: string;
   updatedAt: string;
@@ -1523,6 +1525,14 @@ export interface EmbeddingsChatSettings {
   namespaceStrategy: 'global' | 'character' | 'session';
   /** Whether to show retrieved embeddings in the prompt viewer */
   showInPromptViewer: boolean;
+  /** Custom namespaces override from character/group assignment (takes priority over strategy) */
+  customNamespaces?: string[];
+  /** Enable automatic memory extraction from chat messages */
+  memoryExtractionEnabled?: boolean;
+  /** Extract memories every N messages (default: 5) */
+  memoryExtractionFrequency?: number;
+  /** Minimum importance (1-5) to save extracted memories (default: 2) */
+  memoryExtractionMinImportance?: number;
 }
 
 // ============ API Types ============
