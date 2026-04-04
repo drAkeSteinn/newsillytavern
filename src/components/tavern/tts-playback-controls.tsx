@@ -8,11 +8,13 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Volume2,
+  VolumeX,
   Pause,
   Play,
   Square,
   Loader2,
   ListMusic,
+  MousePointerClick,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTTS } from '@/hooks/use-tts';
@@ -28,6 +30,7 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
     isPaused,
     currentQueue,
     ttsConfig,
+    autoplayBlocked,
     stop,
     pause,
     resume,
@@ -36,7 +39,8 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
   // Find current item
   const currentItem = useMemo(() => 
     currentQueue.find(item => item.status === 'playing') || 
-    currentQueue.find(item => item.status === 'generating'),
+    currentQueue.find(item => item.status === 'generating') ||
+    currentQueue.find(item => item.status === 'autoplay_blocked'),
     [currentQueue]
   );
 
@@ -48,8 +52,8 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
     [currentQueue]
   );
 
-  // Don't render if TTS is disabled or nothing is playing/generating
-  if (!ttsConfig?.enabled || (!isPlaying && currentQueue.length === 0 && !currentItem)) {
+  // Don't render if TTS is disabled or nothing is playing/generating/blocked
+  if (!ttsConfig?.enabled || (!isPlaying && currentQueue.length === 0 && !currentItem && !autoplayBlocked)) {
     return null;
   }
 
@@ -57,10 +61,26 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
   if (compact) {
     return (
       <div className={cn(
-        'flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs',
+        'flex items-center gap-1 px-2 py-1 rounded-full text-xs',
+        autoplayBlocked
+          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+          : 'bg-primary/10 text-primary',
         className
       )}>
-        {isPlaying ? (
+        {autoplayBlocked ? (
+          <>
+            <VolumeX className="w-3 h-3" />
+            <span>Haz clic para activar audio</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={resume}
+            >
+              <Play className="w-2.5 h-2.5" />
+            </Button>
+          </>
+        ) : isPlaying ? (
           <>
             <Volume2 className="w-3 h-3 animate-pulse" />
             <span>{isPaused ? 'Pausado' : 'Reproduciendo'}</span>
@@ -110,12 +130,15 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
   // Full mode - expanded controls
   return (
     <div className={cn(
-      'flex items-center gap-3 px-4 py-2 rounded-lg bg-card border shadow-sm',
+      'flex items-center gap-3 px-4 py-2 rounded-lg border shadow-sm',
+      autoplayBlocked ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-card',
       className
     )}>
       {/* Status indicator */}
       <div className="flex items-center gap-2">
-        {currentItem?.status === 'generating' ? (
+        {autoplayBlocked ? (
+          <VolumeX className="w-5 h-5 text-amber-500" />
+        ) : currentItem?.status === 'generating' ? (
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
         ) : isPlaying ? (
           <Volume2 className={cn(
@@ -128,17 +151,23 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
         
         <div className="flex flex-col">
           <span className="text-sm font-medium">
-            {currentItem?.status === 'generating'
-              ? 'Generando audio...'
-              : isPlaying 
-                ? (isPaused ? 'Pausado' : 'Reproduciendo TTS')
-                : 'TTS Listo'}
+            {autoplayBlocked
+              ? 'Audio bloqueado por el navegador'
+              : currentItem?.status === 'generating'
+                ? 'Generando audio...'
+                : isPlaying 
+                  ? (isPaused ? 'Pausado' : 'Reproduciendo TTS')
+                  : 'TTS Listo'}
           </span>
-          {currentItem && (
+          {autoplayBlocked ? (
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              Haz clic en Reproducir para activar el audio
+            </span>
+          ) : currentItem ? (
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">
               "{currentItem.text.substring(0, 50)}..."
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -152,7 +181,17 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
 
       {/* Playback controls */}
       <div className="flex items-center gap-1 ml-auto">
-        {isPlaying && (
+        {autoplayBlocked ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resume}
+            className="gap-1"
+          >
+            <MousePointerClick className="w-4 h-4" />
+            Activar Audio
+          </Button>
+        ) : isPlaying ? (
           <>
             {isPaused ? (
               <Button
@@ -176,9 +215,9 @@ export function TTSPlaybackControls({ className, compact = false }: TTSPlaybackC
               </Button>
             )}
           </>
-        )}
+        ) : null}
         
-        {(isPlaying || currentItem) && (
+        {(isPlaying || currentItem || autoplayBlocked) && (
           <Button
             variant="outline"
             size="sm"
@@ -203,12 +242,12 @@ interface TTSFloatingIndicatorProps {
 }
 
 export function TTSFloatingIndicator({ className }: TTSFloatingIndicatorProps) {
-  const { isPlaying, isPaused, currentQueue, ttsConfig, stop, pause, resume } = useTTS();
+  const { isPlaying, isPaused, currentQueue, ttsConfig, autoplayBlocked, stop, pause, resume } = useTTS();
 
   // Find current item and counts
   const currentItem = useMemo(() => 
     currentQueue.find(item => 
-      item.status === 'playing' || item.status === 'generating'
+      item.status === 'playing' || item.status === 'generating' || item.status === 'autoplay_blocked'
     ),
     [currentQueue]
   );
@@ -221,10 +260,10 @@ export function TTSFloatingIndicator({ className }: TTSFloatingIndicatorProps) {
   );
 
   const hasActivePlayback = useMemo(() =>
-    isPlaying || currentQueue.some(
-      item => item.status === 'playing' || item.status === 'generating'
+    isPlaying || autoplayBlocked || currentQueue.some(
+      item => item.status === 'playing' || item.status === 'generating' || item.status === 'autoplay_blocked'
     ),
-    [isPlaying, currentQueue]
+    [isPlaying, autoplayBlocked, currentQueue]
   );
 
   // Don't render if TTS is disabled or nothing is active
@@ -241,11 +280,17 @@ export function TTSFloatingIndicator({ className }: TTSFloatingIndicatorProps) {
       'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg',
       'bg-background/95 backdrop-blur border shadow-lg',
       'animate-in slide-in-from-bottom-2 fade-in-0 duration-200',
+      autoplayBlocked && 'border-amber-300 dark:border-amber-700',
       className
     )}>
       {/* Status icon */}
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-        {currentItem?.status === 'generating' ? (
+      <div className={cn(
+        'flex items-center justify-center w-8 h-8 rounded-full',
+        autoplayBlocked ? 'bg-amber-500/10' : 'bg-primary/10'
+      )}>
+        {autoplayBlocked ? (
+          <VolumeX className="w-4 h-4 text-amber-500" />
+        ) : currentItem?.status === 'generating' ? (
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
         ) : (
           <Volume2 className={cn(
@@ -258,17 +303,21 @@ export function TTSFloatingIndicator({ className }: TTSFloatingIndicatorProps) {
       {/* Status text */}
       <div className="flex flex-col">
         <span className="text-sm font-medium">
-          {currentItem?.status === 'generating' 
-            ? 'Generando...' 
-            : isPaused 
-              ? 'Pausado' 
-              : 'Reproduciendo'}
+          {autoplayBlocked
+            ? 'Audio bloqueado'
+            : currentItem?.status === 'generating' 
+              ? 'Generando...' 
+              : isPaused 
+                ? 'Pausado' 
+                : 'Reproduciendo'}
         </span>
-        {queuedCount > 0 && (
+        {autoplayBlocked ? (
+          <span className="text-xs text-amber-500">Clic para activar</span>
+        ) : queuedCount > 0 ? (
           <span className="text-xs text-muted-foreground">
             {queuedCount} más en cola
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* Controls */}

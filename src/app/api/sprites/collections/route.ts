@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
+import { existsSync } from 'fs';
 import path from 'path';
 
 const SPRITES_DIR = path.join(process.cwd(), 'public', 'sprites');
@@ -231,6 +232,179 @@ export async function PUT(request: NextRequest) {
     console.error('Error saving sprite configuration:', error);
     return NextResponse.json(
       { error: 'Failed to save sprite configuration' },
+      { status: 500 }
+    );
+  }
+}
+
+// Create a new collection
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { name } = body;
+
+    if (!name || typeof name !== 'string') {
+      return NextResponse.json({ error: 'Collection name is required' }, { status: 400 });
+    }
+
+    // Sanitize collection name — allow Unicode letters, numbers, hyphens, underscores, spaces
+    const sanitizedName = name
+      .trim()
+      .replace(/\s+/g, '_')           // spaces → underscores
+      .replace(/[^a-zA-Z0-9_\-áéíóúÁÉÍÓÚñÑüÜ]/g, '') // keep Latin chars
+      .replace(/_+/g, '_')            // collapse multiple underscores
+      .replace(/^_|_$/g, '');         // trim leading/trailing underscores
+
+    if (sanitizedName.length === 0) {
+      return NextResponse.json({ error: 'Nombre de colección no válido' }, { status: 400 });
+    }
+
+    // Check if sprites directory exists
+    if (!existsSync(SPRITES_DIR)) {
+      await fs.mkdir(SPRITES_DIR, { recursive: true });
+    }
+
+    // Check if collection already exists
+    const collectionPath = path.join(SPRITES_DIR, sanitizedName);
+    if (existsSync(collectionPath)) {
+      return NextResponse.json({ error: 'La colección ya existe' }, { status: 400 });
+    }
+
+    // Create collection directory
+    await fs.mkdir(collectionPath, { recursive: true });
+
+    // Create initial metadata.json
+    const metadata: CollectionMetadata = {
+      version: 1,
+      collectionName: sanitizedName,
+      sprites: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(
+      path.join(collectionPath, 'metadata.json'),
+      JSON.stringify(metadata, null, 2),
+      'utf-8'
+    );
+
+    return NextResponse.json({
+      success: true,
+      collection: {
+        id: sanitizedName.toLowerCase(),
+        name: sanitizedName,
+        path: `/sprites/${sanitizedName}`,
+        files: []
+      }
+    });
+  } catch (error) {
+    console.error('Create collection error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to create collection' },
+      { status: 500 }
+    );
+  }
+}
+
+// Rename a collection
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { collectionId, newName } = body;
+
+    if (!collectionId || !newName || typeof newName !== 'string') {
+      return NextResponse.json(
+        { error: 'collectionId and newName are required' },
+        { status: 400 }
+      );
+    }
+
+    // Sanitize new name
+    const sanitizedName = newName
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_\-áéíóúÁÉÍÓÚñÑüÜ]/g, '')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    if (sanitizedName.length === 0) {
+      return NextResponse.json({ error: 'Nombre de colección no válido' }, { status: 400 });
+    }
+
+    const oldPath = path.join(SPRITES_DIR, collectionId);
+    const newPath = path.join(SPRITES_DIR, sanitizedName);
+
+    if (!existsSync(oldPath)) {
+      return NextResponse.json({ error: 'Colección no encontrada' }, { status: 404 });
+    }
+
+    // Check if new name already exists (and it's different from current)
+    if (sanitizedName !== collectionId && existsSync(newPath)) {
+      return NextResponse.json({ error: 'Ya existe una colección con ese nombre' }, { status: 400 });
+    }
+
+    // Rename directory
+    await fs.rename(oldPath, newPath);
+
+    // Update metadata.json with new name
+    const metadataPath = path.join(newPath, 'metadata.json');
+    try {
+      const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+      const metadata = JSON.parse(metadataContent);
+      metadata.collectionName = sanitizedName;
+      metadata.updatedAt = new Date().toISOString();
+      await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+    } catch {
+      // Metadata might not exist, skip update
+    }
+
+    return NextResponse.json({
+      success: true,
+      collection: {
+        id: sanitizedName.toLowerCase(),
+        name: sanitizedName,
+        path: `/sprites/${sanitizedName}`,
+        files: []
+      }
+    });
+  } catch (error) {
+    console.error('Rename collection error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to rename collection' },
+      { status: 500 }
+    );
+  }
+}
+
+// Delete a collection
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const collectionId = searchParams.get('collectionId');
+
+    if (!collectionId) {
+      return NextResponse.json({ error: 'collectionId is required' }, { status: 400 });
+    }
+
+    const collectionPath = path.join(SPRITES_DIR, collectionId);
+
+    if (!existsSync(collectionPath)) {
+      return NextResponse.json({ error: 'Colección no encontrada' }, { status: 404 });
+    }
+
+    // Delete all files in collection
+    const files = await fs.readdir(collectionPath);
+    for (const file of files) {
+      await fs.unlink(path.join(collectionPath, file));
+    }
+
+    // Delete collection directory
+    await fs.rmdir(collectionPath);
+
+    return NextResponse.json({ success: true, message: 'Colección eliminada' });
+  } catch (error) {
+    console.error('Delete collection error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete collection' },
       { status: 500 }
     );
   }

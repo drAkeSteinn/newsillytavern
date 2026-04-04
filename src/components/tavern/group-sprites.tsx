@@ -15,11 +15,39 @@ import type { CharacterCard, SpriteState, SpritePackV2, StateCollectionV2 } from
 import { SpritePreview } from './sprite-preview';
 import { useTavernStore } from '@/store';
 
+// ============================================
+// Sprite List Rotation Tracker (shared with character-sprite.tsx)
+// Tracks rotation indices per character per state
+// ============================================
+const _spriteRotationIndex = new Map<string, Map<SpriteState, number>>();
+
+function getRotationIndex(characterId: string, state: SpriteState): number {
+  let charMap = _spriteRotationIndex.get(characterId);
+  if (!charMap) {
+    charMap = new Map<SpriteState, number>();
+    _spriteRotationIndex.set(characterId, charMap);
+  }
+  return charMap.get(state) ?? 0;
+}
+
+function advanceRotationIndex(characterId: string, state: SpriteState): number {
+  let charMap = _spriteRotationIndex.get(characterId);
+  if (!charMap) {
+    charMap = new Map<SpriteState, number>();
+    _spriteRotationIndex.set(characterId, charMap);
+  }
+  const current = charMap.get(state) ?? 0;
+  const next = current + 1;
+  charMap.set(state, next);
+  return next;
+}
+
 // Get sprite from State Collection V2 (uses sprite packs)
 function getSpriteFromStateCollectionV2(
   state: SpriteState,
   stateCollectionsV2: StateCollectionV2[],
-  spritePacksV2: SpritePackV2[]
+  spritePacksV2: SpritePackV2[],
+  characterId: string
 ): { url: string | null; label: string | null } {
   const stateCollection = stateCollectionsV2.find(c => c.state === state);
   if (!stateCollection) return { url: null, label: null };
@@ -29,25 +57,24 @@ function getSpriteFromStateCollectionV2(
   
   switch (stateCollection.behavior) {
     case 'principal':
-      // Use principal sprite if specified, otherwise first sprite
       if (stateCollection.principalSpriteId) {
         const principal = pack.sprites.find(s => s.id === stateCollection.principalSpriteId);
         if (principal) return { url: principal.url, label: principal.label };
       }
       return { url: pack.sprites[0].url, label: pack.sprites[0].label };
     
-    case 'random':
-      // Random selection
+    case 'random': {
       const randomIndex = Math.floor(Math.random() * pack.sprites.length);
       const randomSprite = pack.sprites[randomIndex];
       return { url: randomSprite.url, label: randomSprite.label };
+    }
     
-    case 'list':
-      // Rotate through sprites (use currentIndex if available)
-      const index = stateCollection.currentIndex ?? 0;
-      const safeIndex = Math.min(index, pack.sprites.length - 1);
+    case 'list': {
+      const index = getRotationIndex(characterId, state);
+      const safeIndex = index % pack.sprites.length;
       const listSprite = pack.sprites[safeIndex];
       return { url: listSprite.url, label: listSprite.label };
+    }
     
     default:
       return { url: pack.sprites[0].url, label: pack.sprites[0].label };
@@ -68,6 +95,7 @@ interface GroupSpritesProps {
   characters: CharacterCard[];
   activeCharacterId: string | null;
   isStreaming: boolean;
+  isTTSPlaying?: boolean;
   maxVisible?: number;
   activeGroup?: {
     members?: Array<{
@@ -121,8 +149,10 @@ const POSITIONS_KEY = 'group-sprite-positions';
 // Priority: V2 State Collections > Avatar (legacy system removed)
 function getSpriteUrl(
   state: SpriteState,
-  character?: CharacterCard
+  character?: CharacterCard,
+  characterId?: string
 ): { url: string; label: string | null } {
+  const charId = characterId || character?.id || '';
   // Check for non-empty arrays (empty arrays should not be considered as "configured")
   const hasV2Collections = character?.stateCollectionsV2 && character.stateCollectionsV2.length > 0;
   const hasV2Packs = character?.spritePacksV2 && character.spritePacksV2.length > 0;
@@ -132,7 +162,8 @@ function getSpriteUrl(
     const v2Result = getSpriteFromStateCollectionV2(
       state,
       character.stateCollectionsV2,
-      character.spritePacksV2
+      character.spritePacksV2,
+      charId
     );
     if (v2Result.url) {
       return v2Result;
@@ -145,7 +176,8 @@ function getSpriteUrl(
       const v2IdleResult = getSpriteFromStateCollectionV2(
         'idle',
         character!.stateCollectionsV2,
-        character!.spritePacksV2
+        character!.spritePacksV2,
+        charId
       );
       if (v2IdleResult.url) {
         return v2IdleResult;
@@ -165,6 +197,7 @@ export function GroupSprites({
   characters,
   activeCharacterId,
   isStreaming,
+  isTTSPlaying = false,
   maxVisible = 3,
   activeGroup,
 }: GroupSpritesProps) {
@@ -387,6 +420,27 @@ export function GroupSprites({
     ? filteredCharacters
     : (filteredCharacters.find(c => c.id === activeCharacterId) ? [filteredCharacters.find(c => c.id === activeCharacterId)!] : filteredCharacters.slice(0, 1));
 
+  // ============================================
+  // LIST MODE ROTATION: Track state transitions per character
+  // ============================================
+  const prevStreamingActiveRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prevActive = prevStreamingActiveRef.current;
+    const currentActive = isStreaming ? activeCharacterId : null;
+    prevStreamingActiveRef.current = currentActive;
+
+    // When a character STARTS streaming (talk), advance its rotation index if using list mode
+    if (currentActive && currentActive !== prevActive) {
+      const character = characters.find(c => c.id === currentActive);
+      if (character) {
+        const collection = character.stateCollectionsV2?.find(c => c.state === 'talk');
+        if (collection?.behavior === 'list') {
+          advanceRotationIndex(currentActive, 'talk');
+        }
+      }
+    }
+  }, [isStreaming, activeCharacterId, characters]);
+
   return (
     <div ref={containerRef} className="absolute inset-0 z-5">
       {/* Sprites */}
@@ -417,10 +471,20 @@ export function GroupSprites({
         // ============================================
         const charSpriteState = store.getCharacterSpriteState(character.id);
         
-        // Determine sprite URL based on state and config
-        // PRIORITY: Trigger sprite > Talk (if streaming) > Idle
+        // Determine sprite state:
+        // Priority: Trigger > TTS Talk > Streaming Thinking > Idle
         const hasTriggerSprite = charSpriteState.triggerSpriteUrl;
-        const spriteState: SpriteState = isStreaming && isActive ? 'talk' : 'idle';
+        let spriteState: SpriteState;
+        
+        if (hasTriggerSprite) {
+          spriteState = 'idle'; // Trigger active, use trigger sprite
+        } else if (isTTSPlaying) {
+          spriteState = 'talk'; // TTS playing → character is speaking
+        } else if (isStreaming && isActive) {
+          spriteState = 'thinking'; // Generating → thinking
+        } else {
+          spriteState = charSpriteState.spriteState || 'idle';
+        }
         const countdown = countdowns.get(character.id) || 0;
         
         let spriteUrl: string;
@@ -432,7 +496,7 @@ export function GroupSprites({
           spriteLabel = charSpriteState.triggerSpriteLabel;
         } else {
           // Use state collection or fallback - pass full character for V2 support
-          const spriteResult = getSpriteUrl(spriteState, character);
+          const spriteResult = getSpriteUrl(spriteState, character, character.id);
           spriteUrl = spriteResult.url;
           spriteLabel = spriteResult.label;
         }

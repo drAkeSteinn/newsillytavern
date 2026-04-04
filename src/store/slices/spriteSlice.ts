@@ -910,6 +910,50 @@ export const createSpriteSlice = (set: any, get: any): SpriteSlice => ({
   },
 
   // ============================================
+  // END GENERATION WITH TTS SUPPORT
+  // Like endGenerationForCharacter, but sets 'talk' instead of 'idle'
+  // when TTS is expected to play (no trigger active).
+  // ============================================
+  endGenerationForCharacterWithTTS: (characterId: string, ttsExpected: boolean) => {
+    set((state: any) => {
+      const currentCharState = state.characterSpriteStates[characterId];
+      if (!currentCharState) return state;
+
+      const hasActiveTrigger = currentCharState.triggerSpriteUrl !== null;
+
+      if (hasActiveTrigger) {
+        // Trigger sprite is active, keep it — TTS state is irrelevant
+        return {
+          characterSpriteStates: {
+            ...state.characterSpriteStates,
+            [characterId]: {
+              ...currentCharState,
+              spriteState: 'idle',
+            },
+          },
+        };
+      }
+
+      // No trigger active
+      // If TTS is expected to play → set 'talk' so CharacterSprite shows talk sprite
+      // If TTS is NOT expected → set 'idle' as usual
+      const targetState = ttsExpected ? 'talk' : 'idle';
+
+      return {
+        characterSpriteStates: {
+          ...state.characterSpriteStates,
+          [characterId]: {
+            ...currentCharState,
+            triggerSpriteUrl: null,
+            triggerSpriteLabel: null,
+            spriteState: targetState,
+          },
+        },
+      };
+    });
+  },
+
+  // ============================================
   // LEGACY ACTIONS (for backward compatibility with single chat)
   // ============================================
   

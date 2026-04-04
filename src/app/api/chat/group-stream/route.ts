@@ -501,11 +501,27 @@ export async function POST(request: NextRequest) {
                 ? { ...embeddingsChat, customNamespaces: characterNamespaces }
                 : embeddingsChat;
 
+            // Enrich search query with recent context for better semantic matching
+            const searchCtxDepth = effectiveEmbeddingsChat.searchContextDepth || 0;
+            let groupEnrichedQuery = sanitizedMessage;
+            if (searchCtxDepth > 0) {
+              const recentHist = messages
+                .filter(m => !m.isDeleted)
+                .slice(-(searchCtxDepth * 2 + 1))
+                .map(m => m.content?.trim())
+                .filter(Boolean)
+                .slice(0, -1);
+              if (recentHist.length > 0) {
+                groupEnrichedQuery = recentHist.join(' ') + ' ' + sanitizedMessage;
+              }
+            }
+
             const embeddingsResult = await retrieveEmbeddingsContext(
-              sanitizedMessage,
+              groupEnrichedQuery,
               responder.id,
               sessionId,
-              effectiveEmbeddingsChat
+              effectiveEmbeddingsChat,
+              group.id,
             );
             
             if (embeddingsResult.found) {
@@ -748,6 +764,7 @@ export async function POST(request: NextRequest) {
 
                 case 'openai':
                 case 'vllm':
+                case 'lm-studio':
                 case 'custom': {
                   if (!llmConfig.endpoint) {
                     throw new Error(`${llmConfig.provider} requires an endpoint URL`);
@@ -847,11 +864,15 @@ export async function POST(request: NextRequest) {
           }
 
           // Check if memory extraction should trigger BEFORE closing stream
+          // Count by TURNS (user messages) instead of individual messages.
+          // A turn = 1 user message + N assistant responses.
+          const turnCount = messages.filter(m => m.role === 'user').length;
+          const extractionFrequency = embeddingsChat.memoryExtractionFrequency || 5;
           const shouldExtractGroupMemory =
             embeddingsChat.memoryExtractionEnabled &&
             responsesThisTurn.length > 0 &&
-            messages.length > 0 &&
-            messages.length % (embeddingsChat.memoryExtractionFrequency || 5) === 0 &&
+            turnCount > 0 &&
+            turnCount % extractionFrequency === 0 &&
             !!llmConfig;
 
           if (shouldExtractGroupMemory) {
@@ -877,8 +898,39 @@ export async function POST(request: NextRequest) {
           if (shouldExtractGroupMemory) {
             setTimeout(async () => {
               try {
+                // Build full turn context for context-aware extraction
+                const extractionCtxDepth = embeddingsChat.memoryExtractionContextDepth || 0;
+                let groupChatContext: string | undefined;
+                if (extractionCtxDepth > 0) {
+                  const recentForCtx = messages
+                    .filter(m => !m.isDeleted && m.content?.trim())
+                    .slice(-(extractionCtxDepth * 2 + 1));
+                  if (recentForCtx.length > 0) {
+                    groupChatContext = recentForCtx
+                      .map(m => {
+                        const role = m.role === 'user' ? 'Jugador' : m.role === 'assistant' ? 'Personaje' : m.role;
+                        return `${role}: ${m.content.trim().slice(0, 300)}`;
+                      })
+                      .join('\n  ');
+                  }
+                }
+
+                // Build current turn context (user message + all responses)
+                const turnLines: string[] = [];
+                turnLines.push(`Jugador: ${sanitizedMessage}`);
+                for (const resp of responsesThisTurn) {
+                  if (resp.content) {
+                    turnLines.push(`${resp.characterName}: ${resp.content.trim().slice(0, 500)}`);
+                  }
+                }
+                const fullTurnContext = turnLines.join('\n');
+
+                // Extract individual character memories with turn context
                 for (const resp of responsesThisTurn) {
                   if (resp.content && resp.content.length > 50) {
+                    // Build character-specific context: include the full turn so the LLM sees all responses
+                    const characterContext = groupChatContext || fullTurnContext;
+
                     const response = await fetch('/api/embeddings/extract-memory', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -896,6 +948,8 @@ export async function POST(request: NextRequest) {
                           parameters: llmConfig.parameters,
                         },
                         minImportance: embeddingsChat.memoryExtractionMinImportance || 2,
+                        customPrompt: embeddingsChat.groupMemoryExtractionPrompt || embeddingsChat.memoryExtractionPrompt,
+                        chatContext: characterContext, // NEW: pass turn context
                         consolidationSettings: embeddingsChat.memoryConsolidationEnabled ? {
                           enabled: true,
                           threshold: embeddingsChat.memoryConsolidationThreshold || 50,
@@ -910,6 +964,37 @@ export async function POST(request: NextRequest) {
                         console.log(`[Memory] Auto-extracted ${result.saved} memories for group char ${resp.characterName}`);
                       }
                     }
+                  }
+                }
+
+                // Extract group dynamics if enabled
+                if (embeddingsChat.groupDynamicsExtraction && responsesThisTurn.length > 1 && fullTurnContext.length > 100) {
+                  try {
+                    const dynResponse = await fetch('/api/embeddings/extract-group-dynamics', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        turnContext: fullTurnContext,
+                        groupId: group.id,
+                        sessionId: sessionId || '',
+                        llmConfig: {
+                          provider: llmConfig.provider,
+                          endpoint: llmConfig.endpoint,
+                          apiKey: llmConfig.apiKey,
+                          model: llmConfig.model,
+                          parameters: llmConfig.parameters,
+                        },
+                        minImportance: embeddingsChat.memoryExtractionMinImportance || 2,
+                      }),
+                    });
+                    if (dynResponse.ok) {
+                      const dynResult = await dynResponse.json();
+                      if (dynResult.success && dynResult.saved > 0) {
+                        console.log(`[Memory] Extracted ${dynResult.saved} group dynamics for group ${group.id}`);
+                      }
+                    }
+                  } catch (dynErr) {
+                    console.warn('[Memory] Group dynamics extraction failed (non-blocking):', dynErr);
                   }
                 }
               } catch (err) {

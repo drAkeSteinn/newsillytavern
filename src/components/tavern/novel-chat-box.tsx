@@ -46,6 +46,9 @@ import {
   Square,
   Ear,
   Radio,
+  VolumeX,
+  Brain,
+  Trash2,
 } from 'lucide-react';
 import {
   Popover,
@@ -58,12 +61,11 @@ import { DEFAULT_CHATBOX_APPEARANCE, THEME_COLOR_PRESETS } from '@/types';
 import { t } from '@/lib/i18n';
 import { QuickPetitions } from './user-solicitudes';
 import { ThemeEffects, getThemeColors as getThemeColorsUtil } from './theme-effects';
-import { useTTS } from '@/hooks/use-tts';
 import { useAudioRecorder, useAudioTranscription } from '@/hooks/use-audio-recorder';
 import { useWakeWordDetection } from '@/hooks/use-wake-word-detection';
 
 // Tab type for the chatbox
-type ChatboxTab = 'chat' | 'solicitudes' | 'misiones';
+type ChatboxTab = 'chat' | 'solicitudes' | 'misiones' | 'memorias';
 
 interface NovelChatBoxProps {
   onSendMessage: (message: string) => void;
@@ -82,6 +84,88 @@ interface NovelChatBoxProps {
   activeCharacter?: CharacterCard | null;
   characters?: CharacterCard[];
   activePersona?: Persona | null;
+  /** Whether TTS is currently playing audio (used to pause KWS during TTS) */
+  ttsPlaying?: boolean;
+  /** Whether memory extraction is currently running (triggers auto-refresh of memories tab) */
+  memoryExtracting?: boolean;
+}
+
+// Format memory date to relative time
+function formatMemoryDate(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Ahora';
+  if (minutes < 60) return `Hace ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Hace ${days}d`;
+  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+// Memory type labels and colors (outside component to avoid re-creation)
+const MEMORY_TYPE_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  hecho: { label: 'Hecho', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+  evento: { label: 'Evento', color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
+  relacion: { label: 'Relación', color: 'text-pink-400', bgColor: 'bg-pink-500/20' },
+  preferencia: { label: 'Preferencia', color: 'text-green-400', bgColor: 'bg-green-500/20' },
+  secreto: { label: 'Secreto', color: 'text-violet-400', bgColor: 'bg-violet-500/20' },
+  otro: { label: 'Otro', color: 'text-gray-400', bgColor: 'bg-gray-500/20' },
+};
+
+// Memory item component (outside main component for stable identity)
+function MemoryItem({ memory, onDelete }: {
+  memory: { id: string; content: string; namespace: string; metadata: Record<string, any>; created_at: string };
+  onDelete: (id: string) => void;
+}) {
+  const memType = memory.metadata?.memory_type || 'otro';
+  const typeConfig = MEMORY_TYPE_CONFIG[memType] || MEMORY_TYPE_CONFIG.otro;
+  const importance = memory.metadata?.importance || 3;
+  const isConsolidated = memory.metadata?.is_consolidated;
+  const createdDate = memory.created_at ? new Date(memory.created_at) : null;
+
+  return (
+    <div className="group flex items-start gap-2 p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors">
+      {/* Type indicator bar */}
+      <div className={cn("w-1 h-full min-h-[2rem] rounded-full flex-shrink-0 mt-0.5", typeConfig.bgColor.replace('/20', '/60'))} />
+
+      <div className="flex-1 min-w-0">
+        {/* Top row: type badge + importance + date */}
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", typeConfig.bgColor, typeConfig.color)}>
+            {typeConfig.label}
+          </span>
+          {/* Importance stars */}
+          <span className="text-[10px] text-amber-400">
+            {'★'.repeat(Math.min(importance, 5))}{'☆'.repeat(Math.max(0, 5 - importance))}
+          </span>
+          {isConsolidated && (
+            <span className="text-[9px] text-cyan-400 bg-cyan-500/20 px-1 py-0.5 rounded">
+              Consolidada
+            </span>
+          )}
+          <span className="text-[9px] text-muted-foreground ml-auto">
+            {createdDate ? formatMemoryDate(createdDate) : ''}
+          </span>
+        </div>
+
+        {/* Memory content */}
+        <p className="text-xs leading-relaxed text-foreground/90 line-clamp-3">
+          {memory.content}
+        </p>
+      </div>
+
+      {/* Delete button (appears on hover) */}
+      <button
+        onClick={() => onDelete(memory.id)}
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 flex-shrink-0"
+        title="Eliminar memoria"
+      >
+        <Trash2 className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 export function NovelChatBox({ 
@@ -100,7 +184,9 @@ export function NovelChatBox({
   activeGroup = null,
   activeCharacter = null,
   characters = [],
-  activePersona = null
+  activePersona = null,
+  ttsPlaying = false,
+  memoryExtracting = false,
 }: NovelChatBoxProps) {
   const [input, setInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -112,6 +198,17 @@ export function NovelChatBox({
   const [showAvailableQuests, setShowAvailableQuests] = useState(false);
   const [showAutoQuestConfig, setShowAutoQuestConfig] = useState(false);
   const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null);
+  
+  // Memories tab state
+  const [memoriesLoading, setMemoriesLoading] = useState(false);
+  const [memories, setMemories] = useState<Array<{
+    id: string;
+    content: string;
+    namespace: string;
+    metadata: Record<string, any>;
+    created_at: string;
+  }>>([]);
+  const [memoriesLoaded, setMemoriesLoaded] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -213,6 +310,7 @@ export function NovelChatBox({
   const {
     isListening: kwsListening,
     isCapturing: kwsCapturing,
+    isPausedByTTS: kwsPausedByTTS,
     transcript: kwsTranscript,
     capturedMessage: kwsCapturedMessage,
     lastDetectedWord: kwsLastDetectedWord,
@@ -224,6 +322,7 @@ export function NovelChatBox({
     language: kwsConfig.language,
     silenceDurationMs: kwsConfig.silenceDurationMs,
     cooldownMs: kwsConfig.cooldownMs,
+    ttsPlaying,
     onTranscriptUpdate: (transcript, isCapturing) => {
       console.log('[KWS] Transcript:', transcript, 'Capturing:', isCapturing);
     },
@@ -247,6 +346,9 @@ export function NovelChatBox({
       }
     },
   });
+
+  // Derive KWS active state: true when listening or paused by TTS
+  const kwsActive = kwsListening || kwsPausedByTTS;
 
   // Load ASR/KWS config on mount
   useEffect(() => {
@@ -284,12 +386,12 @@ export function NovelChatBox({
 
   // Handle KWS toggle
   const handleKWSToggle = useCallback(async () => {
-    if (kwsListening) {
+    if (kwsActive) {
       stopKWS();
     } else {
       await startKWS();
     }
-  }, [kwsListening, startKWS, stopKWS]);
+  }, [kwsActive, startKWS, stopKWS]);
 
   // Audio recording hooks
   const { transcribe, isTranscribing } = useAudioTranscription();
@@ -676,6 +778,103 @@ export function NovelChatBox({
 
   const themeColors = getThemeColors();
 
+  // ============================================
+  // MEMORIES TAB - Load & Delete memories
+  // ============================================
+  const loadMemories = useCallback(async () => {
+    if (memoriesLoaded) return;
+    setMemoriesLoading(true);
+    try {
+      let namespacesToFetch: string[] = [];
+      if (isGroupMode && activeGroup) {
+        // Group mode: fetch group namespace + each member's character namespace
+        const memberIds = activeGroup.members?.map(m => m.characterId) || activeGroup.characterIds || [];
+        namespacesToFetch = [`group-${activeGroup.id}`, ...memberIds.map(id => `character-${id}`)];
+      } else if (activeCharacter) {
+        // Single mode: fetch character namespace
+        namespacesToFetch = [`character-${activeCharacter.id}`];
+      }
+
+      if (namespacesToFetch.length === 0) {
+        setMemoriesLoaded(true);
+        setMemoriesLoading(false);
+        return;
+      }
+
+      // Fetch all namespaces in parallel
+      const results = await Promise.all(
+        namespacesToFetch.map(ns =>
+          fetch(`/api/embeddings?namespace=${encodeURIComponent(ns)}&source_type=memory&limit=200`)
+            .then(r => r.json())
+            .then(data => (data.success ? data.data.embeddings : []))
+            .catch(() => [])
+        )
+      );
+
+      // Flatten and sort by created_at (newest first)
+      const allMemories = results.flat().sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setMemories(allMemories);
+      setMemoriesLoaded(true);
+    } catch (error) {
+      console.error('[NovelChatBox] Failed to load memories:', error);
+    } finally {
+      setMemoriesLoading(false);
+    }
+  }, [isGroupMode, activeGroup, activeCharacter, memoriesLoaded]);
+
+  const deleteMemory = useCallback(async (memoryId: string) => {
+    try {
+      const response = await fetch(`/api/embeddings/${memoryId}`, { method: 'DELETE' });
+      if (response.ok) {
+        setMemories(prev => prev.filter(m => m.id !== memoryId));
+      }
+    } catch (error) {
+      console.error('[NovelChatBox] Failed to delete memory:', error);
+    }
+  }, []);
+
+  // Reset memories when character/group changes
+  useEffect(() => {
+    setMemoriesLoaded(false);
+    setMemories([]);
+  }, [activeCharacter?.id, activeGroup?.id, isGroupMode]);
+
+  // Load memories when tab is selected
+  useEffect(() => {
+    if (activeTab === 'memorias') {
+      loadMemories();
+    }
+  }, [activeTab, loadMemories]);
+
+  // Auto-refresh memories after extraction completes
+  // When memoryExtracting goes from true → false, wait a few seconds then refresh
+  const prevExtractingRef = useRef(memoryExtracting);
+  useEffect(() => {
+    if (prevExtractingRef.current && !memoryExtracting) {
+      // Extraction just finished — refresh memories after a delay
+      const timer = setTimeout(() => {
+        setMemoriesLoaded(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+    prevExtractingRef.current = memoryExtracting;
+  }, [memoryExtracting]);
+
+  // Get character name for a namespace
+  const getCharacterNameForNamespace = useCallback((ns: string) => {
+    if (ns.startsWith('character-')) {
+      const charId = ns.replace('character-', '');
+      return characters.find(c => c.id === charId)?.name || ns;
+    }
+    if (ns.startsWith('group-')) {
+      return activeGroup?.name || 'Grupo';
+    }
+    return ns;
+  }, [characters, activeGroup]);
+
   if (!activeSession) return null;
 
   return (
@@ -743,10 +942,10 @@ export function NovelChatBox({
               {headerName}
             </span>
             
-            {/* Message count - only show on chat tab */}
+            {/* Turn count - only show on chat tab (1 turn = 1 user message) */}
             {activeTab === 'chat' && (
               <span className="text-xs text-muted-foreground">
-                {activeSession.messages.filter(m => !m.isDeleted).length}{t('chat.messagesCount')}
+                {activeSession.messages.filter(m => !m.isDeleted && m.role === 'user').length}{t('chat.turnsCount')}
               </span>
             )}
           </div>
@@ -1071,6 +1270,34 @@ export function NovelChatBox({
                 </Badge>
               )}
             </button>
+            
+            {/* Memorias Tab */}
+            <button
+              onClick={() => setActiveTab('memorias')}
+              className={cn(
+                "relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                activeTab === 'memorias' 
+                  ? "text-white shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+              style={activeTab === 'memorias' ? {
+                backgroundColor: themeColors.primary,
+              } : undefined}
+            >
+              <Brain className="w-3.5 h-3.5" />
+              <span>Memorias</span>
+              {memories.length > 0 && (
+                <Badge 
+                  className="ml-0.5 h-4 min-w-4 px-1 text-[9px] font-bold"
+                  style={{ 
+                    backgroundColor: activeTab === 'memorias' ? 'rgba(255,255,255,0.3)' : themeColors.primary,
+                    color: 'white'
+                  }}
+                >
+                  {memories.length}
+                </Badge>
+              )}
+            </button>
           </div>
         )}
       </div>
@@ -1365,20 +1592,25 @@ export function NovelChatBox({
                   <Button
                     type="button"
                     size="icon"
-                    variant={kwsListening ? "default" : "outline"}
+                    variant={kwsActive ? "default" : "outline"}
                     className={cn(
                       "h-8 w-8 flex-shrink-0 transition-all",
-                      kwsListening && "animate-pulse bg-green-600 hover:bg-green-700"
+                      kwsActive && kwsPausedByTTS && "animate-pulse bg-amber-600 hover:bg-amber-700",
+                      kwsActive && !kwsPausedByTTS && "animate-pulse bg-green-600 hover:bg-green-700"
                     )}
                     onClick={handleKWSToggle}
                     disabled={isGenerating || isTranscribing}
                     title={
-                      kwsListening
-                        ? 'Desactivar escucha por voz'
-                        : `Activar escucha por voz (${activeCharacter?.name || 'KWS'})`
+                      kwsPausedByTTS
+                        ? 'KWS en pausa (TTS reproduciendo)'
+                        : kwsActive
+                          ? 'Desactivar escucha por voz'
+                          : `Activar escucha por voz (${activeCharacter?.name || 'KWS'})`
                     }
                   >
-                    {kwsListening ? (
+                    {kwsPausedByTTS ? (
+                      <VolumeX className="w-4 h-4" />
+                    ) : kwsActive ? (
                       <Radio className="w-4 h-4" />
                     ) : (
                       <Ear className="w-4 h-4" />
@@ -1391,12 +1623,14 @@ export function NovelChatBox({
                     </span>
                   )}
                   {/* KWS Status Indicator */}
-                  {kwsListening && !kwsCapturing && (
+                  {kwsActive && !kwsCapturing && (
                     <span className={cn(
                       "text-xs font-mono min-w-[50px]",
-                      "text-green-500 animate-pulse"
+                      kwsPausedByTTS
+                        ? "text-amber-400 animate-pulse"
+                        : "text-green-500 animate-pulse"
                     )}>
-                      🎧 ESCUCHANDO
+                      {kwsPausedByTTS ? '🔇 EN PAUSA' : '🎧 ESCUCHANDO'}
                     </span>
                   )}
                   {/* KWS Capturing Indicator - After wake word detected */}
@@ -1409,7 +1643,7 @@ export function NovelChatBox({
                     </span>
                   )}
                   {/* KWS Transcript Preview - Shows what KWS is detecting in real-time */}
-                  {kwsListening && kwsTranscript && (
+                  {kwsActive && kwsTranscript && (
                     <div className={cn(
                       "flex items-center gap-1 px-2 py-0.5 rounded-full border max-w-[200px] overflow-hidden",
                       kwsCapturing
@@ -2001,6 +2235,119 @@ export function NovelChatBox({
                           </div>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+
+          {/* Memorias Tab Content */}
+          {activeTab === 'memorias' && (
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-3 space-y-3">
+                {/* Header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Brain className="w-4 h-4 text-violet-500" />
+                  <h4 className="font-medium text-sm">Memorias del Personaje</h4>
+                  {memories.length > 0 && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      {memories.length}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Loading */}
+                {memoriesLoading && (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Cargando memorias...
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {!memoriesLoading && memories.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Brain className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-xs">
+                      {isGroupMode 
+                        ? 'Sin memorias extraídas para este grupo'
+                        : 'Sin memorias extraídas para este personaje'
+                      }
+                    </p>
+                    <p className="text-xs mt-1 opacity-70">
+                      Las memorias se extraen automáticamente durante la conversación
+                    </p>
+                  </div>
+                )}
+
+                {/* Memories List */}
+                {!memoriesLoading && memories.length > 0 && (
+                  <div className="space-y-2">
+                    {/* Group memories by character in group mode */}
+                    {isGroupMode ? (
+                      // In group mode, group by namespace
+                      Object.entries(
+                        memories.reduce<Record<string, typeof memories>>((acc, mem) => {
+                          if (!acc[mem.namespace]) acc[mem.namespace] = [];
+                          acc[mem.namespace].push(mem);
+                          return acc;
+                        }, {})
+                      ).map(([namespace, nsMemories]) => (
+                        <div key={namespace} className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 px-1 py-0.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                            <span className="text-xs font-medium text-violet-400">
+                              {getCharacterNameForNamespace(namespace)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              ({nsMemories.length})
+                            </span>
+                          </div>
+                          {nsMemories.map(memory => (
+                            <MemoryItem
+                              key={memory.id}
+                              memory={memory}
+                              onDelete={deleteMemory}
+                            />
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      // Single mode: flat list
+                      memories.map(memory => (
+                        <MemoryItem
+                          key={memory.id}
+                          memory={memory}
+                          onDelete={deleteMemory}
+                        />
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Info Footer */}
+                {!memoriesLoading && memories.length > 0 && (
+                  <div className="pt-2 border-t mt-2 space-y-2">
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      🧠 Namespace: <code className="text-violet-400">{isGroupMode && activeGroup ? `group-${activeGroup.id}` : activeCharacter ? `character-${activeCharacter.id}` : '—'}</code>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      💡 Para gestionar más memorias, ve a Configuración → Embeddings → Examinar
+                    </p>
+                  </div>
+                )}
+
+                {/* Empty state - more helpful info */}
+                {!memoriesLoading && memories.length === 0 && (
+                  <div className="pt-2 border-t mt-2 space-y-2">
+                    <div className="bg-muted/30 rounded-lg p-2.5 space-y-1.5">
+                      <p className="text-[10px] font-medium text-foreground">Para activar la extracción automática:</p>
+                      <ol className="text-[10px] text-muted-foreground space-y-0.5 list-decimal list-inside">
+                        <li>Ollama debe estar corriendo con un modelo de embeddings</li>
+                        <li>Configuración → Embeddings → Usar embeddings en chat ✅</li>
+                        <li>Configuración → Embeddings → Extracción Automática ✅</li>
+                      </ol>
                     </div>
                   </div>
                 )}

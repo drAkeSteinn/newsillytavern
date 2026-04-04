@@ -41,6 +41,7 @@ interface CharacterSpriteProps {
   character?: CharacterCard;    // Full character data for V2 system
   isStreaming?: boolean;         // Is the character currently generating?
   hasContent?: boolean;          // Is there streaming content? (for thinking vs talk)
+  isTTSPlaying?: boolean;        // Is TTS currently playing for this character?
   onSettingsChange?: (settings: SpriteSettings) => void;
 }
 
@@ -52,11 +53,40 @@ const DEFAULT_SPRITE_SETTINGS: SpriteSettings = {
   opacity: 0.9
 };
 
+// ============================================
+// Sprite List Rotation Tracker
+// Tracks rotation indices per character per state
+// Avoids modifying character data (no persistence noise)
+// ============================================
+const _spriteRotationIndex = new Map<string, Map<SpriteState, number>>();
+
+function getRotationIndex(characterId: string, state: SpriteState): number {
+  let charMap = _spriteRotationIndex.get(characterId);
+  if (!charMap) {
+    charMap = new Map<SpriteState, number>();
+    _spriteRotationIndex.set(characterId, charMap);
+  }
+  return charMap.get(state) ?? 0;
+}
+
+function advanceRotationIndex(characterId: string, state: SpriteState): number {
+  let charMap = _spriteRotationIndex.get(characterId);
+  if (!charMap) {
+    charMap = new Map<SpriteState, number>();
+    _spriteRotationIndex.set(characterId, charMap);
+  }
+  const current = charMap.get(state) ?? 0;
+  const next = current + 1;
+  charMap.set(state, next);
+  return next;
+}
+
 // Get sprite from State Collection V2 (uses sprite packs)
 function getSpriteFromStateCollectionV2(
   state: SpriteState,
   stateCollectionsV2: StateCollectionV2[],
-  spritePacksV2: SpritePackV2[]
+  spritePacksV2: SpritePackV2[],
+  characterId: string
 ): { url: string | null; label: string | null } {
   const stateCollection = stateCollectionsV2.find(c => c.state === state);
   if (!stateCollection) return { url: null, label: null };
@@ -79,12 +109,13 @@ function getSpriteFromStateCollectionV2(
       const randomSprite = pack.sprites[randomIndex];
       return { url: randomSprite.url, label: randomSprite.label };
     
-    case 'list':
-      // Rotate through sprites (use currentIndex if available)
-      const index = stateCollection.currentIndex ?? 0;
-      const safeIndex = Math.min(index, pack.sprites.length - 1);
+    case 'list': {
+      // Rotate through sprites using the rotation tracker
+      const index = getRotationIndex(characterId, state);
+      const safeIndex = index % pack.sprites.length;
       const listSprite = pack.sprites[safeIndex];
       return { url: listSprite.url, label: listSprite.label };
+    }
     
     default:
       return { url: pack.sprites[0].url, label: pack.sprites[0].label };
@@ -96,8 +127,10 @@ function getSpriteFromStateCollectionV2(
 function getSpriteUrl(
   state: SpriteState,
   avatarUrl?: string,
-  character?: CharacterCard
+  character?: CharacterCard,
+  characterId?: string
 ): { url: string; label: string | null } {
+  const charId = characterId || '';
   // Try V2 state collections (new system)
   // Check for non-empty arrays (empty arrays should not be considered as "configured")
   const hasV2Collections = character?.stateCollectionsV2 && character.stateCollectionsV2.length > 0;
@@ -107,7 +140,8 @@ function getSpriteUrl(
     const v2Result = getSpriteFromStateCollectionV2(
       state,
       character.stateCollectionsV2,
-      character.spritePacksV2
+      character.spritePacksV2,
+      charId
     );
     if (v2Result.url) {
       return v2Result;
@@ -120,7 +154,8 @@ function getSpriteUrl(
       const v2IdleResult = getSpriteFromStateCollectionV2(
         'idle',
         character!.stateCollectionsV2,
-        character!.spritePacksV2
+        character!.spritePacksV2,
+        charId
       );
       if (v2IdleResult.url) {
         return v2IdleResult;
@@ -153,6 +188,7 @@ export function CharacterSprite({
   character,
   isStreaming = false,
   hasContent = false,
+  isTTSPlaying = false,
   onSettingsChange 
 }: CharacterSpriteProps) {
   const [settings, setSettings] = useState<SpriteSettings>(() => {
@@ -213,6 +249,7 @@ export function CharacterSprite({
   const cancelReturnToIdleForCharacter = useTavernStore((state) => state.cancelReturnToIdleForCharacter);
   const executeReturnToIdleForCharacter = useTavernStore((state) => state.executeReturnToIdleForCharacter);
   const clearSpriteLock = useTavernStore((state) => state.clearSpriteLock);
+  const setSpriteStateForCharacter = useTavernStore((state) => state.setSpriteStateForCharacter);
   
   // Get per-character sprite state from the unified store
   // This is now reactive because characterSpriteStates is a proper selector
@@ -238,14 +275,63 @@ export function CharacterSprite({
   const isReturnToIdleScheduled = charSpriteState.returnToIdle.active;
   
   // Determine the effective sprite state:
-  // Priority: Trigger sprite > Talk (if streaming with content) > Thinking (if generating) > Idle
-  const effectiveSpriteState = charSpriteState.triggerSpriteUrl 
+  // Priority: Trigger sprite > TTS Talk > Streaming Thinking > Store State
+  // 
+  // When TTS is active:
+  //   - During streaming → 'thinking' (not talk, since the character is "thinking" while generating)
+  //   - During TTS playback → 'talk' (the character is "speaking")
+  //   - After TTS ends → 'idle'
+  // 
+  // If a trigger sprite is active, it always takes absolute priority.
+  const effectiveSpriteState = charSpriteState.triggerSpriteUrl
     ? 'idle' // Trigger active, use trigger sprite (handled below)
-    : isStreaming && hasContent 
-      ? 'talk' 
-      : isStreaming 
-        ? 'thinking' 
+    : isTTSPlaying
+      ? 'talk'                    // TTS is playing → character is speaking
+      : isStreaming
+        ? 'thinking'               // Generating → thinking (not talk, even with content)
         : charSpriteState.spriteState;
+
+  // ============================================
+  // LIST MODE ROTATION: Advance index on state transition
+  // When effectiveSpriteState transitions to 'talk' or 'thinking',
+  // advance the rotation index so the NEXT sprite in the list is shown.
+  // ============================================
+  const prevEffectiveStateRef = useRef<SpriteState>(effectiveSpriteState);
+  useEffect(() => {
+    const prev = prevEffectiveStateRef.current;
+    prevEffectiveStateRef.current = effectiveSpriteState;
+
+    // Only advance when transitioning INTO talk or thinking (not from one to the other)
+    if (prev !== 'talk' && prev !== 'thinking' && 
+        (effectiveSpriteState === 'talk' || effectiveSpriteState === 'thinking')) {
+      // Check if the target state collection uses 'list' behavior
+      const stateCollections = character?.stateCollectionsV2;
+      const collection = stateCollections?.find(c => c.state === effectiveSpriteState);
+      if (collection?.behavior === 'list') {
+        advanceRotationIndex(characterId, effectiveSpriteState);
+      }
+    }
+  }, [effectiveSpriteState, character?.stateCollectionsV2, characterId]);
+
+  // ============================================
+  // TTS ↔ SPRITE STATE SYNC
+  // When TTS playback ends, return the sprite to idle state
+  // (only if no trigger is active and not currently streaming)
+  // ============================================
+  const prevTTSToStateRef = useRef(isTTSPlaying);
+  useEffect(() => {
+    const wasPlaying = prevTTSToStateRef.current;
+    prevTTSToStateRef.current = isTTSPlaying;
+
+    // TTS just stopped playing → return to idle
+    if (wasPlaying && !isTTSPlaying && !isStreaming) {
+      const currentState = characterSpriteStates[characterId];
+      // Only update if no trigger is active (trigger has absolute priority)
+      if (currentState && !currentState.triggerSpriteUrl) {
+        setSpriteStateForCharacter(characterId, 'idle');
+      }
+    }
+  }, [isTTSPlaying, isStreaming, characterId, characterSpriteStates, setSpriteStateForCharacter]);
 
   // Update countdown for return to idle
   useEffect(() => {
@@ -275,7 +361,8 @@ export function CharacterSprite({
     : getSpriteUrl(
         effectiveSpriteState,
         avatarUrl,
-        character
+        character,
+        characterId
       );
   const currentSpriteUrl = spriteResult.url;
   const currentSpriteLabel = spriteResult.label;

@@ -7,18 +7,25 @@ interface UseWakeWordDetectionOptions {
   language?: string;
   silenceDurationMs?: number;
   cooldownMs?: number;
+  /** When true and KWS is active, recognition is temporarily paused to prevent speaker echo interference */
+  ttsPlaying?: boolean;
   onWakeWordDetected?: (word: string) => void;
   onMessageReady?: (message: string, detectedWakeWord: string | null) => void;
   onTranscriptUpdate?: (transcript: string, isCapturing: boolean) => void;
 }
 
 interface UseWakeWordDetectionReturn {
+  /** Whether KWS is currently actively listening (false when paused by TTS) */
   isListening: boolean;
+  /** Whether KWS is enabled/active (true even when temporarily paused by TTS) */
+  isActive: boolean;
   isCapturing: boolean;
   transcript: string;
   capturedMessage: string;
   lastDetectedWord: string | null;
   error: string | null;
+  /** Whether KWS is currently paused because TTS is playing */
+  isPausedByTTS: boolean;
   startListening: () => Promise<boolean>;
   stopListening: () => void;
   permissionStatus: 'granted' | 'denied' | 'prompt' | 'checking';
@@ -40,6 +47,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
     language = 'es-ES',
     silenceDurationMs = 1500,
     cooldownMs = 2000,
+    ttsPlaying = false,
     onWakeWordDetected,
     onMessageReady,
     onTranscriptUpdate,
@@ -47,6 +55,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
 
   // State
   const [isListening, setIsListening] = useState(false);
+  const [isPausedByTTS, setIsPausedByTTS] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [capturedMessage, setCapturedMessage] = useState('');
@@ -59,6 +68,7 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const isCapturingRef = useRef(false);
   const isListeningRef = useRef(false);
+  const wasListeningBeforeTTS = useRef(false); // Track if KWS was active before TTS started
   const messageBufferRef = useRef('');
   const lastDetectionTimeRef = useRef(0);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -104,6 +114,57 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
     };
     checkPermission();
   }, []);
+
+  // ============================================
+  // TTS / KWS Coordination
+  // When TTS starts playing, temporarily pause speech recognition
+  // to prevent the mic from picking up speaker audio (echo interference).
+  // When TTS stops, automatically resume recognition if it was active before.
+  // ============================================
+  useEffect(() => {
+    if (ttsPlaying && isListeningRef.current && recognitionRef.current) {
+      // TTS started playing while KWS is active — pause recognition
+      console.log('[KWS] TTS started playing, pausing speech recognition to avoid echo');
+      wasListeningBeforeTTS.current = true;
+      isListeningRef.current = false; // Prevent onend auto-restart
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // Ignore — recognition may already be stopping
+      }
+      // Batch state updates via microtask to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        setIsListening(false);
+        setIsPausedByTTS(true);
+      });
+    } else if (!ttsPlaying && wasListeningBeforeTTS.current) {
+      // TTS stopped playing — resume recognition if it was active before
+      console.log('[KWS] TTS stopped playing, resuming speech recognition');
+      wasListeningBeforeTTS.current = false;
+      queueMicrotask(() => {
+        setIsPausedByTTS(false);
+      });
+      // Small delay to let the audio pipeline fully release
+      setTimeout(() => {
+        if (!isListeningRef.current && recognitionRef.current) {
+          try {
+            isListeningRef.current = true;
+            recognitionRef.current.start();
+            setIsListening(true);
+            console.log('[KWS] Successfully resumed after TTS');
+          } catch (e) {
+            console.error('[KWS] Failed to resume after TTS:', e);
+            isListeningRef.current = false;
+          }
+        }
+      }, 300);
+    } else if (!ttsPlaying && isPausedByTTS) {
+      // TTS was already not playing and we were marked as paused — clear the flag
+      queueMicrotask(() => {
+        setIsPausedByTTS(false);
+      });
+    }
+  }, [ttsPlaying, isPausedByTTS]);
 
   // Clear silence timeout
   const clearSilenceTimeout = useCallback(() => {
@@ -416,11 +477,13 @@ export function useWakeWordDetection(options: UseWakeWordDetectionOptions = {}):
 
   return {
     isListening,
+    isActive: isPausedByTTS || isListening, // Active if listening or paused by TTS
     isCapturing,
     transcript,
     capturedMessage,
     lastDetectedWord,
     error,
+    isPausedByTTS,
     startListening,
     stopListening,
     permissionStatus,

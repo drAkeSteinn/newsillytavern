@@ -86,7 +86,13 @@ const defaultCharacter: Omit<CharacterCard, 'id' | 'createdAt' | 'updatedAt'> = 
 };
 
 export function CharacterEditor({ characterId, open, onClose }: CharacterEditorProps) {
-  const { addCharacter, updateCharacter, getCharacterById, characters, personas, activePersonaId } = useTavernStore();
+  // Use individual selectors to avoid re-rendering on unrelated store changes
+  const addCharacter = useTavernStore((s) => s.addCharacter);
+  const updateCharacter = useTavernStore((s) => s.updateCharacter);
+  const getCharacterById = useTavernStore((s) => s.getCharacterById);
+  const characters = useTavernStore((s) => s.characters);
+  const personas = useTavernStore((s) => s.personas);
+  const activePersonaId = useTavernStore((s) => s.activePersonaId);
 
   // Active tab state
   const [activeTab, setActiveTab] = useState('info');
@@ -766,6 +772,7 @@ export function CharacterEditor({ characterId, open, onClose }: CharacterEditorP
                       <Tooltip key={tab.value}>
                         <TooltipTrigger asChild>
                           <button
+                            type="button"
                             onClick={() => setActiveTab(tab.value)}
                             className={cn(
                               "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",

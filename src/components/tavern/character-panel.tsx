@@ -56,22 +56,21 @@ export function CharacterPanel() {
   const bulkImportRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const {
-    characters,
-    groups,
-    activeCharacterId,
-    activeGroupId,
-    sessions,
-    setActiveCharacter,
-    setActiveGroup,
-    createSession,
-    setActiveSession,
-    deleteCharacter,
-    deleteGroup,
-    addCharacter,
-    addGroup,
-    sidebarOpen
-  } = useTavernStore();
+  // Use individual selectors to avoid re-rendering on unrelated store changes
+  const characters = useTavernStore((s) => s.characters);
+  const groups = useTavernStore((s) => s.groups);
+  const activeCharacterId = useTavernStore((s) => s.activeCharacterId);
+  const activeGroupId = useTavernStore((s) => s.activeGroupId);
+  const sessions = useTavernStore((s) => s.sessions);
+  const setActiveCharacter = useTavernStore((s) => s.setActiveCharacter);
+  const setActiveGroup = useTavernStore((s) => s.setActiveGroup);
+  const createSession = useTavernStore((s) => s.createSession);
+  const setActiveSession = useTavernStore((s) => s.setActiveSession);
+  const deleteCharacter = useTavernStore((s) => s.deleteCharacter);
+  const deleteGroup = useTavernStore((s) => s.deleteGroup);
+  const addCharacter = useTavernStore((s) => s.addCharacter);
+  const addGroup = useTavernStore((s) => s.addGroup);
+  const sidebarOpen = useTavernStore((s) => s.sidebarOpen);
 
   const filteredCharacters = characters.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -15,6 +15,7 @@ import { generateResponse } from '@/lib/llm/generation';
 import type { LLMConfig, ChatApiMessage } from '@/lib/llm/types';
 import { getEmbeddingClient } from '@/lib/embeddings/client';
 import type { CreateEmbeddingParams } from '@/lib/embeddings/types';
+import { DEFAULT_MEMORY_EXTRACTION_PROMPT, DEFAULT_GROUP_DYNAMICS_PROMPT } from './memory-extraction-prompts';
 
 // ============================================
 // Types
@@ -47,7 +48,7 @@ export interface MemoryExtractionResult {
 export interface MemoryExtractionSettings {
   /** Whether auto-extraction is enabled */
   enabled: boolean;
-  /** Extract every N messages (default: 5) */
+  /** Extract every N turns (default: 5). A turn = 1 user message + responses. */
   frequency: number;
   /** Minimum importance to save (1-5, default: 2) */
   minImportance: number;
@@ -63,35 +64,8 @@ const DEFAULT_EXTRACTION_SETTINGS: MemoryExtractionSettings = {
   minImportance: 2,
 };
 
-const MEMORY_EXTRACTION_PROMPT = `Eres un analista de memoria para un personaje de rol. Tu ÚNICA tarea es extraer hechos memorables del mensaje de un personaje.
-
-Reglas estrictas:
-- Solo extrae información NUEVA y RELEVANTE sobre el jugador, relaciones, eventos importantes, secretos o preferencias
-- Ignora saludos, descripciones genéricas, acciones rutinarias y narrativa decorativa
-- Ignora información que ya es conocimiento general del personaje
-- Cada hecho debe ser una FRASE concisa (máximo 50 palabras) en tercera persona
-- Si NO hay nada memorable, responde EXACTAMENTE: []
-
-Responde SOLO con un JSON array, sin explicaciones, sin markdown, sin texto adicional.
-
-Ejemplos:
-
-Mensaje del personaje:
-"*mira con recelo* No confío en ti desde que robaste las gemas del templo. Y sé que le debes dinero a Claudec."
-
-Respuesta correcta:
-[{"contenido":"El personaje no confía en el jugador desde que robó las gemas del templo","tipo":"relacion","importancia":4},{"contenido":"El jugador le debe dinero a Claudec","tipo":"hecho","importancia":3}]
-
-Mensaje del personaje:
-"¡Buenos días! ¿En qué puedo ayudarte hoy?"
-
-Respuesta correcta:
-[]
-
-Ahora analiza este mensaje:
-
-Nombre del personaje: {characterName}
-{lastMessage}`;
+// Use the prompt from the clean prompts file
+const MEMORY_EXTRACTION_PROMPT = DEFAULT_MEMORY_EXTRACTION_PROMPT;
 
 // ============================================
 // Robust JSON Parser (3-layer fallback)
@@ -244,7 +218,6 @@ const TYPE_ALIASES: Record<string, MemoryType> = {
   'relacion': 'relacion',
   'relationship': 'relacion',
   'preferencia': 'preferencia',
-  'preferencia': 'preferencia',
   'secreto': 'secreto',
   'secret': 'secreto',
   'other': 'otro',
@@ -286,17 +259,29 @@ function clampImportance(val: number): number {
 /**
  * Extract memorable facts from the last assistant message using LLM.
  * Uses robust multi-layer JSON parsing.
+ *
+ * @param chatContext - Optional recent messages to provide context (improves fact extraction quality)
  */
 export async function extractMemories(
   lastAssistantMessage: string,
   characterName: string,
   llmConfig: LLMConfig,
+  customPrompt?: string,
+  chatContext?: string,
 ): Promise<MemoryFact[]> {
   if (!lastAssistantMessage?.trim() || lastAssistantMessage.length < 20) {
     return []; // Too short to contain meaningful memories
   }
 
-  const prompt = MEMORY_EXTRACTION_PROMPT
+  const promptTemplate = (customPrompt && customPrompt.trim()) ? customPrompt : MEMORY_EXTRACTION_PROMPT;
+
+  // Build the context section if provided
+  const contextSection = chatContext?.trim()
+    ? `Contexto reciente de la conversación:\n${chatContext}\n`
+    : '';
+
+  const prompt = promptTemplate
+    .replace('{chatContext}', contextSection)
     .replace('{characterName}', characterName)
     .replace('{lastMessage}', lastAssistantMessage);
 
@@ -356,16 +341,37 @@ export async function saveMemoriesAsEmbeddings(
     return { saved: 0, embeddingIds: [], namespace: '' };
   }
 
-  // Determine namespace
+  // Determine namespace (include sessionId to isolate memories per session)
+  // Pattern: character-{characterId}-{sessionId} or group-{groupId}-{sessionId}
+  const sessionSuffix = sessionId && sessionId !== 'unknown' ? `-${sessionId}` : '';
   const namespace = groupId
-    ? `group-${groupId}`
-    : `character-${characterId}`;
+    ? `group-${groupId}${sessionSuffix}`
+    : `character-${characterId}${sessionSuffix}`;
 
   const sourceId = sessionId || 'unknown';
   const embeddingIds: string[] = [];
 
   try {
     const client = getEmbeddingClient();
+
+    // Register namespace so it appears in the UI
+    try {
+      await client.upsertNamespace({
+        namespace,
+        description: groupId
+          ? `Memorias del grupo (${groupId}) — sesión ${sessionId || 'global'}`
+          : `Memorias de personaje (${characterId}) — sesión ${sessionId || 'global'}`,
+        metadata: {
+          type: 'memory',
+          character_id: characterId,
+          session_id: sessionId,
+          group_id: groupId || undefined,
+          auto_created: true,
+        },
+      });
+    } catch (nsErr) {
+      console.warn('[Memory] Failed to upsert namespace (non-blocking):', nsErr);
+    }
 
     for (const fact of validFacts) {
       try {
@@ -404,6 +410,52 @@ export async function saveMemoriesAsEmbeddings(
 // ============================================
 
 /**
+ * Extract group dynamics from a full turn of conversation.
+ * Analyzes inter-character relationships and interactions.
+ */
+export async function extractGroupDynamics(
+  turnContext: string,
+  llmConfig: LLMConfig,
+): Promise<MemoryFact[]> {
+  if (!turnContext?.trim() || turnContext.length < 50) {
+    return [];
+  }
+
+  const prompt = DEFAULT_GROUP_DYNAMICS_PROMPT
+    .replace('{turnContext}', turnContext);
+
+  try {
+    const extractionConfig: LLMConfig = {
+      ...llmConfig,
+      parameters: {
+        ...llmConfig.parameters,
+        temperature: 0.1,
+        maxTokens: 512,
+      },
+    };
+
+    const chatMessages: ChatApiMessage[] = [
+      { role: 'assistant', content: 'Eres un extractor de dinámicas grupales. Responde SOLO con JSON.' },
+      { role: 'user', content: prompt },
+    ];
+
+    const result = await generateResponse(
+      llmConfig.provider,
+      chatMessages,
+      extractionConfig,
+      'GroupDynamicsExtractor'
+    );
+
+    const facts = extractFactsFromLLMOutput(result.message || '');
+    console.log(`[Memory] Extracted ${facts.length} group dynamics facts`);
+    return facts;
+  } catch (error) {
+    console.warn('[Memory] Group dynamics extraction failed:', error);
+    return [];
+  }
+}
+
+/**
  * Full pipeline: Extract memories from message → Save as embeddings.
  * This is the main entry point called from chat routes.
  */
@@ -416,9 +468,11 @@ export async function extractAndSaveMemories(
   options: {
     groupId?: string;
     minImportance?: number;
+    customPrompt?: string;
+    chatContext?: string;
   } = {}
 ): Promise<MemoryExtractionResult> {
-  const { groupId, minImportance = 2 } = options;
+  const { groupId, minImportance = 2, customPrompt, chatContext } = options;
 
   const emptyResult: MemoryExtractionResult = {
     count: 0,
@@ -429,8 +483,8 @@ export async function extractAndSaveMemories(
   };
 
   try {
-    // Step 1: Extract facts via LLM
-    const facts = await extractMemories(lastAssistantMessage, characterName, llmConfig);
+    // Step 1: Extract facts via LLM (with optional chat context)
+    const facts = await extractMemories(lastAssistantMessage, characterName, llmConfig, customPrompt, chatContext);
 
     if (facts.length === 0) {
       return emptyResult;
@@ -459,13 +513,14 @@ export async function extractAndSaveMemories(
 }
 
 /**
- * Check if memory extraction should trigger based on message count.
+ * Check if memory extraction should trigger based on turn count.
+ * A turn = 1 user message + N assistant responses.
  */
 export function shouldExtractMemory(
-  currentMessageCount: number,
+  turnCount: number,
   settings: MemoryExtractionSettings = DEFAULT_EXTRACTION_SETTINGS,
 ): boolean {
-  return settings.enabled && currentMessageCount > 0 && currentMessageCount % settings.frequency === 0;
+  return settings.enabled && turnCount > 0 && turnCount % settings.frequency === 0;
 }
 
 export { DEFAULT_EXTRACTION_SETTINGS };

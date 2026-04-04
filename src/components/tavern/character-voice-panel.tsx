@@ -100,19 +100,13 @@ export function CharacterVoicePanel({
     },
   };
 
-  // Load voices from TTS-WebUI
+  // Load voices from TTS-WebUI via server-side proxy (avoids CORS and direct connection errors)
   const loadVoices = useCallback(async () => {
     const baseUrl = globalConfig?.baseUrl || 'http://localhost:7778';
     setIsLoadingVoices(true);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${baseUrl}/v1/audio/voices`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      const response = await fetch(`/api/tts/available-voices?endpoint=${encodeURIComponent(baseUrl)}`);
       
       if (response.ok) {
         const data = await response.json();

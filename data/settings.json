@@ -45,10 +45,10 @@
   },
   "chatLayout": {
     "novelMode": true,
-    "chatWidth": 78.9548276150191,
-    "chatHeight": 37.037037037037045,
-    "chatX": 48.73237303260147,
-    "chatY": 81.48148148148148,
+    "chatWidth": 49.39787950596018,
+    "chatHeight": 49.753086419753096,
+    "chatX": 30.765699553452585,
+    "chatY": 75.12345679012346,
     "chatOpacity": 0.95,
     "blurBackground": false,
     "showCharacterSprite": true
@@ -62,11 +62,12 @@
     "summaryThreshold": 40
   },
   "chatboxAppearance": {
-    "theme": "sunset",
+    "theme": "midnight",
     "background": {
       "transparency": 0.95,
-      "blur": 8,
-      "useGlassEffect": true
+      "blur": 10,
+      "useGlassEffect": true,
+      "customBackgroundColor": "#000000"
     },
     "font": {
       "fontFamily": "system",
@@ -148,6 +149,12 @@
     "maxTokenBudget": 1024,
     "namespaceStrategy": "character",
     "showInPromptViewer": true,
-    "memoryExtractionEnabled": true
+    "memoryExtractionEnabled": true,
+    "memoryExtractionFrequency": 5,
+    "memoryExtractionMinImportance": 2,
+    "memoryConsolidationEnabled": false,
+    "memoryConsolidationThreshold": 50,
+    "memoryConsolidationKeepRecent": 10,
+    "memoryConsolidationKeepHighImportance": 4
   }
 }

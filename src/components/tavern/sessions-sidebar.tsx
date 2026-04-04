@@ -17,19 +17,18 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export function SessionsSidebar() {
-  const {
-    sessions,
-    activeSessionId,
-    setActiveSession,
-    createSession,
-    deleteSession,
-    getCharacterById,
-    sidebarOpen,
-    setSidebarOpen,
-    setSettingsOpen,
-    activeCharacterId,
-    groups
-  } = useTavernStore();
+  // Use individual selectors to avoid re-rendering on unrelated store changes
+  const sessions = useTavernStore((s) => s.sessions);
+  const activeSessionId = useTavernStore((s) => s.activeSessionId);
+  const setActiveSession = useTavernStore((s) => s.setActiveSession);
+  const createSession = useTavernStore((s) => s.createSession);
+  const deleteSession = useTavernStore((s) => s.deleteSession);
+  const getCharacterById = useTavernStore((s) => s.getCharacterById);
+  const sidebarOpen = useTavernStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useTavernStore((s) => s.setSidebarOpen);
+  const setSettingsOpen = useTavernStore((s) => s.setSettingsOpen);
+  const activeCharacterId = useTavernStore((s) => s.activeCharacterId);
+  const groups = useTavernStore((s) => s.groups);
 
   const handleNewChat = () => {
     if (activeCharacterId) {

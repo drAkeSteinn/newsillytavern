@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const namespace = searchParams.get('namespace');
+    const sourceType = searchParams.get('source_type');
     const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 1000);
 
     let embeddings;
@@ -17,6 +18,11 @@ export async function GET(request: NextRequest) {
       embeddings = await LanceDBWrapper.getNamespaceEmbeddings(namespace, limit);
     } else {
       embeddings = await LanceDBWrapper.getAllEmbeddings(limit);
+    }
+
+    // Filter by source_type if specified
+    if (sourceType) {
+      embeddings = embeddings.filter((emb: any) => emb.source_type === sourceType);
     }
 
     const formatted = embeddings.map((emb: any) => ({

@@ -99,7 +99,7 @@ function CollectionManager({ onCollectionSelect }: CollectionManagerProps) {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo crear la colección',
+        description: error instanceof Error ? error.message : 'No se pudo crear la colección',
         variant: 'destructive',
       });
     }
@@ -129,7 +129,7 @@ function CollectionManager({ onCollectionSelect }: CollectionManagerProps) {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo renombrar la colección',
+        description: error instanceof Error ? error.message : 'No se pudo renombrar la colección',
         variant: 'destructive',
       });
     }
@@ -160,7 +160,7 @@ function CollectionManager({ onCollectionSelect }: CollectionManagerProps) {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo eliminar la colección',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar la colección',
         variant: 'destructive',
       });
     }

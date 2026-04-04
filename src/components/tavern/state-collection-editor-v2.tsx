@@ -80,32 +80,67 @@ const STATE_CONFIG: {
   },
 ];
 
-// Behavior configuration
-const BEHAVIOR_CONFIG: { 
+// Behavior configuration per state
+// Idle: all 3 behaviors (principal, aleatorio, lista)
+// Talk & Thinking: only lista and aleatorio (fallback is always idle)
+const BEHAVIOR_BY_STATE: Record<SpriteState, { 
   value: 'principal' | 'random' | 'list'; 
   label: string; 
   icon: React.ReactNode; 
   description: string 
-}[] = [
-  { 
-    value: 'principal', 
-    label: 'Principal', 
-    icon: <Crown className="w-3.5 h-3.5" />, 
-    description: 'Siempre usa el sprite principal del pack' 
-  },
-  { 
-    value: 'random', 
-    label: 'Aleatorio', 
-    icon: <Shuffle className="w-3.5 h-3.5" />, 
-    description: 'Selecciona un sprite aleatorio del pack' 
-  },
-  { 
-    value: 'list', 
-    label: 'Lista', 
-    icon: <List className="w-3.5 h-3.5" />, 
-    description: 'Rota entre los sprites del pack en orden' 
-  },
-];
+}[]> = {
+  idle: [
+    { 
+      value: 'principal', 
+      label: 'Principal', 
+      icon: <Crown className="w-3.5 h-3.5" />, 
+      description: 'Siempre usa el sprite designado (cuando hace fallback regresa a este)'
+    },
+    { 
+      value: 'random', 
+      label: 'Aleatorio', 
+      icon: <Shuffle className="w-3.5 h-3.5" />, 
+      description: 'Muestra un sprite aleatorio del pack'
+    },
+    { 
+      value: 'list', 
+      label: 'Lista', 
+      icon: <List className="w-3.5 h-3.5" />, 
+      description: 'Rota los sprites del pack en orden cada activación'
+    },
+  ],
+  talk: [
+    { 
+      value: 'list', 
+      label: 'Lista', 
+      icon: <List className="w-3.5 h-3.5" />, 
+      description: 'Cada vez que habla, muestra el siguiente sprite del pack'
+    },
+    { 
+      value: 'random', 
+      label: 'Aleatorio', 
+      icon: <Shuffle className="w-3.5 h-3.5" />, 
+      description: 'Muestra un sprite aleatorio del pack al hablar'
+    },
+  ],
+  thinking: [
+    { 
+      value: 'list', 
+      label: 'Lista', 
+      icon: <List className="w-3.5 h-3.5" />, 
+      description: 'Cada vez que piensa, muestra el siguiente sprite del pack'
+    },
+    { 
+      value: 'random', 
+      label: 'Aleatorio', 
+      icon: <Shuffle className="w-3.5 h-3.5" />, 
+      description: 'Muestra un sprite aleatorio del pack al pensar'
+    },
+  ],
+};
+
+// Get behaviors for a given state
+const getBehaviorsForState = (state: SpriteState) => BEHAVIOR_BY_STATE[state];
 
 export function StateCollectionEditorV2({ 
   character, 
@@ -163,7 +198,7 @@ export function StateCollectionEditorV2({
     const newCollection: StateCollectionV2 = {
       state,
       packId,
-      behavior: currentCollection?.behavior || 'principal',
+      behavior: currentCollection?.behavior || (state === 'idle' ? 'principal' : 'list'),
       principalSpriteId: currentCollection?.principalSpriteId,
       spriteOrder: currentCollection?.spriteOrder,
       excludedSpriteIds: currentCollection?.excludedSpriteIds,
@@ -231,21 +266,28 @@ export function StateCollectionEditorV2({
           Colecciones de Estado V2
         </div>
         <p className="text-muted-foreground">
-          Cada estado ahora referencia un <strong>Sprite Pack</strong> y define cómo seleccionar el sprite.
+          Cada estado referencia un <strong>Sprite Pack</strong> y define cómo seleccionar el sprite.
           Los packs se crean en la pestaña "Sprite Packs".
         </p>
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          {BEHAVIOR_CONFIG.map(config => (
-            <div key={config.value} className="p-2 bg-background/50 rounded border">
-              <div className="flex items-center gap-1 text-xs font-medium">
-                {config.icon}
-                <span>{config.label}</span>
+        <div className="space-y-2 mt-2">
+          <div className="font-medium text-muted-foreground">Idle (Reposo)</div>
+          <div className="grid grid-cols-3 gap-2">
+            {BEHAVIOR_BY_STATE.idle.map(config => (
+              <div key={config.value} className="p-2 bg-background/50 rounded border">
+                <div className="flex items-center gap-1 text-xs font-medium">
+                  {config.icon}
+                  <span>{config.label}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {config.description}
+                </p>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {config.description}
-              </p>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="font-medium text-muted-foreground">Talk / Thinking</div>
+          <p className="text-[10px] text-muted-foreground">
+            Solo <strong>Lista</strong> (rota en orden) y <strong>Aleatorio</strong> — su fallback siempre regresa al Idle.
+          </p>
         </div>
       </div>
 
@@ -332,12 +374,13 @@ export function StateCollectionEditorV2({
                     <Select
                       value={collection.behavior}
                       onValueChange={(v) => handleBehaviorChange(stateConfig.key, v as 'principal' | 'random' | 'list')}
+                    
                     >
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {BEHAVIOR_CONFIG.map(config => (
+                        {getBehaviorsForState(stateConfig.key).map(config => (
                           <SelectItem key={config.value} value={config.value}>
                             <div className="flex items-center gap-2">
                               {config.icon}
@@ -348,7 +391,7 @@ export function StateCollectionEditorV2({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      {BEHAVIOR_CONFIG.find(b => b.value === collection.behavior)?.description}
+                      {getBehaviorsForState(stateConfig.key).find(b => b.value === collection.behavior)?.description}
                     </p>
                   </div>
 

@@ -66,11 +66,6 @@ export {
   
   // Individual reward execution
   executeAttributeReward,
-  executeSpriteReward,
-  executeSoundReward,
-  executeBackgroundReward,
-  executeItemReward,
-  executeCustomReward,
   executeReward,
   
   // Batch execution

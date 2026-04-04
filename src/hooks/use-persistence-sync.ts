@@ -42,15 +42,17 @@ export function usePersistenceSync() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isSaving = useRef(false);
 
-  // Get store state and actions
-  const store = useTavernStore();
+  // Note: We intentionally do NOT subscribe to the store here.
+  // Store subscriptions are handled via useTavernStore.subscribe() in the effect below.
+  // A full store subscription (useTavernStore() without selector) would cause the
+  // entire app to re-render on every store change since PersistenceProvider wraps the root layout.
 
   // Load data from server
   const loadFromServer = useCallback(async () => {
     try {
       const response = await fetch('/api/persistence');
       if (!response.ok) {
-        console.error('Failed to load persistent data');
+        console.warn('[Persistence] Failed to load persistent data');
         return false;
       }
 
@@ -228,19 +230,22 @@ export function usePersistenceSync() {
           }
         }
       } catch (templateError) {
-        console.error('[Persistence] Error loading quest templates:', templateError);
+        console.warn('[Persistence] Error loading quest templates:', templateError);
       }
 
       return true;
     } catch (error) {
-      console.error('Error loading persistent data:', error);
+      console.warn('[Persistence] Error loading persistent data:', error);
       return false;
     }
   }, []);
 
-  // Save data to server
-  const saveToServer = useCallback(async () => {
+  // Save data to server with retry
+  const saveToServer = useCallback(async (attempt = 0) => {
     if (isSaving.current) return;
+
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY_MS = 1000;
 
     try {
       isSaving.current = true;
@@ -311,17 +316,43 @@ export function usePersistenceSync() {
         },
       };
 
+      // Serialize data — catch non-serializable values early
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(dataToSave);
+      } catch (serializeError) {
+        console.warn('[Persistence] Data serialization failed, skipping save:', serializeError);
+        return;
+      }
+
       const response = await fetch('/api/persistence', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSave),
+        body: serialized,
       });
 
       if (!response.ok) {
-        console.error('Failed to save persistent data');
+        // Retry on transient server errors (5xx)
+        if (response.status >= 500 && attempt < MAX_RETRIES) {
+          console.warn(`[Persistence] Server error (${response.status}), retrying in ${RETRY_DELAY_MS}ms... (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+          isSaving.current = false;
+          saveToServer(attempt + 1);
+          return;
+        }
+        // Non-retryable error — log as warn, not error, to avoid Next.js error overlay
+        console.warn(`[Persistence] Save failed with status ${response.status}`);
       }
     } catch (error) {
-      console.error('Error saving persistent data:', error);
+      // Retry on network errors
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[Persistence] Network error, retrying in ${RETRY_DELAY_MS}ms... (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+        isSaving.current = false;
+        saveToServer(attempt + 1);
+        return;
+      }
+      console.warn('[Persistence] Save failed after retries:', error);
     } finally {
       isSaving.current = false;
     }

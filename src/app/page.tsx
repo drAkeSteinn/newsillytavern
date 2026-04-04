@@ -26,7 +26,11 @@ import { useHydration } from '@/hooks/use-hydration';
 import { t } from '@/lib/i18n';
 
 export default function TavernFlow() {
-  const { sidebarOpen, setSidebarOpen, settingsOpen, setSettingsOpen } = useTavernStore();
+  // Use individual selectors to avoid re-rendering the entire page on every store change
+  const sidebarOpen = useTavernStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useTavernStore((s) => s.setSidebarOpen);
+  const settingsOpen = useTavernStore((s) => s.settingsOpen);
+  const setSettingsOpen = useTavernStore((s) => s.setSettingsOpen);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [backgroundGalleryOpen, setBackgroundGalleryOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('llm');

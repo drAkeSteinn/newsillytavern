@@ -99,7 +99,7 @@ export interface TTSQueueItem {
   voiceConfig: CharacterVoiceConfig;
   characterId?: string;
   priority: number;
-  status: 'pending' | 'generating' | 'ready' | 'playing' | 'completed' | 'error';
+  status: 'pending' | 'generating' | 'ready' | 'playing' | 'completed' | 'error' | 'autoplay_blocked';
   audioUrl?: string;
   audioBlob?: Blob;
   error?: string;

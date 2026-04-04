@@ -14,6 +14,7 @@ import {
   filterSegments,
   cleanTextForTTS,
 } from '@/lib/tts';
+import { unlockAudio } from '@/lib/tts/tts-service';
 import type { 
   CharacterVoiceSettings, 
   CharacterVoiceConfig, 
@@ -35,6 +36,7 @@ interface UseTTSReturn {
   isLoadingConfig: boolean;
   isConnected: boolean;
   connectionError: string | null;
+  autoplayBlocked: boolean;
   
   // Actions
   speak: (
@@ -50,6 +52,7 @@ interface UseTTSReturn {
   stop: () => void;
   pause: () => void;
   resume: () => void;
+  unlockAudio: () => Promise<boolean>;
   
   // Config
   loadConfig: () => Promise<void>;
@@ -68,21 +71,23 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   
   // Refs
   const lastMessageIdRef = useRef<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializedRef = useRef(false);
+  const currentQueueLengthRef = useRef(0); // Track queue length to avoid stale closure
 
-  // Check TTS connection status
-  const checkConnection = useCallback(async (): Promise<boolean> => {
+  // Check TTS connection status (uses cached status when within cooldown)
+  const checkConnection = useCallback(async (forceCheck = false): Promise<boolean> => {
     if (!ttsConfig?.enabled) {
       return false;
     }
 
     try {
-      const result = await ttsService.testConnection();
+      const result = await ttsService.testConnection(forceCheck);
       const connected = result.status === 'online';
       setIsConnected(connected);
       setConnectionError(connected ? null : result.error || 'Connection failed');
@@ -112,7 +117,7 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
         ttsService.setConfig(DEFAULT_TTS_WEBUI_CONFIG);
       }
     } catch (error) {
-      console.error('[useTTS] Failed to load config:', error);
+      console.warn('[useTTS] Failed to load config:', error);
       setTtsConfig(DEFAULT_TTS_WEBUI_CONFIG);
     } finally {
       setIsLoadingConfig(false);
@@ -135,33 +140,57 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
         setIsPaused(false);
       },
       onPlaybackEnd: () => {
-        setIsPlaying(ttsService.getIsPlaying());
         setIsPaused(false);
-        // Update queue only when playback ends
-        const queue = ttsService.getQueue();
-        setCurrentQueue([...queue]);
+        // NOTE: Do NOT read isPlaying here — it's still true at this point.
+        // The correct isPlaying state will be synced by onQueueUpdate,
+        // which fires AFTER playNext() updates this.isPlaying.
       },
       onPlaybackError: (item, error) => {
-        console.error('[useTTS] Playback error:', error);
+        // Don't log errors for autoplay-blocked items — that's expected behavior
+        if (item.status !== 'autoplay_blocked') {
+          console.warn('[useTTS] Playback error for text "' + (item.text?.substring(0, 40) || '?') + '...":', error);
+        }
         setIsPlaying(false);
         setIsPaused(false);
       },
+      onAutoplayBlocked: () => {
+        console.warn('[useTTS] Autoplay blocked — click anywhere to enable audio playback');
+        setAutoplayBlocked(true);
+        setIsPlaying(false);
+        // Auto-clear the blocked state after 10 seconds (user likely won't click)
+        setTimeout(() => {
+          setAutoplayBlocked(false);
+        }, 10000);
+      },
       onQueueUpdate: (queue) => {
-        // Don't update on every queue change to prevent re-renders
-        // Only update if queue length changes significantly
-        if (Math.abs(queue.length - currentQueue.length) > 0) {
+        // ALWAYS sync isPlaying from the service — this is the authoritative source.
+        // playNext() sets this.isPlaying = false BEFORE calling onQueueUpdate,
+        // and processQueue() sets it = true BEFORE calling onQueueUpdate,
+        // so we always get the correct value here.
+        const serviceIsPlaying = ttsService.getIsPlaying();
+        setIsPlaying(serviceIsPlaying);
+
+        // Update queue display — use ref to avoid stale closure on currentQueue
+        const prevLen = currentQueueLengthRef.current;
+        currentQueueLengthRef.current = queue.length;
+        if (queue.length !== prevLen) {
           setCurrentQueue([...queue]);
         }
       },
     });
   }, []); // Empty deps - only run once
 
-  // Check connection when config loads
+  // Check connection when config loads, with adaptive interval
+  // Online → check every 30s, Offline → check every 2min (service handles cooldown internally)
   useEffect(() => {
     if (!ttsConfig?.enabled) return;
     
-    checkConnection();
-    connectionCheckIntervalRef.current = setInterval(checkConnection, 30000);
+    checkConnection(true); // Force first check
+    // The service caches results, so we can call frequently — it won't actually
+    // make network requests unless the cooldown has expired
+    connectionCheckIntervalRef.current = setInterval(() => {
+      checkConnection(); // Uses cached result if within cooldown
+    }, 30000);
     
     return () => {
       if (connectionCheckIntervalRef.current) {
@@ -181,11 +210,23 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
       return;
     }
 
-    // Check connection before speaking
-    const connected = await checkConnection();
-    if (!connected) {
-      console.warn('[useTTS] TTS service is not connected, skipping speech');
-      return;
+    // Check cached connection status first — avoid network request if known offline
+    const cachedStatus = ttsService.getCachedConnectionStatus();
+    if (cachedStatus === 'offline') {
+      return; // Silently skip — server is known to be offline
+    }
+
+    // If status is 'online', skip the async check — we know it works
+    // If status is 'unknown', don't block with a network check —
+    // let addToQueue proceed and the service will handle connection errors on generation
+    if (cachedStatus === 'online') {
+      // Already confirmed online — proceed directly
+    } else {
+      // Status is 'unknown' — do a quick connection check
+      const connected = await checkConnection();
+      if (!connected) {
+        return;
+      }
     }
 
     // Use voice settings or fall back to global config
@@ -235,11 +276,21 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
       return;
     }
 
-    // Check connection before speaking
-    const connected = await checkConnection();
-    if (!connected) {
-      console.warn('[useTTS] TTS service is not connected, skipping speech');
-      return;
+    // Check cached connection status first — avoid network request if known offline
+    const cachedStatus = ttsService.getCachedConnectionStatus();
+    if (cachedStatus === 'offline') {
+      return; // Silently skip — server is known to be offline
+    }
+
+    // If status is 'online', skip the async check — we know it works
+    if (cachedStatus === 'online') {
+      // Already confirmed online — proceed directly
+    } else {
+      // Status is 'unknown' — do a quick connection check
+      const connected = await checkConnection();
+      if (!connected) {
+        return;
+      }
     }
 
     if (!voiceSettings.enabled) {
@@ -302,11 +353,13 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     isLoadingConfig,
     isConnected,
     connectionError,
+    autoplayBlocked,
     speak,
     speakWithDualVoice,
     stop,
     pause,
     resume,
+    unlockAudio,
     loadConfig,
     loadVoices,
     checkConnection,
@@ -316,11 +369,12 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
 // ============================================
 // useTTSAutoGeneration Hook
 // Automatically plays TTS for new messages
+// Uses refs to avoid stale closures — fires TTS synchronously
 // ============================================
 
 interface UseTTSAutoGenerationOptions {
   enabled?: boolean;
-  delay?: number;
+  delay?: number; // Ignored — TTS fires synchronously now
   speak?: (text: string, voiceSettings?: CharacterVoiceSettings | null, characterId?: string) => Promise<void>;
   speakWithDualVoice?: (text: string, voiceSettings: CharacterVoiceSettings, characterId?: string) => Promise<void>;
   ttsConfig: TTSWebUIConfig | null;
@@ -334,7 +388,6 @@ export function useTTSAutoGeneration(
 ) {
   const { 
     enabled = true, 
-    delay = 500,
     speak,
     speakWithDualVoice,
     ttsConfig,
@@ -344,33 +397,41 @@ export function useTTSAutoGeneration(
   
   const lastProcessedIdRef = useRef<string>('');
   const lastMessageCountRef = useRef<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isProcessingRef = useRef<boolean>(false);
+
+  // Use refs to always have the latest function references — avoids stale closures
+  const speakRef = useRef(speak);
+  const speakWithDualVoiceRef = useRef(speakWithDualVoice);
   
   const characters = useTavernStore((state) => state.characters);
+  const charactersRef = useRef(characters);
+
+  // Sync refs inside the effect (not during render)
+  useEffect(() => {
+    speakRef.current = speak;
+    speakWithDualVoiceRef.current = speakWithDualVoice;
+    charactersRef.current = characters;
+  }, [speak, speakWithDualVoice, characters]);
 
   useEffect(() => {
     const currentMessageCount = messages.length;
     const lastMessage = messages[messages.length - 1];
-    
-    // Clear any pending timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
 
     // Check all conditions
     if (!enabled) return;
     if (!ttsConfig?.enabled) return;
     if (!ttsConfig?.autoGeneration) return;
     if (!speak || !speakWithDualVoice) return;
-    if (!isConnected) {
-      console.log('[useTTSAutoGeneration] ⏸️ TTS not connected');
-      return;
-    }
+
+    // Check connection using the SERVICE's cached status directly.
+    // We do NOT rely on React's isConnected state here because it starts as false
+    // and only becomes true after the first async checkConnection() completes.
+    // If a message arrives before the check completes, auto-TTS would be skipped.
+    // Using the service's cache is synchronous and always up-to-date.
+    const cachedStatus = ttsService.getCachedConnectionStatus();
+    if (cachedStatus === 'offline') return;
+    // If status is 'unknown' or 'online', proceed — let the service handle connection errors
 
     // Check if message count increased (new message added)
-    const isNewMessage = currentMessageCount > lastMessageCountRef.current;
     lastMessageCountRef.current = currentMessageCount;
     
     if (!lastMessage) return;
@@ -383,52 +444,26 @@ export function useTTSAutoGeneration(
       lastProcessedIdRef.current = lastMessage.id;
       return;
     }
-    
-    // Skip if we're currently processing (prevent race conditions)
-    if (isProcessingRef.current) return;
 
     // Mark as processed immediately to prevent duplicate processing
     lastProcessedIdRef.current = lastMessage.id;
-    isProcessingRef.current = true;
 
-    // Get character voice settings
-    const character = characters.find(c => c.id === lastMessage.characterId);
+    const character = charactersRef.current.find(c => c.id === lastMessage.characterId);
     const voiceSettings = character?.voice;
 
-    console.log('[useTTSAutoGeneration] ✅ Processing message for TTS:', {
-      messageId: lastMessage.id,
-      characterName: character?.name,
-      hasVoiceSettings: !!voiceSettings,
-      voiceEnabled: voiceSettings?.enabled,
-    });
-
-    // Delay before playing to allow message to fully render
-    timeoutRef.current = setTimeout(() => {
-      isProcessingRef.current = false;
-      
-      if (voiceSettings?.enabled) {
-        speakWithDualVoice(lastMessage.content, voiceSettings, lastMessage.characterId);
-      } else {
-        speak(lastMessage.content, null, lastMessage.characterId);
-      }
-    }, delay);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      isProcessingRef.current = false;
-    };
+    if (voiceSettings?.enabled) {
+      speakWithDualVoiceRef.current?.(lastMessage.content, voiceSettings, lastMessage.characterId);
+    } else if (ttsConfig?.enabled) {
+      speakRef.current?.(lastMessage.content, null, lastMessage.characterId);
+    }
+    // No cleanup needed — TTS was fired synchronously into the queue
   }, [
     messages,
     enabled,
-    delay,
-    ttsConfig,
-    characters,
+    ttsConfig?.enabled,
+    ttsConfig?.autoGeneration,
     speak,
     speakWithDualVoice,
-    isConnected,
   ]);
 
   return { isPlaying: isPlaying ?? false };

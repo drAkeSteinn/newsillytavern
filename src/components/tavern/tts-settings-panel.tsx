@@ -173,7 +173,7 @@ export function TTSSettingsPanel() {
         if (data.config.vad) setVadConfig(data.config.vad);
       }
     } catch (error) {
-      console.error('Failed to load TTS config:', error);
+      console.warn('[TTS Settings] Failed to load TTS config:', error);
     }
   };
 
@@ -196,7 +196,7 @@ export function TTSSettingsPanel() {
         setHasChanges(false);
       }
     } catch (error) {
-      console.error('Failed to save TTS config:', error);
+      console.warn('[TTS Settings] Failed to save TTS config:', error);
     } finally {
       setIsSaving(false);
     }
@@ -235,7 +235,7 @@ export function TTSSettingsPanel() {
         setAvailableVoices([]);
       }
     } catch (error) {
-      console.error('Failed to load available voices:', error);
+      console.warn('[TTS Settings] Failed to load available voices:', error);
       setAvailableVoices([]);
     }
   };
@@ -290,23 +290,38 @@ export function TTSSettingsPanel() {
 
       const data = await response.json();
 
-      if (data.success && data.audio) {
+      if (!response.ok) {
+        const errorMsg = data.error || `Error del servidor (${response.status})`;
+        console.warn('[TTS] Test error:', errorMsg);
+        alert(`Error TTS: ${errorMsg}`);
+      } else if (data.success && data.audio) {
         // Create audio blob URL
         const audioBlob = base64ToBlob(data.audio, `audio/${data.format}`);
         const url = URL.createObjectURL(audioBlob);
         setAudioUrl(url);
 
-        // Play audio
+        // Play audio — handle autoplay policy gracefully
         const audio = new Audio(url);
         setIsPlaying(true);
-        audio.play();
+        audio.play().catch((error) => {
+          const errorMsg = error?.message || String(error);
+          if (errorMsg.includes("user didn't interact") || 
+              errorMsg.includes('NotAllowedError') ||
+              errorMsg.includes('play() failed')) {
+            console.warn('[TTS] Autoplay blocked — click the Play button to hear the test');
+            setIsPlaying(false);
+          } else {
+            console.warn('[TTS] Playback error:', error);
+            setIsPlaying(false);
+          }
+        });
         audio.onended = () => setIsPlaying(false);
       } else {
-        console.error('TTS error:', data.error);
+        console.warn('[TTS] Test error:', data.error);
         alert(`Error TTS: ${data.error}`);
       }
     } catch (error) {
-      console.error('Failed to test TTS:', error);
+      console.warn('[TTS] Failed to test TTS:', error);
       alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);

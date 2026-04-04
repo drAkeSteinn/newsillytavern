@@ -648,6 +648,7 @@ export type LLMProvider =
   | 'ollama'
   | 'koboldcpp'
   | 'vllm'
+  | 'lm-studio'
   | 'z-ai'
   | 'custom'
   | 'test-mock';  // Test provider for peticiones/solicitudes testing
@@ -1541,6 +1542,16 @@ export interface EmbeddingsChatSettings {
   memoryConsolidationKeepRecent?: number;
   /** Keep all memories with importance >= this value (default: 4) */
   memoryConsolidationKeepHighImportance?: number;
+  /** Custom prompt for memory extraction (overrides default prompt) */
+  memoryExtractionPrompt?: string;
+  /** Custom prompt for group memory extraction (overrides default group prompt) */
+  groupMemoryExtractionPrompt?: string;
+  /** Number of recent messages to include as context for memory extraction (0 = only last response, default: 2) */
+  memoryExtractionContextDepth?: number;
+  /** Number of recent messages to enrich the embedding search query (0 = only user message, default: 1) */
+  searchContextDepth?: number;
+  /** Enable group dynamics extraction in group chats (extracts inter-character relationships) */
+  groupDynamicsExtraction?: boolean;
 }
 
 // ============ API Types ============

@@ -71,6 +71,7 @@ export function ChatPanel() {
   // UNIFIED SPRITE SYSTEM: Use per-character sprite state management
   const startSpriteGenerationForCharacter = useTavernStore((state) => state.startGenerationForCharacter);
   const endSpriteGenerationForCharacter = useTavernStore((state) => state.endGenerationForCharacter);
+  const endSpriteGenerationForCharacterWithTTS = useTavernStore((state) => state.endGenerationForCharacterWithTTS);
   
   // Memory & Summary System - Track messages and generate summaries
   const summarySettings = useTavernStore((state) => state.summarySettings);
@@ -611,7 +612,8 @@ export function ChatPanel() {
                     const characterMessageKey = `${streamingMessageKeyRef.current}_${finishedChar.id}`;
                     completeTriggersPartialMatches(characterMessageKey, finishedChar, groupCharacters);
                     
-                    endSpriteGenerationForCharacter(finishedChar.id);
+                    const ttsExpected = !!(ttsConfig?.enabled && ttsConfig?.autoGeneration && isTTSConnected);
+                    endSpriteGenerationForCharacterWithTTS(finishedChar.id, ttsExpected);
                   }
                   
                   setStreamingContent('');
@@ -629,7 +631,14 @@ export function ChatPanel() {
                     });
                   }
                 } else if (parsed.type === 'error') {
-                  throw new Error(parsed.error);
+                  // Preserve any accumulated group content before throwing
+                  if (accumulatedContent.trim() && activeSessionId && isStillActive()) {
+                    chatLogger.warn('Group stream error with partial content', {
+                      contentLength: accumulatedContent.length,
+                      error: parsed.error,
+                    });
+                  }
+                  throw new Error(parsed.error || 'Error en la generación del servidor');
                 }
               } catch (parseError) {
                 if (parseError instanceof Error && !parseError.message.includes('JSON')) {
@@ -774,7 +783,30 @@ export function ChatPanel() {
                     // Don't throw - continue streaming even if background triggers fail
                   }
                 } else if (parsed.type === 'error') {
-                  throw new Error(parsed.error);
+                  // If we have accumulated content, save the partial response
+                  // instead of discarding it entirely
+                  const partialContent = accumulatedContent.trim();
+                  if (partialContent && isStillActive()) {
+                    const namePrefix = `${activeCharacter.name}:`;
+                    const cleanedMessage = partialContent.startsWith(namePrefix)
+                      ? partialContent.slice(namePrefix.length).trim()
+                      : partialContent;
+                    
+                    if (cleanedMessage) {
+                      addMessage(activeSessionId, {
+                        characterId: activeCharacter.id,
+                        role: 'assistant',
+                        content: cleanedMessage,
+                        isDeleted: false,
+                        swipeId: generateId(),
+                        swipeIndex: 0,
+                        metadata: { promptData: promptSections }
+                      });
+                    }
+                  }
+                  setStreamingContent('');
+                  // Throw with a more descriptive error message
+                  throw new Error(parsed.error || 'Error en la generación del servidor');
                 } else if (parsed.type === 'done') {
                   let cleanedMessage = accumulatedContent.trim();
                   
@@ -888,13 +920,16 @@ export function ChatPanel() {
         isGenerationInProgressRef.current = false;
         generationIdRef.current = null;
         // End sprite generation for the character
-        // If trigger was activated, keeps trigger sprite; otherwise returns to idle
+        // If trigger was activated, keeps trigger sprite; otherwise:
+        //   - If TTS is enabled → set 'talk' (will show talk sprite until TTS finishes)
+        //   - If TTS is disabled → set 'idle'
         if (activeCharacter) {
           // CRITICAL: Complete any pending partial matches (key:value at end of text)
           // This ensures trigger sprites like "sprite:test01" are properly detected
           completeTriggersPartialMatches(streamingMessageKeyRef.current, activeCharacter, characters);
           
-          endSpriteGenerationForCharacter(activeCharacter.id);
+          const ttsExpected = !!(ttsConfig?.enabled && ttsConfig?.autoGeneration && isTTSConnected);
+          endSpriteGenerationForCharacterWithTTS(activeCharacter.id, ttsExpected);
         }
         
         // ============================================
@@ -913,7 +948,7 @@ export function ChatPanel() {
         }
       }
     }
-  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context, lorebooks, effectiveLorebookIds]);
+  }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context, lorebooks, effectiveLorebookIds, endSpriteGenerationForCharacterWithTTS, ttsConfig, isTTSConnected]);
 
   // Handle regenerate - create a new swipe alternative for an existing message
   const handleRegenerate = useCallback(async (messageId: string) => {
@@ -1047,7 +1082,8 @@ export function ChatPanel() {
           // CRITICAL: Complete any pending partial matches (key:value at end of text)
           completeTriggersPartialMatches(streamingMessageKeyRef.current, activeCharacter, characters);
           
-          endSpriteGenerationForCharacter(activeCharacter.id);
+          const ttsExpected = !!(ttsConfig?.enabled && ttsConfig?.autoGeneration && isTTSConnected);
+          endSpriteGenerationForCharacterWithTTS(activeCharacter.id, ttsExpected);
         }
       }
     }
@@ -1178,7 +1214,8 @@ export function ChatPanel() {
           // CRITICAL: Complete any pending partial matches (key:value at end of text)
           completeTriggersPartialMatches(streamingMessageKeyRef.current, replayChar, characters);
           
-          endSpriteGenerationForCharacter(replayChar.id);
+          const ttsExpected = !!(ttsConfig?.enabled && ttsConfig?.autoGeneration && isTTSConnected);
+          endSpriteGenerationForCharacterWithTTS(replayChar.id, ttsExpected);
         }
         
         // Play TTS for the replayed message
@@ -1271,6 +1308,7 @@ export function ChatPanel() {
           character={activeCharacter}
           isStreaming={isGenerating}
           hasContent={!!streamingContent}
+          isTTSPlaying={isTTSPlaying}
         />
       )}
 
@@ -1282,6 +1320,7 @@ export function ChatPanel() {
           )}
           activeCharacterId={streamingCharacter?.id || null}
           isStreaming={isGenerating && !!streamingContent}
+          isTTSPlaying={isTTSPlaying}
           activeGroup={activeGroup}
         />
       )}
@@ -1309,6 +1348,8 @@ export function ChatPanel() {
         activeCharacter={activeCharacter}
         characters={characters}
         activePersona={activePersona}
+        ttsPlaying={isTTSPlaying}
+        memoryExtracting={memoryExtractingInfo.active}
       />
 
       {/* Quest Notifications */}
