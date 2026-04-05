@@ -17,6 +17,7 @@ import { TTSFloatingIndicator } from './tts-playback-controls';
 import { Sparkles } from 'lucide-react';
 import type { CharacterCard, SummaryData, ChatMessage } from '@/types';
 import { EmbeddingsContextContainer } from '@/components/embeddings/embeddings-context-indicator';
+import { ToolCallNotification, type ToolCallPhase } from '@/components/tools/tool-call-notification';
 import { t } from '@/lib/i18n';
 import { chatLogger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
@@ -33,6 +34,15 @@ export function ChatPanel() {
     characterName?: string;
   }>>([]);
   const [memoryExtractingInfo, setMemoryExtractingInfo] = useState<{ active: boolean; characterNames: string }>({ active: false, characterNames: '' });
+  const [toolCallInfo, setToolCallInfo] = useState<{
+    active: boolean;
+    toolName?: string;
+    toolLabel?: string;
+    toolIcon?: string;
+    params?: Record<string, unknown>;
+    result?: { success: boolean; displayMessage: string; duration: number };
+    phase: ToolCallPhase;
+  }>({ active: false, phase: 'idle' });
 
   // Use proper selectors to subscribe to store changes
   const activeSessionId = useTavernStore((state) => state.activeSessionId);
@@ -479,6 +489,7 @@ export function ChatPanel() {
               ...settings.embeddingsChat,
               customNamespaces: activeGroup?.embeddingNamespaces,
             },  // Pass embeddings chat settings + group namespace override
+            toolsSettings: settings.tools,  // Pass tools/action settings
           })
         });
 
@@ -565,6 +576,38 @@ export function ChatPanel() {
                     // Reset triggers for this specific character
                     resetTriggers(characterMessageKey, currentCharacter);
                   }
+                } else if (parsed.type === 'tool_call_start') {
+                  console.log('[ChatPanel] Group tool call started:', parsed.toolName);
+                  setToolCallInfo({
+                    active: true,
+                    toolName: parsed.toolName,
+                    toolLabel: parsed.toolLabel,
+                    toolIcon: parsed.toolIcon,
+                    params: parsed.params,
+                    phase: 'executing',
+                  });
+                } else if (parsed.type === 'tool_call_result') {
+                  console.log('[ChatPanel] Group tool call result:', parsed.toolName, parsed.success);
+                  setToolCallInfo({
+                    active: true,
+                    toolName: parsed.toolName,
+                    toolLabel: parsed.toolLabel,
+                    toolIcon: parsed.toolIcon,
+                    result: { success: parsed.success, displayMessage: parsed.displayMessage, duration: parsed.duration || 0 },
+                    phase: 'done',
+                  });
+                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
+                } else if (parsed.type === 'tool_call_error') {
+                  console.warn('[ChatPanel] Group tool call error:', parsed.toolName, parsed.error);
+                  setToolCallInfo({
+                    active: true,
+                    toolName: parsed.toolName,
+                    toolLabel: parsed.toolLabel,
+                    toolIcon: parsed.toolIcon,
+                    result: { success: false, displayMessage: parsed.error, duration: 0 },
+                    phase: 'error',
+                  });
+                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
                 } else if (parsed.type === 'token' && parsed.content) {
                   currentCharacterContent += parsed.content;
                   setStreamingContent(currentCharacterContent);
@@ -712,6 +755,7 @@ export function ChatPanel() {
               ...settings.embeddingsChat,
               customNamespaces: activeCharacter?.embeddingNamespaces,
             },  // Pass embeddings chat settings + character namespace override
+            toolsSettings: settings.tools,  // Pass tools/action settings
           })
         });
 
@@ -765,6 +809,36 @@ export function ChatPanel() {
                     setMemoryExtractingInfo({ active: true, characterNames: label });
                     setTimeout(() => setMemoryExtractingInfo(prev => ({ ...prev, active: false })), 8000);
                   }
+                } else if (parsed.type === 'tool_call_start') {
+                  // Tool call detected - show indicator
+                  console.log('[ChatPanel] Tool call started:', parsed.toolName);
+                  setToolCallInfo({
+                    active: true,
+                    toolName: parsed.toolName,
+                    toolLabel: parsed.toolLabel,
+                    toolIcon: parsed.toolIcon,
+                    params: parsed.params,
+                    phase: 'executing',
+                  });
+                } else if (parsed.type === 'tool_call_result') {
+                  // Tool execution completed
+                  console.log('[ChatPanel] Tool call result:', parsed.toolName, parsed.success);
+                  setToolCallInfo(prev => ({
+                    ...prev,
+                    active: true,
+                    result: { success: parsed.success, displayMessage: parsed.displayMessage, duration: parsed.duration || 0 },
+                    phase: 'done',
+                  }));
+                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
+                } else if (parsed.type === 'tool_call_error') {
+                  console.warn('[ChatPanel] Tool call error:', parsed.toolName, parsed.error);
+                  setToolCallInfo(prev => ({
+                    ...prev,
+                    active: true,
+                    result: { success: false, displayMessage: parsed.error, duration: 0 },
+                    phase: 'error',
+                  }));
+                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
                 } else if (parsed.type === 'token' && parsed.content) {
                   accumulatedContent += parsed.content;
                   setStreamingContent(accumulatedContent);
@@ -1011,6 +1085,7 @@ export function ChatPanel() {
           questSettings,  // Pass quest settings
           hudContext: activeHUDContext,  // Pass HUD context for prompt injection
           embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
+          toolsSettings: settings.tools,  // Pass tools/action settings
           summary: currentSession?.summary  // Pass summary for memory/context
         })
       });
@@ -1350,6 +1425,7 @@ export function ChatPanel() {
         activePersona={activePersona}
         ttsPlaying={isTTSPlaying}
         memoryExtracting={memoryExtractingInfo.active}
+        sessionId={activeSessionId}
       />
 
       {/* Quest Notifications */}
@@ -1373,6 +1449,17 @@ export function ChatPanel() {
           </div>
         </div>
       )}
+
+      {/* Tool Call Notification */}
+      <ToolCallNotification
+        active={toolCallInfo.active}
+        toolName={toolCallInfo.toolName}
+        toolLabel={toolCallInfo.toolLabel}
+        toolIcon={toolCallInfo.toolIcon}
+        params={toolCallInfo.params}
+        result={toolCallInfo.result}
+        phase={toolCallInfo.phase}
+      />
     </div>
   );
 }
