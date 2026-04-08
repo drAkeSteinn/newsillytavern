@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { EmojiPicker } from './emoji-picker';
 import { StreamingText } from './streaming-text';
 import { useHotkeys, formatHotkey } from '@/hooks/use-hotkeys';
@@ -49,7 +50,16 @@ import {
   VolumeX,
   Brain,
   Trash2,
+  Plus,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Popover,
   PopoverContent,
@@ -70,6 +80,7 @@ type ChatboxTab = 'chat' | 'solicitudes' | 'misiones' | 'memorias';
 interface NovelChatBoxProps {
   onSendMessage: (message: string) => void;
   isGenerating: boolean;
+  onStopGeneration?: () => void;
   onResetChat?: () => void;
   onClearChat?: () => void;
   onRegenerate?: (messageId: string) => void;
@@ -173,6 +184,7 @@ function MemoryItem({ memory, onDelete }: {
 export function NovelChatBox({ 
   onSendMessage, 
   isGenerating, 
+  onStopGeneration,
   onResetChat, 
   onClearChat,
   onRegenerate,
@@ -212,6 +224,10 @@ export function NovelChatBox({
     created_at: string;
   }>>([]);
   const [memoriesLoaded, setMemoriesLoaded] = useState(false);
+  const [showAddMemoryDialog, setShowAddMemoryDialog] = useState(false);
+  const [newMemoryText, setNewMemoryText] = useState('');
+  const [newMemoryImportance, setNewMemoryImportance] = useState(3);
+  const [addingMemory, setAddingMemory] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -220,25 +236,24 @@ export function NovelChatBox({
   const dragStartRef = useRef({ x: 0, y: 0, left: 0, top: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
-  const {
-    activeSessionId,
-    getActiveSession,
-    settings,
-    updateSettings,
-    deleteMessage,
-    swipeMessage,
-    getSwipeCount,
-    characters: allCharacters,
-    questTemplates,
-    questSettings,
-    activateUserPeticion,
-    getPendingUserSolicitudes,
-    acceptUserSolicitud,
-    rejectUserSolicitud,
-    activateQuest,
-    deactivateQuest,
-    setQuestSettings,
-  } = useTavernStore();
+  // Use individual selectors to avoid re-rendering on every store change
+  const activeSessionId = useTavernStore((s) => s.activeSessionId);
+  const getActiveSession = useTavernStore((s) => s.getActiveSession);
+  const settings = useTavernStore((s) => s.settings);
+  const updateSettings = useTavernStore((s) => s.updateSettings);
+  const deleteMessage = useTavernStore((s) => s.deleteMessage);
+  const swipeMessage = useTavernStore((s) => s.swipeMessage);
+  const getSwipeCount = useTavernStore((s) => s.getSwipeCount);
+  const allCharacters = useTavernStore((s) => s.characters);
+  const questTemplates = useTavernStore((s) => s.questTemplates);
+  const questSettings = useTavernStore((s) => s.questSettings);
+  const activateUserPeticion = useTavernStore((s) => s.activateUserPeticion);
+  const getPendingUserSolicitudes = useTavernStore((s) => s.getPendingUserSolicitudes);
+  const acceptUserSolicitud = useTavernStore((s) => s.acceptUserSolicitud);
+  const rejectUserSolicitud = useTavernStore((s) => s.rejectUserSolicitud);
+  const activateQuest = useTavernStore((s) => s.activateQuest);
+  const deactivateQuest = useTavernStore((s) => s.deactivateQuest);
+  const setQuestSettings = useTavernStore((s) => s.setQuestSettings);
 
   // ASR config state (loaded from API)
   const [asrConfig, setAsrConfig] = useState<{
@@ -679,9 +694,10 @@ export function NovelChatBox({
     }
   }, !isGenerating);
 
-  const handleQuickReply = (reply: string) => {
-    setInput(reply);
-    textareaRef.current?.focus();
+  const handleQuickReply = (item: { label: string; response: string }) => {
+    if (isGenerating || !item.response.trim()) return;
+    onSendMessage(item.response.trim());
+    setInput('');
   };
 
   // Get pending user solicitudes
@@ -855,6 +871,35 @@ export function NovelChatBox({
       console.error('[NovelChatBox] Failed to delete memory:', error);
     }
   }, []);
+
+  const addMemory = useCallback(async () => {
+    if (!newMemoryText.trim() || !activeCharacter) return;
+    setAddingMemory(true);
+    try {
+      const response = await fetch('/api/embeddings/manual-memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: newMemoryText.trim(),
+          characterId: activeCharacter.id,
+          characterName: activeCharacter.name,
+          importance: newMemoryImportance,
+        }),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setNewMemoryText('');
+          setShowAddMemoryDialog(false);
+          setMemoriesLoaded(false);
+        }
+      }
+    } catch (error) {
+      console.error('[NovelChatBox] Failed to add memory:', error);
+    } finally {
+      setAddingMemory(false);
+    }
+  }, [newMemoryText, newMemoryImportance, activeCharacter]);
 
   // Reset memories when character/group/session changes
   useEffect(() => {
@@ -1527,15 +1572,17 @@ export function NovelChatBox({
               {/* Quick Replies - Compact */}
               {settings.quickReplies.length > 0 && (
                 <div className="px-2 py-1 flex gap-1 overflow-x-auto border-t bg-background/30 flex-shrink-0">
-                  {settings.quickReplies.slice(0, 4).map((reply, index) => (
+                  {settings.quickReplies.map((item, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="sm"
-                      className="h-6 px-2 text-xs flex-shrink-0"
-                      onClick={() => handleQuickReply(reply)}
+                      className="h-6 px-2 text-xs flex-shrink-0 disabled:opacity-50 max-w-[120px]"
+                      disabled={isGenerating}
+                      onClick={() => handleQuickReply(item)}
+                      title={item.response !== item.label ? item.response : undefined}
                     >
-                      {reply}
+                      <span className="truncate">{item.label}</span>
                     </Button>
                   ))}
                 </div>
@@ -1720,11 +1767,11 @@ export function NovelChatBox({
                   <Button
                     size="icon"
                     className="h-8 w-8 flex-shrink-0"
-                    onClick={handleSend}
-                    disabled={!input.trim() || isGenerating || isTranscribing}
+                    onClick={isGenerating ? onStopGeneration : handleSend}
+                    disabled={!isGenerating && (!input.trim() || isTranscribing)}
                   >
                     {isGenerating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Square className="w-4 h-4 fill-current" />
                     ) : (
                       <Send className="w-4 h-4" />
                     )}
@@ -2266,15 +2313,97 @@ export function NovelChatBox({
           {activeTab === 'memorias' && (
             <ScrollArea className="flex-1 min-h-0">
               <div className="p-3 space-y-3">
+                {/* Add Memory Dialog */}
+                <Dialog open={showAddMemoryDialog} onOpenChange={setShowAddMemoryDialog}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-violet-500" />
+                        Agregar Recuerdo Personalizado
+                      </DialogTitle>
+                      <DialogDescription>
+                        Inyecta un recuerdo personalizado para {activeCharacter?.name || 'el personaje'}. Este recuerdo se guardará como embedding y será recuperado automáticamente durante la conversación.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <Textarea
+                        value={newMemoryText}
+                        onChange={(e) => setNewMemoryText(e.target.value)}
+                        placeholder="Escribe un recuerdo personalizado del personaje. Ejemplo: 'Ella tiene miedo a las tormentas desde que era pequeña' o 'Su comida favorita es el estofado de carne que preparaba su abuela'..."
+                        rows={4}
+                        className="text-sm"
+                      />
+                      <div className="flex items-center gap-3">
+                        <Label className="text-xs whitespace-nowrap">Importancia:</Label>
+                        <div className="flex items-center gap-2 flex-1">
+                          {[1, 2, 3, 4, 5].map((val) => (
+                            <button
+                              key={val}
+                              onClick={() => setNewMemoryImportance(val)}
+                              className={cn(
+                                'w-7 h-7 rounded-full text-xs font-medium transition-all',
+                                val <= newMemoryImportance
+                                  ? 'bg-violet-500 text-white shadow-sm'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                              )}
+                            >
+                              {val}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {newMemoryImportance <= 2 ? 'Baja' : newMemoryImportance <= 3 ? 'Media' : 'Alta'}
+                        </span>
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAddMemoryDialog(false)}
+                        disabled={addingMemory}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={addMemory}
+                        disabled={!newMemoryText.trim() || addingMemory}
+                        className="bg-violet-600 hover:bg-violet-700"
+                      >
+                        {addingMemory ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5 mr-1.5" />
+                            Agregar Recuerdo
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 {/* Header */}
                 <div className="flex items-center gap-2 mb-3">
                   <Brain className="w-4 h-4 text-violet-500" />
                   <h4 className="font-medium text-sm">Memorias del Personaje</h4>
                   {memories.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto text-xs">
+                    <Badge variant="secondary" className="text-xs">
                       {memories.length}
                     </Badge>
                   )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-6 w-6 p-0 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
+                    onClick={() => setShowAddMemoryDialog(true)}
+                    title="Agregar recuerdo personalizado"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
 
                 {/* Loading */}

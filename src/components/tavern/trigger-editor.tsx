@@ -36,12 +36,9 @@ interface TriggerEditorProps {
 }
 
 export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
-  const store = useTavernStore();
-  const settings = store.settings;
-  
-  // Get triggers from store
-  const sfxTriggers = store.soundTriggers || [];
-  const backgroundTriggers = store.backgroundTriggers || [];
+  const settings = useTavernStore((s) => s.settings);
+  const sfxTriggers = useTavernStore((s) => s.soundTriggers) || [];
+  const backgroundTriggers = useTavernStore((s) => s.backgroundTriggers) || [];
 
   const [newSFXKeyword, setNewSFXKeyword] = useState('');
   const [newSoundPath, setNewSoundPath] = useState('/sounds/pop/pop1.wav');
@@ -65,7 +62,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
       soundPack: 'custom',
     };
     
-    store.setSoundTriggers([...sfxTriggers, newTrigger]);
+    useTavernStore.getState().setSoundTriggers([...sfxTriggers, newTrigger]);
     setNewSFXKeyword('');
   };
 
@@ -83,17 +80,17 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
       cooldownMs: 1500,
     };
     
-    store.setBackgroundTriggers([...backgroundTriggers, newTrigger]);
+    useTavernStore.getState().setBackgroundTriggers([...backgroundTriggers, newTrigger]);
     setNewBgKeyword('');
     setNewBgPath('');
   };
 
   const handleDeleteSFXTrigger = (id: string) => {
-    store.setSoundTriggers(sfxTriggers.filter(t => t.id !== id));
+    useTavernStore.getState().setSoundTriggers(sfxTriggers.filter(t => t.id !== id));
   };
 
   const handleDeleteBackgroundTrigger = (id: string) => {
-    store.setBackgroundTriggers(backgroundTriggers.filter(t => t.id !== id));
+    useTavernStore.getState().setBackgroundTriggers(backgroundTriggers.filter(t => t.id !== id));
   };
 
   const handleTestSound = (src: string) => {
@@ -256,7 +253,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                 </div>
                 <Switch
                   checked={settings.sound?.enabled ?? true}
-                  onCheckedChange={(enabled) => store.updateSettings({ 
+                  onCheckedChange={(enabled) => useTavernStore.getState().updateSettings({ 
                     sound: { ...settings.sound, enabled } 
                   })}
                 />
@@ -273,7 +270,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                   min={0}
                   max={1}
                   step={0.05}
-                  onValueChange={([volume]) => store.updateSettings({ 
+                  onValueChange={([volume]) => useTavernStore.getState().updateSettings({ 
                     sound: { ...settings.sound, globalVolume: volume } 
                   })}
                 />
@@ -289,7 +286,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                 </div>
                 <Switch
                   checked={settings.backgroundTriggers?.enabled ?? true}
-                  onCheckedChange={(enabled) => store.updateSettings({ 
+                  onCheckedChange={(enabled) => useTavernStore.getState().updateSettings({ 
                     backgroundTriggers: { ...settings.backgroundTriggers, enabled } 
                   })}
                 />
@@ -305,7 +302,7 @@ export function TriggerEditor({ open, onOpenChange }: TriggerEditorProps) {
                 </div>
                 <Switch
                   checked={settings.sound?.realtimeEnabled ?? true}
-                  onCheckedChange={(realtimeEnabled) => store.updateSettings({ 
+                  onCheckedChange={(realtimeEnabled) => useTavernStore.getState().updateSettings({ 
                     sound: { ...settings.sound, realtimeEnabled } 
                   })}
                 />

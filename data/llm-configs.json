@@ -1,26 +1,5 @@
 [
   {
-    "name": "33",
-    "provider": "z-ai",
-    "endpoint": "",
-    "apiKey": "",
-    "model": "",
-    "parameters": {
-      "temperature": 0.7,
-      "topP": 0.9,
-      "topK": 40,
-      "maxTokens": 512,
-      "contextSize": 4096,
-      "repetitionPenalty": 1.1,
-      "frequencyPenalty": 0,
-      "presencePenalty": 0,
-      "stopStrings": [],
-      "stream": true
-    },
-    "isActive": false,
-    "id": "960e8af8-9196-4108-8eb7-221fb69010a8"
-  },
-  {
     "name": "Text Generation WebUI",
     "provider": "text-generation-webui",
     "endpoint": "http://localhost:5000",
@@ -64,11 +43,11 @@
     "mockResponse": "Accion=hab1 sd"
   },
   {
-    "name": "LM Studio",
-    "provider": "lm-studio",
-    "endpoint": "http://localhost:1234/v1",
+    "name": "Ollama",
+    "provider": "ollama",
+    "endpoint": "http://localhost:11434",
     "apiKey": "",
-    "model": "loaded",
+    "model": "qwen3.5:9b",
     "parameters": {
       "temperature": 0.7,
       "topP": 0.9,
@@ -81,7 +60,7 @@
       "stopStrings": [],
       "stream": true
     },
-    "isActive": true,
-    "id": "14105a9e-cebd-4a80-b717-c4ed015edb67"
+    "isActive": false,
+    "id": "cf8df389-3e66-432c-b558-ff0a329a1a96"
   }
 ]

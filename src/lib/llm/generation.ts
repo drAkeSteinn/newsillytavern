@@ -43,6 +43,7 @@ export async function generateResponse(
     }
 
     case 'openai':
+    case 'grok':
     case 'vllm':
     case 'lm-studio':
     case 'custom': {

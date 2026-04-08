@@ -244,7 +244,8 @@ export function GroupSprites({
   // ============================================
   // UNIFIED SYSTEM: Use store for per-character sprite state
   // ============================================
-  const store = useTavernStore();
+  const getReturnToIdleCountdownForCharacter = useTavernStore((s) => s.getReturnToIdleCountdownForCharacter);
+  const getCharacterSpriteState = useTavernStore((s) => s.getCharacterSpriteState);
 
   // Save to localStorage
   useEffect(() => {
@@ -261,7 +262,7 @@ export function GroupSprites({
       const newCountdowns = new Map<string, number>();
       
       characters.forEach(character => {
-        const remaining = store.getReturnToIdleCountdownForCharacter(character.id);
+        const remaining = getReturnToIdleCountdownForCharacter(character.id);
         if (remaining > 0) {
           newCountdowns.set(character.id, remaining);
         }
@@ -271,7 +272,7 @@ export function GroupSprites({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [characters, store]);
+  }, [characters, getReturnToIdleCountdownForCharacter]);
 
   // Get position for a character
   const getCharacterPosition = useCallback((character: CharacterCard, index: number, total: number): SpritePosition => {

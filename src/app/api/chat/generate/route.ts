@@ -168,12 +168,16 @@ export async function POST(request: NextRequest) {
       }
 
       case 'openai':
+      case 'grok':
       case 'vllm':
       case 'lm-studio':
       case 'custom': {
         // These need a valid endpoint
         if (!llmConfig.endpoint) {
           throw new Error(`${llmConfig.provider} requires an endpoint URL. Please configure it in settings.`);
+        }
+        if (llmConfig.provider === 'grok' && !llmConfig.apiKey) {
+          throw new Error('Grok (xAI) requires an API key. Please configure it in settings.');
         }
         let chatMessages = buildChatMessages(
           finalSystemPrompt,

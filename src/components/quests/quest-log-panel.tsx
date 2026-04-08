@@ -77,19 +77,17 @@ export function QuestLogPanel({
   showSettings = false,
   onOpenSettings,
 }: QuestLogPanelProps) {
-  const {
-    sessions,
-    questTemplates,
-    questSettings,
-    activateQuest,
-    completeQuest: completeSessionQuest,
-    failQuest: failSessionQuest,
-    progressQuestObjective,
-    completeObjective,
-    toggleObjectiveCompletion,  // NEW: Toggle function
-    groups,
-    characters,
-  } = useTavernStore();
+  const sessions = useTavernStore((s) => s.sessions);
+  const questTemplates = useTavernStore((s) => s.questTemplates);
+  const questSettings = useTavernStore((s) => s.questSettings);
+  const activateQuest = useTavernStore((s) => s.activateQuest);
+  const completeSessionQuest = useTavernStore((s) => s.completeQuest);
+  const failSessionQuest = useTavernStore((s) => s.failQuest);
+  const progressQuestObjective = useTavernStore((s) => s.progressQuestObjective);
+  const completeObjective = useTavernStore((s) => s.completeObjective);
+  const toggleObjectiveCompletion = useTavernStore((s) => s.toggleObjectiveCompletion);
+  const groups = useTavernStore((s) => s.groups);
+  const characters = useTavernStore((s) => s.characters);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<QuestStatus | 'all'>('all');

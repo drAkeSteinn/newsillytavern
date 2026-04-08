@@ -71,20 +71,18 @@ const LOGIC_LABELS: Record<number, string> = {
 };
 
 export function LorebookPanel() {
-  const {
-    lorebooks,
-    activeLorebookIds,
-    addLorebook,
-    updateLorebook,
-    deleteLorebook,
-    toggleLorebook,
-    addLorebookEntry,
-    updateLorebookEntry,
-    deleteLorebookEntry,
-    duplicateLorebookEntry,
-    importSillyTavernLorebook,
-    exportSillyTavernLorebook
-  } = useTavernStore();
+  const lorebooks = useTavernStore((s) => s.lorebooks);
+  const activeLorebookIds = useTavernStore((s) => s.activeLorebookIds);
+  const addLorebook = useTavernStore((s) => s.addLorebook);
+  const updateLorebook = useTavernStore((s) => s.updateLorebook);
+  const deleteLorebook = useTavernStore((s) => s.deleteLorebook);
+  const toggleLorebook = useTavernStore((s) => s.toggleLorebook);
+  const addLorebookEntry = useTavernStore((s) => s.addLorebookEntry);
+  const updateLorebookEntry = useTavernStore((s) => s.updateLorebookEntry);
+  const deleteLorebookEntry = useTavernStore((s) => s.deleteLorebookEntry);
+  const duplicateLorebookEntry = useTavernStore((s) => s.duplicateLorebookEntry);
+  const importSillyTavernLorebook = useTavernStore((s) => s.importSillyTavernLorebook);
+  const exportSillyTavernLorebook = useTavernStore((s) => s.exportSillyTavernLorebook);
 
   const [selectedLorebookId, setSelectedLorebookId] = useState<string | null>(null);
   const [editingEntryUid, setEditingEntryUid] = useState<number | null>(null);

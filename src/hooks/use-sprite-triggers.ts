@@ -851,7 +851,13 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
     tagDelimiters = { start: '|', end: '|' },
   } = options;
 
-  const store = useTavernStore();
+  const isSpriteLocked = useTavernStore((s) => s.isSpriteLocked);
+  const currentSpriteUrl = useTavernStore((s) => s.currentSpriteUrl);
+  const currentSpriteLabel = useTavernStore((s) => s.currentSpriteLabel);
+  const returnToIdle = useTavernStore((s) => s.returnToIdle);
+  const spriteLock = useTavernStore((s) => s.spriteLock);
+  const isReturnToIdleScheduled = useTavernStore((s) => s.isReturnToIdleScheduled);
+  const getReturnToIdleCountdown = useTavernStore((s) => s.getReturnToIdleCountdown);
   
   // Ref to track handler state per message
   const handlerStateRef = useRef<SpriteHandlerState>(createSpriteHandlerState());
@@ -865,13 +871,13 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       if (!enabled || !text.trim() || !character) return null;
 
       // Check if sprite is locked
-      if (store.isSpriteLocked && store.isSpriteLocked()) {
+      if (isSpriteLocked && isSpriteLocked()) {
         return null;
       }
 
       // Get trigger collections and sprite packs from character
       const triggerCollections = character.triggerCollections || [];
-      const spritePacksV2 = character.spritePacksV2 || store.spritePacksV2 || [];
+      const spritePacksV2 = character.spritePacksV2 || useTavernStore.getState().spritePacksV2 || [];
       
       if (triggerCollections.length === 0) {
         return null;
@@ -894,7 +900,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
 
       return result;
     },
-    [enabled, store, tagDelimiters]
+    [enabled, isSpriteLocked, tagDelimiters]
   );
 
   /**
@@ -907,12 +913,12 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       const characterId = character.id;
 
       // Check if we should add to queue or execute immediately
-      const charState = store.getCharacterSpriteState(characterId);
+      const charState = useTavernStore.getState().getCharacterSpriteState(characterId);
       const hasActiveTrigger = charState.triggerQueue.active !== null;
 
       if (hasActiveTrigger) {
         // Add to queue
-        store.addTriggerToQueue(characterId, {
+        useTavernStore.getState().addTriggerToQueue(characterId, {
           triggerCollectionId: result.collection.id,
           spriteId: result.selectedSprite.id,
           source: result.matchSource,
@@ -925,15 +931,15 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
         result,
         {
           triggerCollections: character.triggerCollections || [],
-          spritePacksV2: character.spritePacksV2 || store.spritePacksV2 || [],
-          spriteIndex: store.spriteIndex,
+          spritePacksV2: character.spritePacksV2 || useTavernStore.getState().spritePacksV2 || [],
+          spriteIndex: useTavernStore.getState().spriteIndex,
           character,
           messageKey: `msg_${Date.now()}`,
-          isSpriteLocked: store.isSpriteLocked?.() ?? false,
+          isSpriteLocked: useTavernStore.getState().isSpriteLocked?.() ?? false,
         },
         {
           applyTriggerForCharacter: (id, hit) => {
-            store.applyTriggerForCharacter(id, {
+            useTavernStore.getState().applyTriggerForCharacter(id, {
               spriteUrl: hit.spriteUrl,
               spriteLabel: hit.spriteLabel,
               returnToIdleMs: hit.returnToIdleMs,
@@ -941,10 +947,10 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
               spriteLabel: hit.spriteLabel,
             } as SpriteTriggerHit);
           },
-          scheduleReturnToIdleForCharacter: store.scheduleReturnToIdleForCharacter,
-          addTriggerToQueue: store.addTriggerToQueue,
-          startSpriteChain: store.startSpriteChain,
-          startSoundChain: store.startSoundChain,
+          scheduleReturnToIdleForCharacter: useTavernStore.getState().scheduleReturnToIdleForCharacter,
+          addTriggerToQueue: useTavernStore.getState().addTriggerToQueue,
+          startSpriteChain: useTavernStore.getState().startSpriteChain,
+          startSoundChain: useTavernStore.getState().startSoundChain,
         },
         () => {
           // Get idle sprite from state collection V2
@@ -968,7 +974,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
 
       return result;
     },
-    [store]
+    []
   );
 
   /**
@@ -993,7 +999,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       if (!enabled || !text.trim()) return null;
 
       // Check if sprite is locked
-      if (store.isSpriteLocked && store.isSpriteLocked()) {
+      if (isSpriteLocked && isSpriteLocked()) {
         return null;
       }
 
@@ -1001,12 +1007,12 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       // (this is intentional behavior - new triggers can override pending idle return)
 
       // Try sprite packs first (priority)
-      const packs = character?.spritePacks || store.spritePacks || [];
+      const packs = character?.spritePacks || useTavernStore.getState().spritePacks || [];
       const hit = matchSpritePacks(
         text,
         packs,
-        store.spriteIndex,
-        store.spriteLibraries,
+        useTavernStore.getState().spriteIndex,
+        useTavernStore.getState().spriteLibraries,
         { tagDelimiters }
       );
 
@@ -1045,7 +1051,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
 
       return null;
     },
-    [enabled, globalCooldownMs, store, tagDelimiters]
+    [enabled, globalCooldownMs, isSpriteLocked, tagDelimiters]
   );
 
   /**
@@ -1059,7 +1065,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       const characterId = character.id;
 
       // Apply the sprite using the UNIFIED per-character system
-      store.applyTriggerForCharacter(characterId, hit);
+      useTavernStore.getState().applyTriggerForCharacter(characterId, hit);
 
       // Schedule return to idle if configured
       // Use 'clear' mode to let the normal logic determine what sprite to show
@@ -1099,7 +1105,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
         }
         
         // Schedule the return - using 'clear' mode by default
-        store.scheduleReturnToIdleForCharacter(
+        useTavernStore.getState().scheduleReturnToIdleForCharacter(
           characterId,
           hit.spriteUrl,
           returnToMode,
@@ -1111,7 +1117,7 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
       
       return hit;
     },
-    [store]
+    []
   );
 
   /**
@@ -1133,68 +1139,68 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
    * Reset trigger state for a specific character
    */
   const resetTriggerStateForCharacter = useCallback((characterId: string) => {
-    store.cancelReturnToIdleForCharacter(characterId);
-  }, [store]);
+    useTavernStore.getState().cancelReturnToIdleForCharacter(characterId);
+  }, []);
 
   /**
    * Reset trigger state for new message (legacy - uses active character)
    */
   const resetTriggerState = useCallback(() => {
     // Cancel any pending return to idle
-    store.cancelReturnToIdle();
-  }, [store]);
+    useTavernStore.getState().cancelReturnToIdle();
+  }, []);
 
   /**
    * Get sprite state for a specific character
    */
   const getCharacterSpriteState = useCallback((characterId: string) => {
-    return store.getCharacterSpriteState(characterId);
-  }, [store]);
+    return useTavernStore.getState().getCharacterSpriteState(characterId);
+  }, []);
 
   /**
    * Get return to idle countdown for a specific character
    */
   const getReturnToIdleCountdownForCharacter = useCallback((characterId: string) => {
-    return store.getReturnToIdleCountdownForCharacter(characterId);
-  }, [store]);
+    return useTavernStore.getState().getReturnToIdleCountdownForCharacter(characterId);
+  }, []);
 
   /**
    * Check if return to idle is scheduled for a specific character
    */
   const isReturnToIdleScheduledForCharacter = useCallback((characterId: string) => {
-    return store.isReturnToIdleScheduledForCharacter(characterId);
-  }, [store]);
+    return useTavernStore.getState().isReturnToIdleScheduledForCharacter(characterId);
+  }, []);
 
   /**
    * Lock sprite (prevent trigger changes)
    */
   const lockSprite = useCallback(
     (url: string, durationMs: number = 0, intervalMs: number = 0) => {
-      store.applySpriteLock(url, durationMs, intervalMs);
+      useTavernStore.getState().applySpriteLock(url, durationMs, intervalMs);
     },
-    [store]
+    []
   );
 
   /**
    * Unlock sprite
    */
   const unlockSprite = useCallback(() => {
-    store.clearSpriteLock();
-  }, [store]);
+    useTavernStore.getState().clearSpriteLock();
+  }, []);
 
   /**
    * Cancel pending return to idle
    */
   const cancelIdleReturn = useCallback(() => {
-    store.cancelReturnToIdle();
-  }, [store]);
+    useTavernStore.getState().cancelReturnToIdle();
+  }, []);
 
   /**
    * Force immediate return to idle
    */
   const forceIdleReturn = useCallback(() => {
-    store.executeReturnToIdle();
-  }, [store]);
+    useTavernStore.getState().executeReturnToIdle();
+  }, []);
 
   // Set up callback for return to idle (for external listeners)
   useEffect(() => {
@@ -1241,13 +1247,13 @@ export function useSpriteTriggers(options: UseSpriteTriggersOptions = {}) {
     forceIdleReturn,
 
     // Current state (from store - legacy, for single chat)
-    currentSpriteUrl: store.currentSpriteUrl,
-    currentSpriteLabel: store.currentSpriteLabel,
-    isLocked: store.isSpriteLocked(),
-    isReturnToIdleScheduled: store.isReturnToIdleScheduled(),
-    returnToIdleCountdown: store.getReturnToIdleCountdown(),
-    returnToIdleState: store.returnToIdle,
-    lockState: store.spriteLock,
+    currentSpriteUrl,
+    currentSpriteLabel,
+    isLocked: isSpriteLocked(),
+    isReturnToIdleScheduled: isReturnToIdleScheduled(),
+    returnToIdleCountdown: getReturnToIdleCountdown(),
+    returnToIdleState: returnToIdle,
+    lockState: spriteLock,
 
     // Utilities (exposed for testing/debugging)
     extractPipeTokens,

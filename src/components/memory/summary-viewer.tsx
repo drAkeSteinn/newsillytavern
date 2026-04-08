@@ -25,13 +25,11 @@ interface SummaryViewerProps {
 }
 
 export function SummaryViewer({ sessionId, className }: SummaryViewerProps) {
-  const { 
-    summaries, 
-    getSessionSummaries, 
-    deleteSummary, 
-    isGeneratingSummary,
-    summarySettings
-  } = useTavernStore();
+  const summaries = useTavernStore((s) => s.summaries);
+  const getSessionSummaries = useTavernStore((s) => s.getSessionSummaries);
+  const deleteSummary = useTavernStore((s) => s.deleteSummary);
+  const isGeneratingSummary = useTavernStore((s) => s.isGeneratingSummary);
+  const summarySettings = useTavernStore((s) => s.summarySettings);
   
   const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
   

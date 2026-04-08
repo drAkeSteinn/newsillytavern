@@ -89,18 +89,16 @@ const FONT_SIZE_OPTIONS = [
 ];
 
 export function DialogueSettingsPanel() {
-  const {
-    dialogueSettings,
-    setDialogueSettings,
-    setTypewriterSettings,
-    setTypographySettings,
-    setDialogueStyle,
-    setActionStyle,
-    setThoughtStyle,
-    setWhisperStyle,
-    setNarrationStyle,
-    setEmotionStyle,
-  } = useTavernStore();
+  const dialogueSettings = useTavernStore((s) => s.dialogueSettings);
+  const setDialogueSettings = useTavernStore((s) => s.setDialogueSettings);
+  const setTypewriterSettings = useTavernStore((s) => s.setTypewriterSettings);
+  const setTypographySettings = useTavernStore((s) => s.setTypographySettings);
+  const setDialogueStyle = useTavernStore((s) => s.setDialogueStyle);
+  const setActionStyle = useTavernStore((s) => s.setActionStyle);
+  const setThoughtStyle = useTavernStore((s) => s.setThoughtStyle);
+  const setWhisperStyle = useTavernStore((s) => s.setWhisperStyle);
+  const setNarrationStyle = useTavernStore((s) => s.setNarrationStyle);
+  const setEmotionStyle = useTavernStore((s) => s.setEmotionStyle);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [contentStylesOpen, setContentStylesOpen] = useState(false);

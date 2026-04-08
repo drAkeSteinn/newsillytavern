@@ -211,9 +211,27 @@ export function usePersistenceSync() {
           }
         }
 
-        // Apply updates to store
-        if (Object.keys(updates).length > 0) {
-          useTavernStore.setState(updates);
+        // Apply updates to store - only update keys that actually changed
+        // This prevents unnecessary re-renders when server data matches localStorage
+        const currentState = useTavernStore.getState();
+        const filteredUpdates: Record<string, unknown> = {};
+
+        for (const [key, newValue] of Object.entries(updates)) {
+          try {
+            if (JSON.stringify(currentState[key as keyof typeof currentState]) !== JSON.stringify(newValue)) {
+              filteredUpdates[key] = newValue;
+            }
+          } catch (e) {
+            // If comparison fails (circular refs, etc.), include the update
+            filteredUpdates[key] = newValue;
+          }
+        }
+
+        if (Object.keys(filteredUpdates).length > 0) {
+          console.log('[Persistence] Applying', Object.keys(filteredUpdates).length, 'changed keys:', Object.keys(filteredUpdates).join(', '));
+          useTavernStore.setState(filteredUpdates);
+        } else {
+          console.log('[Persistence] Server data matches localStorage, skipping setState');
         }
       }
 
@@ -225,8 +243,13 @@ export function usePersistenceSync() {
         if (templatesResponse.ok) {
           const templatesData = await templatesResponse.json();
           if (templatesData.templates && Array.isArray(templatesData.templates)) {
-            useTavernStore.setState({ questTemplates: templatesData.templates });
-            console.log('[Persistence] Loaded', templatesData.templates.length, 'quest templates');
+            const currentTemplates = useTavernStore.getState().questTemplates;
+            if (JSON.stringify(currentTemplates) !== JSON.stringify(templatesData.templates)) {
+              useTavernStore.setState({ questTemplates: templatesData.templates });
+              console.log('[Persistence] Loaded', templatesData.templates.length, 'quest templates (changed)');
+            } else {
+              console.log('[Persistence] Quest templates unchanged, skipping update');
+            }
           }
         }
       } catch (templateError) {

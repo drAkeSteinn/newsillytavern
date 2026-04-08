@@ -61,7 +61,6 @@ export function CharacterPanel() {
   const groups = useTavernStore((s) => s.groups);
   const activeCharacterId = useTavernStore((s) => s.activeCharacterId);
   const activeGroupId = useTavernStore((s) => s.activeGroupId);
-  const sessions = useTavernStore((s) => s.sessions);
   const setActiveCharacter = useTavernStore((s) => s.setActiveCharacter);
   const setActiveGroup = useTavernStore((s) => s.setActiveGroup);
   const createSession = useTavernStore((s) => s.createSession);
@@ -84,7 +83,7 @@ export function CharacterPanel() {
     // Find existing INDIVIDUAL session (not group session) for this character
     // A character can have: 1 individual session + multiple group sessions
     // Priority: individual session (no groupId) > group session
-    const individualSession = sessions.find(s =>
+    const individualSession = useTavernStore.getState().sessions.find(s =>
       s.characterId === characterId && !s.groupId
     );
 
@@ -101,7 +100,7 @@ export function CharacterPanel() {
     setActiveCharacter(null);
     
     // Find existing session for this group or create new
-    const existingSession = sessions.find(s => s.groupId === groupId);
+    const existingSession = useTavernStore.getState().sessions.find(s => s.groupId === groupId);
     if (existingSession) {
       setActiveSession(existingSession.id);
     } else {

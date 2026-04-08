@@ -52,7 +52,9 @@ import { QuestLogPanel } from './quest-log-panel';
 import { QuestTemplateManager } from '@/components/settings/quest-template-manager';
 
 export function QuestSettingsPanel() {
-  const { questSettings, setQuestSettings, activeSessionId } = useTavernStore();
+  const questSettings = useTavernStore((s) => s.questSettings);
+  const setQuestSettings = useTavernStore((s) => s.setQuestSettings);
+  const activeSessionId = useTavernStore((s) => s.activeSessionId);
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
   
   // Ensure promptTemplate exists with default fallback

@@ -170,19 +170,17 @@ const groupEditorTabs = [
 ];
 
 export function GroupEditor({ groupId, open, onClose }: GroupEditorProps) {
-  const {
-    characters,
-    groups,
-    addGroup,
-    updateGroup,
-    deleteGroup,
-    addGroupMember,
-    removeGroupMember,
-    toggleGroupMemberActive,
-    toggleGroupMemberPresent,
-    toggleGroupMemberNarrator,
-    updateGroupMember
-  } = useTavernStore();
+  const characters = useTavernStore((s) => s.characters);
+  const groups = useTavernStore((s) => s.groups);
+  const addGroup = useTavernStore((s) => s.addGroup);
+  const updateGroup = useTavernStore((s) => s.updateGroup);
+  const deleteGroup = useTavernStore((s) => s.deleteGroup);
+  const addGroupMember = useTavernStore((s) => s.addGroupMember);
+  const removeGroupMember = useTavernStore((s) => s.removeGroupMember);
+  const toggleGroupMemberActive = useTavernStore((s) => s.toggleGroupMemberActive);
+  const toggleGroupMemberPresent = useTavernStore((s) => s.toggleGroupMemberPresent);
+  const toggleGroupMemberNarrator = useTavernStore((s) => s.toggleGroupMemberNarrator);
+  const updateGroupMember = useTavernStore((s) => s.updateGroupMember);
 
   const { toast } = useToast();
 

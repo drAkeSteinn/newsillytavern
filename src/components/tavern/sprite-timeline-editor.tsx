@@ -122,16 +122,14 @@ interface SpriteCollectionFromAPI {
 // ============================================
 
 export function SpriteTimelineEditor() {
-  const {
-    editorState,
-    selectCollection,
-    selectSprite,
-    selectKeyframe,
-    setZoom,
-    toggleSnap,
-    soundTriggers,
-    soundCollections,
-  } = useTavernStore();
+  const editorState = useTavernStore((s) => s.editorState);
+  const selectCollection = useTavernStore((s) => s.selectCollection);
+  const selectSprite = useTavernStore((s) => s.selectSprite);
+  const selectKeyframe = useTavernStore((s) => s.selectKeyframe);
+  const setZoom = useTavernStore((s) => s.setZoom);
+  const toggleSnap = useTavernStore((s) => s.toggleSnap);
+  const soundTriggers = useTavernStore((s) => s.soundTriggers);
+  const soundCollections = useTavernStore((s) => s.soundCollections);
 
   const { toast } = useToast();
   

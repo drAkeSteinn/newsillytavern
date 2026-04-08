@@ -72,23 +72,21 @@ const SORT_OPTIONS = [
 // ============================================
 
 export function InventoryPanel() {
-  const {
-    items,
-    containers,
-    currencies,
-    inventorySettings,
-    addItem,
-    updateItem,
-    deleteItem,
-    addToInventory,
-    removeFromInventory,
-    setInventorySettings,
-    sortInventory,
-    addCurrency,
-    updateCurrency,
-    deleteCurrency,
-    adjustCurrency,
-  } = useTavernStore();
+  const items = useTavernStore((s) => s.items);
+  const containers = useTavernStore((s) => s.containers);
+  const currencies = useTavernStore((s) => s.currencies);
+  const inventorySettings = useTavernStore((s) => s.inventorySettings);
+  const addItem = useTavernStore((s) => s.addItem);
+  const updateItem = useTavernStore((s) => s.updateItem);
+  const deleteItem = useTavernStore((s) => s.deleteItem);
+  const addToInventory = useTavernStore((s) => s.addToInventory);
+  const removeFromInventory = useTavernStore((s) => s.removeFromInventory);
+  const setInventorySettings = useTavernStore((s) => s.setInventorySettings);
+  const sortInventory = useTavernStore((s) => s.sortInventory);
+  const addCurrency = useTavernStore((s) => s.addCurrency);
+  const updateCurrency = useTavernStore((s) => s.updateCurrency);
+  const deleteCurrency = useTavernStore((s) => s.deleteCurrency);
+  const adjustCurrency = useTavernStore((s) => s.adjustCurrency);
   
   // Local state
   const [searchQuery, setSearchQuery] = useState('');

@@ -29,7 +29,7 @@ export const TextFormatter = memo(function TextFormatter({
   isUser = false,
   appearance
 }: TextFormatterProps) {
-  const { dialogueSettings } = useTavernStore();
+  const dialogueSettings = useTavernStore((s) => s.dialogueSettings);
 
   // Get typography settings
   const typography = dialogueSettings.typography ?? DEFAULT_TYPOGRAPHY_SETTINGS;

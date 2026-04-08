@@ -112,14 +112,12 @@ function resetMessageState(messageKey: string): void {
 // ============ Hook ============
 
 export function useBackgroundTriggers() {
-  const state = useTavernStore();
-  
-  const backgroundPacks = state.backgroundPacks;
-  const backgroundIndex = state.backgroundIndex;
-  const settings = state.settings;
-  const setBackgroundIndex = state.setBackgroundIndex;
-  const applyBackgroundHit = state.applyBackgroundHit;
-  const updateBackgroundPackIndex = state.updateBackgroundPackIndex;
+  const backgroundPacks = useTavernStore((s) => s.backgroundPacks);
+  const backgroundIndex = useTavernStore((s) => s.backgroundIndex);
+  const settings = useTavernStore((s) => s.settings);
+  const setBackgroundIndex = useTavernStore((s) => s.setBackgroundIndex);
+  const applyBackgroundHit = useTavernStore((s) => s.applyBackgroundHit);
+  const updateBackgroundPackIndex = useTavernStore((s) => s.updateBackgroundPackIndex);
   
   const currentMessageKeyRef = useRef<string>('');
   const indexLoadedRef = useRef(false);

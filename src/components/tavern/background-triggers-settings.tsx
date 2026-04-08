@@ -45,20 +45,18 @@ const MATCH_MODE_DESCRIPTIONS: Record<BackgroundMatchMode, { label: string; desc
 };
 
 export function BackgroundTriggersSettings() {
-  const {
-    backgroundTriggerPacks,
-    backgroundCollections,
-    settings,
-    addBackgroundTriggerPack,
-    updateBackgroundTriggerPack,
-    deleteBackgroundTriggerPack,
-    toggleBackgroundTriggerPack,
-    setBackgroundCollections,
-    addBackgroundTriggerItem,
-    updateBackgroundTriggerItem,
-    deleteBackgroundTriggerItem,
-    updateSettings,
-  } = useTavernStore();
+  const backgroundTriggerPacks = useTavernStore((s) => s.backgroundTriggerPacks);
+  const backgroundCollections = useTavernStore((s) => s.backgroundCollections);
+  const settings = useTavernStore((s) => s.settings);
+  const addBackgroundTriggerPack = useTavernStore((s) => s.addBackgroundTriggerPack);
+  const updateBackgroundTriggerPack = useTavernStore((s) => s.updateBackgroundTriggerPack);
+  const deleteBackgroundTriggerPack = useTavernStore((s) => s.deleteBackgroundTriggerPack);
+  const toggleBackgroundTriggerPack = useTavernStore((s) => s.toggleBackgroundTriggerPack);
+  const setBackgroundCollections = useTavernStore((s) => s.setBackgroundCollections);
+  const addBackgroundTriggerItem = useTavernStore((s) => s.addBackgroundTriggerItem);
+  const updateBackgroundTriggerItem = useTavernStore((s) => s.updateBackgroundTriggerItem);
+  const deleteBackgroundTriggerItem = useTavernStore((s) => s.deleteBackgroundTriggerItem);
+  const updateSettings = useTavernStore((s) => s.updateSettings);
 
   const [isLoading, setIsLoading] = useState(false);
   const [expandedPacks, setExpandedPacks] = useState<string[]>([]);

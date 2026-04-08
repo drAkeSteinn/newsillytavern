@@ -843,6 +843,11 @@ export function EmbeddingsSettingsPanel() {
   } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [refreshingEmbeddings, setRefreshingEmbeddings] = useState(false);
+
+  // Examinar tab filters
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<string>('memory');
+  const [namespaceFilter, setNamespaceFilter] = useState<string>('');
+
   const [splitterType, setSplitterType] = useState('recursive-character');
   const [chunkSize, setChunkSize] = useState(1000);
   const [chunkOverlap, setChunkOverlap] = useState(200);
@@ -2104,75 +2109,151 @@ export function EmbeddingsSettingsPanel() {
 
         {/* Tab 6: Examinar (Browse Embeddings) */}
         <TabsContent value="embeddings" className="space-y-3 mt-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {selectedNamespace ? `${embeddings.length} en "${selectedNamespace}"` : `${stats?.totalEmbeddings || 0} total`}
-              </span>
-              {selectedNamespace && (
-                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => handleSelectNamespace(null)}>
-                  Mostrar todo
-                </Button>
-              )}
+          {/* Filter bar */}
+          {!selectedNamespace && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 min-w-0">
+                <Select value={sourceTypeFilter} onValueChange={setSourceTypeFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Tipo de origen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
+                    <SelectItem value="memory">Memoria</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                    <SelectItem value="file">Archivo</SelectItem>
+                    <SelectItem value="character">Personaje</SelectItem>
+                    <SelectItem value="world">Mundo</SelectItem>
+                    <SelectItem value="lorebook">Lorebook</SelectItem>
+                    <SelectItem value="session">Sesión</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="relative">
+                  <Tag className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                  <Input
+                    className="h-8 text-xs pl-7"
+                    placeholder="Filtrar por namespace..."
+                    value={namespaceFilter}
+                    onChange={(e) => setNamespaceFilter(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex gap-1.5">
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={refreshEmbeddingsTab} disabled={refreshingEmbeddings}>
-                {refreshingEmbeddings ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
-                Actualizar
-              </Button>
-              <Button size="sm" className="h-7 text-xs" onClick={() => setCreateEmbeddingOpen(true)}>
-                <Plus className="w-3 h-3 mr-1" />Agregar
-              </Button>
-            </div>
-          </div>
+          )}
 
-          {refreshingEmbeddings ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground ml-2">Cargando embeddings...</span>
-            </div>
-          ) : embeddings.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Sin embeddings almacenados.</p>
-              <p className="text-xs mt-1">Agrega embeddings manualmente o importa desde archivos.</p>
-            </div>
-          ) : (
-            <div className="max-h-[400px] overflow-y-auto space-y-1.5 pr-1">
-              {embeddings.map(emb => (
-                <div key={emb.id} className="p-3 rounded-lg border border-border/40 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm line-clamp-2">{emb.content}</p>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <Badge variant="outline" className="text-[10px]">
-                          <Tag className="w-2.5 h-2.5 mr-0.5" />
-                          {emb.namespace}
-                        </Badge>
-                        {emb.source_type && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            <Globe className="w-2.5 h-2.5 mr-0.5" />
-                            {emb.source_type}
-                          </Badge>
-                        )}
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(emb.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => handleDeleteEmbedding(emb.id)}
-                    >
-                      <Trash2 className="w-3 h-3" />
+          {/* Filtered embeddings */}
+          {(() => {
+            const filteredEmbeddings = (() => {
+              let result = embeddings;
+              if (sourceTypeFilter !== 'all') {
+                result = result.filter(emb => emb.source_type === sourceTypeFilter);
+              }
+              if (namespaceFilter.trim()) {
+                const pattern = namespaceFilter.trim().toLowerCase();
+                result = result.filter(emb => emb.namespace.toLowerCase().includes(pattern));
+              }
+              return result;
+            })();
+
+            return (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {selectedNamespace
+                        ? `${embeddings.length} en "${selectedNamespace}"`
+                        : `${filteredEmbeddings.length} de ${embeddings.length} embeddings`
+                      }
+                    </span>
+                    {selectedNamespace && (
+                      <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => handleSelectNamespace(null)}>
+                        Mostrar todo
+                      </Button>
+                    )}
+                    {!selectedNamespace && (sourceTypeFilter !== 'all' || namespaceFilter.trim()) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs"
+                        onClick={() => { setSourceTypeFilter('all'); setNamespaceFilter(''); }}
+                      >
+                        Limpiar filtros
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={refreshEmbeddingsTab} disabled={refreshingEmbeddings}>
+                      {refreshingEmbeddings ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                      Actualizar
+                    </Button>
+                    <Button size="sm" className="h-7 text-xs" onClick={() => setCreateEmbeddingOpen(true)}>
+                      <Plus className="w-3 h-3 mr-1" />Agregar
                     </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+
+                {refreshingEmbeddings ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground ml-2">Cargando embeddings...</span>
+                  </div>
+                ) : filteredEmbeddings.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">
+                      {embeddings.length === 0
+                        ? 'Sin embeddings almacenados.'
+                        : 'Sin resultados para los filtros seleccionados.'
+                      }
+                    </p>
+                    <p className="text-xs mt-1">
+                      {embeddings.length === 0
+                        ? 'Agrega embeddings manualmente o importa desde archivos.'
+                        : 'Prueba cambiando el tipo o el filtro de namespace.'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-h-[400px] overflow-y-auto space-y-1.5 pr-1">
+                    {filteredEmbeddings.map(emb => (
+                      <div key={emb.id} className="p-3 rounded-lg border border-border/40 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm line-clamp-2">{emb.content}</p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <Badge variant="outline" className="text-[10px]">
+                                <Tag className="w-2.5 h-2.5 mr-0.5" />
+                                {emb.namespace}
+                              </Badge>
+                              {emb.source_type && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  <Globe className="w-2.5 h-2.5 mr-0.5" />
+                                  {emb.source_type}
+                                </Badge>
+                              )}
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(emb.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                            onClick={() => handleDeleteEmbedding(emb.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Danger Zone */}
           {stats && stats.totalEmbeddings > 0 && (

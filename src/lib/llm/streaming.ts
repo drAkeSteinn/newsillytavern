@@ -32,6 +32,7 @@ export async function* getStreamGenerator(
     }
 
     case 'openai':
+    case 'grok':
     case 'vllm':
     case 'lm-studio':
     case 'custom': {

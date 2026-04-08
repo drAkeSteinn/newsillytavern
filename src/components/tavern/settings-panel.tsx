@@ -48,6 +48,8 @@ import {
   RefreshCw,
   Loader2,
   Wrench,
+  Plug,
+  WifiOff,
 } from 'lucide-react';
 import {
   Select,
@@ -274,6 +276,396 @@ function LMStudioModelSelector({ endpoint, currentModel, onModelChange }: LMStud
   );
 }
 
+// ============================================
+// Grok (xAI) Model Selector
+// Shows known Grok models + fetches from API if key is provided
+// ============================================
+
+interface GrokModel {
+  id: string;
+  name: string;
+  context: string;
+  capabilities: string;
+  tier: string;
+}
+
+interface GrokModelSelectorProps {
+  endpoint: string;
+  apiKey: string;
+  currentModel: string;
+  onModelChange: (model: string) => void;
+}
+
+function GrokModelSelector({ endpoint, apiKey, currentModel, onModelChange }: GrokModelSelectorProps) {
+  const [models, setModels] = useState<GrokModel[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<string>('known');
+  const { toast } = useToast();
+
+  const fetchModels = useCallback(async () => {
+    if (!apiKey) {
+      toast({ variant: 'destructive', description: 'Configura la API Key de Grok primero' });
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/grok/models?apiKey=${encodeURIComponent(apiKey)}&endpoint=${encodeURIComponent(endpoint)}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errData.error || `Servidor respondió con ${response.status}`);
+      }
+
+      const data = await response.json();
+      const modelList: GrokModel[] = (data.data || []).map((m: GrokModel) => ({
+        id: m.id,
+        name: m.name || m.id,
+        context: m.context || '',
+        capabilities: m.capabilities || '',
+        tier: m.tier || 'other',
+      }));
+
+      setModels(modelList);
+      setSource(data.source || 'known');
+
+      if (modelList.length === 0) {
+        setError('No se encontraron modelos');
+        toast({ description: 'No hay modelos disponibles', variant: 'destructive' });
+      } else {
+        toast({ description: `${modelList.length} modelo(s) Grok disponible(s) (${data.source || 'known'})` });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error de conexión';
+      setError(msg);
+      toast({ variant: 'destructive', description: `Error al obtener modelos: ${msg}` });
+    } finally {
+      setLoading(false);
+    }
+  }, [apiKey, endpoint, toast]);
+
+  // Auto-fetch models when API key is available
+  const lastFetchedKey = useRef<string>('');
+  useEffect(() => {
+    if (apiKey && apiKey !== lastFetchedKey.current) {
+      lastFetchedKey.current = apiKey;
+      fetchModels();
+    }
+  }, [apiKey, fetchModels]);
+
+  const isModelInList = models.some(m => m.id === currentModel);
+
+  // Group models by tier for organized display
+  const tierLabels: Record<string, string> = {
+    flagship: '⭐ Flagship',
+    specialized: '🔧 Especializados',
+    standard: '📊 Estándar',
+    lightweight: '🪶 Livianos',
+    legacy: '📦 Legacy',
+    other: '📋 Otros',
+  };
+
+  const groupedModels = models.reduce<Record<string, GrokModel[]>>((acc, model) => {
+    const tier = model.tier || 'other';
+    if (!acc[tier]) acc[tier] = [];
+    acc[tier].push(model);
+    return acc;
+  }, {});
+
+  return (
+    <div className="mt-1 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        {/* Model dropdown */}
+        <Select
+          value={isModelInList ? currentModel : '__custom__'}
+          onValueChange={(value) => {
+            if (value === '__custom__') {
+              // Keep current custom value
+            } else {
+              onModelChange(value);
+            }
+          }}
+        >
+          <SelectTrigger className="h-8 text-sm flex-1">
+            <SelectValue placeholder="Seleccionar modelo Grok..." />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {/* Default recommendation */}
+            <SelectItem value="grok-3">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                <span className="font-medium">Grok 3 (Recomendado)</span>
+              </span>
+            </SelectItem>
+
+            {models.length > 0 && <SelectSeparator />}
+
+            {/* Grouped models */}
+            {Object.entries(groupedModels).map(([tier, tierModels]) => (
+              <div key={tier}>
+                <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                  {tierLabels[tier] || tier}
+                </div>
+                {tierModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex flex-col">
+                      <span className="truncate">{model.name}</span>
+                      {model.context && (
+                        <span className="text-xs text-muted-foreground">
+                          {model.context} · {model.capabilities}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </div>
+            ))}
+
+            {/* Show custom option if current model isn't in the list */}
+            {!isModelInList && currentModel && (
+              <>
+                <SelectSeparator />
+                <SelectItem value="__custom__" disabled>
+                  <span className="truncate text-muted-foreground" title={currentModel}>
+                    {currentModel} (personalizado)
+                  </span>
+                </SelectItem>
+              </>
+            )}
+          </SelectContent>
+        </Select>
+
+        {/* Refresh button */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={fetchModels}
+                disabled={loading || !apiKey}
+              >
+                {loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Refrescar modelos desde xAI API</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Manual input for custom model name */}
+      <div className="flex items-center gap-2">
+        <Input
+          value={isModelInList ? '' : currentModel}
+          onChange={(e) => onModelChange(e.target.value)}
+          placeholder={isModelInList ? 'Modelo seleccionado arriba' : 'Escribe un model ID personalizado...'}
+          className="h-7 text-xs"
+        />
+      </div>
+
+      {/* Source info */}
+      {models.length > 0 && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          {source === 'api' ? (
+            <>
+              <CheckCircle className="h-3 w-3 text-emerald-500" />
+              {models.length} modelos obtenidos de la API xAI
+            </>
+          ) : (
+            <>
+              <Info className="h-3 w-3 text-blue-500" />
+              {models.length} modelos conocidos (conecta tu API key para obtener la lista completa)
+            </>
+          )}
+        </p>
+      )}
+
+      {/* Error message */}
+      {error && models.length === 0 && (
+        <p className="text-xs text-destructive flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Ollama Model Selector
+// Fetches available models from Ollama's /api/tags endpoint
+// ============================================
+
+interface OllamaModelSelectorProps {
+  endpoint: string;
+  currentModel: string;
+  onModelChange: (model: string) => void;
+}
+
+function OllamaModelSelector({ endpoint, currentModel, onModelChange }: OllamaModelSelectorProps) {
+  const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchModels = useCallback(async () => {
+    if (!endpoint) {
+      toast({ variant: 'destructive', description: 'Configura el endpoint de Ollama primero' });
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/ollama/models?endpoint=${encodeURIComponent(endpoint)}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errData.error || `Servidor respondió con ${response.status}`);
+      }
+
+      const data = await response.json();
+      const modelList = (data.data || [])
+        .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+
+      if (modelList.length === 0) {
+        setError('No se encontraron modelos');
+        toast({ description: 'No hay modelos disponibles en Ollama. Usa "ollama pull" para descargar uno.', variant: 'destructive' });
+      } else {
+        setModels(modelList);
+        toast({ description: `${modelList.length} modelo(s) encontrado(s) en Ollama` });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error de conexión';
+      setError(msg);
+      toast({ variant: 'destructive', description: `Error al obtener modelos: ${msg}` });
+    } finally {
+      setLoading(false);
+    }
+  }, [endpoint, toast]);
+
+  // Auto-fetch models when endpoint changes and we haven't loaded yet
+  const lastFetchedEndpoint = useRef<string>('');
+  useEffect(() => {
+    if (endpoint && endpoint !== lastFetchedEndpoint.current) {
+      lastFetchedEndpoint.current = endpoint;
+      fetchModels();
+    }
+  }, [endpoint, fetchModels]);
+
+  // Check if current model is in the fetched list
+  const isModelInList = models.some(m => m.id === currentModel);
+
+  return (
+    <div className="mt-1 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        {/* Model dropdown */}
+        <Select
+          value={isModelInList ? currentModel : '__custom__'}
+          onValueChange={(value) => {
+            if (value === '__custom__') {
+              // Keep current custom value
+            } else {
+              onModelChange(value);
+            }
+          }}
+        >
+          <SelectTrigger className="h-8 text-sm flex-1">
+            <SelectValue placeholder="Seleccionar modelo..." />
+          </SelectTrigger>
+          <SelectContent className="max-h-60">
+            {models.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                <span className="truncate block max-w-[280px]" title={model.id}>
+                  {model.name}
+                </span>
+              </SelectItem>
+            ))}
+
+            {/* Show custom option if current model isn't in the list */}
+            {!isModelInList && currentModel && (
+              <>
+                <SelectSeparator />
+                <SelectItem value="__custom__" disabled>
+                  <span className="truncate text-muted-foreground" title={currentModel}>
+                    {currentModel} (personalizado)
+                  </span>
+                </SelectItem>
+              </>
+            )}
+          </SelectContent>
+        </Select>
+
+        {/* Refresh button */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={fetchModels}
+                disabled={loading || !endpoint}
+              >
+                {loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Refrescar modelos desde Ollama</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Manual input for custom model name */}
+      <div className="flex items-center gap-2">
+        <Input
+          value={currentModel || ''}
+          onChange={(e) => onModelChange(e.target.value)}
+          placeholder="O escribe un nombre personalizado (ej: qwen3.5:9b)..."
+          className="h-7 text-xs"
+        />
+      </div>
+
+      {/* Info text when model is selected */}
+      {isModelInList && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <CheckCircle className="h-3 w-3 text-emerald-500" />
+          Modelo disponible en Ollama
+        </p>
+      )}
+
+      {/* Error message */}
+      {error && models.length === 0 && (
+        <p className="text-xs text-destructive flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: string; needsEndpoint: boolean; description: string }[] = [
   { value: 'test-mock', label: '🧪 Test Mock (Prueba)', defaultEndpoint: '', needsEndpoint: false, description: 'Prueba del sistema de peticiones sin LLM real' },
   { value: 'z-ai', label: 'Z.ai Chat', defaultEndpoint: '', needsEndpoint: false, description: 'SDK integrado, sin configuración' },
@@ -283,6 +675,7 @@ const LLM_PROVIDERS: { value: LLMProvider; label: string; defaultEndpoint: strin
   { value: 'vllm', label: 'vLLM', defaultEndpoint: 'http://localhost:8000', needsEndpoint: true, description: 'Servidor vLLM' },
   { value: 'lm-studio', label: 'LM Studio', defaultEndpoint: 'http://localhost:1234/v1', needsEndpoint: true, description: 'Servidor LM Studio local (OpenAI-compatible)' },
   { value: 'openai', label: 'OpenAI', defaultEndpoint: 'https://api.openai.com/v1', needsEndpoint: true, description: 'API de OpenAI' },
+  { value: 'grok', label: 'Grok (xAI)', defaultEndpoint: 'https://api.x.ai/v1', needsEndpoint: true, description: 'API de xAI Grok - Modelos: Grok 4, Grok 3, Grok 2' },
   { value: 'anthropic', label: 'Anthropic', defaultEndpoint: 'https://api.anthropic.com/v1', needsEndpoint: true, description: 'API de Anthropic' },
   { value: 'custom', label: 'Personalizado', defaultEndpoint: '', needsEndpoint: true, description: 'Endpoint personalizado OpenAI-compatible' }
 ];
@@ -295,19 +688,31 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: SettingsPanelProps) {
   const { toast } = useToast();
-  const store = useTavernStore();
-  const { 
-    settings, 
-    updateSettings, 
-    llmConfigs, 
-    addLLMConfig, 
-    updateLLMConfig, 
-    setActiveLLMConfig,
-    deleteLLMConfig 
-  } = store;
+  const settings = useTavernStore((s) => s.settings);
+  const updateSettings = useTavernStore((s) => s.updateSettings);
+  const llmConfigs = useTavernStore((s) => s.llmConfigs);
+  const addLLMConfig = useTavernStore((s) => s.addLLMConfig);
+  const updateLLMConfig = useTavernStore((s) => s.updateLLMConfig);
+  const setActiveLLMConfig = useTavernStore((s) => s.setActiveLLMConfig);
+  const deleteLLMConfig = useTavernStore((s) => s.deleteLLMConfig);
 
   const [newConfigOpen, setNewConfigOpen] = useState(false);
+  // LLM connection test state
+  const [testingConnection, setTestingConnection] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, {
+    success: boolean;
+    steps: Array<{ name: string; status: string; message: string; latencyMs?: number }>;
+    error?: string;
+    latency?: number;
+    model?: string;
+  }>>({});
+
   const [recordingHotkey, setRecordingHotkey] = useState<string | null>(null);
+  const [editingQuickReply, setEditingQuickReply] = useState<number | null>(null);
+  const [editingQuickReplyLabel, setEditingQuickReplyLabel] = useState('');
+  const [editingQuickReplyValue, setEditingQuickReplyValue] = useState('');
+  const [newQuickReplyLabel, setNewQuickReplyLabel] = useState('');
+  const [newQuickReplyValue, setNewQuickReplyValue] = useState('');
   const hotkeyContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newConfig, setNewConfig] = useState({
@@ -326,45 +731,45 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
         type: 'config',
         data: {
           // Settings
-          settings: store.settings,
+          settings: useTavernStore.getState().settings,
           // LLM & TTS
-          llmConfigs: store.llmConfigs,
-          ttsConfigs: store.ttsConfigs,
-          promptTemplates: store.promptTemplates,
+          llmConfigs: useTavernStore.getState().llmConfigs,
+          ttsConfigs: useTavernStore.getState().ttsConfigs,
+          promptTemplates: useTavernStore.getState().promptTemplates,
           // Personas
-          personas: store.personas,
+          personas: useTavernStore.getState().personas,
           // Lorebooks
-          lorebooks: store.lorebooks,
-          activeLorebookIds: store.activeLorebookIds,
+          lorebooks: useTavernStore.getState().lorebooks,
+          activeLorebookIds: useTavernStore.getState().activeLorebookIds,
           // Sound system
-          soundTriggers: store.soundTriggers,
-          soundCollections: store.soundCollections,
-          soundSequenceTriggers: store.soundSequenceTriggers,
+          soundTriggers: useTavernStore.getState().soundTriggers,
+          soundCollections: useTavernStore.getState().soundCollections,
+          soundSequenceTriggers: useTavernStore.getState().soundSequenceTriggers,
           // Visual systems - Backgrounds
-          backgrounds: store.backgrounds,
-          backgroundPacks: store.backgroundPacks,
-          backgroundIndex: store.backgroundIndex,
-          backgroundTriggerPacks: store.backgroundTriggerPacks,
-          backgroundCollections: store.backgroundCollections,
+          backgrounds: useTavernStore.getState().backgrounds,
+          backgroundPacks: useTavernStore.getState().backgroundPacks,
+          backgroundIndex: useTavernStore.getState().backgroundIndex,
+          backgroundTriggerPacks: useTavernStore.getState().backgroundTriggerPacks,
+          backgroundCollections: useTavernStore.getState().backgroundCollections,
           // Visual systems - Sprites (V2)
-          spritePacksV2: store.spritePacksV2,
+          spritePacksV2: useTavernStore.getState().spritePacksV2,
           // HUD
-          hudTemplates: store.hudTemplates,
+          hudTemplates: useTavernStore.getState().hudTemplates,
           // Atmosphere
-          atmosphereSettings: store.atmosphereSettings,
-          activeAtmospherePresetId: store.activeAtmospherePresetId,
+          atmosphereSettings: useTavernStore.getState().atmosphereSettings,
+          activeAtmospherePresetId: useTavernStore.getState().activeAtmospherePresetId,
           // Memory
-          summarySettings: store.summarySettings,
-          characterMemories: store.characterMemories,
-          sessionTracking: store.sessionTracking,
+          summarySettings: useTavernStore.getState().summarySettings,
+          characterMemories: useTavernStore.getState().characterMemories,
+          sessionTracking: useTavernStore.getState().sessionTracking,
           // Quest
-          questSettings: store.questSettings,
-          questNotifications: store.questNotifications,
+          questSettings: useTavernStore.getState().questSettings,
+          questNotifications: useTavernStore.getState().questNotifications,
           // Dialogue
-          dialogueSettings: store.dialogueSettings,
+          dialogueSettings: useTavernStore.getState().dialogueSettings,
           // Inventory
-          inventorySettings: store.inventorySettings,
-          inventoryNotifications: store.inventoryNotifications,
+          inventorySettings: useTavernStore.getState().inventorySettings,
+          inventoryNotifications: useTavernStore.getState().inventoryNotifications,
         }
       };
 
@@ -464,62 +869,62 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
         type: 'full',
         data: {
           // Configuration
-          settings: store.settings,
-          llmConfigs: store.llmConfigs,
-          ttsConfigs: store.ttsConfigs,
-          promptTemplates: store.promptTemplates,
-          personas: store.personas,
+          settings: useTavernStore.getState().settings,
+          llmConfigs: useTavernStore.getState().llmConfigs,
+          ttsConfigs: useTavernStore.getState().ttsConfigs,
+          promptTemplates: useTavernStore.getState().promptTemplates,
+          personas: useTavernStore.getState().personas,
           // Lorebooks
-          lorebooks: store.lorebooks,
-          activeLorebookIds: store.activeLorebookIds,
+          lorebooks: useTavernStore.getState().lorebooks,
+          activeLorebookIds: useTavernStore.getState().activeLorebookIds,
           // Sound system
-          soundTriggers: store.soundTriggers,
-          soundCollections: store.soundCollections,
-          soundSequenceTriggers: store.soundSequenceTriggers,
+          soundTriggers: useTavernStore.getState().soundTriggers,
+          soundCollections: useTavernStore.getState().soundCollections,
+          soundSequenceTriggers: useTavernStore.getState().soundSequenceTriggers,
           // Visual systems - Backgrounds
-          backgrounds: store.backgrounds,
-          backgroundPacks: store.backgroundPacks,
-          backgroundIndex: store.backgroundIndex,
-          backgroundTriggerPacks: store.backgroundTriggerPacks,
-          backgroundCollections: store.backgroundCollections,
+          backgrounds: useTavernStore.getState().backgrounds,
+          backgroundPacks: useTavernStore.getState().backgroundPacks,
+          backgroundIndex: useTavernStore.getState().backgroundIndex,
+          backgroundTriggerPacks: useTavernStore.getState().backgroundTriggerPacks,
+          backgroundCollections: useTavernStore.getState().backgroundCollections,
           // Visual systems - Sprites (V2)
-          spritePacksV2: store.spritePacksV2,
+          spritePacksV2: useTavernStore.getState().spritePacksV2,
           // HUD
-          hudTemplates: store.hudTemplates,
+          hudTemplates: useTavernStore.getState().hudTemplates,
           // Atmosphere
-          atmosphereSettings: store.atmosphereSettings,
-          activeAtmospherePresetId: store.activeAtmospherePresetId,
+          atmosphereSettings: useTavernStore.getState().atmosphereSettings,
+          activeAtmospherePresetId: useTavernStore.getState().activeAtmospherePresetId,
           // Memory
-          summarySettings: store.summarySettings,
-          summaries: store.summaries,
-          characterMemories: store.characterMemories,
-          sessionTracking: store.sessionTracking,
+          summarySettings: useTavernStore.getState().summarySettings,
+          summaries: useTavernStore.getState().summaries,
+          characterMemories: useTavernStore.getState().characterMemories,
+          sessionTracking: useTavernStore.getState().sessionTracking,
           // Quest
-          questSettings: store.questSettings,
-          quests: store.quests,
-          questNotifications: store.questNotifications,
+          questSettings: useTavernStore.getState().questSettings,
+          quests: useTavernStore.getState().quests,
+          questNotifications: useTavernStore.getState().questNotifications,
           // Dialogue
-          dialogueSettings: store.dialogueSettings,
+          dialogueSettings: useTavernStore.getState().dialogueSettings,
           // Inventory
-          inventorySettings: store.inventorySettings,
-          items: store.items,
-          containers: store.containers,
-          currencies: store.currencies,
-          inventoryNotifications: store.inventoryNotifications,
+          inventorySettings: useTavernStore.getState().inventorySettings,
+          items: useTavernStore.getState().items,
+          containers: useTavernStore.getState().containers,
+          currencies: useTavernStore.getState().currencies,
+          inventoryNotifications: useTavernStore.getState().inventoryNotifications,
           // Timeline
-          collections: store.collections,
+          collections: useTavernStore.getState().collections,
           // Data
-          characters: store.characters,
-          sessions: store.sessions,
-          groups: store.groups,
+          characters: useTavernStore.getState().characters,
+          sessions: useTavernStore.getState().sessions,
+          groups: useTavernStore.getState().groups,
           // Active states
-          activeSessionId: store.activeSessionId,
-          activeCharacterId: store.activeCharacterId,
-          activeGroupId: store.activeGroupId,
-          activeBackground: store.activeBackground,
-          activeOverlayBack: store.activeOverlayBack,
-          activeOverlayFront: store.activeOverlayFront,
-          activePersonaId: store.activePersonaId,
+          activeSessionId: useTavernStore.getState().activeSessionId,
+          activeCharacterId: useTavernStore.getState().activeCharacterId,
+          activeGroupId: useTavernStore.getState().activeGroupId,
+          activeBackground: useTavernStore.getState().activeBackground,
+          activeOverlayBack: useTavernStore.getState().activeOverlayBack,
+          activeOverlayFront: useTavernStore.getState().activeOverlayFront,
+          activePersonaId: useTavernStore.getState().activePersonaId,
         }
       };
 
@@ -1034,15 +1439,47 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                               </div>
                             )}
                             
+                            {/* API Key field - shown BEFORE model for Grok (needed to fetch models) */}
+                            {config.provider !== 'z-ai' && config.provider === 'grok' && (
+                              <div>
+                                <Label className="text-xs">API Key (requerido)</Label>
+                                <Input
+                                  type="password"
+                                  value={config.apiKey || ''}
+                                  onChange={(e) => 
+                                    updateLLMConfig(config.id, { apiKey: e.target.value })
+                                  }
+                                  placeholder="xai-..."
+                                  className="mt-1 h-8 text-sm"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Obtén tu API key en <a href="https://console.x.ai/" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:no-underline">console.x.ai</a>
+                                </p>
+                              </div>
+                            )}
+
                             {/* Model field - for providers that need model selection */}
                             {config.provider !== 'z-ai' && config.provider !== 'test-mock' && (
                               <div>
-                                <Label className="text-xs">Modelo {config.provider === 'lm-studio' ? '' : '(opcional)'}</Label>
+                                <Label className="text-xs">Modelo {(config.provider === 'lm-studio' || config.provider === 'ollama' || config.provider === 'grok') ? '(requerido)' : '(opcional)'}</Label>
                                 
                                 {/* LM Studio: Model selector with refresh and dropdown */}
                                 {config.provider === 'lm-studio' ? (
                                   <LMStudioModelSelector
                                     endpoint={config.endpoint}
+                                    currentModel={config.model || ''}
+                                    onModelChange={(model) => updateLLMConfig(config.id, { model })}
+                                  />
+                                ) : config.provider === 'ollama' ? (
+                                  <OllamaModelSelector
+                                    endpoint={config.endpoint}
+                                    currentModel={config.model || ''}
+                                    onModelChange={(model) => updateLLMConfig(config.id, { model })}
+                                  />
+                                ) : config.provider === 'grok' ? (
+                                  <GrokModelSelector
+                                    endpoint={config.endpoint}
+                                    apiKey={config.apiKey || ''}
                                     currentModel={config.model || ''}
                                     onModelChange={(model) => updateLLMConfig(config.id, { model })}
                                   />
@@ -1059,8 +1496,8 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                               </div>
                             )}
                             
-                            {/* API Key field - for providers that need it */}
-                            {config.provider !== 'z-ai' && (
+                            {/* API Key field - for providers that need it (non-Grok, already shown above for Grok) */}
+                            {config.provider !== 'z-ai' && config.provider !== 'grok' && (
                               <div>
                                 <Label className="text-xs">API Key {config.provider === 'openai' || config.provider === 'anthropic' ? '(requerido)' : '(opcional)'}</Label>
                                 <Input
@@ -1099,6 +1536,138 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                               </div>
                             )}
                             
+                            {/* Test Connection Button */}
+                            {config.provider !== 'z-ai' && config.provider !== 'test-mock' && (
+                              <div className="pt-2 border-t">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  disabled={testingConnection === config.id || !config.endpoint}
+                                  onClick={async () => {
+                                    setTestingConnection(config.id);
+                                    setTestResults(prev => ({ ...prev, [config.id]: undefined }));
+
+                                    try {
+                                      const providerDefaults: Record<string, string> = {
+                                        grok: 'grok-3',
+                                        openai: 'gpt-4o-mini',
+                                        anthropic: 'claude-sonnet-4-20250514',
+                                        ollama: 'llama3',
+                                      };
+
+                                      const response = await fetch('/api/llm/test', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                          provider: config.provider,
+                                          endpoint: config.endpoint,
+                                          apiKey: config.apiKey,
+                                          model: config.model || providerDefaults[config.provider] || '',
+                                        }),
+                                      });
+
+                                      const result = await response.json();
+                                      setTestResults(prev => ({ ...prev, [config.id]: result }));
+
+                                      if (result.success) {
+                                        toast({
+                                          title: 'Conexión exitosa',
+                                          description: result.model
+                                            ? `Modelo ${result.model} responde correctamente (${result.latency}ms)`
+                                            : `API responde correctamente (${result.latency}ms)`,
+                                        });
+                                      } else {
+                                        toast({
+                                          title: 'Error de conexión',
+                                          description: result.error || 'No se pudo conectar a la API',
+                                          variant: 'destructive',
+                                        });
+                                      }
+                                    } catch (err) {
+                                      const msg = err instanceof Error ? err.message : 'Error desconocido';
+                                      setTestResults(prev => ({
+                                        ...prev,
+                                        [config.id]: {
+                                          success: false,
+                                          steps: [{ name: 'Error', status: 'error', message: msg }],
+                                          error: msg,
+                                        },
+                                      }));
+                                      toast({
+                                        title: 'Error de prueba',
+                                        description: msg,
+                                        variant: 'destructive',
+                                      });
+                                    } finally {
+                                      setTestingConnection(null);
+                                    }
+                                  }}
+                                >
+                                  {testingConnection === config.id ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                      Probando conexión...
+                                    </>
+                                  ) : testResults[config.id]?.success ? (
+                                    <>
+                                      <CheckCircle className="w-3.5 h-3.5 mr-1.5 text-emerald-500" />
+                                      Probar Conexión
+                                    </>
+                                  ) : testResults[config.id] && !testResults[config.id].success ? (
+                                    <>
+                                      <WifiOff className="w-3.5 h-3.5 mr-1.5 text-destructive" />
+                                      Probar Conexión
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plug className="w-3.5 h-3.5 mr-1.5" />
+                                      Probar Conexión
+                                    </>
+                                  )}
+                                </Button>
+
+                                {/* Test Results Display */}
+                                {testResults[config.id] && (
+                                  <div className="mt-2 space-y-1">
+                                    {testResults[config.id].steps.map((step, idx) => (
+                                      <div
+                                        key={idx}
+                                        className={cn(
+                                          'flex items-start gap-2 text-xs p-1.5 rounded',
+                                          step.status === 'success' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                                          step.status === 'warning' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                                          step.status === 'error' && 'bg-red-500/10 text-red-600 dark:text-red-400',
+                                          step.status === 'running' && 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+                                        )}
+                                      >
+                                        <span className="shrink-0 mt-0.5">
+                                          {step.status === 'success' && <CheckCircle className="w-3 h-3" />}
+                                          {step.status === 'warning' && <AlertCircle className="w-3 h-3" />}
+                                          {step.status === 'error' && <X className="w-3 h-3" />}
+                                          {step.status === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium">{step.name}</span>
+                                          {step.latencyMs && (
+                                            <span className="text-muted-foreground ml-1">({step.latencyMs}ms)</span>
+                                          )}
+                                          <p className="text-muted-foreground whitespace-pre-wrap break-words mt-0.5">
+                                            {step.message}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {testResults[config.id].latency && (
+                                      <p className="text-xs text-muted-foreground text-right">
+                                        Tiempo total: {testResults[config.id].latency}ms
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {/* Test Mock custom response */}
                             {config.provider === 'test-mock' && (
                               <div className="space-y-2">
@@ -1436,6 +2005,214 @@ export function SettingsPanel({ open, onOpenChange, initialTab = 'llm' }: Settin
                   </div>
                 </div>
                 </Collapsible>
+
+                {/* Respuestas Rápidas */}
+                <div className="border-t pt-4 mt-6 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg">
+                      <MessageSquare className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-emerald-600">Respuestas Rápidas</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Botones de acceso rápido en el chat. <strong>Etiqueta</strong> es lo que se ve, <strong>Respuesta</strong> es lo que se envía.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Existing items */}
+                  <div className="space-y-2">
+                    {settings.quickReplies.map((item, index) => (
+                      <div
+                        key={index}
+                        className="rounded-lg border group"
+                      >
+                        {editingQuickReply === index ? (
+                          <div className="p-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground w-16 flex-shrink-0">Etiqueta</Label>
+                              <Input
+                                value={editingQuickReplyLabel}
+                                onChange={(e) => setEditingQuickReplyLabel(e.target.value)}
+                                className="h-8 text-sm flex-1"
+                                placeholder="Texto visible en el botón..."
+                                maxLength={20}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground w-16 flex-shrink-0">Respuesta</Label>
+                              <Input
+                                value={editingQuickReplyValue}
+                                onChange={(e) => setEditingQuickReplyValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && editingQuickReplyValue.trim() && editingQuickReplyLabel.trim()) {
+                                    const updated = [...settings.quickReplies];
+                                    updated[index] = { label: editingQuickReplyLabel.trim(), response: editingQuickReplyValue.trim() };
+                                    updateSettings({ quickReplies: updated });
+                                    setEditingQuickReply(null);
+                                    setEditingQuickReplyValue('');
+                                    setEditingQuickReplyLabel('');
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingQuickReply(null);
+                                    setEditingQuickReplyValue('');
+                                    setEditingQuickReplyLabel('');
+                                  }
+                                }}
+                                className="h-8 text-sm flex-1"
+                                placeholder="Texto que se envía como mensaje..."
+                                maxLength={200}
+                              />
+                            </div>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                                disabled={!editingQuickReplyValue.trim() || !editingQuickReplyLabel.trim()}
+                                onClick={() => {
+                                  if (editingQuickReplyValue.trim() && editingQuickReplyLabel.trim()) {
+                                    const updated = [...settings.quickReplies];
+                                    updated[index] = { label: editingQuickReplyLabel.trim(), response: editingQuickReplyValue.trim() };
+                                    updateSettings({ quickReplies: updated });
+                                  }
+                                  setEditingQuickReply(null);
+                                  setEditingQuickReplyValue('');
+                                  setEditingQuickReplyLabel('');
+                                }}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-1" />
+                                Guardar
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingQuickReply(null);
+                                  setEditingQuickReplyValue('');
+                                  setEditingQuickReplyLabel('');
+                                }}
+                              >
+                                <X className="w-3.5 h-3.5 mr-1" />
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 p-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium">{item.label}</span>
+                              {item.response !== item.label && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">{item.response}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingQuickReply(index);
+                                  setEditingQuickReplyLabel(item.label);
+                                  setEditingQuickReplyValue(item.response);
+                                }}
+                              >
+                                <Settings2 className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                                onClick={() => {
+                                  const updated = settings.quickReplies.filter((_, i) => i !== index);
+                                  updateSettings({ quickReplies: updated });
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add new quick reply */}
+                  {settings.quickReplies.length < 12 && (
+                    <div className="p-3 rounded-lg border border-dashed space-y-2">
+                      <p className="text-xs text-muted-foreground font-medium">Agregar nueva respuesta rápida</p>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground w-16 flex-shrink-0">Etiqueta</Label>
+                        <Input
+                          value={newQuickReplyLabel}
+                          onChange={(e) => setNewQuickReplyLabel(e.target.value)}
+                          className="h-8 text-sm flex-1"
+                          placeholder="Ej: Buscar..."
+                          maxLength={20}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground w-16 flex-shrink-0">Respuesta</Label>
+                        <Input
+                          value={newQuickReplyValue}
+                          onChange={(e) => setNewQuickReplyValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newQuickReplyValue.trim() && newQuickReplyLabel.trim()) {
+                              updateSettings({
+                                quickReplies: [...settings.quickReplies, { label: newQuickReplyLabel.trim(), response: newQuickReplyValue.trim() }]
+                              });
+                              setNewQuickReplyValue('');
+                              setNewQuickReplyLabel('');
+                            }
+                          }}
+                          className="h-8 text-sm flex-1"
+                          placeholder="Ej: Busca en internet las últimas noticias de tecnología"
+                          maxLength={200}
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-full"
+                        disabled={!newQuickReplyValue.trim() || !newQuickReplyLabel.trim()}
+                        onClick={() => {
+                          updateSettings({
+                            quickReplies: [...settings.quickReplies, { label: newQuickReplyLabel.trim(), response: newQuickReplyValue.trim() }]
+                          });
+                          setNewQuickReplyValue('');
+                          setNewQuickReplyLabel('');
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Agregar
+                      </Button>
+                    </div>
+                  )}
+
+                  {settings.quickReplies.length >= 12 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Máximo 12 respuestas rápidas permitidas.
+                    </p>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => updateSettings({
+                      quickReplies: [
+                        { label: 'Continue', response: 'Continue' },
+                        { label: '...', response: '...' },
+                        { label: 'Yes', response: 'Yes' },
+                        { label: 'No', response: 'No' },
+                      ]
+                    })}
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Restablecer valores predeterminados
+                  </Button>
+                </div>
               </div>
             </div>
           </TabsContent>

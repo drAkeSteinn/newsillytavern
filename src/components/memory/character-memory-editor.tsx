@@ -58,14 +58,12 @@ export function CharacterMemoryEditor({
   characterName,
   className 
 }: CharacterMemoryEditorProps) {
-  const { 
-    getCharacterMemory, 
-    addMemoryEvent, 
-    removeMemoryEvent,
-    updateRelationship,
-    removeRelationship,
-    setCharacterNotes
-  } = useTavernStore();
+  const getCharacterMemory = useTavernStore((s) => s.getCharacterMemory);
+  const addMemoryEvent = useTavernStore((s) => s.addMemoryEvent);
+  const removeMemoryEvent = useTavernStore((s) => s.removeMemoryEvent);
+  const updateRelationship = useTavernStore((s) => s.updateRelationship);
+  const removeRelationship = useTavernStore((s) => s.removeRelationship);
+  const setCharacterNotes = useTavernStore((s) => s.setCharacterNotes);
   const { toast } = useToast();
   
   const memory = getCharacterMemory(characterId);

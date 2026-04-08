@@ -12,6 +12,7 @@ export {
   getToolsByCategory,
   toOpenAITools,
   executeTool,
+  buildPromptBasedToolsSection,
 } from './tool-registry';
 export {
   getSessionReminders,
@@ -37,8 +38,12 @@ export type {
   ToolCallAccumulator,
   AnthropicToolState,
 } from './parsers/native-parser';
-// Prompt-based parser (kept for reference, not used in native mode)
+// Prompt-based parser (for models that output tool calls as text)
 export {
   parseToolCallFromText,
+  parseAllToolCallsFromText,
+  mightContainToolCall,
   stripToolCallFromText,
+  splitIntoChunks,
+  cleanModelArtifacts,
 } from './parsers/prompt-parser';

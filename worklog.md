@@ -1002,229 +1002,1393 @@ Stage Summary:
 - **Trigger priority preserved**: If any trigger activated during generation, it overrides ALL automatic state transitions. TTS state changes are ignored while trigger is active.
 - **No TTS**: Behavior unchanged (thinking during streaming → idle when done)
 - Files: character-sprite.tsx, group-sprites.tsx, spriteSlice.ts, chat-panel.tsx
+---
+Task ID: 19
+Agent: Main Agent
+Task: Agregar LM Studio como proveedor LLM
+
+Work Log:
+- Analizado el sistema completo de proveedores LLM (tipos, streaming, generation, UI, rutas API)
+- LM Studio es OpenAI-compatible, por lo que se reutiliza el handler existente de streamOpenAICompatible/callOpenAICompatible
+- Agregado `'lm-studio'` al tipo `LLMProvider` en `src/types/index.ts`
+- Agregado `'lm-studio'` al array `SUPPORTED_PROVIDERS` en `src/lib/llm/types.ts`
+- Agregado `case 'lm-studio':` al switch en `src/lib/llm/streaming.ts` (grupo openai/vllm/lm-studio/custom)
+- Agregado `case 'lm-studio':` al switch en `src/lib/llm/generation.ts` (grupo openai/vllm/lm-studio/custom)
+- Agregada entrada LM Studio al array `LLM_PROVIDERS` en `src/components/tavern/settings-panel.tsx` (label, defaultEndpoint: http://localhost:1234/v1, description)
+- Agregado `case 'lm-studio':` al switch en `src/app/api/chat/stream/route.ts`
+- Agregado `case 'lm-studio':` al switch en `src/app/api/chat/group-stream/route.ts`
+- Agregado `case 'lm-studio':` al switch en `src/app/api/chat/regenerate/route.ts`
+- Agregado `case 'lm-studio':` al switch en `src/app/api/chat/generate/route.ts`
+- Lint pasado (error pre-existente en fullscreen-editor.tsx, no relacionado)
+- Servidor de desarrollo funcionando correctamente
+
+Stage Summary:
+- LM Studio agregado exitosamente como proveedor LLM en 9 archivos
+- Endpoint por defecto: http://localhost:1234/v1
+- Reutiliza el handler OpenAI-compatible existente (sin código duplicado)
+- Disponible en todas las rutas: stream, group-stream, regenerate, generate
+- Visible en el panel de configuración con label "LM Studio" y descripción en español
+---
+Task ID: 20
+Agent: Main Agent
+Task: Corregir auto-activación TTS y optimizar cola con pre-generación en paralelo
+
+Work Log:
+- Analizado sistema completo de TTS (hook, service, cola, conexión)
+- Identificada causa raíz del Problema 1: `isConnected` de React inicia como `false`, y el effect de auto-generation lo comprueba antes de que el primer check async complete. Si llega un mensaje antes, se salta el TTS.
+- Identificada causa raíz del Problema 2: `processQueue()` es estrictamente secuencial: genera → reproduce → genera el siguiente. No hay superposición entre generación y reproducción.
+
+**Fix 1 - Auto-activación TTS (`src/hooks/use-tts.ts`):**
+- Cambiado `useTTSAutoGeneration` para usar `ttsService.getCachedConnectionStatus()` directamente en vez de `isConnected` de React
+- Solo se salta si el status es 'offline' (confirmadamente no hay servidor)
+- Si status es 'unknown' o 'online', procede — el servicio maneja errores de conexión
+- Removido `isConnected` del array de dependencias del effect
+- Optimizado `speak()` y `speakWithDualVoice()`: cuando status es 'online', saltan el check async y proceden directamente al addToQueue
+
+**Fix 2 - Pre-generación en paralelo (`src/lib/tts/tts-service.ts`):**
+- Agregado flag `isGenerating` para rastrear si hay pre-generación en curso
+- Nuevo método `pregenerateNext()`: busca el siguiente item 'pending' en la cola y lo genera en background mientras el actual se reproduce
+- Modificado `processQueue()`: después de generar el audio actual, llama `pregenerateNext()` ANTES de `await playItem()`
+- Modificado `processQueue()`: si el siguiente item ya está 'ready' (pre-generado), salta la generación y va directo a reproducción
+- Actualizado `stop()`: resetea `isGenerating` además de `isPlaying`
+- Actualizado `playNext()`: comentarios aclaratorios sobre el flujo pre-gen → play
+
+**Flujo optimizado:**
+```
+Antes: generate(2s) → play(5s) → generate(2s) → play(4s) → ...  Total: 13s para 2 items
+Después: generate(2s) → [play(5s) + generate(2s) en paralelo] → play(4s) inmediata  Total: 9s para 2 items
+```
+
+Stage Summary:
+- Auto-TTS ahora se activa inmediatamente sin necesidad de prueba de voz previa
+- Cola TTS ahora pre-genera el siguiente audio mientras reproduce el actual
+- Para mensajes con múltiples segmentos, el tiempo total se reduce significativamente
+- Lint limpio (solo error pre-existente en fullscreen-editor.tsx)
+---
+Task ID: 21
+Agent: Main Agent
+Task: Revisar y corregir serialización de peticiones TTS + fix race condition
+
+Work Log:
+- Analizado el flujo completo de la cola TTS para verificar serialización
+- Encontrado bug de race condition: si un audio termina de reproducirse ANTES de que pregenerateNext() termine de generar el siguiente, la cola se quedaba estancada
+- Identificado que las peticiones TTS YA estaban serializadas correctamente (isGenerating previene overlap), pero faltaba el mecanismo de recuperación
+
+**Fix - Race condition en pregenerateNext():**
+- Cuando pregenerateNext() termina de generar un item, ahora verifica si ese item pasó a ser el primero en la cola (porque el anterior terminó de reproducirse durante la generación)
+- Si `this.queue[0] === nextItem && !this.isPlaying` → llama processQueue() para reproducir inmediatamente
+- También aplica el mismo check en el catch (por si la generación falló pero el item ya está en posición 0)
+
+**Fix - processQueue() case para 'generating':**
+- Agregado caso explícito: si queue[0].status === 'generating' → return (esperar a que pregenerateNext termine y dispare processQueue)
+- Antes se caía en el `if (item.status !== 'pending') return` genérico, que era correcto pero silencioso
+
+**Diseño final del pipeline serial:**
+```
+Solo 1 petición TTS a la vez (serializado):
+
+[processQueue]                  [pregenerateNext]
+     │                                │
+     ├─ await generateSpeech(#1)      │
+     │                                │
+     ├─ status='ready'                │
+     ├─ pregenerateNext() ───────────►├─ await generateSpeech(#2)
+     ├─ await playItem(#1)            │
+     │         │                       ├─ status='ready'
+     │         │◄──────────────────────┤  (si #1 terminó: processQueue())
+     │         ▼                       │
+     ├─ playItem(#2) inmediato        │  (si #1 sigue: esperar)
+     │         │                       │
+     ...
+```
+
+State machine por item:
+  pending → generating → ready → playing → completed
+                              ↑          ↑
+                              └──────────┘ (pre-generated, 0ms wait)
+
+Stage Summary:
+- Las peticiones TTS están serializadas: solo 1 petición al servidor a la vez
+- Los audios generados se cachean como blobs para reproducción inmediata
+- Race condition corregida: si el audio actual termina antes de que el siguiente se genere, el sistema se recupera automáticamente
+- La pre-generación permite que la reproducción sea continua sin pausas entre segmentos
+---
+Task ID: 22
+Agent: Main Agent
+Task: Selector de modelos LM Studio con dropdown y botón de refrescar
+
+Work Log:
+- Analizado cómo LM Studio expone modelos: GET /v1/models devuelve { data: [{ id: "..." }] }
+- LM Studio acepta model: "loaded" para usar el modelo cargado actualmente
+- Creado componente LMStudioModelSelector en settings-panel.tsx
+- Dropdown con modelos obtenidos de LM Studio + opción "Por defecto (cargado en LM Studio)"
+- Botón de refrescar (RefreshCw icon) con spinner de carga
+- Auto-fetch de modelos cuando el endpoint cambia
+- Input manual para escribir un nombre de modelo personalizado
+- Indicador visual cuando se usa "loaded" (modelo por defecto)
+- Mensajes de error cuando no hay conexión o no hay modelos
+- Importados Select, SelectSeparator de shadcn/ui; RefreshCw, Loader2 de lucide-react
+
+**Comportamiento:**
+- Al seleccionar LM Studio como proveedor y configurar endpoint → auto-fetch de modelos
+- "Por defecto" → envía model: "loaded" → LM Studio usa el que esté cargado
+- Seleccionar un modelo específico → lo envía tal cual en la petición
+- Input manual permite escribir cualquier nombre → se envía directamente
+- Botón de refrescar re-fetch modelos (útil al cambiar de modelo en LM Studio)
+- Los nombres de modelo se muestran limpios (solo el nombre, sin la ruta completa)
+
+Stage Summary:
+- LM Studio ahora tiene selector de modelos con dropdown refrescable
+- Opción "Por defecto" usa el modelo cargado en LM Studio sin necesidad de saber el nombre
+- Los usuarios pueden refrescar la lista al cambiar de modelo en LM Studio
+---
+Task ID: 2
+Agent: Main Agent
+Task: Change memory extraction from per-message to per-turn counting + configure chat history limits
+
+Work Log:
+- Analyzed full memory extraction flow: memory-extraction.ts → stream/route.ts → group-stream/route.ts
+- Analyzed context manager: context-manager.ts with sliding window (maxMessages=50, maxTokens=4096, keepFirstN=1, keepLastN=20)
+- Analyzed memory-settings-panel.tsx for existing context limit UI
+- Changed stream/route.ts: extraction now counts by user messages (turns) instead of all messages
+- Changed group-stream/route.ts: same turn-based counting for group chats
+- Updated memory-extraction.ts: shouldExtractMemory() documentation now references turns
+- Updated embeddings-settings-panel.tsx: label changed from "mensajes" to "turnos", min=1, description updated
+- Confirmed context limits (maxMessages, maxTokens, keepFirstN, keepLastN) are already configurable via UI and persisted in localStorage via Zustand store
+
+Stage Summary:
+- Memory extraction now counts by TURNS (user messages) not individual messages
+- A turn = 1 user message + N responses (consistent for both normal and group chats)
+- Context history limits already exist in Configuración → Memoria → Límites de Contexto
+- Settings persist via Zustand → localStorage (survives browser restart)
 
 ---
-## Task ID: 19 - tool-system-core-infrastructure
+## Task ID: 19 - embeddings-panel-restructure-7tabs
 ### Work Task
-Create the complete tool system core infrastructure with type definitions, central registry, execution engine, parsers, barrel export, and stub tool implementations.
+Reorganize the embeddings settings panel from a collapsible-based layout into a 7-tab structure, add a new Prompts tab for custom memory extraction prompt editing, and wire up the custom prompt through the full stack.
 
 ### Work Summary
 
-**Created 12 files in `/src/lib/tools/`:**
+**Files Modified:**
 
-**Core Infrastructure (5 files):**
+1. **`src/types/index.ts`** — Added `memoryExtractionPrompt?: string` to `EmbeddingsChatSettings` interface
 
-1. **`types.ts`** — Complete type system for the tool infrastructure:
-   - `ToolCategory`: 4 categories (real_world, in_character, cognitive, system)
-   - `ToolPermission`: 3 modes (auto, ask, disabled)
-   - `ToolParameterDef`: JSON Schema subset for parameter definitions
-   - `ToolDefinition`: Full tool metadata + schema + permission config
-   - `ToolContext`: Runtime context passed to executors (characterId, sessionId, llmConfig)
-   - `ToolExecutionResult`: Standardized execution result with displayMessage
-   - `ParsedToolCall`: Parsed tool call from LLM response
-   - `ToolCallEvent`: SSE event types for client notification
-   - `CharacterToolSettings`: Per-character tool configuration
-   - `ToolUsageRecord`: In-memory usage tracking
-   - `ToolExecutor`: Interface for tool implementations (added — was missing from spec)
+2. **`src/store/defaults.ts`** — Added `memoryExtractionPrompt` default value (full Spanish extraction prompt with `{characterName}` and `{lastMessage}` variables) to the `embeddingsChat` object in `defaultSettings`
 
-2. **`tool-registry.ts`** — Central Map-based registry:
-   - `registerTool()`: Register a tool with definition + executor
-   - `getTool()`: Lookup by name
-   - `getAllTools()`: List all registered tools
-   - `getToolsByCategory()`: Filter by category
-   - `getToolDefinitions()`: Get enabled definitions by names
-   - `toOpenAITools()`: Convert to OpenAI function-calling format
-   - `buildToolsPromptText()`: Generate Spanish prompt text for prompt-based fallback
+3. **`src/lib/embeddings/memory-extraction.ts`** — Three changes:
+   - Exported `MEMORY_EXTRACTION_PROMPT` constant so the UI can use it for "Restore Default"
+   - Added `customPrompt?: string` parameter to `extractMemories()` — uses custom prompt if provided and non-empty, falls back to default
+   - Added `customPrompt?: string` to `extractAndSaveMemories()` options — passes through to `extractMemories()`
 
-3. **`executor.ts`** — Central execution engine:
-   - `executeToolCall()`: Main entry point with guard checks
-   - Validates tool exists, not disabled, within daily limits
-   - In-memory usage tracking per session
-   - Error handling with descriptive Spanish messages
-   - Re-exports all registry functions for convenience
+4. **`src/app/api/embeddings/extract-memory/route.ts`** — Added `customPrompt` to destructured body, passes it through to `extractAndSaveMemories()`
 
-4. **`parsers.ts`** — Two parsing strategies:
-   - `parseNativeToolCalls()`: Parse OpenAI-format tool_calls from API response
-   - `parsePromptToolCalls()`: Regex-based detection of TOOL_CALL patterns in text output (code fence + pipe fallback)
-   - `stripToolCallText()`: Clean tool call syntax from LLM response for display
+5. **`src/app/api/chat/stream/route.ts`** — Added `customPrompt: embeddingsChat.memoryExtractionPrompt` to the extract-memory fetch body
 
-5. **`index.ts`** — Barrel export with auto-registration of all built-in tools via side-effect imports
+6. **`src/app/api/chat/group-stream/route.ts`** — Added `customPrompt: embeddingsChat.memoryExtractionPrompt` to the extract-memory fetch body
 
-**Stub Tool Implementations (7 files in `tools/` subdirectory):**
+7. **`src/components/embeddings/embeddings-settings-panel.tsx`** — Complete restructure:
+   - Removed outer collapsible wrappers (Configuración, Integración con Chat)
+   - Converted `EmbeddingsChatIntegration` from a Collapsible component to `EmbeddingsChatIntegrationContent` (flat Card, no wrapper)
+   - Created new `PromptsTabContent` sub-component with textarea, preview, save/restore buttons
+   - Reorganized into 7 tabs with `grid-cols-7` layout:
+     - Tab 1: Configuración (Settings) — Service status cards + Ollama URL + model + thresholds + advanced + save/test
+     - Tab 2: Integración — Chat integration settings, memory extraction, memory consolidation
+     - Tab 3: Búsqueda — Semantic search
+     - Tab 4: Archivos — File upload + chunking
+     - Tab 5: Namespaces — Namespace management
+     - Tab 6: Examinar — Browse embeddings
+     - Tab 7: Prompts (NEW) — Custom memory extraction prompt editor with:
+       - Textarea for editing the prompt
+       - Preview button showing variables replaced with example values
+       - "Restore Default" button
+       - Character count and unsaved changes indicator
+       - Save button
+   - Removed `configOpen` state (no longer needed since config is in a tab)
+   - Header info banner kept above tabs
+   - All dialogs remain outside tabs
+   - Added imports: `RotateCcw`, `Pencil`, `MEMORY_EXTRACTION_PROMPT`
 
-- `roll-dice.ts` — Dice rolling (in_character, auto)
-- `search-memory.ts` — Memory/embedding search (cognitive, auto)
-- `get-weather.ts` — Weather lookup (real_world, auto)
-- `search-web.ts` — Web search via z-ai-web-dev-sdk (real_world, ask, 1min cooldown)
-- `set-reminder.ts` — Reminder creation (system, auto)
-- `check-stat.ts` — RPG stat query (in_character, auto)
-- `modify-stat.ts` — RPG stat modification (in_character, auto)
+**ESLint:** Zero new errors introduced (only pre-existing error in `fullscreen-editor.tsx` remains)
+---
+Task ID: 3
+Agent: Main Agent
+Task: Review embeddings flow, reorganize panel tabs, add configurable extraction prompt
 
-Each stub registers a proper `ToolDefinition` with correct schema and returns a placeholder `ToolExecutionResult`.
+Work Log:
+- Reviewed full embeddings retrieval flow: retrieveEmbeddingsContext() in chat-context.ts
+- Confirmed: only user message (sanitizedMessage) is used as search query — NOT chat history
+- Confirmed: group chat calls retrieveEmbeddingsContext per-responder with responder.id, so each character's memories are found
+- Reorganized embeddings panel from 4 tabs + 2 collapsibles into 7 flat tabs:
+  1. Configuración (service status, Ollama URL, model, thresholds)
+  2. Integración (chat integration, memory extraction, consolidation — flattened from Collapsible)
+  3. Búsqueda (semantic search — unchanged)
+  4. Archivos (file upload — unchanged)
+  5. Namespaces (namespace management — unchanged)
+  6. Examinar (browse embeddings — unchanged)
+  7. Prompts (NEW — custom memory extraction prompt with preview, save, restore default)
+- Created clean prompts file: src/lib/embeddings/memory-extraction-prompts.ts (no server imports, client-safe)
+- Added memoryExtractionPrompt to EmbeddingsChatSettings type and store defaults
+- Modified extractMemories/extractAndSaveMemories to accept customPrompt parameter
+- Updated extract-memory API route to pass customPrompt through
+- Updated stream/group-stream routes to send customPrompt from settings
+- Fixed browser-side crash: extracted prompt constant to separate file to avoid importing lancedb in client bundle
 
-**ESLint:** Zero errors in all new files (1 pre-existing error in unrelated `fullscreen-editor.tsx`)
+Stage Summary:
+- Embeddings retrieval confirmed working for both normal and group chat
+- Search query = user message only (not chat history) — this is correct for semantic search
+- 7-tab layout implemented with all existing functionality preserved
+- Custom extraction prompt fully configurable and persisted in localStorage
 
 ---
-## Task ID: 19 - built-in-tool-implementations
+Task ID: 1
+Agent: Main
+Task: Fix app not visible in browser - CORS and dev server issues
+
+Work Log:
+- Diagnosed app not rendering: dev server was not running after context reset
+- Found CORS blocking issue: `allowedDevOrigins` in next.config.ts had old session ID
+- Added current session ID `preview-chat-0874b2c1-f82e-468f-93c9-02daabc4ba05.space.z.ai` and `*.space.z.ai` wildcard
+- Cleared `.next` cache and restarted dev server
+- Verified HTTP 200 response (26KB HTML), no CORS warnings
+- Renamed "Integración" tab to "Integración del chat" in embeddings panel
+
+Stage Summary:
+- App now renders correctly in preview panel (HTTP 200, no CORS errors)
+- Embeddings panel tabs: Configuración, Integración del chat, Búsqueda, Archivos, Namespaces, Examinar, Prompts
+- All 7 tabs fully implemented with sub-components
+- Server compiles in ~4.5s after cache warm
+
+---
+Task ID: 2
+Agent: Main
+Task: Implement context-aware embeddings improvements
+
+Work Log:
+- Added 3 new settings to EmbeddingsChatSettings type: memoryExtractionContextDepth, searchContextDepth, groupDynamicsExtraction
+- Updated defaults.ts with new settings (context depth 2, search depth 1, group dynamics off)
+- Updated memory-extraction-prompts.ts: added {chatContext} variable, updated default prompt with context examples, added DEFAULT_GROUP_DYNAMICS_PROMPT
+- Modified memory-extraction.ts: extractMemories() now accepts optional chatContext, added extractGroupDynamics() function
+- Modified extract-memory API route to accept chatContext parameter
+- Created /api/embeddings/extract-group-dynamics API route for group dynamics extraction
+- Modified stream/route.ts: enriched search query with searchContextDepth, pass chatContext to extraction
+- Modified group-stream/route.ts: enriched search query, pass turn context to each character extraction, added group dynamics extraction call
+- Updated embeddings-settings-panel.tsx UI: added Context Depth slider, Search Context slider, Group Dynamics toggle, updated info boxes
+- Fixed duplicate 'preferencia' key in TYPE_ALIASES
+- Fixed TS2322 error in setEditCustomTypeText
+
+Stage Summary:
+- Chat normal: memories now extracted with N recent messages as context (configurable 0-5)
+- Chat grupal: each character sees the full turn context + group dynamics extraction available
+- Search: enriched query includes recent messages for better semantic matching
+- All new settings configurable in "Integración del chat" tab
+- App compiles successfully (HTTP 200)
+---
+Task ID: 7
+Agent: main
+Task: Implement two separate editable prompts for memory extraction (normal chat + group chat)
+
+Work Log:
+- Created DEFAULT_GROUP_MEMORY_EXTRACTION_PROMPT in memory-extraction-prompts.ts with group-optimized instructions (focus on inter-character dynamics, reactions, opinions about others)
+- Created GROUP_MEMORY_PROMPT_VARIABLES export for documentation
+- Added groupMemoryExtractionPrompt field to EmbeddingsChatSettings type (types/index.ts)
+- Added groupMemoryExtractionPrompt to DEFAULT_EMBEDDINGS_CHAT default values (embeddings-settings-panel.tsx)
+- Rewrote PromptsTabContent with internal sub-tabs: "Chat Normal" and "Chat Grupo"
+  - Each tab has its own local state for editing
+  - Amber dot indicator when a prompt has been customized
+  - Different preview data per tab type (normal preview vs multi-character group preview)
+  - Different info box per tab explaining the prompt's purpose
+  - Save and Restore Default buttons work independently per tab
+- Updated group-stream/route.ts to use groupMemoryExtractionPrompt (fallback to memoryExtractionPrompt) for individual character extraction in group chats
+- Normal chat (stream/route.ts) continues using memoryExtractionPrompt (no changes needed)
+- Lint passes clean on all modified files (pre-existing error in fullscreen-editor.tsx unrelated)
+
+Stage Summary:
+- Two independent editable prompts: one for 1:1 chat, one for group chat individual extraction
+- Group prompt optimized for inter-character awareness (names, reactions, opinions, agreements/disagreements)
+- UI has clean tab switcher with customization indicators
+- Group dynamics prompt (DEFAULT_GROUP_DYNAMICS_PROMPT) remains separate and unchanged (analyzes full turn, not individual response)
+---
+Task ID: 8
+Agent: main
+Task: Fix memory extraction pipeline — namespaces, model config, and search strategy
+
+Work Log:
+- Fixed namespace pattern to include sessionId: `character-{characterId}-{sessionId}` and `group-{groupId}-{sessionId}`
+  - Prevents memory leaking between different chat sessions of the same character
+  - Updated descriptions to include session info
+- Updated getNamespacesForStrategy() to search BOTH session-specific AND generic namespaces
+  - character strategy: searches character-{id}-{sid}, character-{id}, default, world, world-building
+  - session strategy: searches character-{id}-{sid}, group-{gid}-{sid}, session-{sid}, character-{id}, group-{gid}, default, world
+  - Added groupId parameter to retrieveEmbeddingsContext() and getNamespacesForStrategy()
+  - group-stream/route.ts now passes group.id to retrieveEmbeddingsContext()
+- Fixed Ollama client model refresh: added refreshOllamaClient() method
+  - Called before createEmbedding(), searchSimilar(), and searchInNamespace()
+  - Compares current model with persisted config and resets singleton if changed
+  - Eliminates duplicate code in searchSimilar
+- Verified sessionId flows correctly from stream routes to extract-memory endpoint
+- Verified both stream/route.ts (normal chat) and group-stream/route.ts (group chat) pass sessionId
+
+Stage Summary:
+- Memories now isolated per session (namespace includes sessionId)
+- Search covers both session-specific and generic namespaces
+- Group chats search in both group-{gid}-{sid} and character-{id}-{sid} namespaces
+- Ollama model always uses latest configured model (no stale singleton)
+- Lint clean on all modified files
+---
+Task ID: 9
+Agent: main
+Task: Fix critical bug — Memories tab UI not finding saved memories (namespace mismatch)
+
+Work Log:
+- Diagnosed root cause: Backend saves memories with sessionId in namespace (`character-{id}-{sessionId}`), but UI fetches without it (`character-{id}`)
+- Added `sessionId` prop to `NovelChatBoxProps` interface
+- Updated `loadMemories()` callback to include sessionId in namespace fetch pattern
+  - Single mode: fetches `character-{id}-{sessionId}` (primary) + `character-{id}` (fallback for backward compat)
+  - Group mode: fetches `group-{gid}-{sessionId}` + `character-{id}-{sessionId}` per member (primary) + generic namespaces (fallback)
+  - Added deduplication of both namespaces and memory IDs across fetch results
+- Updated memory reset effect to trigger on sessionId change (not just character/group change)
+- Updated namespace footer display to show session-scoped namespace with truncated sessionId
+- Passed `activeSessionId` from chat-panel.tsx to NovelChatBox component
+
+Stage Summary:
+- Critical bug fixed: Memories tab now finds and displays memories saved by the extraction system
+- Session-scoped namespaces prevent cross-session memory leakage
+- Backward compatible: still fetches generic namespaces as fallback for manually created lore
+---
+Task ID: 1
+Agent: Main Agent
+Task: Clonar repositorio de referencia y aplicar sistema de Tool Calling nativo
+
+Work Log:
+- Clonado https://github.com/drAkeSteinn/newsillytavern.git a /home/z/newsillytavern-ref
+- Analizado el sistema completo de tools del repositorio de referencia
+- Copiados todos los archivos del sistema de tools: types, definitions, parsers (native + prompt), executor, tool-registry, 7 tool implementations
+- Copiados providers actualizados (openai.ts, ollama.ts, anthropic.ts) con funciones WithTools
+- Copiadas rutas de streaming actualizadas (stream/route.ts, group-stream/route.ts) con loop de tool calling
+- Agregados tipos de ToolsSettings a src/types/index.ts (ToolCategory, ToolPermissionMode, ToolParameterDef, ToolParameterSchema, ToolDefinition, CharacterToolConfig, ToolsSettings, DEFAULT_TOOLS_SETTINGS)
+- Agregado campo `tools?: ToolsSettings` a AppSettings
+- Copiados componentes UI: tools-settings-panel.tsx, tool-call-notification.tsx
+- Agregado tab "Herramientas" al settings-panel con icono Wrench
+- Agregado manejo de eventos SSE (tool_call_start, tool_call_result, tool_call_error) al chat-panel
+- Agregado componente ToolCallNotification al chat-panel
+
+Stage Summary:
+- Sistema de Tool Calling nativo completo copiado del repositorio de referencia
+- Soporta 3 proveedores con tool calling nativo: OpenAI-compatible, Ollama, Anthropic
+- 7 herramientas disponibles: roll_dice, search_memory, get_weather, search_web, set_reminder, modify_stat, check_stat
+- Loop de tool calling implementado en stream route (maxToolRounds configurable)
+- UI de configuración de tools integrada en el panel de settings
+- Notificaciones visuales de tool calls en el chat panel
+- Lint pasa correctamente (solo error preexistente en fullscreen-editor.tsx)
+---
+## Task ID: 19 - group-chat-native-tool-calling-fix
 ### Work Task
-Create 7 built-in tool implementations for the character tool system. Each tool is a separate file that self-registers in the tool registry.
+Fix native tool calling in group chat (group-stream route). Previously, the group stream route only used regular streaming functions without tool support, and referenced a non-existent `buildGroupCompletionPrompt` function.
 
 ### Work Summary
 
-**Foundation files updated:**
+**Problem Analysis:**
+1. **Group stream (group-stream/route.ts)**: Used `streamOpenAICompatible` and `streamAnthropic` (NO tools support) instead of `streamOpenAIWithTools` and `streamAnthropicWithTools`
+2. **No tool execution loop**: When the LLM responded with tool calls, they were ignored
+3. **Fake tool comment**: Lines 871-880 had a misleading comment saying tools were "handled internally" when they weren't
+4. **`buildGroupCompletionPrompt`**: Referenced but never existed (would cause ReferenceError at runtime for Ollama/text-generation-webui)
+5. **Normal chat (stream/route.ts)**: Already had complete working tool calling
 
-1. `src/lib/tools/types.ts` - Added enabled, maxUsesPerDay to ToolDefinition; toolName, duration to ToolExecutionResult; ParsedToolCall interface
-2. `src/lib/tools/tool-registry.ts` - Full registry with registerTool, getTool, getAllTools, getAllToolEntries, getToolsByCategory, getToolDefinitions, hasTool, toOpenAITools, buildToolsPromptText
-3. `src/lib/tools/index.ts` - Barrel export with all re-exports and auto-imports of all 7 tool files
+**Changes Made to `/src/app/api/chat/group-stream/route.ts`:**
 
-**7 Tool Implementations (src/lib/tools/tools/):**
+1. **Added missing imports:**
+   - `buildCompletionPrompt` from `@/lib/llm` (for Ollama/text-gen fallback)
+   - `type NativeToolCall` from `@/lib/tools` (for executeGroupToolCalls helper)
 
-| Tool | File | Category | Permission | Features |
-|------|------|----------|------------|----------|
-| roll_dice | roll-dice.ts | in_character | auto | NdX parser, 1-100 dice, nat1/crit highlights |
-| search_memory | search-memory.ts | cognitive | auto | LanceDB embeddings, per-character namespace, graceful fallback |
-| get_weather | get-weather.ts | real_world | auto | wttr.in API, 10s timeout, celsius/fahrenheit |
-| search_web | search-web.ts | real_world | auto | z-ai-web-dev-sdk web_search, dynamic import |
-| set_reminder | set-reminder.ts | real_world | ask | In-memory Map, importance 1-5 |
-| check_stat | check-stat.ts | in_character | auto | Stats resolver integration, placeholder fallback |
-| modify_stat | modify-stat.ts | in_character | auto | Stats resolver integration, simulated fallback |
+2. **Added `executeGroupToolCalls` helper function:**
+   - Executes detected tool calls for group chat
+   - Sends `tool_call_start` and `tool_call_result` SSE events for each tool
+   - Returns `{ results, shouldContinue }`
 
-**ESLint:** Zero errors from new files.
+3. **Replaced provider switch cases with tool-aware streaming:**
+   - **OpenAI/vLLM/lm-studio/custom**: Uses `streamOpenAIWithTools` + `createToolCallAccumulator` when tools enabled, with follow-up `streamOpenAICompatible` call
+   - **Anthropic**: Uses `streamAnthropicWithTools` + `createAnthropicToolState` when tools enabled, with follow-up `streamAnthropic` call
+   - **Ollama**: Uses `streamOllamaWithTools` when tools enabled, with follow-up completion prompt; falls back to `buildCompletionPrompt` without tools
+   - **text-generation-webui/koboldcpp/default**: Uses `buildCompletionPrompt` (no tool support)
 
+4. **Removed dead code:**
+   - Deleted fake tool handling comment block
+   - Deleted unused `buildGroupCompletionPrompt` function definition
+   - Changed `generator` type to `AsyncGenerator<string> | undefined` with `if (generator)` guard
+
+**Frontend (already working):**
+- `ToolCallNotification` component renders in chat-panel for both normal and group chat
+- SSE events `tool_call_start`, `tool_call_result`, `tool_call_error` handled in both chat paths
+- Visual notification shows tool name, icon, parameters during execution and result after completion
+
+**ESLint:** Only pre-existing error in `fullscreen-editor.tsx` (unrelated)
+**Dev server:** Compiles successfully
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix tool calling for models that output JSON as text content instead of native tool_calls
+
+Work Log:
+- Analyzed console logs: LLM (anubis-mini-8b-v1 via LM Studio) outputs tool call JSON as `delta.content` instead of `delta.tool_calls`
+- The content `{"type": "function", "name": "search_web", "parameters": {...}}` was being streamed as text to the client
+- Enhanced `src/lib/tools/parsers/prompt-parser.ts` with:
+  - `mightContainToolCall()` fast pre-check function
+  - `splitIntoChunks()` helper for replaying buffered content
+  - Improved regex patterns for LM Studio format (`"type": "function"` prefix, `"arguments"` alternative key)
+  - Embedded JSON detection (tool call within text)
+- Modified `src/app/api/chat/stream/route.ts` (OpenAI, Anthropic, Ollama cases):
+  - Changed from streaming directly to client to BUFFERING content during first tool round
+  - After buffering: check native tool calls → text-based tool calls → regular text
+  - Text-based tool calls emit proper `tool_call_start`/`tool_call_result` SSE events
+  - Tool results injected as user message for follow-up call
+- Modified `src/app/api/chat/group-stream/route.ts` (same logic for all 3 providers)
+- Exported new functions from `src/lib/tools/index.ts`
+
+Stage Summary:
+- Tool calling now works for models that output JSON as text (LM Studio, small models)
+- Text-based tool call detection: parses JSON, strips from display, executes, sends notification SSE
+- Notifications (tool_call_start/result/error) now properly emitted for both native AND text-based tool calls
+- Regular text responses are buffered then replayed as small chunks (minor latency, no flash)
+- ESLint: only pre-existing error in fullscreen-editor.tsx
+
+---
+Task ID: 5
+Agent: general-purpose
+Task: Update group-stream/route.ts with tool calling fixes
+
+Work Log:
+- Added cleanModelArtifacts to imports from @/lib/tools
+- Updated 3 text-based tool call fallback sections (OpenAI, Anthropic, Ollama)
+- Updated follow-up response streaming to buffer and clean for tool rounds
+- Added better logging
+
+Stage Summary:
+- All tool call fallback paths now clean model artifacts
+- Follow-up responses in tool rounds are buffered and cleaned before streaming
+- Tool context messages include instruction to not mention tools
+
+---
+## Task ID: 19 - tool-calling-fallback-fix
+### Work Task
+Fix tool calling system to properly handle models that output tool calls as text content (like LM Studio with anubis-mini-8b-v1). Clean model special tokens from all responses and add better debug logging.
+
+### Root Cause
+The model `anubis-mini-8b-v1` via LM Studio receives the `tools` array correctly but responds with tool call JSON as `delta.content` instead of `delta.tool_calls`. While TavernFlow already had a text-based fallback parser, two problems existed:
+1. Model special tokens (`<|reservedspecialtoken4|>`, `<|startheader_id|>assistant:`) were not being cleaned from responses
+2. Follow-up responses after tool execution also contained special tokens
+
+### Work Summary
+
+**New utility: `cleanModelArtifacts()` (`src/lib/tools/parsers/prompt-parser.ts`):**
+- Cleans LLaMA special tokens: `<|reserved_special_token_N|>`, `<|startheader_id|>`, `<|endheader_id|>`, `<|eot_id|>`
+- Cleans ChatML/GPT-NeoX tokens: `<|im_start|>`, `<|im_end|>`
+- Cleans generic special tokens: `<|anything|>`
+- Cleans Mistral tokens: `<s>`, `</s>`
+- Cleans LLaMA instruction tokens: `[INST]`, `[/INST]`, `<<SYS>>`, `<</SYS>>`
+- Cleans up multiple consecutive newlines from stripping
+- Exported from `src/lib/tools/index.ts`
+
+**Updated `stripToolCallFromText()` (`prompt-parser.ts`):**
+- Now calls `cleanModelArtifacts()` after removing tool call JSON
+- Ensures no special tokens leak through in the cleaned content
+
+**Improved `mightContainToolCall()` (`prompt-parser.ts`):**
+- More flexible detection: no longer requires JSON to start at beginning of text
+- Added check for `"name"` + `"parameters"/"arguments"` anywhere in content with JSON-like structure
+
+**Better logging in stream route (`src/app/api/chat/stream/route.ts`):**
+- Added logging after Round 0 buffer: content length, finish reason, native tool call count
+- Added content preview logging when text-based tool call might be detected
+- Added ✓/✗ symbols for quick visual scanning of tool call detection results
+- Added follow-up round content length comparison (before/after cleaning)
+
+**Clean follow-up responses (`src/app/api/chat/stream/route.ts`):**
+- Tool round follow-up responses are now buffered → cleaned → streamed
+- Normal responses stream directly in real-time (no delay)
+- Tool context message now includes "No menciones las herramientas ni el proceso interno" instruction
+
+**All provider fallback paths updated (stream route):**
+- OpenAI/lm-studio/vllm/custom: ✓ clean artifacts on parse failure and regular text
+- Anthropic: ✓ same
+- Ollama: ✓ same
+
+**Group stream route (`src/app/api/chat/group-stream/route.ts`):**
+- All 6 follow-up streaming paths (native + text-based × OpenAI + Anthropic + Ollama) now buffer → clean → stream
+- All 6 fallback paths (parse failure + regular text × 3 providers) now clean artifacts
+- Removed dead `isToolRound` variable (group-stream doesn't use tool round loop)
+- Added `cleanModelArtifacts` to imports
+
+### Answer to User's Question about LM Studio Configuration
+LM Studio does NOT need special configuration for tools. TavernFlow sends the `tools` array via the standard OpenAI-compatible API body parameter. Whether the model uses them properly depends on the model itself. The fallback system now handles models that output tool calls as text.
+
+### Files Modified:
+- `src/lib/tools/parsers/prompt-parser.ts` — Added `cleanModelArtifacts()`, improved `mightContainToolCall()`, updated `stripToolCallFromText()`
+- `src/lib/tools/index.ts` — Exported `cleanModelArtifacts`
+- `src/app/api/chat/stream/route.ts` — Better logging, clean artifacts on all paths, buffer+clean follow-up responses
+- `src/app/api/chat/group-stream/route.ts` — Same fixes for group chat, clean all 6 follow-up streaming paths
+---
+Task ID: 1-3
+Agent: Main
+Task: Fix tool calling - JSON crudo visible como texto en LM Studio models
+
+Work Log:
+- Read route.ts, openai.ts, native-parser.ts, prompt-parser.ts, executor.ts, types.ts
+- Identified root cause: regex patterns in `parseToolCallFromText` use `[^{}]*` which CANNOT match nested JSON objects like `{"parameters": {"query": "..."}}`
+- Rewrote `prompt-parser.ts` with brace-counting JSON extraction (`extractJsonObject`, `findAllToolCallJsonObjects`)
+- Added `parseAllToolCallsFromText()` function to handle MULTIPLE tool calls in single response
+- Updated `stripToolCallFromText()` to use brace-counting for proper nested JSON removal
+- Updated `index.ts` to export new function
+- Updated `stream/route.ts` (3 occurrences: OpenAI, Anthropic, Ollama) to use `parseAllToolCallsFromText` and execute multiple tools
+- Updated `group-stream/route.ts` (3 occurrences) with same fixes
+- Verified no remaining `parseToolCallFromText` references
+- Lint passes (1 pre-existing error in fullscreen-editor.tsx, unrelated)
+
+Stage Summary:
+- Fixed: Tool call JSON with nested objects now properly detected and parsed
+- Fixed: Multiple tool calls in single response supported
+- Fixed: JSON tool calls stripped from visible output before sending to frontend
+- The model outputs like `{"type":"function","name":"search_web","parameters":{"query":"..."}}` are now correctly intercepted
+
+---
+Task ID: 19 - tool-calling-prompt-injection-fix
+Agent: Main Agent
+Task: Fix tool calling for models that dont support native tool calling (Anubis, Rocinante via LM Studio)
+
+Work Log:
+- Analyzed the complete tool calling flow: stream/route.ts, openai.ts, native-parser.ts, prompt-parser.ts, tool-registry.ts
+- Identified root cause: `buildPromptBasedToolsSection()` existed in tool-registry.ts but was NOT exported from index.ts and NOT used in either route
+- Comment in route.ts explicitly said: "Tools are NOT injected into the system prompt"
+- Models like Anubis/Rocinante via LM Studio ignore the `tools` API parameter and have NO knowledge of available tools
+- LM Studio warning confirms: "[SamplingSwitch] Config for switch mistralToolsSamplingSwitch has no end strings defined"
+- The existing content-fallback parser (mightContainToolCall + parseAllToolCallsFromText) was already implemented but could never trigger because the model never output tool calls
+
+- Exported `buildPromptBasedToolsSection` from `src/lib/tools/index.ts`
+- Imported and injected tool instructions into `finalSystemPrompt` in `src/app/api/chat/stream/route.ts`
+- Imported and injected tool instructions into `finalSystemPrompt` in `src/app/api/chat/group-stream/route.ts`
+- Improved `buildPromptBasedToolsSection()` with clearer instructions for small models:
+  - Added example of correct usage with search_web
+  - Added "REGLAS IMPORTANTES" section (4 rules)
+  - Instructions tell model to output ONLY the tool_call block (no extra text)
+  - Instructions tell model NOT to use tool_call for normal conversation
+  - Instructions tell model NEVER to fabricate data when tools are available
+
+Stage Summary:
+- Fixed: Models now know about tools via system prompt injection
+- Fixed: buildPromptBasedToolsSection exported and used in both stream and group-stream routes
+- The existing content-fallback parser will detect ```tool_call``` blocks from the model output
+- When tool calls are detected, they are executed and results are injected for a follow-up response
+- No changes to frontend needed - SSE events (tool_call_start, tool_call_result) already implemented
+
+
+---
+## Task ID: 19 - ollama-tool-calling-fix-and-model-discovery
+
+### Work Task
+(1) Fix Ollama 400 error when sending tools: `required: boolean` in per-property definitions conflicts with Ollama's Go struct which expects `required: []string` only at schema level. (2) Add Ollama model auto-discovery dropdown similar to LM Studio's model selector.
+
+### Work Summary
+
+**Bug Fix: Ollama tool calling 400 error (`required: bool` unmarshal error):**
+
+Root cause: Each `ToolParameterDef` has a `required: boolean` field (e.g., `city: { type: 'string', required: true }`). When tools are serialized and sent to Ollama's `/api/chat`, the Go backend tries to unmarshal `required: true` as `[]string` in `ToolFunctionParameters.tools.function.parameters.properties.required`, causing a 400 error.
+
+Files modified:
+1. `src/lib/tools/tool-registry.ts` — `toOpenAITools()` now strips `required` from each property before sending to API:
+   ```typescript
+   properties: Object.fromEntries(
+     Object.entries(t.parameters.properties).map(([key, val]) => {
+       const { required: _required, ...cleanProps } = val;
+       return [key, cleanProps];
+     })
+   ),
+   required: t.parameters.required, // Only at schema level (string array)
+   ```
+
+2. `src/lib/llm/providers/ollama.ts` — `streamOllamaWithTools()` now does the same stripping (had its own inline conversion, not using `toOpenAITools()`):
+   Same pattern as above, strips `required: boolean` from each property.
+
+**Feature: Ollama model auto-discovery dropdown:**
+
+1. `src/app/api/ollama/models/route.ts` — NEW API route:
+   - GET `/api/ollama/models?endpoint=http://localhost:11434`
+   - Proxies to Ollama's `/api/tags` endpoint (avoids CORS)
+   - Returns `{ data: [{ id: "qwen3.5:9b", name: "qwen3.5:9b" }] }`
+   - Normalizes to same format as LM Studio's `/v1/models` response
+   - 5-second timeout, proper error handling
+
+2. `src/components/tavern/settings-panel.tsx` — NEW `OllamaModelSelector` component:
+   - Mirror of `LMStudioModelSelector` with Ollama-specific API calls
+   - Dropdown `<Select>` with auto-discovered models from Ollama
+   - Manual text input for custom model names
+   - Auto-fetches models when endpoint changes
+   - Refresh button to re-fetch model list
+   - Green checkmark when selected model is available
+   - Error display when Ollama is unreachable
+   - Integrated into model field rendering (line ~1211): `config.provider === 'ollama' ? <OllamaModelSelector> : ...`
+   - Model label no longer shows "(opcional)" for Ollama
+
+**ESLint:** Pre-existing error only (fullscreen-editor.tsx), no new errors introduced.
+**Dev server:** Running normally on port 3000.
+
+
+---
+## Task ID: 20 - tool-calling-result-propagation-fix
+
+### Work Task
+Fix tool calling flow: (1) search_web fails because z-ai-web-dev-sdk has auth issue (missing X-Token header). (2) When a tool fails, the system always tells the model it was `success: true`, confusing the model. (3) Ollama model sometimes doesn't respond after tool execution.
+
+### Work Summary
+
+**Bug Fix 1: search_web SDK auth failure (`src/lib/tools/tools/search-web.ts`):**
+- Root cause: `z-ai-web-dev-sdk` sends `Authorization: Bearer <apiKey>` but the remote function server expects `X-Token` header
+- Solution: Added two-layer fallback:
+  - Layer 1: Try SDK normally (works if server accepts Bearer token)
+  - Layer 2: If SDK fails with 401, do direct fetch with `X-Token: <apiKey>` header to `${baseUrl}/functions/invoke`
+- Added `loadZAIConfig()` utility that reads config from `.z-ai-config` (CWD, home, /etc) — same paths as SDK
+- Both layers use 15-second timeout
+
+**Bug Fix 2: Hardcoded `success: true` in tool result propagation (`src/app/api/chat/stream/route.ts`):**
+- `executeToolCallsAndContinue()` now returns `toolResults` array with actual `{ success, displayMessage }` per tool
+- All 3 call sites (OpenAI line ~614, Anthropic line ~735, Ollama line ~837) updated to destructure `toolResults` and use it instead of hardcoded `success: true`
+- Fallback to `success: true` only if `toolResults` is empty (shouldn't happen)
+
+**Bug Fix 3: Ollama model not responding after tool failure (`src/lib/tools/parsers/native-parser.ts`):**
+- `buildToolMessagesForOllama()` now clearly indicates failure status: `(Estado: FALLIDO)` vs `(Estado: EXITOSO)`
+- When ANY tool fails, the instruction to the model changes from "respond naturally" to "AVISO: Una o más herramientas fallaron. Infórmale al usuario sobre el error de manera natural y sugiere alternativas si es posible."
+- This gives the model clear context to inform the user about the failure instead of being confused
+
+**Files Modified:**
+- `src/lib/tools/tools/search-web.ts` — Complete rewrite with dual-layer fetch + X-Token fallback
+- `src/app/api/chat/stream/route.ts` — 3 call sites updated for real tool result propagation
+- `src/lib/tools/parsers/native-parser.ts` — Improved failure messaging in Ollama tool messages
+
+**ESLint:** Pre-existing error only (fullscreen-editor.tsx), no new errors introduced.
+**Dev server:** Running normally.
+
+
+---
+## Task ID: 21 - ollama-tool-calling-architecture-fix
+
+### Work Task
+Research how Ollama tool calling actually works and fix the implementation based on official Ollama API documentation.
+
+### Key Findings from Research
+
+1. **Tool calling does NOT require thinking mode** — The `think` parameter is independent and only for thinking models
+2. **Ollama sends `done_reason: "stop"` for tool calls** — NOT `"tool_calls"` as we assumed
+3. **Follow-up must use `/api/chat` with native tool messages** — NOT `/api/generate` with plain text
+4. **Tool results must use `role: "tool"` with `tool_name` field** — NOT `role: "user"` with text
+
+The correct Ollama tool calling flow per official docs:
+```
+Round 0: POST /api/chat with tools
+  → Model responds: message.tool_calls = [{function: {name, arguments}}]
+  → done_reason: "stop" (NOT "tool_calls"!)
+
+Execute tools...
+
+Round 1: POST /api/chat with:
+  - Original messages
+  - {role: "assistant", content: "", tool_calls: [{function: {name, arguments}}]}
+  - {role: "tool", content: "result text", tool_name: "get_weather"}
+  → Model responds with final text
+```
+
+### Files Modified
+
+**Bug Fix 1: Tool call detection (`src/app/api/chat/stream/route.ts`, line ~826):**
+- Before: `if (hasToolCalls(accumulator) && (accumulator.finishReason === 'tool_calls' || accumulator.finishReason === 'tool use'))`
+- After: `if (hasToolCalls(accumulator))` — Ollama sends `done_reason: "stop"` for both normal and tool call responses
+
+**Bug Fix 2: Follow-up uses /api/chat instead of /api/generate (`src/app/api/chat/stream/route.ts`, line ~893):**
+- Before: `generator = streamOllama(combinedPrompt, llmConfig)` — used completion endpoint with text concatenation
+- After: `generator = streamOllamaWithTools(toolContextMessages, llmConfig, [], toolFollowAccumulator)` — uses chat endpoint with proper tool messages
+
+**Bug Fix 3: Native Ollama tool message format (`src/lib/tools/parsers/native-parser.ts`):**
+- Before: `buildToolMessagesForOllama()` returned `{role: "user", content: "[Resultado de herramientas: ...]"}` — plain text
+- After: Returns proper Ollama format:
+  - `{role: "assistant", content: "", tool_calls: [{function: {name, arguments}}]}`
+  - `{role: "tool", content: "result", tool_name: "get_weather"}`
+
+**Improvement: Conditional tools in request (`src/lib/llm/providers/ollama.ts`):**
+- Only includes `tools` in request body when there are tools to send
+- Follow-up rounds (tool results) don't need tools in the request
+
+### Impact
+These 3 bugs explain why Ollama tool calling was failing:
+- Bug 1: Tool calls were detected only by luck (when content-based fallback caught JSON)
+- Bug 2: Follow-up used wrong endpoint, model couldn't understand tool context
+- Bug 3: Tool results were formatted as plain text, model didn't recognize them as tool results
+
+
+---
+Task ID: 19 - send-button-loading-and-cancel
+### Work Task
+Add loading spinner and cancel/stop button to the chat box send button. When the LLM is processing, the send button should change to a stop button that allows the user to cancel the request.
+
+### Work Summary
+
+**Problem:**
+- The send button showed a `Loader2` spinner when generating but was **disabled**, so users couldn't cancel an ongoing request
+- There was no way to stop a streaming LLM response once it started
+
+**Solution — Minimal 3-file change:**
+
+**1. chat-panel.tsx — Added `handleStopGeneration` callback:**
+- New `useCallback` that sets `generationIdRef.current = null` and `isGenerationInProgressRef.current = false`
+- This triggers the existing cancellation mechanism: `isStillActive()` returns `false` → `reader.cancel()` is called → streaming stops
+- Passed as `onStopGeneration` prop to `NovelChatBox`
+
+**2. novel-chat-box.tsx — Updated send button behavior:**
+- Added `onStopGeneration?: () => void` to `NovelChatBoxProps` interface
+- When `isGenerating` is true: Button shows a filled **Square** icon (stop symbol) and calls `onStopGeneration` on click
+- When `isGenerating` is false: Button shows normal **Send** icon and calls `handleSend` on click
+- Button is no longer disabled during generation — it's now an active stop button
+
+**Behavior:**
+- Before: Send button → disabled spinner (no way to cancel)
+- After: Send button → active stop button (Square icon) → cancels streaming request immediately
+
+**ESLint:** Passes (only pre-existing error in fullscreen-editor.tsx)
+**Dev server:** GET / 200 — all changes compiled successfully
+
+---
+Task ID: 20 - fix-ollama-native-tool-calling
+### Work Task
+Fix Ollama native tool calling not working. When sending a message to Qwen 3.5:9b via TavernFlow, the model outputs ```tool_call``` as text instead of using native tool_calls. Works correctly in Ollama's own UI.
+
+### Root Cause
+**Double instruction conflict**: The code was injecting text-based tool instructions (`buildPromptBasedToolsSection`) into the system prompt AND simultaneously sending native tools in the API body. The text instructions explicitly told the model:
+
+```
+"Para usar una herramienta, incluye EXACTAMENTE este bloque en tu respuesta:
+\`\`\`tool_call
+{"name": "nombre_herramienta", "parameters": {...}}
+\`\`\`"
+```
+
+This caused the model to follow the text instructions (output ```tool_call``` blocks) instead of using the native `tool_calls` mechanism provided by the API. In Ollama's own UI, there are no such text instructions, so native tool calling works correctly.
+
+### Work Summary
+
+**Fix 1: stream/route.ts (line 438)**
+- Changed condition from `if (toolsEnabled && availableTools.length > 0)` to `if (toolsEnabled && availableTools.length > 0 && !shouldUseTools)`
+- Text-based tool instructions are now ONLY injected when native tool calling is NOT available
+- For Ollama (and other native-tool-capable providers), only the API body tools are sent
+
+**Fix 2: group-stream/route.ts (line 758)**
+- Same fix applied: `!charShouldUseTools` condition added
+- Group chat was also affected by the same double-instruction issue
+
+**Fix 3: ollama.ts — Enhanced logging**
+- Added tool names logging to see which tools are sent
+- Added sample tool definition logging (JSON)
+- Added request body keys logging
+- Added per-chunk tool_calls detection logging
+- Added done_reason + finishReason logging on stream completion
+
+### Expected Behavior After Fix:
+- Ollama with Qwen 3.5 should now receive tools via API body ONLY (no text instructions)
+- Model will use native `tool_calls` in response → properly detected by `processOllamaToolDelta`
+- Tool execution will proceed with real results → response sent back to model
+- Final natural language response delivered to user
+
+### Files Modified:
+- `src/app/api/chat/stream/route.ts` — Conditional text-based tool prompt injection
+- `src/app/api/chat/group-stream/route.ts` — Same fix for group chat
+- `src/lib/llm/providers/ollama.ts` — Enhanced debugging logs
 
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Implement Tool/Action System for TavernFlow
+Task: Quick Replies - enviar directamente + editor en tab Atajos
 
 Work Log:
-- Created complete tool system architecture at src/lib/tools/
-  - types.ts: ToolDefinition, ToolExecutionResult, ParsedToolCall, ToolsSettings
-  - tool-registry.ts: Central registry with registerTool(), executeTool(), buildPromptBasedToolsSection()
-  - parsers/prompt-parser.ts: Parse tool calls from LLM text output (```tool_call``` format)
-  - index.ts: Barrel exports
-- Created 5 built-in tools:
-  - roll_dice: Dice rolling with notation support (1d20, 2d6+3)
-  - search_memory: Search LanceDB embeddings for relevant memories
-  - get_weather: Weather via wttr.in API (free, no key needed)
-  - search_web: Web search via z-ai-web-dev-sdk
-  - set_reminder: In-memory reminder creation per session
-- Integrated into stream route (src/app/api/chat/stream/route.ts):
-  - Extracts toolsSettings from request body
-  - Injects prompt-based tools section into system prompt
-  - After streaming, detects tool calls via parseToolCallFromText()
-  - Executes tools and sends SSE events (tool_call_start, tool_call_result)
-  - Generates follow-up LLM response with tool results
-- Integrated into group-stream route (src/app/api/chat/group-stream/route.ts):
-  - Per-character tool config resolution
-  - Tool call detection and execution per character response
-- Added ToolsSettings type to src/types/index.ts
-- Created UI: src/components/tools/tools-settings-panel.tsx
-  - Master toggle for entire tool system
-  - Max tool calls per turn slider
-  - Prompt-based mode toggle
-  - Per-character tool enable/disable configuration
-  - Tool cards with category badges and icons
-  - "How it works" explainer section
-- Added "Herramientas" tab to settings panel (settings-panel.tsx)
-- Added SSE event handling in chat-panel.tsx for both normal and group chat
-- Added tool call indicator UI (amber pill notification)
-- Passed toolsSettings in all 3 request bodies (group chat, normal chat, regeneration)
+- Investigated current state: quick replies hardcoded as ['Continue', '...', 'Yes', 'No'], no UI to configure
+- Modified `handleQuickReply` in `novel-chat-box.tsx` to directly send message via `onSendMessage()` instead of just setting input
+- Removed `.slice(0, 4)` limit so all configured replies are shown
+- Added `disabled={isGenerating}` to quick reply buttons during generation
+- Added Quick Replies editor section in Atajos tab of settings-panel.tsx with:
+  - List of current replies with hover-reveal edit (Settings2 icon) and delete (Trash2 icon) buttons
+  - Inline editing with Enter to save, Escape to cancel
+  - "Agregar" input + button to add new replies (max 12)
+  - "Restablecer valores predeterminados" button
+  - Emerald color scheme to distinguish from hotkeys section
 
 Stage Summary:
-- Full tool/action system implemented with 5 built-in tools
-- Works with ALL LLM models via prompt-based detection (no native tool calling required)
-- UI settings panel for enable/disable per character
-- SSE events for real-time tool execution indicators
-- All changes pass lint (only pre-existing errors in unrelated files)
-
----
-## Task ID: 19 - tools-notification-and-settings-improvement
-### Work Task
-Improve tool call system: (1) Answer user's 3 questions about how prompt-based works, how to add notifications, and how LLM decides to use tools. (2) Create enhanced visual notification component for tool calls. (3) Improve tools settings panel with better explanations and mode selector.
-
-### Work Summary
-
-**User Questions Answered:**
-1. **Prompt-based mode**: The system injects `[HERRAMIENTAS DISPONIBLES]` section into the system prompt with tool definitions. The LLM reads descriptions and generates a ` ```tool_call ``` ` block with JSON. Disabling `promptBasedEnabled` currently disables the ENTIRE tool system because native tool calling is not yet implemented.
-2. **Notifications**: A minimal notification existed (amber spinner bar). Enhanced significantly with new component.
-3. **LLM decision**: The LLM reads tool descriptions in the prompt and decides contextually. Example: user asks about weather → LLM calls `get_weather`. Depends heavily on model intelligence.
-
-**New Component (`src/components/tools/tool-call-notification.tsx`):**
-- Phase-based notification: `executing` → `done` → `error` → `idle`
-- Shows tool icon (lucide icon mapping from string names), parameters (up to 3 key-value pairs), result message, and duration
-- Color-coded: amber for executing, emerald for success, red for error
-- Smooth framer-motion animations (spring entrance, fade/scale exit)
-- Auto-dismiss after 4 seconds for done/error phases
-- Pulse ring animation while tool is executing
-- Responsive: technical name hidden on small screens
-
-**Chat Panel Integration (`src/components/tavern/chat-panel.tsx`):**
-- Enhanced `toolCallInfo` state with: `params`, `result`, `phase` (ToolCallPhase type)
-- SSE `tool_call_start`: sets phase to `'executing'`, passes `params`
-- SSE `tool_call_result`: sets phase to `'done'`, passes `displayMessage` and `duration`
-- SSE `tool_call_error`: sets phase to `'error'`, passes error message
-- Replaced old minimal notification with new `ToolCallNotification` component
-- Auto-reset to idle after 5 seconds
-
-**Tools Settings Panel (`src/components/tools/tools-settings-panel.tsx`):**
-- **Mode Selector**: Two clickable cards — Prompt-Based (recommended, works with all models) and Native Tool Calling (marked as "Próximamente")
-- **Warning Banner**: When native mode selected, shows amber warning that it disables tools since native isn't implemented
-- **Better "How it works"**: 5-step numbered flow with visual example showing the complete LLM decision cycle
-- **Improved Tool Descriptions**: More detailed descriptions explaining when each tool activates
-- **Notification Info**: Added note that users will see notifications when tools are used
-- **Visual Example**: Badge flow showing "LLM detects → Generates call → Responds naturally"
-- Fixed category color for cognitive (was blue, changed to cyan to avoid blue color restriction)
-
-### Files Modified/Created:
-- `src/components/tools/tool-call-notification.tsx` — NEW: Enhanced phase-based notification component
-- `src/components/tools/tools-settings-panel.tsx` — REWRITTEN: Mode selector, better descriptions, visual flow
-- `src/components/tavern/chat-panel.tsx` — MODIFIED: Enhanced toolCallInfo state, SSE handlers, new component
-
-**ESLint:** Passes (only pre-existing fullscreen-editor.tsx error)
-**Dev Server:** GET / 200, compilation successful
+- Quick replies now send directly as user messages on click
+- Full CRUD UI for quick replies added in Settings > Atajos tab
+- Max 12 quick replies enforced
+- State variables added: editingQuickReply, editingQuickReplyValue, newQuickReply
 
 ---
 Task ID: 2
 Agent: Main Agent
-Task: Implement native tool calling system (replace prompt-based with native)
+Task: Quick Replies - migrar de string[] a {label, response}[] con persistencia JSON
 
 Work Log:
-- Investigated current prompt-based tool system flow (injection into system prompt, JSON parsing from LLM output)
-- Analyzed all provider implementations (OpenAI, Ollama, Anthropic, Z.ai, TextGenWebUI)
-- Confirmed prompt-based had multiple failure points (JSON malformation, format detection, name mismatches)
-- Created native tool call parser (`src/lib/tools/parsers/native-parser.ts`):
-  - `ToolCallAccumulator` for OpenAI-compatible streaming deltas
-  - `processOpenAIDelta()` / `finalizeToolCalls()` for OpenAI format
-  - `processOllamaToolDelta()` for Ollama /api/chat format
-  - `AnthropicToolState` / `processAnthropicEvent()` for Anthropic format
-  - Message builders: `buildToolMessagesForOpenAI()`, `buildToolMessagesForOllama()`, `buildToolMessagesForAnthropic()`
-- Modified OpenAI provider (`src/lib/llm/providers/openai.ts`):
-  - Added `streamOpenAIWithTools()` - sends `tools` param, accumulates `delta.tool_calls`
-- Modified Ollama provider (`src/lib/llm/providers/ollama.ts`):
-  - Added `streamOllamaWithTools()` - uses `/api/chat` endpoint (not `/api/generate`) with tools
-- Modified Anthropic provider (`src/lib/llm/providers/anthropic.ts`):
-  - Added `streamAnthropicWithTools()` - handles `tool_use` content blocks
-- Rewrote stream route tool system (`src/app/api/chat/stream/route.ts`):
-  - Removed prompt-based injection (`buildPromptBasedToolsSection` not in system prompt)
-  - Removed prompt-based detection (`parseToolCallFromText` not used)
-  - Added tool call loop: stream → detect tool_calls → execute → re-call with tool results → stream final response
-  - Added `executeToolCallsAndContinue()` helper function
-  - Follow-up calls include FULL chat history (fixing the old problem of generic follow-up without character context)
-- Updated group-stream route (`src/app/api/chat/group-stream/route.ts`):
-  - Same prompt-based removal and native tool calling support
-- Updated types: Removed `promptBasedEnabled` from `ToolsSettings` (both `src/types/index.ts` and `src/lib/tools/types.ts`)
-- Redesigned UI tools panel (`src/components/tools/tools-settings-panel.tsx`):
-  - Removed Prompt-Based vs Native mode selector
-  - Added provider compatibility indicator
-  - Shows which provider is active and whether it supports tool calling
-  - Updated "How it works" section to reflect native flow
-  - Master toggle disabled when provider doesn't support tools
+- Added `QuickReplyItem` interface to `src/types/index.ts` with `label` and `response` fields
+- Updated `AppSettings.quickReplies` type from `string[]` to `QuickReplyItem[]`
+- Updated defaults in `src/store/defaults.ts` and `src/lib/persistence.ts` to new format
+- Added `migrateSettings()` function in `persistence.ts` to auto-migrate old `string[]` data to `{label, response}[]`
+- Updated `novel-chat-box.tsx`: `handleQuickReply` now receives `{label, response}` object, sends `response` as message, displays `label` on button with `max-w-[120px]` and `truncate`, shows `title` tooltip when response differs from label
+- Rewrote quick replies editor in `settings-panel.tsx` Atajos tab: each item shows label (bold) + response preview (muted), editing mode has two separate inputs (Etiqueta max 20 chars, Respuesta max 200 chars), new item form has dashed border with both fields
+- State variables updated: `newQuickReply` → `newQuickReplyLabel` + `newQuickReplyValue`, added `editingQuickReplyLabel`
 
 Stage Summary:
-- **Native tool calling is now the ONLY mode** — no prompt-based fallback
-- Supported providers: OpenAI, vLLM, LM Studio, Custom (OpenAI-compatible), Anthropic, Ollama
-- The follow-up LLM call after tool execution now has FULL character context (was generic before)
-- SSE events (`tool_call_start`, `tool_call_result`) remain unchanged — frontend handles them the same way
-- ESLint: passes (only pre-existing error)
-- Dev server: compilation successful
+- Quick replies now have label (displayed) + response (sent) separation
+- Long responses are hidden behind short labels in chatbox
+- Migration from old `string[]` format is automatic and transparent
+- All data persists in `data/settings.json` as JSON (permanent across restarts)
+- Max 12 items, label max 20 chars, response max 200 chars
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix Ollama tool calling - bugs found and fixed
+
+Work Log:
+- Investigated Ollama API docs (curl from GitHub raw): confirmed tool format is correct
+- Found BUG #1: streamOllamaWithTools message mapper strips `tool_calls` and `tool_name` from messages (ollama.ts:94-97), breaking follow-up rounds
+- Found BUG #2: Client chat-panel.tsx does NOT send `toolsSettings` in the request body, relying on server defaults
+- Fixed BUG #1: Updated message mapper to preserve `tool_calls` and `tool_name` fields using Record<string, unknown>
+- Fixed BUG #2: Added `toolsSettings: settings.tools` to the client request body
+- Added comprehensive logging: shouldUseTools/toolsEnabled status, Ollama case routing, message roles, tool-related messages, HTTP errors with model/messages/tools count
+- Confirmed Ollama API format matches our implementation: done_reason is "stop" for tool calls (not "tool_calls"), route.ts checks hasToolCalls() instead of finishReason which is correct
+
+Stage Summary:
+- Critical fix: Ollama follow-up rounds now properly include tool_calls and tool_name in messages
+- Client now sends toolsSettings from the store, allowing per-character tool configuration
+- Added diagnostic logging throughout the Ollama tool calling pipeline for future debugging
+- User needs to test with Qwen 3.5:9b to verify if initial tool calls now work
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Add Z.ai provider support for native tool calling
+
+Work Log:
+- Analyzed Z.ai API: OpenAI-compatible at http://172.25.136.193:8080/v1
+- Found that Z.ai API now requires X-Token (JWT) header for ALL endpoints (chat completions + functions)
+- The z-ai-web-dev-sdk (v0.0.16) does NOT send X-Token header — SDK only uses Authorization + X-Z-AI-From
+- Implemented `streamZAIWithTools()` in zai.ts — mirrors streamOpenAIWithTools pattern with Z.ai auth
+- Added `buildZAIHeaders()` helper to centralize auth header construction (Authorization + X-Z-AI-From + optional X-Token)
+- Added `z-ai` to `supportsNativeTools` list in stream route (was previously excluded)
+- Rewrote `z-ai` case in stream route with full tool calling support:
+  - First round: streams with tools via streamZAIWithTools, buffers content for tool call detection
+  - Supports both native tool_calls (OpenAI format) and text-based fallback
+  - Follow-up rounds: sends tool results via streamZAI
+  - No tools: falls back to normal streamZAI
+- Fixed import: `toOpenAITools` imported from `@/lib/tools` (not native-parser)
+- Exported `streamZAIWithTools` from providers/index.ts
+
+Stage Summary:
+- Z.ai tool calling is now IMPLEMENTED but BLOCKED by X-Token requirement
+- The API returns 401 "missing X-Token header" for all requests without a valid JWT token
+- Users can provide their JWT token via llmConfig.apiKey field (which gets passed as overrideToken to streamZAI)
+- Once authenticated, Z.ai will support full tool calling (search_web, get_weather, roll_dice, etc.)
+- TypeScript: No new errors introduced. Lint: Clean (only pre-existing fullscreen-editor error)
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Investigar y resolver error 401 de Z.ai API (X-Token requerido)
+
+Work Log:
+- Investigado SDK z-ai-web-dev-sdk v0.0.16 y v0.0.17
+- Descubierto que v0.0.17 agregó soporte para campo "token" en config (X-Token header)
+- Actualizado SDK de v0.0.16 a v0.0.17 con bun
+- Probado SDK directamente: falla con 401 "missing X-Token header"
+- Verificado que el dashboard del API tampoco envía X-Token (también está roto)
+- No hay token JWT disponible en el entorno (env vars, config files, etc.)
+- Reescrito completamente el proveedor Z.ai (src/lib/llm/providers/zai.ts):
+  - Usa formato de headers idéntico al SDK v0.0.17
+  - Resuelve token desde: runtime override > config file "token" field
+  - Parser SSE unificado y reutilizable
+  - Mensajes de error claros en español
+- Actualizado route.ts para pasar token como parámetro separado (zaiRuntimeToken)
+- Limpiado logging excesivo de headers en el route
+
+Stage Summary:
+- El API de Z.ai agregó recientemente requerimiento de X-Token (JWT)
+- SDK v0.0.17 soporta el campo "token" en config, pero /etc/.z-ai-config no lo tiene
+- No hay forma de obtener el token JWT en este entorno (ni del gateway, ni de env vars)
+- El propio dashboard del API en http://172.25.136.193:8080/dashboard/ también está roto (no envía X-Token)
+- Código reescrito y listo para funcionar cuando el token esté disponible
+- Para resolver: agregar campo "token" al archivo /etc/.z-ai-config con un JWT válido
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Corregir error "invalid X-Token" causado por x-session-id usado como token
+
+Work Log:
+- Identificado que el gateway Z.ai envía header "x-session-id" (41 chars)
+- El código anterior usaba x-session-id como candidato X-Token
+- x-session-id es un ID de sesión, NO un JWT válido para autenticación
+- Removido x-session-id de la lista de candidatos de token
+- Ahora solo se usan: X-Token header directo > fc-security-token
+- Mensaje de error mejorado: indica que no hay token disponible
+
+Stage Summary:
+- El error cambió de "missing X-Token" a "invalid X-Token" porque se enviaba x-session-id como token
+- x-session-id ya no se usa como candidato de autenticación
+- El error ahora será "Z.ai requiere autenticación X-Token" (missing) en vez de "invalid X-Token"
+- Situación final: el API requiere X-Token JWT que no está disponible en este servidor
+
+---
+## Task ID: 19 - tool-calling-ollama-prompt-fallback
+### Work Task
+Fix and improve the tool calling system for Ollama provider and group chat. Add `usePromptBasedFallback` setting, update stream routes, improve UI toggle, fix search_web error handling, and enhance prompt-based tool instructions.
+
+### Work Summary
+
+**1. Types (`src/types/index.ts`):**
+- Added `usePromptBasedFallback?: boolean` to `ToolsSettings` interface with documentation comment
+- Added `usePromptBasedFallback: false` to `DEFAULT_TOOLS_SETTINGS` default
+
+**2. Stream Route (`src/app/api/chat/stream/route.ts`):**
+- Added `usePromptBasedFallback` to `toolsSettings` extraction from request body (defaults to `false`)
+- Changed `shouldUseTools` logic: `toolsEnabled && supportsNativeTools && !toolsSettings.usePromptBasedFallback`
+  - When `usePromptBasedFallback` is true, native tool calling is disabled, so prompt-based injection kicks in
+- Updated logging: added new branch for prompt-based fallback case
+- Updated `buildPromptBasedToolsSection()` call to pass `effectiveCharacter.name`
+
+**3. Group Stream Route (`src/app/api/chat/group-stream/route.ts`):**
+- Added `usePromptBasedFallback` to `toolsSettings` extraction from request body
+- Changed `charShouldUseTools` logic: `charToolsEnabled && charSupportsTools && !toolsSettings.usePromptBasedFallback`
+- Updated `buildPromptBasedToolsSection()` call to pass `responder.name`
+
+**4. Tools Settings Panel (`src/components/tools/tools-settings-panel.tsx`):**
+- Added `FileText` icon import from lucide-react
+- Renamed master toggle label to "Herramientas habilitadas" and removed `disabled` prop (tools can work via prompt-based mode even without native support)
+- Added new "Modo texto (prompt-based)" toggle with violet styling and description explaining use cases (Ollama models without native support, broken native tool calling)
+- Added info banner when prompt-based mode is active (violet themed, explains ```tool_call``` block usage)
+- Updated provider compatibility notice: 4 contextual messages based on combination of providerSupportsTools and usePromptBasedFallback
+- Restructured layout: tools list (character selector, per-character tool toggles) now visible whenever tools are enabled, regardless of mode
+- "Máximo de herramientas por turno" slider only shown in native mode (hidden in prompt-based mode)
+- Added "Cómo funciona (Modo Texto)" section with step-by-step explanation and example, shown when prompt-based is active or provider doesn't support native tools
+- "Cómo funciona (Tool Calling Nativo)" section still shown when using native mode, with note about prompt-based alternative
+
+**5. Search Web Tool (`src/lib/tools/tools/search-web.ts`):**
+- Removed X-Token direct fetch fallback (also fails with 401, no point trying)
+- Added early return for 401/auth errors with clear user-facing message: "el servicio de búsqueda web no está disponible (error de autenticación)"
+- Improved outer catch block with specific error messages for: auth errors, timeout errors, network errors
+- Each error type gets a user-friendly Spanish display message instead of generic "No se pudo completar la búsqueda web"
+
+**6. Prompt-Based Tools Section (`src/lib/tools/tool-registry.ts`):**
+- Added optional `characterName?: string` parameter to `buildPromptBasedToolsSection()`
+- Added roleplay awareness: instructions now reference the character name ("Eres un personaje en un roleplay, como {name}")
+- Added character-specific instruction to maintain personality when using tools
+- Improved formatting: added "FORMATO DE USO:" header, clearer section structure
+- Added rule 5: "Al recibir los resultados de una herramienta, intégralos naturalmente en tu respuesta de roleplay. No menciones que usaste una herramienta ni el proceso interno."
+- Rule 3 now explicitly says "SIEMPRE respondiendo en personaje"
+- Updated callers in stream route and group-stream route to pass character name
+
+**ESLint:** Passes with 1 pre-existing error (unrelated `fullscreen-editor.tsx`)
+**Dev server:** Running normally, GET / 200
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Implementar prompt-based fallback para tools y asegurar funcionamiento en chat normal y grupo
+
+Work Log:
+- Añadido campo `usePromptBasedFallback` a ToolsSettings en types/index.ts
+- Actualizado stream/route.ts: cuando usePromptBasedFallback=true, se desactiva native tools y se inyectan instrucciones de texto en el system prompt
+- Actualizado group-stream/route.ts: misma lógica para chat de grupo
+- Mejorado buildPromptBasedToolsSection() en tool-registry.ts: ahora acepta characterName para instrucciones contextualizadas al roleplay
+- Añadido toggle "Modo texto (prompt-based)" en tools-settings-panel.tsx con info contextual por proveedor
+- Mejorado manejo de errores en search-web.ts: detecta 401 y muestra mensaje claro sin intentar fallback que también falla
+
+Stage Summary:
+- Herramientas ahora funcionan en 3 modos: nativo, prompt-based, o desactivado
+- "Modo texto" permite usar tools con CUALQUIER proveedor (incluyendo Ollama con modelos que no soportan nativo)
+- Chat normal y chat de grupo ambos soportan los 3 modos
+- El toggle en la UI muestra mensajes contextuales según el proveedor actual
+
+---
+Task ID: tool-calling-diagnostic
+Agent: Main Agent
+Task: Diagnostic test of Ollama tool calling pipeline - simulate tool calls to verify everything is correctly built
+
+Work Log:
+- Read all key files: ollama.ts, native-parser.ts, stream/route.ts, group-stream/route.ts, tool-registry.ts, search-web.ts
+- Created comprehensive test endpoint at /api/test-tools with 19 test cases
+- Test categories: registry, format for Ollama, tool execution, Ollama parser, follow-up format, Ollama connection, prompt-based fallback
+
+Stage Summary:
+- **19 tests: 17 OK, 1 Error, 1 Warning**
+- ✅ 5 tools registered and discoverable by name (roll_dice, search_memory, get_weather, search_web, set_reminder)
+- ✅ Tool definitions formatted correctly for Ollama /api/chat (JSON valid, 3620 chars)
+- ✅ roll_dice execution works perfectly
+- ✅ get_weather execution works (837ms, API available)
+- ⚠️ search_web fails with auth error (Z.ai SDK token issue - KNOWN, not a tool calling bug)
+- ✅ search_memory works (no results for test query, as expected)
+- ✅ Ollama parser correctly detects tool_calls in response
+- ✅ Ollama parser handles incremental chunks correctly
+- ✅ Ollama parser correctly ignores normal text (no false positives)
+- ✅ Follow-up messages formatted correctly for Ollama (tool → result format)
+- ❌ Ollama not running on this server (localhost:11434) - user must have Ollama running
+- ✅ Prompt-based fallback section generates correctly (3290 chars)
+- **CONCLUSION**: The entire tool calling pipeline is correctly built. The only blockers are (1) Ollama must be running, (2) search_web needs auth token (separate issue)
+---
+
+## Task ID: memory-extraction-pipeline-fix
+### Work Task
+Fix 3 issues in the memory extraction pipeline: (1) namespace naming uses sessionId suffix isolating memories per session, (2) auto-created namespace type does not match grouping system, (3) Examinar tab has no way to filter embeddings by character.
+
+### Work Summary
+
+**CHANGE 1: Fix namespace naming — character-level namespace WITHOUT sessionId**
+
+File: `src/lib/embeddings/memory-extraction.ts` — `saveMemoriesAsEmbeddings()`
+
+- Removed `sessionSuffix` logic that appended `-{sessionId}` to namespace names
+- Namespace now uses only character or group ID: `character-{characterId}` or `group-{groupId}`
+- All memories for a character are now in ONE namespace, enabling unified context retrieval
+- `characterId` and `sessionId` remain in embedding metadata for filtering (not removed)
+- Added optional `characterName` parameter for better namespace description display
+- Updated `extractAndSaveMemories()` call to pass `characterName` through
+- `extract-group-dynamics` route still works (uses groupId path, characterName not needed)
+
+**Before:** `character-abc-12345`, `character-abc-67890` (isolated per session)
+**After:** `character-abc` (all sessions unified)
+
+**CHANGE 2: Auto-created namespace type set to "Memoria del Personaje"**
+
+File: `src/lib/embeddings/memory-extraction.ts` — `saveMemoriesAsEmbeddings()` → `upsertNamespace()`
+
+- Changed `metadata.type` from `memory` to `Memoria del Personaje`
+- This matches the type grouping system in `chat-context.ts` `getNamespaceTypesMap()`
+- The grouping logic reads `metadata.type` from namespaces and converts to uppercase for prompt headers
+- Standard types: `Memoria del Personaje`, `Eventos Recientes`, `Lore del Mundo`, `Reglas y Mecánicas`, `Relaciones`
+- Updated namespace description to include character name: `Memorias de {characterName}` instead of `Memorias de personaje ({characterId}) — sesión {sessionId}`
+
+**CHANGE 3: Add source_type and namespace filters in Examinar tab**
+
+File: `src/components/embeddings/embeddings-settings-panel.tsx`
+
+- Added `sourceTypeFilter` state (default: `memory`) and `namespaceFilter` state (default: ``)
+- Added filter bar at top of Examinar tab (hidden when a specific namespace is selected)
+- Filter bar has:
+  - Select dropdown for source_type: "Todos los tipos", "Memoria", "Personalizado", "Archivo", "Personaje", "Mundo", "Lorebook", "Sesión"
+  - Text input for namespace pattern matching (partial match, case-insensitive) with Tag icon
+- Default view: shows only memory embeddings across all characters
+- Filtered count shown: "X de Y embeddings" instead of just "Y total"
+- "Limpiar filtros" button appears when any filter is active
+- Empty state distinguishes between "no embeddings at all" vs "no results for current filters"
+- All existing functionality preserved: delete, create, namespace selection, refresh
+
+**Lint:** Both changed files pass ESLint with zero errors (pre-existing error in unrelated `fullscreen-editor.tsx`)
+
+**Dev server:** Compiling and running correctly on port 3000
+
+
+---
+Task ID: memory-extraction-pipeline-fix
+Agent: Main Agent + full-stack-developer subagent
+Task: Fix memory extraction pipeline: namespace isolation, type grouping, and UI filtering
+
+Work Log:
+- **Change 1: Fixed namespace naming** (`memory-extraction.ts` `saveMemoriesAsEmbeddings()`)
+  - Removed `sessionSuffix` that created isolated namespaces per session (e.g. `character-abc-12345`)
+  - Now uses: `character-{characterId}` for normal chat, `group-{groupId}` for group chat
+  - All memories for a character accumulate in ONE namespace across all sessions
+  - `characterName` parameter added for better namespace descriptions: "Memorias de Alvar" instead of "Memorias de personaje (abc)"
+  - `extractAndSaveMemories()` updated to pass `characterName` to `saveMemoriesAsEmbeddings()`
+
+- **Change 2: Fixed namespace type for grouping** (`memory-extraction.ts`)
+  - Changed `metadata.type` from `'memory'` to `'Memoria del Personaje'` in auto-created namespaces
+  - This matches the grouping system in `chat-context.ts` `getNamespaceTypesMap()` which uses this type to create `[MEMORIA DEL PERSONAJE]` headers in the LLM prompt
+  - Ensures auto-extracted memories appear under the correct section in prompts
+
+- **Change 3: Added Examinar tab filters** (`embeddings-settings-panel.tsx`)
+  - Added filter bar at top of Examinar tab with:
+    - Source type dropdown (defaults to "Memoria"): Todos, Memoria, Personalizado, Archivo, Personaje, Mundo, Lorebook, Sesión
+    - Namespace text input for partial match filtering (case-insensitive)
+  - Shows filtered count: "X de Y embeddings" when filters are active
+  - "Limpiar filtros" button when any filter is active
+  - Distinguishes between "no embeddings" and "no results for current filters"
+  - Filter bar hides when a specific namespace is already selected (to avoid confusion)
+  - State: `sourceTypeFilter` (default: 'memory'), `namespaceFilter` (default: '')
+
+Stage Summary:
+- Memory extraction now correctly accumulates ALL memories per character in one namespace
+- Auto-created namespaces use the correct type for prompt grouping
+- Users can filter the Examinar tab by source type and namespace to find specific character memories
+- All changes pass lint (only pre-existing error in fullscreen-editor.tsx)
+
+---
+Task ID: 19 - memory-extraction-bug-fix-and-enhancements
+Agent: Main Agent
+Task: Fix memory extraction not saving, add custom memory button, auto-create namespaces on session start
+
+Work Log:
+- Investigated why memory extraction showed notification but didn't save embeddings
+- Found critical bug: stream routes used `fetch('/api/embeddings/extract-memory')` from server-side setTimeout callback - relative fetch may fail in this deployment
+- Replaced HTTP fetch with direct function call to `extractAndSaveMemories` in both stream routes
+- Replaced group dynamics extraction HTTP fetch with direct function calls too
+- Added proper auto-consolidation logic after extraction (previously bundled in API route)
+- Added "Agregar" button in memories tab of chatbox for custom memory injection
+- Created `/api/embeddings/ensure-namespace` endpoint for auto-namespace creation
+- Added useEffect in chat-panel.tsx to auto-create namespaces when session starts/resets
+
+Stage Summary:
+- **Bug Fix (critical)**: Replaced unreliable server-side `fetch('/api/embeddings/extract-memory')` with direct `import()` calls to `extractAndSaveMemories()` and `autoConsolidateAfterExtraction()` in both `stream/route.ts` and `group-stream/route.ts`
+- **Bug Fix**: Replaced server-side `fetch('/api/embeddings/extract-group-dynamics')` with direct calls to `extractGroupDynamics()` and `getEmbeddingClient().createEmbedding()`
+- **Feature**: Added "Agregar Recuerdo" button in memories tab with dialog for custom memory text + importance rating (1-5)
+- **Feature**: Created `/api/embeddings/ensure-namespace` API endpoint for namespace creation
+- **Feature**: Added auto-namespace creation in chat-panel.tsx when session starts (1.5s delay, non-blocking)
+- Lint passes with zero new errors
+
+---
+Task ID: 2
+Agent: settings-panel-fix
+Task: Fix bare useTavernStore() in settings-panel.tsx
+
+Work Log:
+- Replaced `const store = useTavernStore()` with individual selectors for settings, updateSettings, llmConfigs, addLLMConfig, updateLLMConfig, setActiveLLMConfig, deleteLLMConfig
+- Changed all store.XXX references in export/import handlers to useTavernStore.getState().XXX
+
+Stage Summary:
+- Settings panel no longer subscribes to entire store
+- Only re-renders when settings or LLM configs change
+- Export/import handlers still access full store via getState() at call time
+
+---
+Task ID: 9
+Agent: persistence-sync-fix
+Task: Fix persistence sync to prevent unnecessary re-renders on server load
+
+Work Log:
+- Added deep comparison (JSON.stringify) before setState in loadFromServer
+- Added comparison for quest templates setState
+- Server data that matches localStorage no longer triggers re-renders
+- Added console logs for debugging (shows which keys actually changed)
+
+Stage Summary:
+- Eliminated app flash on initial load when server data matches localStorage
+- Only store keys with actual changes trigger re-renders
+---
+Task ID: 19
+Agent: Main Agent
+Task: Fix app-wide flashing when navigating to configuration sections or editing characters
+
+Work Log:
+- Diagnosed root cause: multiple components using `useTavernStore()` without a selector, subscribing to the ENTIRE store
+- The most critical was `novel-chat-box.tsx` (always visible in chat area) subscribing to ALL store values
+- Any store change (opening settings, toggling panels, loading data) caused the entire chatbox to re-render
+- 15+ components total were using `useTavernStore()` without selectors
+
+Stage Summary:
+- Fixed `novel-chat-box.tsx`: Converted from `useTavernStore()` to 17 individual selectors
+- Fixed `appearance-settings-panel.tsx`: 11 individual selectors
+- Fixed `background-triggers-settings.tsx`: 12 individual selectors
+- Fixed `lorebook-panel.tsx`: 12 individual selectors
+- Fixed `inventory-panel.tsx`: 15 individual selectors
+- Fixed `sprite-timeline-editor.tsx`: 8 individual selectors
+- Fixed `dialogue-settings-panel.tsx`: 10 individual selectors
+- Fixed `memory-settings-panel.tsx`: 4 individual selectors
+- Fixed `character-memory-editor.tsx`: 6 individual selectors
+- Fixed `quest-settings-panel.tsx`: 3 individual selectors
+- Fixed `summary-viewer.tsx`: 5 individual selectors
+- Fixed `quest-activation-dialog.tsx`: 5 individual selectors
+- Fixed `atmosphere-presets.tsx`: 4 individual selectors (×2 components)
+- Fixed `atmosphere-settings.tsx`: 8 individual selectors
+- Verified: 0 bare `useTavernStore()` calls remain in the codebase
+- Dev server running normally with all changes
+---
+## Task ID: 19 - grok-xai-provider-integration
+### Work Task
+Integrate xAI Grok API as a new LLM provider. The Grok API is OpenAI-compatible, so it leverages existing streaming and tool-calling infrastructure.
+
+### Work Summary
+
+**Type System (`src/types/index.ts`):**
+- Added `'grok'` to `LLMProvider` type union
+
+**LLM Types (`src/lib/llm/types.ts`):**
+- Added `'grok'` to `SUPPORTED_PROVIDERS` constant array
+
+**Streaming Module (`src/lib/llm/streaming.ts`):**
+- Added `case 'grok':` alongside `openai/vllm/lm-studio/custom` in the streaming switch
+- Routes to `streamOpenAICompatible()` (OpenAI-compatible API)
+
+**Generation Module (`src/lib/llm/generation.ts`):**
+- Added `case 'grok':` alongside `openai/vllm/lm-studio/custom` in the generation switch
+- Routes to `callOpenAICompatible()` for non-streaming requests
+
+**Settings Panel UI (`src/components/tavern/settings-panel.tsx`):**
+- Added Grok to `LLM_PROVIDERS` array:
+  - Label: "Grok (xAI)"
+  - Default endpoint: `https://api.x.ai/v1`
+  - Needs endpoint: true
+  - Description: "API de xAI Grok (OpenAI-compatible)"
+
+**Chat Stream Route (`src/app/api/chat/stream/route.ts`):**
+- Added `'grok'` to `supportsNativeTools` array (Grok supports OpenAI-compatible tool calling)
+- Added `case 'grok':` alongside `openai/vllm/lm-studio/custom` in the provider switch
+- Added API key validation: throws error if provider is grok but no apiKey is set
+
+**Group Stream Route (`src/app/api/chat/group-stream/route.ts`):**
+- Added `'grok'` to `charSupportsTools` array
+- Added `case 'grok':` alongside `openai/vllm/lm-studio/custom` in the provider switch
+- Added API key validation
+
+**Regenerate Route (`src/app/api/chat/regenerate/route.ts`):**
+- Added `case 'grok':` alongside `openai/vllm/lm-studio/custom` in the provider switch
+- Added API key validation
+
+**Generate Route (`src/app/api/chat/generate/route.ts`):**
+- Added `case 'grok':` alongside `openai/vllm/lm-studio/custom` in the provider switch
+- Added API key validation
+
+**Features inherited from OpenAI-compatible provider:**
+- ✅ Streaming support
+- ✅ Native tool calling (function calling)
+- ✅ Frequency/presence penalty
+- ✅ Stop strings
+- ✅ Configurable timeout
+- ✅ SSE event parsing
+- ✅ Text-based tool call fallback detection
+
+**ESLint:** Passes with zero new errors (pre-existing error in fullscreen-editor.tsx unrelated)
+---
+Task ID: 1
+Agent: Main Agent
+Task: Implementar integración completa de la API de X Grok en los proveedores LLM
+
+Work Log:
+- Exploré la arquitectura de proveedores LLM del proyecto: Grok usa el proveedor OpenAI-compatible en `openai.ts`
+- Investigué en internet los modelos disponibles de la API xAI Grok (docs.x.ai, AG2 docs, datastudios)
+- Identifiqué el problema raíz: `openai.ts` tenía `config.model || 'gpt-3.5-turbo'` como fallback, y la config de Grok tenía `model: ""`
+- Creé API endpoint `/api/grok/models/route.ts` con 11 modelos conocidos y fallback a API xAI
+- Creé componente `GrokModelSelector` con dropdown organizado por tiers (Flagship, Estándar, Livianos, Legacy)
+- Actualicé `openai.ts` con defaults por proveedor: Grok→`grok-3`, OpenAI→`gpt-4o-mini`
+- Habilité `frequency_penalty` y `presence_penalty` para Grok (además de OpenAI)
+- Reorganicé el settings panel para que la API Key de Grok aparezca antes del selector de modelos
+- Actualicé la config guardada con `model: "grok-3"`, `maxTokens: 2048`, `contextSize: 131072`
+
+Stage Summary:
+- Archivos creados: `src/app/api/grok/models/route.ts`
+- Archivos modificados: `src/lib/llm/providers/openai.ts`, `src/components/tavern/settings-panel.tsx`, `data/llm-configs.json`
+- 11 modelos Grok disponibles en el dropdown organizados por categoría
+- El endpoint API fallback a modelos conocidos cuando la API xAI no responde
+- El error de "gpt-3.5-turbo does not exist" está resuelto con el default `grok-3`
+---
+Task ID: grok-test-connection
+Agent: Main Agent
+Task: Add LLM connection test feature for Grok and other providers
+
+Work Log:
+- Investigated existing Grok API integration code (openai.ts, settings-panel.tsx, grok/models route)
+- Found the HTML error was caused by incorrect endpoint configuration
+- Created `/api/llm/test` route that performs 3-step diagnostics:
+  1. Input validation (checks provider, endpoint, API key presence)
+  2. Endpoint reachability test (hits /models or equivalent, with timeout)
+  3. Chat completion test (sends minimal message, validates response)
+- Added "Probar Conexión" (Test Connection) button in settings panel UI
+- Button shows different icons based on test state: Plug (neutral), Loader2 (testing), CheckCircle (success), WifiOff (error)
+- Test results displayed inline with colored step indicators (green/amber/red/blue)
+- Handles all providers: OpenAI, Grok, Anthropic, Ollama, KoboldCPP, LM Studio, vLLM, custom
+- Provides specific error messages for common issues (HTML response = wrong endpoint, 401 = bad key, 404 = wrong model)
+- Verified compilation succeeds on dev server
+
+Stage Summary:
+- New file: `src/app/api/llm/test/route.ts` - API endpoint for connection testing
+- Modified: `src/components/tavern/settings-panel.tsx` - Added test button + results display
+- Test feature works for all LLM providers and gives actionable diagnostics
+---
+Task ID: grok-html-fix
+Agent: Main Agent
+Task: Fix HTML response error when using Grok API in chat, add robust error handling
+
+Work Log:
+- Investigated the full flow: client → /api/chat/stream → openai.ts provider → xAI API
+- Identified root cause: client-side `response.json()` calls throw raw error when server returns HTML
+- Added `safeParseJSON()` helper function in chat-panel.tsx that:
+  - Checks Content-Type header before attempting JSON.parse
+  - Catches HTML responses and provides descriptive error messages
+  - Shows preview of HTML content for diagnostics
+- Fixed 4 vulnerable `.json()` calls in chat-panel.tsx:
+  - Single chat streaming (line 878)
+  - Group chat streaming (line 613)
+  - Non-streaming generate (line 1057)
+  - Regenerate swipe (line 1216)
+- Enhanced server-side logging in openai.ts:
+  - Added HTML detection in error response handler for streamOpenAIWithTools
+  - Logs response URL, status, content-type for diagnostics
+  - Provides descriptive error when HTML is detected in error responses
+- Added LLM config diagnostic logging in stream route (masked API key)
+
+Stage Summary:
+- Modified: `src/components/tavern/chat-panel.tsx` - Added safeParseJSON helper, fixed 4 .json() calls
+- Modified: `src/lib/llm/providers/openai.ts` - Better HTML detection and logging
+- Modified: `src/app/api/chat/stream/route.ts` - Added config diagnostic logging
+- The HTML error should now show a descriptive message with preview instead of raw JSON.parse error
+
+---
+## Task ID: 19 - chat-rerender-cascade-fix
+### Work Task
+Fix excessive re-rendering when sending messages in chat. Root cause: 5 components subscribing to the entire `sessions` array from Zustand store, causing all to re-render simultaneously when `addMessage` creates a new array reference.
+
+### Work Summary
+
+**Root Cause Analysis:**
+When a message is sent, `addMessage` creates a new `sessions` array reference. 5 components subscribed to `sessions` all re-render simultaneously, and within ChatPanel, multiple `useEffect` hooks fire on session/state changes causing additional cascading re-renders. The auto-create namespaces effect had `sessions` in its dependency array, triggering an API call on EVERY message.
+
+**Files Modified (3 of 5 evaluated):**
+
+**1. `src/components/tavern/chat-panel.tsx` — CRITICAL (4 changes):**
+- Replaced `const sessions = useTavernStore((state) => state.sessions)` with a targeted selector: `const activeSession = useTavernStore((state) => state.sessions.find(s => s.id === state.activeSessionId) || null)` — now only re-renders when the active session changes, not when ANY session changes
+- Removed redundant `const activeSession = sessions.find((s) => s.id === activeSessionId)` since activeSession is now from the store directly
+- Changed auto-create namespaces effect to use `useTavernStore.getState().sessions.find(...)` instead of the `sessions` variable, breaking the reactive dependency
+- Removed `sessions` from the effect's dependency array (was `[activeSessionId, sessions, activeGroup, activeCharacter, characters, settings.embeddingsChat]` → now `[activeSessionId, activeGroup, activeCharacter, characters, settings.embeddingsChat]`)
+
+**2. `src/components/tavern/hud-display.tsx` (2 changes):**
+- Replaced `const sessions = useTavernStore((state) => state.sessions)` with `const activeSession = useTavernStore((state) => state.sessions.find(s => s.id === state.activeSessionId) || null)`
+- Removed redundant `const activeSession = sessions.find((s) => s.id === activeSessionId)` line
+
+**3. `src/components/tavern/character-panel.tsx` (3 changes):**
+- Removed `const sessions = useTavernStore((s) => s.sessions)` subscription entirely
+- In `handleSelectCharacter()`: replaced `sessions.find(...)` with `useTavernStore.getState().sessions.find(...)` (safe because it's in a callback, not render)
+- In `handleSelectGroup()`: replaced `sessions.find(...)` with `useTavernStore.getState().sessions.find(...)` (safe because it's in a callback, not render)
+
+**Files NOT Modified (evaluated, no change needed):**
+
+**4. `src/components/tavern/sessions-sidebar.tsx` — No change:**
+- This component genuinely needs the full sessions list to render the chat sidebar. It correctly subscribes to `sessions` and `activeSessionId`. The re-render here is expected and necessary (new message timestamps, active session highlighting).
+
+**5. `src/components/tavern/novel-chat-box.tsx` — No change:**
+- `getActiveSession` is a stable function reference (doesn't change between renders)
+- `settings` object subscription is fine because settings don't change during message flow
+- The component already receives `streamingContent`, `isGenerating` etc. as props from ChatPanel, so it re-renders during streaming by design (needed for UI updates)
+
+**Impact:**
+- Before fix: Sending a message caused 5 components to re-render simultaneously, with ChatPanel's effects triggering additional cascading re-renders including an unnecessary API call
+- After fix: Only 2 components re-render on message send (SessionsSidebar for list update + ChatPanel for active session), and the API call in the auto-create namespaces effect only fires when the session changes, not on every message
+- Net reduction: ~3 unnecessary component re-renders per message sent
+
+**Verification:**
+- ESLint passes (1 pre-existing error in unrelated file `fullscreen-editor.tsx`)
+- TypeScript compilation: no new errors introduced (pre-existing errors in other files confirmed unrelated)
+---
+Task ID: 1
+Agent: Main
+Task: Fix excessive re-rendering when sending chat messages
+
+Work Log:
+- Investigated 5 components subscribing to entire `sessions` array from Zustand store
+- Identified cascade: addMessage → new sessions array → 5 components re-render → effects fire → more re-renders
+- Fixed `chat-panel.tsx`: replaced `sessions` subscription with targeted active session selector
+- Fixed `chat-panel.tsx`: removed `sessions` from auto-create namespaces effect deps (was firing API call per message)
+- Fixed `hud-display.tsx`: replaced `sessions` subscription with active session selector
+- Fixed `character-panel.tsx`: removed `sessions` subscription, used `getState()` in callbacks instead
+- Also fixed `openai.ts` Grok provider: `presencePenalty`/`frequencyPenalty` only sent when non-zero
+
+Stage Summary:
+- ~3 unnecessary component re-renders eliminated per message sent
+- 1 unnecessary API call eliminated (ensure-namespace no longer fires per message)
+- No business logic changes - pure rendering optimization
+- No new lint errors introduced

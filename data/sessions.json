@@ -1,51 +1,224 @@
 [
   {
-    "id": "c84400b3-3c56-4252-9098-f9f5fca8136e",
+    "id": "2632db26-0133-41e3-ad0f-d5bd43330d1f",
+    "characterId": "37089df2-4fba-42a0-b478-8fad69cc4e9e",
+    "name": "Chat with Ana",
+    "messages": [
+      {
+        "id": "03dc4f02-9e35-4d81-88cf-88bf61262130",
+        "characterId": "37089df2-4fba-42a0-b478-8fad69cc4e9e",
+        "role": "assistant",
+        "content": "",
+        "timestamp": "2026-04-04T08:32:45.632Z",
+        "isDeleted": false,
+        "swipeId": "0344a7ee-7782-487a-8eae-7b3f45c33b43",
+        "swipeIndex": 0,
+        "swipes": [
+          ""
+        ]
+      },
+      {
+        "characterId": "37089df2-4fba-42a0-b478-8fad69cc4e9e",
+        "role": "user",
+        "content": "hola",
+        "isDeleted": false,
+        "swipeId": "c1559197-e6f3-4a42-ab24-9d22142c0541",
+        "swipeIndex": 0,
+        "id": "2b012cf3-2cfa-4861-9151-ad79b130f746",
+        "timestamp": "2026-04-08T14:38:16.283Z",
+        "swipes": [
+          "hola"
+        ]
+      },
+      {
+        "characterId": "37089df2-4fba-42a0-b478-8fad69cc4e9e",
+        "role": "system",
+        "content": "⚠️ El servidor devolvió una página HTML en lugar de JSON (502). Esto puede indicar que el cuerpo de la petición es muy grande, o que ocurrió un error interno del servidor.\nPreview: \"<html> <head><title>502 Bad Gateway</title></head> <body bgcolor=\"white\"> <center><h1>502 Bad Gateway</h1></center> <hr><center>alb</center> </body> </html> <!-- a padding to disable MSIE and C...\"",
+        "isDeleted": false,
+        "swipeId": "4a500c24-cd05-475b-9b45-84b65ab5edfc",
+        "swipeIndex": 0,
+        "id": "9a36437d-8a91-4afd-93fe-32c2bbe56825",
+        "timestamp": "2026-04-08T14:38:48.299Z",
+        "swipes": [
+          "⚠️ El servidor devolvió una página HTML en lugar de JSON (502). Esto puede indicar que el cuerpo de la petición es muy grande, o que ocurrió un error interno del servidor.\nPreview: \"<html> <head><title>502 Bad Gateway</title></head> <body bgcolor=\"white\"> <center><h1>502 Bad Gateway</h1></center> <hr><center>alb</center> </body> </html> <!-- a padding to disable MSIE and C...\""
+        ]
+      }
+    ],
+    "createdAt": "2026-04-04T08:32:45.632Z",
+    "updatedAt": "2026-04-08T14:38:48.299Z",
+    "sessionStats": {
+      "characterStats": {
+        "37089df2-4fba-42a0-b478-8fad69cc4e9e": {
+          "attributeValues": {
+            "nivel_de_crack": 0,
+            "lujuria": 100,
+            "resistencia": 100,
+            "energia": 100
+          },
+          "lastUpdated": {
+            "nivel_de_crack": 1775291565632,
+            "lujuria": 1775291565632,
+            "resistencia": 1775291565632,
+            "energia": 1775291565632
+          },
+          "changeLog": []
+        }
+      },
+      "solicitudes": {
+        "characterSolicitudes": {},
+        "lastModified": 1775291565632
+      },
+      "initialized": true,
+      "lastModified": 1775291565632
+    },
+    "sessionQuests": [],
+    "turnCount": 0
+  },
+  {
+    "id": "0b1beb59-1dde-40a6-90c5-151ee82eb4f5",
+    "characterId": "27be65df-187b-4af3-a116-2b03843d1cb1",
+    "name": "Chat with Jess",
+    "messages": [
+      {
+        "id": "626f6359-9893-414d-a1bc-67d257fb9fc7",
+        "characterId": "27be65df-187b-4af3-a116-2b03843d1cb1",
+        "role": "assistant",
+        "content": "",
+        "timestamp": "2026-04-04T08:32:45.958Z",
+        "isDeleted": false,
+        "swipeId": "577c1479-5a3f-45cc-8530-1b9750fad7b2",
+        "swipeIndex": 0,
+        "swipes": [
+          ""
+        ]
+      }
+    ],
+    "createdAt": "2026-04-04T08:32:45.958Z",
+    "updatedAt": "2026-04-04T08:32:45.958Z",
+    "sessionStats": {
+      "characterStats": {
+        "27be65df-187b-4af3-a116-2b03843d1cb1": {
+          "attributeValues": {
+            "nivel_de_crack": 0,
+            "lujuria": 0,
+            "resistencia": 100,
+            "energia": 100
+          },
+          "lastUpdated": {
+            "nivel_de_crack": 1775291565958,
+            "lujuria": 1775291565958,
+            "resistencia": 1775291565958,
+            "energia": 1775291565958
+          },
+          "changeLog": []
+        }
+      },
+      "solicitudes": {
+        "characterSolicitudes": {},
+        "lastModified": 1775291565958
+      },
+      "initialized": true,
+      "lastModified": 1775291565958
+    },
+    "sessionQuests": [],
+    "turnCount": 0
+  },
+  {
+    "id": "66925be0-c394-40f5-aaa2-f7051a48fb89",
+    "characterId": "22d19969-611a-4f7f-9e62-eede779152b3",
+    "name": "Chat with Aitana",
+    "messages": [
+      {
+        "id": "51438f74-67de-4fc2-ab05-c56fe64ddb05",
+        "characterId": "22d19969-611a-4f7f-9e62-eede779152b3",
+        "role": "assistant",
+        "content": "",
+        "timestamp": "2026-04-08T14:36:31.182Z",
+        "isDeleted": false,
+        "swipeId": "bf3caec9-ca13-475e-9b44-311393185b35",
+        "swipeIndex": 0,
+        "swipes": [
+          ""
+        ]
+      },
+      {
+        "characterId": "22d19969-611a-4f7f-9e62-eede779152b3",
+        "role": "user",
+        "content": "hola",
+        "isDeleted": false,
+        "swipeId": "98d3b960-6aa5-4df3-8ba4-935e5005008b",
+        "swipeIndex": 0,
+        "id": "e3108497-6487-432c-a6ea-1a067c7a4cc2",
+        "timestamp": "2026-04-08T14:36:50.724Z",
+        "swipes": [
+          "hola"
+        ]
+      },
+      {
+        "characterId": "22d19969-611a-4f7f-9e62-eede779152b3",
+        "role": "system",
+        "content": "⚠️ El servidor devolvió una página HTML en lugar de JSON (502). Esto puede indicar que el cuerpo de la petición es muy grande, o que ocurrió un error interno del servidor.\nPreview: \"<html> <head><title>502 Bad Gateway</title></head> <body bgcolor=\"white\"> <center><h1>502 Bad Gateway</h1></center> <hr><center>alb</center> </body> </html> <!-- a padding to disable MSIE and C...\"",
+        "isDeleted": false,
+        "swipeId": "4561b796-8276-4026-b7bc-fee449585f49",
+        "swipeIndex": 0,
+        "id": "af135585-3485-43ef-a37b-5b915625bcf4",
+        "timestamp": "2026-04-08T14:37:30.891Z",
+        "swipes": [
+          "⚠️ El servidor devolvió una página HTML en lugar de JSON (502). Esto puede indicar que el cuerpo de la petición es muy grande, o que ocurrió un error interno del servidor.\nPreview: \"<html> <head><title>502 Bad Gateway</title></head> <body bgcolor=\"white\"> <center><h1>502 Bad Gateway</h1></center> <hr><center>alb</center> </body> </html> <!-- a padding to disable MSIE and C...\""
+        ]
+      }
+    ],
+    "createdAt": "2026-04-08T14:36:31.182Z",
+    "updatedAt": "2026-04-08T14:37:30.891Z",
+    "sessionStats": {
+      "characterStats": {
+        "22d19969-611a-4f7f-9e62-eede779152b3": {
+          "attributeValues": {
+            "nivel_saliva": 100,
+            "lujuria": 0,
+            "resistencia": 100,
+            "energia": 100
+          },
+          "lastUpdated": {
+            "nivel_saliva": 1775658991182,
+            "lujuria": 1775658991182,
+            "resistencia": 1775658991182,
+            "energia": 1775658991182
+          },
+          "changeLog": []
+        }
+      },
+      "solicitudes": {
+        "characterSolicitudes": {},
+        "lastModified": 1775658991182
+      },
+      "initialized": true,
+      "lastModified": 1775658991182
+    },
+    "sessionQuests": [],
+    "turnCount": 0
+  },
+  {
+    "id": "6be48cf6-052e-4ac9-9d6b-4c5d8c9700cc",
     "characterId": "7e6b6d7b-905e-4199-a15a-797f2efac746",
     "name": "Chat with Rick",
     "messages": [
       {
-        "id": "53a9f2c3-5c18-4a72-b298-00ee2c850a10",
+        "id": "fdf322ee-bdb0-49d8-91f6-846159beadf4",
         "characterId": "7e6b6d7b-905e-4199-a15a-797f2efac746",
         "role": "assistant",
         "content": "\"Sí, sí, adelante. Haz tu pregunta. Sorpréndeme. O decepcióname, que estadísticamente es lo más probable.\"",
-        "timestamp": "2026-04-04T08:17:17.841Z",
+        "timestamp": "2026-04-08T14:42:24.625Z",
         "isDeleted": false,
-        "swipeId": "6b94bfb1-c92b-4a06-afa5-2398b1be5a64",
+        "swipeId": "00637e0e-7cb1-48b6-9c3c-d88b4a30b9d9",
         "swipeIndex": 0,
         "swipes": [
           "\"Sí, sí, adelante. Haz tu pregunta. Sorpréndeme. O decepcióname, que estadísticamente es lo más probable.\""
         ]
-      },
-      {
-        "characterId": "7e6b6d7b-905e-4199-a15a-797f2efac746",
-        "role": "user",
-        "content": "ok",
-        "isDeleted": false,
-        "swipeId": "eda38dc6-eeee-49d9-9b08-ecfb05f0fc45",
-        "swipeIndex": 0,
-        "id": "c730170b-7184-40c3-9c94-9afcc28de8f9",
-        "timestamp": "2026-04-04T08:18:08.685Z",
-        "swipes": [
-          "ok"
-        ]
-      },
-      {
-        "characterId": "7e6b6d7b-905e-4199-a15a-797f2efac746",
-        "role": "system",
-        "content": "⚠️ fetch failed",
-        "isDeleted": false,
-        "swipeId": "d8dcd294-d67a-4186-80ec-748b01be24f6",
-        "swipeIndex": 0,
-        "id": "ebbb7427-a3f0-4f48-a86c-d5477b51bffd",
-        "timestamp": "2026-04-04T08:18:21.046Z",
-        "swipes": [
-          "⚠️ fetch failed"
-        ]
       }
     ],
-    "createdAt": "2026-04-04T08:17:17.841Z",
-    "updatedAt": "2026-04-04T08:18:21.046Z",
+    "createdAt": "2026-04-08T14:39:04.458Z",
+    "updatedAt": "2026-04-08T14:42:24.625Z",
     "sessionStats": {
       "characterStats": {
         "7e6b6d7b-905e-4199-a15a-797f2efac746": {
@@ -56,10 +229,10 @@
       },
       "solicitudes": {
         "characterSolicitudes": {},
-        "lastModified": 1775290637841
+        "lastModified": 1775659344625
       },
       "initialized": true,
-      "lastModified": 1775290637841
+      "lastModified": 1775659344625
     },
     "sessionQuests": [],
     "turnCount": 0

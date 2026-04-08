@@ -134,6 +134,7 @@ export const SUPPORTED_PROVIDERS = [
   'ollama',
   'vllm',
   'lm-studio',
+  'grok',
   'koboldcpp',
   'text-generation-webui',
   'custom'

@@ -11,7 +11,7 @@ import { useTavernStore } from '@/store/tavern-store';
  */
 export function SettingsApplier() {
   const { setTheme, theme: currentTheme } = useTheme();
-  const { settings } = useTavernStore();
+  const settings = useTavernStore((s) => s.settings);
 
   // Sync theme from store with next-themes
   useEffect(() => {

@@ -649,6 +649,7 @@ export type LLMProvider =
   | 'koboldcpp'
   | 'vllm'
   | 'lm-studio'
+  | 'grok'
   | 'z-ai'
   | 'custom'
   | 'test-mock';  // Test provider for peticiones/solicitudes testing
@@ -1492,6 +1493,13 @@ export const DEFAULT_CHATBOX_APPEARANCE: ChatboxAppearanceSettings = {
   animationIntensity: 50,
 };
 
+export interface QuickReplyItem {
+  /** Label shown on the button in the chatbox */
+  label: string;
+  /** Actual text sent as the user message */
+  response: string;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   fontSize: number;
@@ -1505,7 +1513,7 @@ export interface AppSettings {
   defaultBackground: string;
   backgroundFit: BackgroundFit;
   swipeEnabled: boolean;
-  quickReplies: string[];
+  quickReplies: QuickReplyItem[];
   hotkeys: Record<string, string>;
   sound: SoundSettings;
   backgroundTriggers: BackgroundTriggerSettings;
@@ -1594,12 +1602,14 @@ export interface ToolsSettings {
   enabled: boolean;
   maxToolCallsPerTurn: number;
   characterConfigs: CharacterToolConfig[];
+  usePromptBasedFallback?: boolean; // If true, always use prompt-based tools instead of native, even for providers that support native tool calling
 }
 
 export const DEFAULT_TOOLS_SETTINGS: ToolsSettings = {
   enabled: true,
   maxToolCallsPerTurn: 2,
   characterConfigs: [],
+  usePromptBasedFallback: false,
 };
 
 // ============ API Types ============

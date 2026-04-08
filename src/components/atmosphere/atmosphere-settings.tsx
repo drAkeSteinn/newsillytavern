@@ -45,16 +45,14 @@ interface AtmosphereSettingsProps {
 }
 
 export function AtmosphereSettings({ className }: AtmosphereSettingsProps) {
-  const {
-    atmosphereSettings,
-    setAtmosphereSettings,
-    atmosphereGlobalIntensity,
-    setAtmosphereGlobalIntensity,
-    atmosphereAudioEnabled,
-    setAtmosphereAudioEnabled,
-    activeAtmosphereLayers,
-    activeAtmospherePresetId,
-  } = useTavernStore();
+  const atmosphereSettings = useTavernStore((s) => s.atmosphereSettings);
+  const setAtmosphereSettings = useTavernStore((s) => s.setAtmosphereSettings);
+  const atmosphereGlobalIntensity = useTavernStore((s) => s.atmosphereGlobalIntensity);
+  const setAtmosphereGlobalIntensity = useTavernStore((s) => s.setAtmosphereGlobalIntensity);
+  const atmosphereAudioEnabled = useTavernStore((s) => s.atmosphereAudioEnabled);
+  const setAtmosphereAudioEnabled = useTavernStore((s) => s.setAtmosphereAudioEnabled);
+  const activeAtmosphereLayers = useTavernStore((s) => s.activeAtmosphereLayers);
+  const activeAtmospherePresetId = useTavernStore((s) => s.activeAtmospherePresetId);
   
   const activeLayerCount = activeAtmosphereLayers.length;
   

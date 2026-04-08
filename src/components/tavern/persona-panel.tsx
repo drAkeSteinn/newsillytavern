@@ -69,15 +69,13 @@ const DEFAULT_PERSONA_STATS_CONFIG: CharacterStatsConfig = {
 };
 
 export function PersonaPanel() {
-  const { 
-    personas, 
-    activePersonaId,
-    characters,
-    addPersona, 
-    updatePersona, 
-    deletePersona, 
-    setActivePersona 
-  } = useTavernStore();
+  const personas = useTavernStore((s) => s.personas);
+  const activePersonaId = useTavernStore((s) => s.activePersonaId);
+  const characters = useTavernStore((s) => s.characters);
+  const addPersona = useTavernStore((s) => s.addPersona);
+  const updatePersona = useTavernStore((s) => s.updatePersona);
+  const deletePersona = useTavernStore((s) => s.deletePersona);
+  const setActivePersona = useTavernStore((s) => s.setActivePersona);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{

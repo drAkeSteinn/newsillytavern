@@ -85,8 +85,8 @@ export function HUDDisplay({ className }: HUDDisplayProps) {
   const activeGroupId = useTavernStore((state) => state.activeGroupId);
   const groups = useTavernStore((state) => state.groups);
   const characters = useTavernStore((state) => state.characters);
-  const sessions = useTavernStore((state) => state.sessions);
   const activeSessionId = useTavernStore((state) => state.activeSessionId);
+  const activeSession = useTavernStore((state) => state.sessions.find(s => s.id === state.activeSessionId) || null);
 
   // Get derived values from subscribed state
   const activeCharacter = characters.find((c) => c.id === activeCharacterId);
@@ -101,7 +101,6 @@ export function HUDDisplay({ className }: HUDDisplayProps) {
   const position = activeTemplate?.position || 'top-right';
   
   // Get current session for stats values
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
   const sessionStats = activeSession?.sessionStats;
   
   // Determine if this is a group chat

@@ -48,7 +48,10 @@ export function clearTriggerHistory() {
 
 export function TriggerIndicator({ className, showHistory = true, maxHistory = 10 }: TriggerIndicatorProps) {
   const [, forceUpdate] = useState(0);
-  const store = useTavernStore();
+  const currentSpriteUrl = useTavernStore((s) => s.currentSpriteUrl);
+  const currentSpriteLabel = useTavernStore((s) => s.currentSpriteLabel);
+  const isSpriteLocked = useTavernStore((s) => s.isSpriteLocked);
+  const returnToIdle = useTavernStore((s) => s.returnToIdle);
   
   // Subscribe to history changes
   useEffect(() => {
@@ -60,10 +63,8 @@ export function TriggerIndicator({ className, showHistory = true, maxHistory = 1
   }, []);
 
   // Get current state
-  const currentSpriteUrl = store.currentSpriteUrl;
-  const currentSpriteLabel = store.currentSpriteLabel;
-  const isLocked = store.isSpriteLocked();
-  const returnToIdleState = store.returnToIdle;
+  const isLocked = isSpriteLocked();
+  const returnToIdleState = returnToIdle;
   
   // Format time
   const formatTime = (ms: number) => {

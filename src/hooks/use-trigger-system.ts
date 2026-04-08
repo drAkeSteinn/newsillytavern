@@ -22,7 +22,7 @@ export function useTriggerSystem() {
     emotionTriggers,
   } = useTriggerStore();
 
-  const { setActiveBackground } = useTavernStore();
+  const setActiveBackground = useTavernStore((s) => s.setActiveBackground);
   const lastProcessedMessage = useRef<string>('');
   const streamingBuffer = useRef<string>('');
 

@@ -12,12 +12,10 @@ import { OverlayAtmosphereLayer } from './overlay-atmosphere-layer';
 // ============================================
 
 export function AtmosphereRenderer() {
-  const {
-    activeAtmosphereLayers,
-    atmosphereSettings,
-    atmosphereGlobalIntensity,
-    atmosphereAudioEnabled,
-  } = useTavernStore();
+  const activeAtmosphereLayers = useTavernStore((s) => s.activeAtmosphereLayers);
+  const atmosphereSettings = useTavernStore((s) => s.atmosphereSettings);
+  const atmosphereGlobalIntensity = useTavernStore((s) => s.atmosphereGlobalIntensity);
+  const atmosphereAudioEnabled = useTavernStore((s) => s.atmosphereAudioEnabled);
   
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   

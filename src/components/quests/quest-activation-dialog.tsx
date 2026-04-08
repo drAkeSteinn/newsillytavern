@@ -85,13 +85,11 @@ export function QuestActivationDialog({
   onOpenChange,
   sessionId,
 }: QuestActivationDialogProps) {
-  const {
-    questTemplates,
-    loadTemplates,
-    activateQuestFromTemplate,
-    questSettings,
-    sessions,
-  } = useTavernStore();
+  const questTemplates = useTavernStore((s) => s.questTemplates);
+  const loadTemplates = useTavernStore((s) => s.loadTemplates);
+  const activateQuestFromTemplate = useTavernStore((s) => s.activateQuestFromTemplate);
+  const questSettings = useTavernStore((s) => s.questSettings);
+  const sessions = useTavernStore((s) => s.sessions);
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');

@@ -22,6 +22,43 @@ import { t } from '@/lib/i18n';
 import { chatLogger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
 
+/**
+ * Safely parse a JSON response, handling HTML error pages gracefully.
+ * Returns the parsed JSON or an error object if parsing fails.
+ */
+async function safeParseJSON(response: Response): Promise<Record<string, unknown>> {
+  const contentType = response.headers.get('content-type') || '';
+
+  // Detect HTML responses (Next.js error pages, proxy errors, etc.)
+  if (contentType.includes('text/html')) {
+    const text = await response.text().catch(() => '');
+    const preview = text.slice(0, 200).replace(/\s+/g, ' ').trim();
+    throw new Error(
+      `El servidor devolvió una página HTML en lugar de JSON (${response.status}). ` +
+      `Esto puede indicar que el cuerpo de la petición es muy grande, ` +
+      `o que ocurrió un error interno del servidor.\n` +
+      `Preview: "${preview}..."`
+    );
+  }
+
+  try {
+    return await response.json();
+  } catch (err) {
+    // If JSON parse fails, try to read as text for diagnostics
+    const text = await response.text().catch(() => '');
+    if (text.trimStart().startsWith('<') && /<html|<head|<body|<!doctype/i.test(text)) {
+      throw new Error(
+        `Error del servidor (${response.status}): Respuesta HTML inesperada. ` +
+        `Preview: "${text.slice(0, 150).trim()}..."`
+      );
+    }
+    throw new Error(
+      `Error al procesar la respuesta del servidor (${response.status}). ` +
+      `El cuerpo no es JSON válido.`
+    );
+  }
+}
+
 export function ChatPanel() {
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingCharacter, setStreamingCharacter] = useState<CharacterCard | null>(null);
@@ -48,7 +85,7 @@ export function ChatPanel() {
   const activeSessionId = useTavernStore((state) => state.activeSessionId);
   const activeCharacterId = useTavernStore((state) => state.activeCharacterId);
   const activeGroupId = useTavernStore((state) => state.activeGroupId);
-  const sessions = useTavernStore((state) => state.sessions);
+  const activeSession = useTavernStore((state) => state.sessions.find(s => s.id === state.activeSessionId) || null);
   const characters = useTavernStore((state) => state.characters);
   const groups = useTavernStore((state) => state.groups);
   const settings = useTavernStore((state) => state.settings);
@@ -97,7 +134,6 @@ export function ChatPanel() {
   const isGenerationInProgressRef = useRef(false);
   
   // Get derived values from subscribed state
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeCharacter = characters.find((c) => c.id === activeCharacterId);
   const activeGroup = groups.find((g) => g.id === activeGroupId);
   const activePersona = personas.find((p) => p.id === activePersonaId);
@@ -257,6 +293,70 @@ export function ChatPanel() {
     }
   }, [activeSessionId, summarySettings.enabled, isGroupMode, initSessionTracking]);
 
+  // ============================================
+  // Auto-create embedding namespaces when session starts/resets
+  // ============================================
+  useEffect(() => {
+    if (!activeSessionId) return;
+    
+    const session = useTavernStore.getState().sessions.find(s => s.id === activeSessionId);
+    if (!session) return;
+    
+    // Only proceed if embeddings chat is enabled
+    const embeddingsChat = settings.embeddingsChat;
+    if (!embeddingsChat?.enabled && !embeddingsChat?.memoryExtractionEnabled) return;
+    
+    let cancelled = false;
+    
+    const ensureNamespaces = async () => {
+      try {
+        const body: Record<string, any> = { sessionId: activeSessionId };
+        
+        if (session.groupId && activeGroup) {
+          body.groupId = session.groupId;
+          body.groupName = activeGroup.name || '';
+          
+          if (activeGroup.members) {
+            body.memberIds = activeGroup.members.map(m => m.characterId);
+            body.memberNames = activeGroup.members.map(m => {
+              const char = characters.find(c => c.id === m.characterId);
+              return char?.name || '';
+            });
+          }
+        } else if (session.characterId && activeCharacter) {
+          body.characterId = session.characterId;
+          body.characterName = activeCharacter.name || '';
+        } else {
+          return; // No character or group to create namespace for
+        }
+        
+        const response = await fetch('/api/embeddings/ensure-namespace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        
+        if (!cancelled && response.ok) {
+          const result = await response.json();
+          if (result.success && result.data.namespaces.length > 0) {
+            console.log('[ChatPanel] Auto-created namespaces:', result.data.namespaces);
+          }
+        }
+      } catch (err) {
+        // Non-blocking - namespace creation failure shouldn't break chat
+        console.warn('[ChatPanel] Failed to ensure namespaces:', err);
+      }
+    };
+    
+    // Delay slightly to avoid blocking session initialization
+    const timer = setTimeout(ensureNamespaces, 1500);
+    
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeSessionId, activeGroup, activeCharacter, characters, settings.embeddingsChat]);
+
   // Function to generate summary when threshold is reached
   const generateSummaryIfNeeded = useCallback(async () => {
     if (!activeSessionId || !summarySettings.enabled || !summarySettings.autoSummarize) {
@@ -414,11 +514,27 @@ export function ChatPanel() {
     // Helper to check if this generation is still the active one
     const isStillActive = () => generationIdRef.current === generationId;
 
+    // Helper to safely parse error responses (handles JSON and HTML error pages)
+    const parseStreamError = async (resp: Response, fallbackKey: string) => {
+      try {
+        const errorData = await resp.json();
+        return errorData.error || t(fallbackKey);
+      } catch {
+        try {
+          const errorText = await resp.text();
+          console.error('[ChatPanel] Non-JSON error response:', errorText.slice(0, 300));
+          return `Error del servidor (${resp.status}). Verifica la configuración del LLM.`;
+        } catch {
+          return `Error del servidor (${resp.status})`;
+        }
+      }
+    };
+
     try {
       // Get the active LLM config
       const { llmConfigs } = useTavernStore.getState();
       const activeLLMConfig = llmConfigs.find(c => c.isActive);
-      
+       
       if (!activeLLMConfig) {
         throw new Error(t('chat.noLLM'));
       }
@@ -489,13 +605,12 @@ export function ChatPanel() {
               ...settings.embeddingsChat,
               customNamespaces: activeGroup?.embeddingNamespaces,
             },  // Pass embeddings chat settings + group namespace override
-            toolsSettings: settings.tools,  // Pass tools/action settings
           })
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || t('chat.error.streaming'));
+          const errorData = await safeParseJSON(response);
+          throw new Error((errorData as { error?: string }).error || t('chat.error.streaming'));
         }
 
         const reader = response.body?.getReader();
@@ -554,6 +669,37 @@ export function ChatPanel() {
                     setMemoryExtractingInfo({ active: true, characterNames: label });
                     setTimeout(() => setMemoryExtractingInfo(prev => ({ ...prev, active: false })), 8000);
                   }
+                } else if (parsed.type === 'tool_call_start') {
+                  // Tool call detected - show indicator
+                  console.log('[ChatPanel] Tool call started:', parsed.toolName);
+                  setToolCallInfo({
+                    active: true,
+                    toolName: parsed.toolName,
+                    toolLabel: parsed.toolLabel,
+                    toolIcon: parsed.toolIcon,
+                    params: parsed.params,
+                    phase: 'executing',
+                  });
+                } else if (parsed.type === 'tool_call_result') {
+                  // Tool execution completed
+                  console.log('[ChatPanel] Tool call result:', parsed.toolName, parsed.success);
+                  setToolCallInfo(prev => ({
+                    ...prev,
+                    active: true,
+                    result: { success: parsed.success, displayMessage: parsed.displayMessage, duration: parsed.duration || 0 },
+                    phase: 'done',
+                  }));
+                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
+                } else if (parsed.type === 'tool_call_error') {
+                  // Tool call error
+                  console.log('[ChatPanel] Tool call error:', parsed.error);
+                  setToolCallInfo(prev => ({
+                    ...prev,
+                    active: true,
+                    result: { success: false, displayMessage: parsed.error, duration: 0 },
+                    phase: 'error',
+                  }));
+                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
                 } else if (parsed.type === 'character_start') {
                   currentCharacterContent = '';
                   const char = groupCharacters.find(c => c.id === parsed.characterId);
@@ -576,38 +722,6 @@ export function ChatPanel() {
                     // Reset triggers for this specific character
                     resetTriggers(characterMessageKey, currentCharacter);
                   }
-                } else if (parsed.type === 'tool_call_start') {
-                  console.log('[ChatPanel] Group tool call started:', parsed.toolName);
-                  setToolCallInfo({
-                    active: true,
-                    toolName: parsed.toolName,
-                    toolLabel: parsed.toolLabel,
-                    toolIcon: parsed.toolIcon,
-                    params: parsed.params,
-                    phase: 'executing',
-                  });
-                } else if (parsed.type === 'tool_call_result') {
-                  console.log('[ChatPanel] Group tool call result:', parsed.toolName, parsed.success);
-                  setToolCallInfo({
-                    active: true,
-                    toolName: parsed.toolName,
-                    toolLabel: parsed.toolLabel,
-                    toolIcon: parsed.toolIcon,
-                    result: { success: parsed.success, displayMessage: parsed.displayMessage, duration: parsed.duration || 0 },
-                    phase: 'done',
-                  });
-                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
-                } else if (parsed.type === 'tool_call_error') {
-                  console.warn('[ChatPanel] Group tool call error:', parsed.toolName, parsed.error);
-                  setToolCallInfo({
-                    active: true,
-                    toolName: parsed.toolName,
-                    toolLabel: parsed.toolLabel,
-                    toolIcon: parsed.toolIcon,
-                    result: { success: false, displayMessage: parsed.error, duration: 0 },
-                    phase: 'error',
-                  });
-                  setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
                 } else if (parsed.type === 'token' && parsed.content) {
                   currentCharacterContent += parsed.content;
                   setStreamingContent(currentCharacterContent);
@@ -755,13 +869,13 @@ export function ChatPanel() {
               ...settings.embeddingsChat,
               customNamespaces: activeCharacter?.embeddingNamespaces,
             },  // Pass embeddings chat settings + character namespace override
-            toolsSettings: settings.tools,  // Pass tools/action settings
+            toolsSettings: settings.tools,  // Pass tool calling configuration
           })
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || t('chat.error.streaming'));
+          const errorData = await safeParseJSON(response);
+          throw new Error((errorData as { error?: string }).error || t('chat.error.streaming'));
         }
 
         const reader = response.body?.getReader();
@@ -831,7 +945,8 @@ export function ChatPanel() {
                   }));
                   setTimeout(() => setToolCallInfo(prev => ({ ...prev, active: false, phase: 'idle' })), 5000);
                 } else if (parsed.type === 'tool_call_error') {
-                  console.warn('[ChatPanel] Tool call error:', parsed.toolName, parsed.error);
+                  // Tool call error
+                  console.log('[ChatPanel] Tool call error:', parsed.error);
                   setToolCallInfo(prev => ({
                     ...prev,
                     active: true,
@@ -938,10 +1053,10 @@ export function ChatPanel() {
           })
         });
 
-        const data = await response.json();
+        const data = await safeParseJSON(response);
 
         if (!response.ok) {
-          throw new Error(data.error || t('chat.error.generation'));
+          throw new Error((data as { error?: string }).error || t('chat.error.generation'));
         }
 
         if (isStillActive()) {
@@ -1024,6 +1139,13 @@ export function ChatPanel() {
     }
   }, [isGenerating, activeSessionId, activeCharacter, activePersona, isGroupMode, activeGroup, characters, addMessage, setGenerating, processTriggers, resetBgDetection, scanForBackgroundTriggers, activeGroupId, settings.context, lorebooks, effectiveLorebookIds, endSpriteGenerationForCharacterWithTTS, ttsConfig, isTTSConnected]);
 
+  // Handle stop generation - cancel the current streaming request
+  const handleStopGeneration = useCallback(() => {
+    generationIdRef.current = null;
+    isGenerationInProgressRef.current = false;
+    chatLogger.info('[ChatPanel] Generation stopped by user');
+  }, []);
+
   // Handle regenerate - create a new swipe alternative for an existing message
   const handleRegenerate = useCallback(async (messageId: string) => {
     if (isGenerating || isGenerationInProgressRef.current || !activeSessionId) return;
@@ -1085,14 +1207,13 @@ export function ChatPanel() {
           questSettings,  // Pass quest settings
           hudContext: activeHUDContext,  // Pass HUD context for prompt injection
           embeddingsChat: settings.embeddingsChat,  // Pass embeddings chat settings
-          toolsSettings: settings.tools,  // Pass tools/action settings
           summary: currentSession?.summary  // Pass summary for memory/context
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || t('chat.error.regeneration'));
+        const errorData = await safeParseJSON(response);
+        throw new Error((errorData as { error?: string }).error || t('chat.error.regeneration'));
       }
 
       const reader = response.body?.getReader();
@@ -1409,6 +1530,7 @@ export function ChatPanel() {
       <NovelChatBox 
         onSendMessage={(msg) => handleSend(msg)}
         isGenerating={isGenerating}
+        onStopGeneration={handleStopGeneration}
         onResetChat={handleResetChat}
         onClearChat={handleClearChat}
         onRegenerate={handleRegenerate}

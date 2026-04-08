@@ -33,8 +33,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: lastMessage, characterName, characterId' }, { status: 400 });
     }
 
-    console.log(`[extract-memory] Received: character="${characterName}" (${characterId}), sessionId="${sessionId?.slice(0, 8)}...", groupId="${groupId || 'none'}", msgLen=${lastMessage.length}, minImportance=${minImportance}, hasCustomPrompt=${!!customPrompt}, hasChatContext=${!!chatContext}, consolidation=${consolidationSettings?.enabled ? `enabled(threshold=${consolidationSettings.threshold})` : 'disabled'}`);
-
     // Dynamic import to avoid loading heavy modules at startup
     const { extractAndSaveMemories } = await import('@/lib/embeddings/memory-extraction');
 
@@ -52,7 +50,6 @@ export async function POST(request: NextRequest) {
     if (result.saved > 0 && consolidationSettings?.enabled && llmConfig) {
       try {
         const { autoConsolidateAfterExtraction } = await import('@/lib/embeddings/memory-consolidation');
-        console.log(`[extract-memory] Checking consolidation for "${result.namespace}" (settings: threshold=${consolidationSettings.threshold}, keepRecent=${consolidationSettings.keepRecent}, keepHighImportance=${consolidationSettings.keepHighImportance})`);
         consolidationResult = await autoConsolidateAfterExtraction(
           result.namespace,
           llmConfig,
@@ -60,15 +57,11 @@ export async function POST(request: NextRequest) {
         );
         if (consolidationResult?.consolidated) {
           console.log(`[extract-memory] Auto-consolidated "${result.namespace}": -${consolidationResult.removedCount} +${consolidationResult.createdCount}`);
-        } else {
-          console.log(`[extract-memory] No consolidation needed for "${result.namespace}" (result=${consolidationResult ? 'below threshold' : 'null'})`);
         }
       } catch (consolidationErr) {
         // Don't fail the extraction if consolidation fails
         console.warn('[extract-memory] Auto-consolidation failed (non-blocking):', consolidationErr);
       }
-    } else if (result.saved > 0 && !consolidationSettings?.enabled) {
-      console.log(`[extract-memory] Consolidation disabled, skipping for "${result.namespace}"`);
     }
 
     return NextResponse.json({

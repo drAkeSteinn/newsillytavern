@@ -62,26 +62,24 @@ type SoundSettingsTab = 'global' | 'triggers' | 'sequences';
 
 export function SoundTriggersSettings() {
   const soundLogger = getLogger('sound');
-  const {
-    soundTriggers,
-    soundCollections,
-    soundSequenceTriggers,
-    settings,
-    characters,
-    addSoundTrigger,
-    updateSoundTrigger,
-    deleteSoundTrigger,
-    cloneSoundTrigger,
-    toggleSoundTrigger,
-    toggleSoundKeyword,
-    setSoundCollections,
-    updateSettings,
-    addSoundSequenceTrigger,
-    updateSoundSequenceTrigger,
-    deleteSoundSequenceTrigger,
-    cloneSoundSequenceTrigger,
-    toggleSoundSequenceTrigger,
-  } = useTavernStore();
+  const soundTriggers = useTavernStore((s) => s.soundTriggers);
+  const soundCollections = useTavernStore((s) => s.soundCollections);
+  const soundSequenceTriggers = useTavernStore((s) => s.soundSequenceTriggers);
+  const settings = useTavernStore((s) => s.settings);
+  const characters = useTavernStore((s) => s.characters);
+  const addSoundTrigger = useTavernStore((s) => s.addSoundTrigger);
+  const updateSoundTrigger = useTavernStore((s) => s.updateSoundTrigger);
+  const deleteSoundTrigger = useTavernStore((s) => s.deleteSoundTrigger);
+  const cloneSoundTrigger = useTavernStore((s) => s.cloneSoundTrigger);
+  const toggleSoundTrigger = useTavernStore((s) => s.toggleSoundTrigger);
+  const toggleSoundKeyword = useTavernStore((s) => s.toggleSoundKeyword);
+  const setSoundCollections = useTavernStore((s) => s.setSoundCollections);
+  const updateSettings = useTavernStore((s) => s.updateSettings);
+  const addSoundSequenceTrigger = useTavernStore((s) => s.addSoundSequenceTrigger);
+  const updateSoundSequenceTrigger = useTavernStore((s) => s.updateSoundSequenceTrigger);
+  const deleteSoundSequenceTrigger = useTavernStore((s) => s.deleteSoundSequenceTrigger);
+  const cloneSoundSequenceTrigger = useTavernStore((s) => s.cloneSoundSequenceTrigger);
+  const toggleSoundSequenceTrigger = useTavernStore((s) => s.toggleSoundSequenceTrigger);
 
   const [activeTab, setActiveTab] = useState<SoundSettingsTab>('global');
   const [isLoading, setIsLoading] = useState(false);

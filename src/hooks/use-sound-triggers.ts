@@ -152,12 +152,10 @@ function getRandomIndex(maxFiles: number): number {
 // ============ Hook ============
 
 export function useSoundTriggers() {
-  const state = useTavernStore();
-  
-  const soundTriggers = state.soundTriggers;
-  const soundCollections = state.soundCollections;
-  const settings = state.settings;
-  const setSoundCollections = state.setSoundCollections;
+  const soundTriggers = useTavernStore((s) => s.soundTriggers);
+  const soundCollections = useTavernStore((s) => s.soundCollections);
+  const settings = useTavernStore((s) => s.settings);
+  const setSoundCollections = useTavernStore((s) => s.setSoundCollections);
   
   const currentMessageKeyRef = useRef<string>('');
   const collectionsLoadedRef = useRef(false);

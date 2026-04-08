@@ -14,12 +14,10 @@ interface AtmospherePresetsProps {
 }
 
 export function AtmospherePresets({ className }: AtmospherePresetsProps) {
-  const {
-    atmospherePresets,
-    activeAtmospherePresetId,
-    activateAtmospherePreset,
-    clearAtmosphereLayers,
-  } = useTavernStore();
+  const atmospherePresets = useTavernStore((s) => s.atmospherePresets);
+  const activeAtmospherePresetId = useTavernStore((s) => s.activeAtmospherePresetId);
+  const activateAtmospherePreset = useTavernStore((s) => s.activateAtmospherePreset);
+  const clearAtmosphereLayers = useTavernStore((s) => s.clearAtmosphereLayers);
   
   const handlePresetClick = (presetId: string) => {
     if (presetId === activeAtmospherePresetId) {
@@ -78,12 +76,10 @@ function getIconForPreset(presetId: string) {
 
 // Export compact version for quick access
 export function AtmospherePresetsCompact({ className }: AtmospherePresetsProps) {
-  const {
-    atmospherePresets,
-    activeAtmospherePresetId,
-    activateAtmospherePreset,
-    clearAtmosphereLayers,
-  } = useTavernStore();
+  const atmospherePresets = useTavernStore((s) => s.atmospherePresets);
+  const activeAtmospherePresetId = useTavernStore((s) => s.activeAtmospherePresetId);
+  const activateAtmospherePreset = useTavernStore((s) => s.activateAtmospherePreset);
+  const clearAtmosphereLayers = useTavernStore((s) => s.clearAtmosphereLayers);
   
   const handlePresetClick = (presetId: string) => {
     if (presetId === activeAtmospherePresetId) {

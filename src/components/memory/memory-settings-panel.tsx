@@ -49,7 +49,10 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_SUMMARY_SETTINGS } from '@/types';
 
 export function MemorySettingsPanel() {
-  const { summarySettings, setSummarySettings, settings, updateSettings } = useTavernStore();
+  const summarySettings = useTavernStore((s) => s.summarySettings);
+  const setSummarySettings = useTavernStore((s) => s.setSummarySettings);
+  const settings = useTavernStore((s) => s.settings);
+  const updateSettings = useTavernStore((s) => s.updateSettings);
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
   
   // Ensure promptTemplate exists with default fallback

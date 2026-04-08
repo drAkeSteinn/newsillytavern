@@ -330,6 +330,7 @@ export async function saveMemoriesAsEmbeddings(
   sessionId: string,
   groupId?: string,
   minImportance: number = 2,
+  characterName?: string,
 ): Promise<{ saved: number; embeddingIds: string[]; namespace: string }> {
   if (facts.length === 0) {
     return { saved: 0, embeddingIds: [], namespace: '' };
@@ -341,12 +342,11 @@ export async function saveMemoriesAsEmbeddings(
     return { saved: 0, embeddingIds: [], namespace: '' };
   }
 
-  // Determine namespace (include sessionId to isolate memories per session)
-  // Pattern: character-{characterId}-{sessionId} or group-{groupId}-{sessionId}
-  const sessionSuffix = sessionId && sessionId !== 'unknown' ? `-${sessionId}` : '';
+  // Determine namespace — character-level or group-level, NO sessionId suffix
+  // All memories for a character/group share one namespace for unified context retrieval
   const namespace = groupId
-    ? `group-${groupId}${sessionSuffix}`
-    : `character-${characterId}${sessionSuffix}`;
+    ? `group-${groupId}`
+    : `character-${characterId}`;
 
   const sourceId = sessionId || 'unknown';
   const embeddingIds: string[] = [];
@@ -359,10 +359,10 @@ export async function saveMemoriesAsEmbeddings(
       await client.upsertNamespace({
         namespace,
         description: groupId
-          ? `Memorias del grupo (${groupId}) — sesión ${sessionId || 'global'}`
-          : `Memorias de personaje (${characterId}) — sesión ${sessionId || 'global'}`,
+          ? `Memorias del grupo ${groupId}`
+          : `Memorias de ${characterName || characterId}`,
         metadata: {
-          type: 'memory',
+          type: 'Memoria del Personaje',
           character_id: characterId,
           session_id: sessionId,
           group_id: groupId || undefined,
@@ -497,6 +497,7 @@ export async function extractAndSaveMemories(
       sessionId,
       groupId,
       minImportance,
+      characterName,
     );
 
     return {

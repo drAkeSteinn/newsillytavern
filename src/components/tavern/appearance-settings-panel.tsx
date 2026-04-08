@@ -358,19 +358,17 @@ function LivePreview({ settings }: { settings: ChatboxAppearanceSettings }) {
 // ============================================
 
 export function AppearanceSettingsPanel() {
-  const {
-    settings,
-    updateChatboxAppearance,
-    updateChatboxBackground,
-    updateChatboxFont,
-    updateChatboxTextFormatting,
-    updateChatboxTextColors,
-    updateMessageBubbles,
-    updateChatboxAvatars,
-    updateChatboxStreaming,
-    updateChatboxInput,
-    resetChatboxAppearance,
-  } = useTavernStore();
+  const settings = useTavernStore((s) => s.settings);
+  const updateChatboxAppearance = useTavernStore((s) => s.updateChatboxAppearance);
+  const updateChatboxBackground = useTavernStore((s) => s.updateChatboxBackground);
+  const updateChatboxFont = useTavernStore((s) => s.updateChatboxFont);
+  const updateChatboxTextFormatting = useTavernStore((s) => s.updateChatboxTextFormatting);
+  const updateChatboxTextColors = useTavernStore((s) => s.updateChatboxTextColors);
+  const updateMessageBubbles = useTavernStore((s) => s.updateMessageBubbles);
+  const updateChatboxAvatars = useTavernStore((s) => s.updateChatboxAvatars);
+  const updateChatboxStreaming = useTavernStore((s) => s.updateChatboxStreaming);
+  const updateChatboxInput = useTavernStore((s) => s.updateChatboxInput);
+  const resetChatboxAppearance = useTavernStore((s) => s.resetChatboxAppearance);
   
   const appearance = settings.chatboxAppearance || DEFAULT_CHATBOX_APPEARANCE;
   
